@@ -1,0 +1,75 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="Contact Us" description="Get in touch with the Crooked Lake Reserve HOA board">
+  <div class="max-w-4xl mx-auto">
+    <div class="bg-white rounded-lg shadow-md p-8">
+      <h1 class="text-4xl font-bold text-gray-900 mb-6">Contact the Board</h1>
+      
+      <section class="mb-8">
+        <p class="text-gray-700 mb-6">
+          We're here to help! Please use the contact information below to reach the board 
+          with questions, concerns, or suggestions.
+        </p>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          <div class="bg-gray-50 rounded-lg p-6">
+            <h2 class="text-xl font-semibold text-gray-900 mb-3">General Inquiries</h2>
+            <p class="text-gray-600 mb-2">
+              <strong>Email:</strong> board@clrhoa.com
+            </p>
+            <p class="text-gray-600">
+              <strong>Phone:</strong> (555) 123-4567
+            </p>
+          </div>
+
+          <div class="bg-gray-50 rounded-lg p-6">
+            <h2 class="text-xl font-semibold text-gray-900 mb-3">Mailing Address</h2>
+            <p class="text-gray-600">
+              Crooked Lake Reserve HOA<br />
+              P.O. Box 1234<br />
+              Your City, ST 12345
+            </p>
+          </div>
+        </div>
+
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
+          <h2 class="text-xl font-semibold text-gray-900 mb-3">Response Time</h2>
+          <p class="text-gray-700">
+            The board typically responds to inquiries within 2-3 business days. 
+            For urgent matters, please call the phone number above.
+          </p>
+        </div>
+
+        <div class="border-t pt-6">
+          <h2 class="text-2xl font-semibold text-gray-900 mb-4">Common Questions</h2>
+          <div class="space-y-4">
+            <div>
+              <h3 class="text-lg font-semibold text-gray-900 mb-2">How do I submit an architectural request?</h3>
+              <p class="text-gray-700">
+                Please download the Architectural Review form from the 
+                <a href="/documents" class="text-blue-600 hover:text-blue-800 underline">Documents</a> section 
+                and submit it to the board via email.
+              </p>
+            </div>
+            <div>
+              <h3 class="text-lg font-semibold text-gray-900 mb-2">When are HOA dues due?</h3>
+              <p class="text-gray-700">
+                Dues are typically due quarterly. Check the latest news and announcements 
+                for specific due dates and payment instructions.
+              </p>
+            </div>
+            <div>
+              <h3 class="text-lg font-semibold text-gray-900 mb-2">How can I attend a board meeting?</h3>
+              <p class="text-gray-700">
+                Board meetings are open to all homeowners. Meeting dates and locations 
+                are posted in the <a href="/news" class="text-blue-600 hover:text-blue-800 underline">News</a> section.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+</BaseLayout>

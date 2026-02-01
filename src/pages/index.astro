@@ -1,0 +1,46 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="Home">
+  <div class="max-w-4xl mx-auto">
+    <div class="bg-white rounded-lg shadow-md p-8 mb-8">
+      <h1 class="text-4xl font-bold text-gray-900 mb-4">Welcome to Crooked Lake Reserve</h1>
+      <p class="text-xl text-gray-700 mb-6">
+        Your Homeowners Association is committed to maintaining the quality and value of our community.
+      </p>
+      <p class="text-gray-600 mb-4">
+        This website provides important information, documents, and updates for all residents. 
+        Please check back regularly for news and announcements.
+      </p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+      <div class="bg-white rounded-lg shadow-md p-6">
+        <h2 class="text-2xl font-semibold text-gray-900 mb-3">Latest News</h2>
+        <p class="text-gray-600 mb-4">Stay informed about community updates and important announcements.</p>
+        <a href="/news" class="text-blue-600 hover:text-blue-800 font-medium">
+          View All News →
+        </a>
+      </div>
+
+      <div class="bg-white rounded-lg shadow-md p-6">
+        <h2 class="text-2xl font-semibold text-gray-900 mb-3">Documents & Forms</h2>
+        <p class="text-gray-600 mb-4">Access governing documents, policies, and forms.</p>
+        <a href="/documents" class="text-blue-600 hover:text-blue-800 font-medium">
+          Browse Documents →
+        </a>
+      </div>
+    </div>
+
+    <div class="bg-blue-50 border border-blue-200 rounded-lg p-6">
+      <h2 class="text-2xl font-semibold text-gray-900 mb-3">Need Help?</h2>
+      <p class="text-gray-700 mb-4">
+        If you have questions or need assistance, please don't hesitate to contact the board.
+      </p>
+      <a href="/contact" class="inline-block bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors">
+        Contact Us
+      </a>
+    </div>
+  </div>
+</BaseLayout>
