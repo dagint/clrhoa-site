@@ -23,4 +23,4 @@ First quarter HOA dues for 2026 are due by **March 1, 2026**.
 - Standard Assessment: $XXX.XX
 - Late fees apply after March 15, 2026
 
-Please include your account number with all payments. For questions about your account or payment options, contact the board at board@clrhoa.com.
+Please include your account number with all payments. For questions about your account or payment options, contact the board at info@clrhoa.com.

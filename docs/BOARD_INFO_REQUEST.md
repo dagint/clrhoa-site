@@ -36,8 +36,8 @@ Reply: [Specific contact name] OR [Keep as “contact the board”]
 ### 2. Contact page (how residents reach the board)
 
 **Email for homeowner inquiries:**  
-Is **board@clrhoa.com** correct and checked regularly? If not, what email should we show?  
-Reply: [Yes, use board@clrhoa.com] OR [Use this instead: _______________]
+Is **info@clrhoa.com** correct and checked regularly? If not, what email should we show?  
+Reply: [Yes, use info@clrhoa.com] OR [Use this instead: _______________]
 
 **Phone number:**  
 The site currently has a fake number. What number should we publish (or should we say “contact by email only”)?  
@@ -85,7 +85,7 @@ Thanks,
 | Board      | “Board member information will be updated here” | Names + roles (President, Secretary, etc.) |
 | Contact    | Phone (555) 123-4567                   | Real phone or “email only”           |
 | Contact    | P.O. Box 1234, Your City, ST 12345     | Real HOA mailing address             |
-| Contact    | board@clrhoa.com                       | Confirm or correct email             |
+| Contact    | info@clrhoa.com                        | Confirm or correct email             |
 | Documents  | Download links for Covenants & Bylaws  | The actual PDF files                 |
 
 Nothing in this request requires the board to use the computer in any special way—they can reply in plain email with the information filled in.

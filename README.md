@@ -175,7 +175,7 @@ Cloudflare Pages automatically deploys:
 
 ## 📞 Support
 
-For questions about the website or content updates, contact the board at board@clrhoa.com.
+For questions about the website or content updates, contact the board at info@clrhoa.com.
 
 ## 📄 License
 

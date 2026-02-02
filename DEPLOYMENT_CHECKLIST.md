@@ -201,4 +201,4 @@ For deployment issues:
 - Contact Cloudflare support if needed
 
 For website content questions:
-- Contact the board at board@clrhoa.com
+- Contact the board at info@clrhoa.com
