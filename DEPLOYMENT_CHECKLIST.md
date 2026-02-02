@@ -170,7 +170,9 @@ Add these DNS records:
 If the **build** succeeds but the **deploy** step fails with a Wrangler or Node version error:
 
 - **Cause:** A custom **deploy command** (e.g. `npx wrangler deploy`) is set in Cloudflare Pages. For a static Astro site, you don't need it—Pages deploys the `dist/` folder automatically after the build.
-- **Fix:** In Cloudflare Dashboard → your Pages project → **Settings** → **Builds & deployments** → **Build configurations**, clear any **Deploy command** (or leave it blank). Save. Re-run the deployment or push a small change to trigger a new build.
+- **Fix (either option):**
+  1. **Preferred:** Set **Deploy command** to `true` (no Wrangler; Pages deploys `dist/` automatically). Save and re-run.
+  2. **If the UI requires a real deploy command:** The repo includes `wrangler.jsonc` so `npx wrangler deploy` deploys the `dist/` folder. Ensure the deploy command is exactly `npx wrangler deploy` (no extra args). Commit and push `wrangler.jsonc` if you added it, then re-run the deployment.
 - **Optional:** Set **Node.js version** to `20` so the build and any future commands use Node 20 (the repo `.nvmrc` is set to 20).
 
 ### Build Fails
