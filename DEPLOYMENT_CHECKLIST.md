@@ -87,7 +87,7 @@ dist
 
 **Environment variables:** (none required for basic setup)
 
-**Node version:** `18` (or higher)
+**Node version:** `20` (recommended; repo `.nvmrc` is set to 20)
 
 ### 10. Deploy
 1. Click **Save and Deploy**
@@ -164,6 +164,14 @@ Add these DNS records:
 3. Changes deploy automatically within 2-3 minutes
 
 ## 🆘 Troubleshooting
+
+### "Wrangler requires Node.js v20" or deploy command fails
+
+If the **build** succeeds but the **deploy** step fails with a Wrangler or Node version error:
+
+- **Cause:** A custom **deploy command** (e.g. `npx wrangler deploy`) is set in Cloudflare Pages. For a static Astro site, you don't need it—Pages deploys the `dist/` folder automatically after the build.
+- **Fix:** In Cloudflare Dashboard → your Pages project → **Settings** → **Builds & deployments** → **Build configurations**, clear any **Deploy command** (or leave it blank). Save. Re-run the deployment or push a small change to trigger a new build.
+- **Optional:** Set **Node.js version** to `20` so the build and any future commands use Node 20 (the repo `.nvmrc` is set to 20).
 
 ### Build Fails
 - Check build logs in Cloudflare Pages dashboard
