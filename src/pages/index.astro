@@ -3,44 +3,48 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 ---
 
 <BaseLayout title="Home">
-  <div class="max-w-4xl mx-auto">
-    <div class="bg-white rounded-lg shadow-md p-8 mb-8">
-      <h1 class="text-4xl font-bold text-gray-900 mb-4">Welcome to Crooked Lake Reserve</h1>
-      <p class="text-xl text-gray-700 mb-6">
-        Your Homeowners Association is committed to maintaining the quality and value of our community.
+  <section class="hero-gradient min-h-screen flex items-center text-white relative overflow-hidden">
+    <div class="absolute inset-0 bg-black/20"></div>
+    <div class="absolute inset-0 bg-[url('/placeholder-lake.jpg')] bg-cover bg-center opacity-30"></div>
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
+      <h1 class="text-5xl md:text-6xl font-heading font-bold mb-6 leading-tight">
+        Welcome to<br />
+        <span class="text-clr-beige">Crooked Lake Reserve</span>
+      </h1>
+      <p class="text-xl md:text-2xl mb-12 max-w-2xl mx-auto opacity-95">
+        Your trusted homeowners association serving our beautiful lakefront community
       </p>
-      <p class="text-gray-600 mb-4">
-        This website provides important information, documents, and updates for all residents. 
-        Please check back regularly for news and announcements.
-      </p>
-    </div>
-
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-      <div class="bg-white rounded-lg shadow-md p-6">
-        <h2 class="text-2xl font-semibold text-gray-900 mb-3">Latest News</h2>
-        <p class="text-gray-600 mb-4">Stay informed about community updates and important announcements.</p>
-        <a href="/news" class="text-blue-600 hover:text-blue-800 font-medium">
-          View All News →
+      <div class="flex flex-col sm:flex-row gap-4 justify-center">
+        <a href="/news" class="bg-clr-orange hover:brightness-110 text-white px-8 py-4 rounded-xl font-semibold text-lg shadow-lg hover:shadow-xl transition-all">
+          Latest News
         </a>
-      </div>
-
-      <div class="bg-white rounded-lg shadow-md p-6">
-        <h2 class="text-2xl font-semibold text-gray-900 mb-3">Documents & Forms</h2>
-        <p class="text-gray-600 mb-4">Access governing documents, policies, and forms.</p>
-        <a href="/documents" class="text-blue-600 hover:text-blue-800 font-medium">
-          Browse Documents →
+        <a href="/documents" class="border-2 border-white/50 hover:bg-white/10 backdrop-blur-sm text-white px-8 py-4 rounded-xl font-semibold text-lg transition-all">
+          HOA Documents
         </a>
       </div>
     </div>
+  </section>
 
-    <div class="bg-blue-50 border border-blue-200 rounded-lg p-6">
-      <h2 class="text-2xl font-semibold text-gray-900 mb-3">Need Help?</h2>
-      <p class="text-gray-700 mb-4">
-        If you have questions or need assistance, please don't hesitate to contact the board.
-      </p>
-      <a href="/contact" class="inline-block bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors">
-        Contact Us
-      </a>
+  <section class="py-20 bg-clr-beige/50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <h2 class="text-3xl font-heading font-bold text-center text-clr-green mb-16">Quick Access</h2>
+      <div class="grid md:grid-cols-3 gap-8">
+        <div class="card-hover bg-white p-8 rounded-2xl shadow-sm border border-gray-100 text-center max-w-2xl mx-auto md:max-w-none">
+          <h3 class="text-2xl font-semibold text-clr-green mb-4">Annual Meeting</h3>
+          <p class="text-clr-gray mb-6">First Sunday in February, Eustis Community Center. 2026: Feb 1, 2:00–4:15 PM</p>
+          <a href="/news" class="text-clr-orange font-semibold hover:underline">Details →</a>
+        </div>
+        <div class="card-hover bg-white p-8 rounded-2xl shadow-sm border border-gray-100 text-center max-w-2xl mx-auto md:max-w-none">
+          <h3 class="text-2xl font-semibold text-clr-green mb-4">Documents & Forms</h3>
+          <p class="text-clr-gray mb-6">CCRs, bylaws, and meeting minutes</p>
+          <a href="/documents" class="text-clr-orange font-semibold hover:underline">Browse →</a>
+        </div>
+        <div class="card-hover bg-white p-8 rounded-2xl shadow-sm border border-gray-100 text-center max-w-2xl mx-auto md:max-w-none">
+          <h3 class="text-2xl font-semibold text-clr-green mb-4">Contact the Board</h3>
+          <p class="text-clr-gray mb-6">Questions or feedback</p>
+          <a href="/contact" class="text-clr-orange font-semibold hover:underline">Contact →</a>
+        </div>
+      </div>
     </div>
-  </div>
+  </section>
 </BaseLayout>

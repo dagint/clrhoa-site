@@ -5,7 +5,6 @@ import { getCollection } from 'astro:content';
 const allDocuments = await getCollection('documents');
 const publishedDocuments = allDocuments.filter((item) => item.data.published);
 
-// Group documents by category
 const documentsByCategory = publishedDocuments.reduce((acc, doc) => {
   const category = doc.data.category;
   if (!acc[category]) {
@@ -15,50 +14,65 @@ const documentsByCategory = publishedDocuments.reduce((acc, doc) => {
   return acc;
 }, {} as Record<string, typeof publishedDocuments>);
 
-// Sort categories
 const categories = ['Governing Documents', 'Policies', 'Forms', 'Meeting Minutes', 'Other'] as const;
+
+const keyRules = [
+  { title: 'Quarterly assessments', detail: 'Due January, April, July, and October.' },
+  { title: 'Minimum 12-month leases', detail: 'Per Addendum C to the Covenants.' },
+  { title: 'ARC approval required', detail: 'Architectural Review Committee approval required for modifications. ($500 fee removed 2022.)' },
+  { title: 'Fences & garage rules', detail: 'No chain-link fences; specific garage rules apply. See Covenants for details.' },
+  { title: 'Lake access', detail: 'Lots 10–14: West Crooked Lake. Lots 15–24: Lake Dicie (no docks).' },
+];
 ---
 
 <BaseLayout title="Documents & Forms" description="Access HOA documents, forms, and meeting minutes">
-  <div class="max-w-4xl mx-auto">
-    <div class="bg-white rounded-lg shadow-md p-8 mb-6">
-      <h1 class="text-4xl font-bold text-gray-900 mb-4">Documents & Forms</h1>
-      <p class="text-gray-700 mb-4">
-        All official HOA documents, forms, and meeting minutes are available below. 
-        Documents are organized by category for easy access.
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+    <div class="max-w-2xl mx-auto mb-12">
+      <h1 class="text-4xl font-heading font-bold text-clr-green mb-4">Documents & Forms</h1>
+      <p class="text-gray-700 font-body mb-4">
+        All official HOA documents, forms, and meeting minutes are available below.
+        Governing documents are grouped by category with direct download links.
       </p>
-      <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <p class="text-sm text-gray-700">
-          <strong>Note for Board Members:</strong> To add or update documents, edit the Markdown files 
-          in the <code class="bg-white px-1 rounded">src/content/documents/</code> directory. 
-          See the README for instructions.
+      <div class="bg-clr-beige/30 border border-gray-100 rounded-xl p-4">
+        <p class="text-sm text-clr-gray font-body">
+          <strong>Note for Board Members:</strong> To add or update document listings, edit the Markdown files
+          in <code class="bg-white px-1 rounded">src/content/documents/</code>. Place PDFs in
+          <code class="bg-white px-1 rounded">public/docs/</code> or <code class="bg-white px-1 rounded">public/documents/files/</code> as noted in each entry.
         </p>
       </div>
     </div>
 
+    <!-- Key Rules from Governing Docs -->
+    <section class="mb-16">
+      <h2 class="text-3xl font-heading font-bold text-center text-clr-green mb-8">Key Rules at a Glance</h2>
+      <p class="text-center text-gray-700 font-body mb-8 max-w-2xl mx-auto">
+        Summary of important rules from the Crooked Lake Reserve Covenants & Bylaws. See the full documents below for complete language.
+      </p>
+      <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-5xl mx-auto">
+        {keyRules.map((rule) => (
+          <div class="card-hover bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+            <h3 class="text-lg font-heading font-semibold text-clr-green mb-2">{rule.title}</h3>
+            <p class="text-clr-gray text-sm font-body">{rule.detail}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+
+    <!-- Documents by category with card layout and download links -->
     {categories.map((category) => {
       const docs = documentsByCategory[category] || [];
       if (docs.length === 0) return null;
 
       return (
-        <section class="bg-white rounded-lg shadow-md p-8 mb-6">
-          <h2 class="text-2xl font-semibold text-gray-900 mb-4">{category}</h2>
-          <div class="space-y-4">
+        <section class="mb-12">
+          <h2 class="text-2xl font-heading font-bold text-clr-green mb-6">{category}</h2>
+          <div class="grid md:grid-cols-2 gap-6">
             {docs.map((doc) => (
-              <div class="border-l-4 border-blue-500 pl-4 py-2">
-                <h3 class="text-lg font-semibold text-gray-900 mb-1">
-                  <a
-                    href={doc.data.fileUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="hover:text-blue-600 transition-colors"
-                  >
-                    {doc.data.title}
-                  </a>
-                </h3>
-                <p class="text-gray-600 text-sm mb-2">{doc.data.description}</p>
+              <div class="card-hover bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
+                <h3 class="text-xl font-heading font-semibold text-clr-green mb-2">{doc.data.title}</h3>
+                <p class="text-clr-gray text-sm font-body mb-4">{doc.data.description}</p>
                 {doc.data.effectiveDate && (
-                  <p class="text-gray-500 text-xs">
+                  <p class="text-gray-500 text-xs font-body mb-4">
                     Effective: {doc.data.effectiveDate.toLocaleDateString('en-US', {
                       year: 'numeric',
                       month: 'long',
@@ -66,6 +80,14 @@ const categories = ['Governing Documents', 'Policies', 'Forms', 'Meeting Minutes
                     })}
                   </p>
                 )}
+                <a
+                  href={doc.data.fileUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="inline-flex items-center gap-2 bg-clr-orange hover:brightness-110 text-white px-6 py-3 rounded-xl font-semibold text-sm shadow-lg hover:shadow-xl transition-all font-body"
+                >
+                  <span aria-hidden="true">↓</span> Download PDF
+                </a>
               </div>
             ))}
           </div>

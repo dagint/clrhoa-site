@@ -1,3 +1,12 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer utilities {
+  .hero-gradient {
+    background: linear-gradient(135deg, #1e5f38 0%, #2d8a5e 50%, #f4e8d9 100%);
+  }
+  .card-hover {
+    @apply transition-all duration-300 hover:-translate-y-1 hover:shadow-xl;
+  }
+}

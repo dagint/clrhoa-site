@@ -20,11 +20,11 @@ const { Content } = await item.render();
 ---
 
 <BaseLayout title={item.data.title} description={item.data.summary}>
-  <article class="max-w-4xl mx-auto">
-    <div class="bg-white rounded-lg shadow-md p-8">
+  <article class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+    <div class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 max-w-2xl mx-auto">
       <header class="mb-6">
-        <h1 class="text-4xl font-bold text-gray-900 mb-4">{item.data.title}</h1>
-        <div class="flex items-center text-gray-600 text-sm mb-4">
+        <h1 class="text-4xl font-heading font-bold text-clr-green mb-4">{item.data.title}</h1>
+        <div class="flex items-center text-clr-gray text-sm mb-4 flex-wrap gap-2 font-body">
           <time>
             {item.data.date.toLocaleDateString('en-US', {
               year: 'numeric',
@@ -35,22 +35,22 @@ const { Content } = await item.render();
           {item.data.tags && item.data.tags.length > 0 && (
             <div class="flex flex-wrap gap-2 ml-4">
               {item.data.tags.map((tag) => (
-                <span class="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded">
+                <span class="px-2 py-1 bg-clr-beige/50 text-clr-gray text-xs rounded font-body">
                   {tag}
                 </span>
               ))}
             </div>
           )}
         </div>
-        <p class="text-xl text-gray-700">{item.data.summary}</p>
+        <p class="text-xl text-gray-700 font-body">{item.data.summary}</p>
       </header>
 
-      <div class="prose prose-lg max-w-none">
+      <div class="prose prose-lg max-w-none prose-headings:font-heading prose-headings:text-clr-green prose-a:text-clr-orange prose-a:no-underline hover:prose-a:underline font-body">
         <Content />
       </div>
 
-      <footer class="mt-8 pt-6 border-t border-gray-200">
-        <a href="/news" class="text-blue-600 hover:text-blue-800 font-medium">
+      <footer class="mt-8 pt-6 border-t border-gray-100">
+        <a href="/news" class="text-clr-orange font-semibold hover:underline font-body">
           ← Back to News
         </a>
       </footer>

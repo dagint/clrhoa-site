@@ -13,23 +13,23 @@ const publishedNews = allNews
 ---
 
 <BaseLayout title="News & Announcements" description="Latest news and announcements from Crooked Lake Reserve HOA">
-  <div class="max-w-4xl mx-auto">
-    <div class="bg-white rounded-lg shadow-md p-8">
-      <h1 class="text-4xl font-bold text-gray-900 mb-6">News & Announcements</h1>
-      
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+    <div class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 max-w-2xl mx-auto">
+      <h1 class="text-4xl font-heading font-bold text-clr-green mb-6">News & Announcements</h1>
+
       {publishedNews.length === 0 ? (
-        <p class="text-gray-600">No news items available at this time.</p>
+        <p class="text-clr-gray font-body">No news items available at this time.</p>
       ) : (
         <div class="space-y-6">
           {publishedNews.map((item) => (
-            <article class="border-b border-gray-200 pb-6 last:border-b-0">
-              <div class="flex items-start justify-between mb-2">
-                <h2 class="text-2xl font-semibold text-gray-900">
-                  <a href={`/news/${item.slug}`} class="hover:text-blue-600 transition-colors">
+            <article class="border-b border-gray-100 pb-6 last:border-b-0">
+              <div class="flex items-start justify-between gap-4 mb-2 flex-wrap">
+                <h2 class="text-2xl font-heading font-semibold text-clr-green">
+                  <a href={`/news/${item.slug}`} class="hover:underline transition-colors">
                     {item.data.title}
                   </a>
                 </h2>
-                <time class="text-sm text-gray-500 whitespace-nowrap ml-4">
+                <time class="text-sm text-clr-gray whitespace-nowrap font-body">
                   {item.data.date.toLocaleDateString('en-US', {
                     year: 'numeric',
                     month: 'long',
@@ -37,19 +37,19 @@ const publishedNews = allNews
                   })}
                 </time>
               </div>
-              <p class="text-gray-700 mb-3">{item.data.summary}</p>
+              <p class="text-gray-700 mb-3 font-body">{item.data.summary}</p>
               {item.data.tags && item.data.tags.length > 0 && (
                 <div class="flex flex-wrap gap-2 mb-3">
                   {item.data.tags.map((tag) => (
-                    <span class="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded">
+                    <span class="px-2 py-1 bg-clr-beige/50 text-clr-gray text-xs rounded font-body">
                       {tag}
                     </span>
                   ))}
                 </div>
               )}
               <a
-                href={`/news/${item.slug || item.id.split('/').pop()?.replace('.md', '') || item.id}`}
-                class="text-blue-600 hover:text-blue-800 font-medium inline-block"
+                href={`/news/${item.slug}`}
+                class="text-clr-orange font-semibold hover:underline inline-block font-body"
               >
                 Read more →
               </a>

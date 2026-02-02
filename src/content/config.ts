@@ -19,7 +19,10 @@ const documentsCollection = defineCollection({
     slug: z.string().optional(),
     category: z.enum(['Governing Documents', 'Policies', 'Forms', 'Meeting Minutes', 'Other']),
     description: z.string(),
-    fileUrl: z.string().url(),
+    // Accept full URLs or site-relative paths (e.g. /documents/files/name.pdf)
+    fileUrl: z.string().refine((v) => v.startsWith('http') || v.startsWith('/'), {
+      message: 'fileUrl must be a full URL (https://...) or a path starting with /',
+    }),
     effectiveDate: z.coerce.date().optional(),
     published: z.boolean().default(true),
   }),

@@ -140,8 +140,8 @@ Cloudflare Pages automatically deploys:
 
 - This is a static site with no server-side code
 - No third-party analytics or tracking scripts included
-- Board-only area is currently a placeholder (no authentication yet)
-- All content is public until authentication is implemented
+- Board-only area has been removed for now; can be re-added with authentication later
+- All content is public
 
 ## 📋 Deployment Checklist
 

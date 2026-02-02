@@ -2,47 +2,71 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 ---
 
-<BaseLayout title="About Our Community" description="Learn about Crooked Lake Reserve and our community values">
-  <div class="max-w-4xl mx-auto">
-    <div class="bg-white rounded-lg shadow-md p-8">
-      <h1 class="text-4xl font-bold text-gray-900 mb-6">About Crooked Lake Reserve</h1>
-      
-      <section class="mb-8">
-        <h2 class="text-2xl font-semibold text-gray-900 mb-4">Our Community</h2>
-        <p class="text-gray-700 mb-4">
-          Crooked Lake Reserve is a vibrant homeowners association dedicated to maintaining 
-          the quality of life and property values for all residents. Our community is built 
-          on principles of respect, cooperation, and shared responsibility.
-        </p>
-        <p class="text-gray-700">
-          We work together to ensure our neighborhood remains a wonderful place to live, 
-          work, and raise families.
+<BaseLayout title="About Our Community" description="Learn about Crooked Lake Reserve — 25 custom homes, 45 acres, lake access, Eustis FL">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+    <h1 class="text-4xl font-heading font-bold text-clr-green mb-12 text-center">About Crooked Lake Reserve</h1>
+
+    <!-- Stats grid -->
+    <section class="mb-16">
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto">
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 text-center card-hover">
+          <p class="text-2xl md:text-3xl font-heading font-bold text-clr-green">25</p>
+          <p class="text-clr-gray text-sm font-body">Homes</p>
+        </div>
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 text-center card-hover">
+          <p class="text-2xl md:text-3xl font-heading font-bold text-clr-green">45</p>
+          <p class="text-clr-gray text-sm font-body">Acres</p>
+        </div>
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 text-center card-hover">
+          <p class="text-2xl md:text-3xl font-heading font-bold text-clr-green">1</p>
+          <p class="text-clr-gray text-sm font-body">Annual Meeting</p>
+        </div>
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 text-center card-hover">
+          <p class="text-2xl md:text-3xl font-heading font-bold text-clr-green">—</p>
+          <p class="text-clr-gray text-sm font-body">Lake Access</p>
+        </div>
+      </div>
+    </section>
+
+    <div class="max-w-2xl mx-auto space-y-8">
+      <!-- Community -->
+      <section class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 card-hover">
+        <h2 class="text-2xl font-heading font-semibold text-clr-green mb-4">Our Community</h2>
+        <p class="text-gray-700 font-body">
+          Crooked Lake Reserve is 25 custom homes on 45 acres, established 2005. No pool or clubhouse — the HOA focuses on private roads, entrance maintenance, irrigation well, and stormwater.
         </p>
       </section>
 
-      <section class="mb-8">
-        <h2 class="text-2xl font-semibold text-gray-900 mb-4">Our Mission</h2>
-        <p class="text-gray-700 mb-4">
-          The Crooked Lake Reserve Homeowners Association is committed to:
+      <!-- Annual meeting -->
+      <section class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 card-hover">
+        <h2 class="text-2xl font-heading font-semibold text-clr-green mb-4">Annual Meeting</h2>
+        <p class="text-gray-700 font-body">
+          First Sunday in February, Eustis Community Center. The 2026 annual meeting was February 1, 2026, 2:00 PM–4:15 PM. Details and reminders are posted in <a href="/news" class="text-clr-orange hover:underline font-semibold">News</a>.
         </p>
-        <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
-          <li>Maintaining and enhancing property values</li>
-          <li>Preserving the aesthetic quality of our community</li>
-          <li>Fostering a sense of community among residents</li>
-          <li>Ensuring compliance with governing documents</li>
-          <li>Providing transparent communication and governance</li>
-        </ul>
       </section>
 
-      <section>
-        <h2 class="text-2xl font-semibold text-gray-900 mb-4">Get Involved</h2>
-        <p class="text-gray-700 mb-4">
-          We encourage all residents to participate in community activities and consider 
-          serving on the board or committees. Your involvement helps make our community stronger.
+      <!-- Contact / governance -->
+      <section class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 card-hover">
+        <h2 class="text-2xl font-heading font-semibold text-clr-green mb-4">Contact & Governance</h2>
+        <p class="text-gray-700 font-body mb-4">
+          There is no property management company. Contact the Board directly for questions, dues, or compliance. See <a href="/contact" class="text-clr-orange hover:underline font-semibold">Contact</a> for how to reach the Board.
         </p>
-        <p class="text-gray-700">
-          For more information about board positions and committees, please visit our 
-          <a href="/board" class="text-blue-600 hover:text-blue-800 underline">Board & Committees</a> page.
+        <p class="text-gray-700 font-body">
+          Governing documents are available to all residents. Read the Bylaws and Covenants & Restrictions on the Documents page.
+        </p>
+        <a
+          href="/documents"
+          class="inline-flex items-center gap-2 mt-4 bg-clr-orange hover:brightness-110 text-white px-6 py-3 rounded-xl font-semibold text-sm shadow-lg hover:shadow-xl transition-all font-body"
+        >
+          Bylaws & Covenants →
+        </a>
+      </section>
+
+      <!-- Get involved -->
+      <section class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 card-hover">
+        <h2 class="text-2xl font-heading font-semibold text-clr-green mb-4">Get Involved</h2>
+        <p class="text-gray-700 font-body">
+          Residents are encouraged to attend the annual meeting and consider serving on the Board or committees. See <a href="/board" class="text-clr-orange hover:underline font-semibold">Board & Committees</a> for more.
         </p>
       </section>
     </div>

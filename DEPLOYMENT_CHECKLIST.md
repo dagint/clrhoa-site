@@ -94,6 +94,22 @@ dist
 2. Wait for the build to complete (usually 2-3 minutes)
 3. Your site will be available at: `https://<project-name>.pages.dev`
 
+## 🤖 Automated Deployment (How It Works)
+
+Once the repo is connected to Cloudflare Pages, **deployment is automatic**—no manual uploads or scripts.
+
+| Action | Result |
+|--------|--------|
+| **Push to `main`** | Cloudflare runs `npm run build`, deploys the `dist/` output, and updates the live site. |
+| **Push to another branch** (e.g. `develop`) | Cloudflare builds and deploys a **preview URL** (e.g. `https://<branch>-<project>.pages.dev`) so you can test before merging to `main`. |
+
+**Typical workflow:**
+1. Make changes locally (content, code, or both).
+2. Commit and push to GitHub: `git add . && git commit -m "Update news" && git push origin main`
+3. Cloudflare detects the push, builds the site, and deploys. Check the **Deployments** tab in the Cloudflare Pages dashboard for status and logs.
+
+No GitHub Actions or extra automation is required—Cloudflare Pages handles it when connected to Git. To change build settings (e.g. Node version, env vars), use **Settings → Builds & deployments** in the Pages project.
+
 ## 🔗 Custom Domain Setup
 
 ### 11. Add Custom Domain
