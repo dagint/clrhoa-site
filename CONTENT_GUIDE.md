@@ -116,6 +116,17 @@ To hide content without deleting it:
 2. Change `published: true` to `published: false`
 3. Save the file
 
+## 🖼️ Front page hero image (optional)
+
+The large image on the front page is controlled by a small config file. **Ask a technical person** to change it.
+
+- **Single image (default):** One static image; no rotation.
+- **Rotating images:** Multiple images that fade every 5 seconds.
+
+The config file is `src/config/hero.ts`. In it:
+- Set `heroRotate` to `true` to turn on rotation, or `false` for a single static image.
+- Set `heroImages` to a list of image paths (e.g. `['/placeholder-lake.jpg']` or `['/images/hero1.jpg', '/images/hero2.jpg']`). Put image files in the `public/` folder (or `public/images/`).
+
 ## ✅ Best Practices
 
 - Use descriptive filenames

@@ -1,11 +1,31 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+import { heroRotate, heroImages } from '../config/hero';
+
+const showRotation = heroRotate && heroImages.length > 1;
+const heroImage = heroImages[0] ?? '/placeholder-lake.jpg';
 ---
 
 <BaseLayout title="Home">
   <section class="hero-gradient min-h-screen flex items-center text-white relative overflow-hidden">
-    <div class="absolute inset-0 bg-black/20"></div>
-    <div class="absolute inset-0 bg-[url('/placeholder-lake.jpg')] bg-cover bg-center opacity-30"></div>
+    <div class="absolute inset-0 bg-black/20" aria-hidden="true"></div>
+    {showRotation ? (
+      <div id="hero-slides" class="absolute inset-0" aria-hidden="true">
+        {heroImages.map((src, i) => (
+          <div
+            class={`hero-slide absolute inset-0 bg-cover bg-center transition-opacity duration-1000 ${i === 0 ? 'hero-slide-active opacity-30' : 'opacity-0'}`}
+            style={{ backgroundImage: `url(${src})` }}
+            data-hero-index={i}
+          />
+        ))}
+      </div>
+    ) : (
+      <div
+        class="absolute inset-0 bg-cover bg-center opacity-30"
+        style={{ backgroundImage: `url(${heroImage})` }}
+        aria-hidden="true"
+      />
+    )}
     <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
       <h1 class="text-5xl md:text-6xl font-heading font-bold mb-6 leading-tight">
         Welcome to<br />
@@ -23,6 +43,25 @@ import BaseLayout from '../layouts/BaseLayout.astro';
         </a>
       </div>
     </div>
+    {showRotation && (
+      <script>
+        (function () {
+          const container = document.getElementById('hero-slides');
+          if (!container) return;
+          const slides = container.querySelectorAll('.hero-slide');
+          if (slides.length <= 1) return;
+          let index = 0;
+          const interval = 5000;
+          setInterval(function () {
+            slides[index].classList.remove('hero-slide-active', 'opacity-30');
+            slides[index].classList.add('opacity-0');
+            index = (index + 1) % slides.length;
+            slides[index].classList.remove('opacity-0');
+            slides[index].classList.add('hero-slide-active', 'opacity-30');
+          }, interval);
+        })();
+      </script>
+    )}
   </section>
 
   <section class="py-20 bg-clr-beige/50">
