@@ -2,11 +2,108 @@
 @tailwind components;
 @tailwind utilities;
 
+/* News article content (markdown-rendered) */
+.news-article-prose h2 {
+  @apply text-2xl font-heading font-semibold text-clr-green mt-8 mb-4;
+}
+.news-article-prose p {
+  @apply text-gray-700 my-4 leading-relaxed;
+}
+.news-article-prose ul {
+  @apply my-4 pl-6 list-disc space-y-1;
+}
+.news-article-prose li {
+  @apply text-gray-700;
+}
+.news-article-prose a {
+  @apply text-clr-orange font-semibold no-underline hover:underline;
+}
+
 @layer utilities {
   .hero-gradient {
     background: linear-gradient(135deg, #1e5f38 0%, #2d8a5e 50%, #f4e8d9 100%);
   }
   .card-hover {
     @apply transition-all duration-300 hover:-translate-y-1 hover:shadow-xl;
+  }
+}
+
+/* Print Styles */
+@media print {
+  /* Hide navigation, footer, and non-essential elements */
+  header,
+  footer,
+  nav,
+  .no-print,
+  button,
+  .card-hover {
+    display: none !important;
+  }
+
+  /* Optimize page layout for printing */
+  body {
+    background: white;
+    color: black;
+    font-size: 12pt;
+    line-height: 1.5;
+  }
+
+  /* Ensure content uses full page width */
+  .max-w-4xl,
+  .max-w-7xl,
+  .max-w-2xl {
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Remove shadows and borders for cleaner print */
+  .shadow-sm,
+  .shadow-lg,
+  .shadow-xl,
+  .border,
+  .border-2 {
+    box-shadow: none !important;
+    border: 1px solid #ccc !important;
+  }
+
+  /* Optimize colors for black and white printing */
+  .text-clr-green,
+  .text-clr-orange {
+    color: black !important;
+  }
+
+  .bg-clr-beige,
+  .bg-clr-green,
+  .bg-white {
+    background: white !important;
+  }
+
+  /* Ensure links are visible */
+  a {
+    color: black !important;
+    text-decoration: underline !important;
+  }
+
+  /* Page breaks */
+  section {
+    page-break-inside: avoid;
+  }
+
+  h1, h2, h3 {
+    page-break-after: avoid;
+  }
+
+  /* Show URLs for links */
+  a[href^="http"]:after {
+    content: " (" attr(href) ")";
+    font-size: 10pt;
+    color: #666;
+  }
+
+  a[href^="/"]:after {
+    content: " (https://clrhoa.com" attr(href) ")";
+    font-size: 10pt;
+    color: #666;
   }
 }

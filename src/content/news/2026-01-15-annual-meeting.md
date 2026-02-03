@@ -8,8 +8,6 @@ tags:
 published: true
 ---
 
-# Annual Meeting – February 1, 2026
-
 The Crooked Lake Reserve HOA Annual Meeting was held on **February 1, 2026, 2:00 PM–4:15 PM** at Eustis Community Center.
 
 ## Agenda Items
@@ -21,6 +19,6 @@ The Crooked Lake Reserve HOA Annual Meeting was held on **February 1, 2026, 2:00
 
 ## For Future Meetings
 
-The annual meeting is held the first Sunday in February at Eustis Community Center. Details and reminders are posted here and in News. Proxy forms are available in the Documents section.
+The annual meeting is typically held on the first Sunday in February at Eustis Community Center. Details and reminders are posted in News. Proxy forms are available in the [Documents](/documents) section.
 
-For questions, contact the board at info@clrhoa.com.
+For questions, please use the [Contact](/contact) page to reach the board securely.

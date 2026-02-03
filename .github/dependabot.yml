@@ -1,0 +1,47 @@
+# Dependabot configuration for automated dependency updates
+# https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+
+version: 2
+updates:
+  # Enable version updates for npm
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    # Open pull requests for version updates
+    open-pull-requests-limit: 10
+    # Group updates to reduce PR noise
+    groups:
+      production-dependencies:
+        dependency-type: "production"
+      development-dependencies:
+        dependency-type: "development"
+    # Labels for PRs
+    labels:
+      - "dependencies"
+      - "security"
+    # Commit message
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    # Reviewers (optional - add GitHub usernames)
+    # reviewers:
+    #   - "username"
+    # Assignees (optional - add GitHub usernames)
+    # assignees:
+    #   - "username"
+    # Ignore specific dependencies (if needed)
+    # ignore:
+    #   - dependency-name: "package-name"
+    #     update-types: ["version-update:semver-major"]
+
+  # Enable version updates for GitHub Actions (if using CI/CD)
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    labels:
+      - "github-actions"
+      - "dependencies"

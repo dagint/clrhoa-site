@@ -1,0 +1,317 @@
+---
+import ResourcesLayout from '../../layouts/ResourcesLayout.astro';
+
+const addressCity = import.meta.env.PUBLIC_PHYSICAL_ADDRESS_CITY ?? 'Eustis';
+const addressState = import.meta.env.PUBLIC_PHYSICAL_ADDRESS_STATE ?? 'FL';
+
+// Waste Management & Recycling Information
+const trashSchedule = import.meta.env.PUBLIC_TRASH_SCHEDULE ?? '';
+const recyclingSchedule = import.meta.env.PUBLIC_RECYCLING_SCHEDULE ?? '';
+const recyclingCenterName = import.meta.env.PUBLIC_RECYCLING_CENTER_NAME ?? '';
+const recyclingCenterAddress = import.meta.env.PUBLIC_RECYCLING_CENTER_ADDRESS ?? '';
+const recyclingCenterHours = import.meta.env.PUBLIC_RECYCLING_CENTER_HOURS ?? '';
+const recyclingCenterPhone = import.meta.env.PUBLIC_RECYCLING_CENTER_PHONE ?? '';
+const recyclingCenterWebsite = import.meta.env.PUBLIC_RECYCLING_CENTER_WEBSITE ?? '';
+const wasteManagementContact = import.meta.env.PUBLIC_WASTE_MANAGEMENT_CONTACT ?? '';
+const wasteManagementPhone = import.meta.env.PUBLIC_WASTE_MANAGEMENT_PHONE ?? '';
+const wasteManagementWebsite = import.meta.env.PUBLIC_WASTE_MANAGEMENT_WEBSITE ?? '';
+---
+
+<ResourcesLayout title="Local Resources" description={`Government services, schools, utilities, and community resources for ${addressCity}, ${addressState}`} currentSection="local-resources">
+  <div class="max-w-4xl mx-auto">
+    <div class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
+      <div class="flex items-center gap-3 mb-6">
+        <svg class="w-8 h-8 text-clr-orange" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+        <h1 class="text-3xl font-heading font-bold text-clr-green">Local Resources</h1>
+      </div>
+
+      <div class="space-y-6">
+        <p class="text-gray-700 font-body">
+          Helpful links and resources for {addressCity}, {addressState} and the surrounding Lake County area.
+        </p>
+
+        <!-- Waste Management & Recycling Section -->
+        {(trashSchedule || recyclingSchedule || recyclingCenterName || wasteManagementContact) && (
+          <div class="bg-white border-2 border-clr-green rounded-2xl p-8 mb-6">
+            <div class="flex items-center gap-3 mb-6">
+              <svg class="w-8 h-8 text-clr-orange" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              <h2 class="text-2xl font-heading font-bold text-clr-green">Waste Management & Recycling</h2>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-6">
+              <!-- Waste Management Service -->
+              <div class="bg-clr-beige/30 border border-gray-200 rounded-lg p-6">
+                <h3 class="text-lg font-heading font-semibold text-clr-green mb-4">Waste Management Service</h3>
+                {wasteManagementContact && (
+                  <div class="mb-4">
+                    <strong class="text-clr-green">{wasteManagementContact}</strong>
+                    {wasteManagementWebsite && (
+                      <>
+                        <br />
+                        <a href={wasteManagementWebsite} target="_blank" rel="noopener noreferrer" class="text-clr-orange hover:underline font-semibold text-sm mt-2 inline-block">
+                          Visit WM Website →
+                        </a>
+                      </>
+                    )}
+                  </div>
+                )}
+                {trashSchedule && (
+                  <div class="mb-3">
+                    <strong class="text-clr-green">Trash Pickup:</strong><br />
+                    <span class="text-gray-700 font-body">{trashSchedule}</span>
+                  </div>
+                )}
+                {recyclingSchedule && (
+                  <div class="mb-3">
+                    <strong class="text-clr-green">Recycling Pickup:</strong><br />
+                    <span class="text-gray-700 font-body">{recyclingSchedule}</span>
+                  </div>
+                )}
+                <div class="bg-blue-50 border-2 border-blue-200 rounded-lg p-4 mt-4">
+                  <p class="text-blue-800 font-body text-sm mb-2">
+                    <strong>Important:</strong>
+                  </p>
+                  <ul class="text-blue-800 font-body text-sm space-y-1 list-disc list-inside">
+                    <li>WM provides a 96-gallon cart for weekly collection</li>
+                    <li>Place container curbside by 6 a.m. on your service day</li>
+                    <li>Verify your specific service day using the WM website</li>
+                    <li>Report missed pickups after 6 p.m. on your service day</li>
+                  </ul>
+                </div>
+                {wasteManagementWebsite && (
+                  <div class="mt-4 space-y-2">
+                    <a
+                      href={wasteManagementWebsite}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="inline-flex items-center gap-2 bg-clr-orange hover:brightness-110 text-white px-4 py-2 rounded-lg font-semibold text-sm shadow-md hover:shadow-lg transition-all font-body"
+                    >
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                      </svg>
+                      Verify Service Day
+                    </a>
+                  </div>
+                )}
+              </div>
+
+              <!-- Service Guidelines -->
+              <div class="bg-clr-beige/30 border border-gray-200 rounded-lg p-6">
+                <h3 class="text-lg font-heading font-semibold text-clr-green mb-4">Service Guidelines</h3>
+                <div class="space-y-3 text-gray-700 font-body text-sm">
+                  <div>
+                    <strong class="text-clr-green">Container Placement:</strong>
+                    <ul class="list-disc list-inside ml-2 mt-1 space-y-1">
+                      <li>Place container on street with wheels against curb</li>
+                      <li>Keep at least 3 feet from parked cars and mailboxes</li>
+                      <li>Remove container same day after pickup</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <strong class="text-clr-green">What to Include:</strong>
+                    <ul class="list-disc list-inside ml-2 mt-1 space-y-1">
+                      <li>All trash should be bagged</li>
+                      <li>Lid must close tightly - do not overfill</li>
+                      <li>Additional bags will be picked up</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <strong class="text-clr-green">Holiday Schedule:</strong>
+                    <p class="mt-1">
+                      If a holiday falls on a weekday, collections for the rest of the week are pushed back one day. Check the WM website for holiday schedules.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Recycling Center Information */}
+            {recyclingCenterName && (
+              <div class="mt-6 bg-clr-beige/30 border border-gray-200 rounded-lg p-6">
+                <div class="flex items-center justify-between mb-4">
+                  <h3 class="text-lg font-heading font-semibold text-clr-green">Recycling Center</h3>
+                  {recyclingCenterWebsite && (
+                    <a
+                      href={recyclingCenterWebsite}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="text-clr-orange hover:underline font-semibold text-sm"
+                    >
+                      Visit Website →
+                    </a>
+                  )}
+                </div>
+                <div class="space-y-3 text-gray-700 font-body">
+                  <div>
+                    <strong class="text-clr-green text-lg">{recyclingCenterName}</strong>
+                    <p class="text-sm text-gray-600 mt-1">
+                      Family-owned recycling center serving Lake County since 1959. Accepts aluminum, copper, steel, and more.
+                    </p>
+                  </div>
+                  <div class="grid md:grid-cols-2 gap-4">
+                    {recyclingCenterAddress && (
+                      <div>
+                        <strong class="text-clr-green">Address:</strong>
+                        <p class="mt-1">{recyclingCenterAddress}</p>
+                      </div>
+                    )}
+                    {recyclingCenterHours && (
+                      <div>
+                        <strong class="text-clr-green">Hours:</strong>
+                        <p class="mt-1">{recyclingCenterHours}</p>
+                      </div>
+                    )}
+                  </div>
+                  {recyclingCenterPhone && (
+                    <div>
+                      <strong class="text-clr-green">Phone:</strong>{' '}
+                      <a href={`tel:${recyclingCenterPhone.replace(/\D/g, '')}`} class="text-clr-orange hover:underline font-semibold">
+                        {recyclingCenterPhone}
+                      </a>
+                    </div>
+                  )}
+                  <div class="bg-blue-50 border-2 border-blue-200 rounded-lg p-4 mt-4">
+                    <p class="text-blue-800 font-body text-sm">
+                      <strong>Accepted Materials:</strong> Aluminum cans, aluminum of all types, bare bright copper, #1 and #2 copper, steel, brass, and more. Call for current pricing.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        <div class="grid md:grid-cols-2 gap-6">
+          <!-- Government Services -->
+          <div class="bg-clr-beige/30 border border-gray-200 rounded-lg p-6">
+            <h2 class="text-xl font-heading font-semibold text-clr-green mb-4">Government Services</h2>
+            <ul class="space-y-3 text-gray-700 font-body">
+              <li>
+                <strong class="text-clr-green">City of Eustis:</strong><br />
+                <a href="https://www.eustis.org/" target="_blank" rel="noopener noreferrer" class="text-clr-orange hover:underline font-semibold">
+                  Visit website →
+                </a><br />
+                <span class="text-sm">City services, permits, utilities, and local information</span>
+              </li>
+              <li>
+                <strong class="text-clr-green">Lake County Government:</strong><br />
+                <a href="https://www.lakecountyfl.gov/" target="_blank" rel="noopener noreferrer" class="text-clr-orange hover:underline font-semibold">
+                  Visit website →
+                </a><br />
+                <span class="text-sm">County services, property records, and regional information</span>
+              </li>
+              <li>
+                <strong class="text-clr-green">Lake County Property Appraiser:</strong><br />
+                <a href="https://www.lcpa.org/" target="_blank" rel="noopener noreferrer" class="text-clr-orange hover:underline font-semibold">
+                  Visit website →
+                </a><br />
+                <span class="text-sm">Property records, assessments, and tax information</span>
+              </li>
+            </ul>
+          </div>
+
+          <!-- Utilities & Services -->
+          <div class="bg-clr-beige/30 border border-gray-200 rounded-lg p-6">
+            <h2 class="text-xl font-heading font-semibold text-clr-green mb-4">Utilities & Services</h2>
+            <ul class="space-y-3 text-gray-700 font-body">
+              <li>
+                <strong class="text-clr-green">Duke Energy:</strong><br />
+                <a href="https://www.duke-energy.com/" target="_blank" rel="noopener noreferrer" class="text-clr-orange hover:underline font-semibold">
+                  Visit website →
+                </a><br />
+                <span class="text-sm">Electric service, outages, and billing</span>
+              </li>
+              <li>
+                <strong class="text-clr-green">Lake County Water Authority:</strong><br />
+                <a href="https://www.lcwa.org/" target="_blank" rel="noopener noreferrer" class="text-clr-orange hover:underline font-semibold">
+                  Visit website →
+                </a><br />
+                <span class="text-sm">Water service and conservation information</span>
+              </li>
+            </ul>
+          </div>
+
+          <!-- Schools & Education -->
+          <div class="bg-clr-beige/30 border border-gray-200 rounded-lg p-6">
+            <h2 class="text-xl font-heading font-semibold text-clr-green mb-4">Schools & Education</h2>
+            <ul class="space-y-3 text-gray-700 font-body">
+              <li>
+                <strong class="text-clr-green">Lake County Schools:</strong><br />
+                <a href="https://www.lake.k12.fl.us/" target="_blank" rel="noopener noreferrer" class="text-clr-orange hover:underline font-semibold">
+                  Visit website →
+                </a><br />
+                <span class="text-sm">School district information, calendars, and resources</span>
+              </li>
+              <li>
+                <strong class="text-clr-green">Lake-Sumter State College:</strong><br />
+                <a href="https://www.lssc.edu/" target="_blank" rel="noopener noreferrer" class="text-clr-orange hover:underline font-semibold">
+                  Visit website →
+                </a><br />
+                <span class="text-sm">Local community college</span>
+              </li>
+            </ul>
+          </div>
+
+          <!-- Recreation & Community -->
+          <div class="bg-clr-beige/30 border border-gray-200 rounded-lg p-6">
+            <h2 class="text-xl font-heading font-semibold text-clr-green mb-4">Recreation & Community</h2>
+            <ul class="space-y-3 text-gray-700 font-body">
+              <li>
+                <strong class="text-clr-green">Lake County Parks & Trails:</strong><br />
+                <a href="https://www.lakecountyfl.gov/departments/public_works/parks_trails" target="_blank" rel="noopener noreferrer" class="text-clr-orange hover:underline font-semibold">
+                  Visit website →
+                </a><br />
+                <span class="text-sm">Parks, trails, and recreational facilities</span>
+              </li>
+              <li>
+                <strong class="text-clr-green">Eustis Recreation:</strong><br />
+                <a href="https://www.eustis.org/departments/parks_and_recreation" target="_blank" rel="noopener noreferrer" class="text-clr-orange hover:underline font-semibold">
+                  Visit website →
+                </a><br />
+                <span class="text-sm">Local parks, events, and programs</span>
+              </li>
+              <li>
+                <strong class="text-clr-green">Lake County Library System:</strong><br />
+                <a href="https://www.mylakelibrary.org/" target="_blank" rel="noopener noreferrer" class="text-clr-orange hover:underline font-semibold">
+                  Visit website →
+                </a><br />
+                <span class="text-sm">Library locations, hours, and services</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="bg-clr-beige/30 border border-gray-200 rounded-lg p-4 mt-6">
+          <h3 class="font-heading font-semibold text-clr-green mb-2">Additional Resources</h3>
+          <ul class="space-y-2 text-gray-700 font-body text-sm">
+            <li>
+              <strong>Lake County Chamber of Commerce:</strong>
+              <a href="https://www.lakecountychamber.com/" target="_blank" rel="noopener noreferrer" class="text-clr-orange hover:underline font-semibold ml-2">
+                Visit website →
+              </a>
+            </li>
+            <li>
+              <strong>Florida Department of Transportation:</strong>
+              <a href="https://www.fdot.gov/" target="_blank" rel="noopener noreferrer" class="text-clr-orange hover:underline font-semibold ml-2">
+                Visit website →
+              </a>
+              <span class="block mt-1">Road conditions, construction updates, and traffic information</span>
+            </li>
+            <li>
+              <strong>Florida Department of Environmental Protection:</strong>
+              <a href="https://floridadep.gov/" target="_blank" rel="noopener noreferrer" class="text-clr-orange hover:underline font-semibold ml-2">
+                Visit website →
+              </a>
+              <span class="block mt-1">Environmental regulations and water quality information</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</ResourcesLayout>

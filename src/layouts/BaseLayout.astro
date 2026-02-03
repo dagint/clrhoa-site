@@ -1,13 +1,69 @@
 ---
 import '../styles/tailwind.css';
+import Analytics from '../components/Analytics.astro';
 
 interface Props {
   title: string;
   description?: string;
+  image?: string;
+  preloadImages?: string[];
 }
 
-const { title, description = 'Crooked Lake Reserve Homeowners Association' } = Astro.props;
+const { title, description = 'Crooked Lake Reserve Homeowners Association', image, preloadImages = [] } = Astro.props;
 const canonicalURL = new URL(Astro.url.pathname, Astro.site);
+const siteURL = Astro.site || 'https://clrhoa.com';
+const fullTitle = `${title} | Crooked Lake Reserve HOA`;
+const ogImage = image || `${siteURL}/placeholder-lake.jpg`;
+
+// Get current path for active navigation highlighting
+const currentPath = Astro.url.pathname;
+function isActive(path: string): boolean {
+  return currentPath === path || (path !== '/' && currentPath.startsWith(path));
+}
+
+// Address information from environment variables (for structured data)
+const addressCity = import.meta.env.PUBLIC_PHYSICAL_ADDRESS_CITY ?? 'Eustis';
+const addressState = import.meta.env.PUBLIC_PHYSICAL_ADDRESS_STATE ?? 'FL';
+
+// Social media links (optional)
+const facebookUrl = import.meta.env.PUBLIC_FACEBOOK_URL ?? '';
+const twitterUrl = import.meta.env.PUBLIC_TWITTER_URL ?? '';
+const instagramUrl = import.meta.env.PUBLIC_INSTAGRAM_URL ?? '';
+const nextdoorUrl = import.meta.env.PUBLIC_NEXTDOOR_URL ?? '';
+
+// Resources dropdown menu items - organized by category
+const resourcesMenuItems = [
+  // Most Frequently Used
+  { name: 'Overview', path: '/resources', category: 'main' },
+  { name: 'Emergency Contacts', path: '/resources/emergency-contacts', category: 'main' },
+  { name: 'FAQ', path: '/resources/faq', category: 'main' },
+  
+  // Community Resources
+  { name: 'Local Resources', path: '/resources/local-resources', category: 'community' },
+  { name: 'Vendor List', path: '/resources/vendors', category: 'community' },
+  { name: 'Community Map', path: '/resources/map', category: 'community' },
+  
+  // Safety & Preparedness
+  { name: 'Hurricane Preparedness', path: '/resources/hurricane', category: 'safety' },
+  { name: 'Wildlife Safety', path: '/resources/wildlife-safety', category: 'safety' },
+  { name: 'Water Restrictions', path: '/resources/water-restrictions', category: 'safety' },
+  
+  // Legal & Compliance
+  { name: 'Florida HOA Law', path: '/resources/law', category: 'legal' },
+  { name: 'Flood Insurance', path: '/resources/flood-insurance', category: 'legal' },
+  
+  // Maintenance
+  { name: 'Pest Control', path: '/resources/pest-control', category: 'maintenance' },
+];
+
+// Group resources by category for better organization
+const resourcesByCategory = {
+  main: resourcesMenuItems.filter(item => item.category === 'main'),
+  community: resourcesMenuItems.filter(item => item.category === 'community'),
+  safety: resourcesMenuItems.filter(item => item.category === 'safety'),
+  legal: resourcesMenuItems.filter(item => item.category === 'legal'),
+  maintenance: resourcesMenuItems.filter(item => item.category === 'maintenance'),
+};
 ---
 
 <!doctype html>
@@ -18,69 +74,573 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site);
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="generator" content={Astro.generator} />
-    <title>{title} | Crooked Lake Reserve HOA</title>
+    <title>{fullTitle}</title>
     <link rel="canonical" href={canonicalURL} />
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content={canonicalURL} />
+    <meta property="og:title" content={fullTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:site_name" content="Crooked Lake Reserve HOA" />
+    
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content={canonicalURL} />
+    <meta name="twitter:title" content={fullTitle} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImage} />
+    
+    <!-- Structured Data (JSON-LD) -->
+    <script type="application/ld+json" set:html={JSON.stringify({
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "Crooked Lake Reserve Homeowners Association",
+      "alternateName": "CLR HOA",
+      "url": siteURL,
+      "logo": `${siteURL}/favicon.svg`,
+      "description": "Crooked Lake Reserve Homeowners Association serving our beautiful lakefront community in ${addressCity}, ${addressState === 'FL' ? 'Florida' : addressState}",
+      "address": {
+        "@type": "PostalAddress",
+        "addressLocality": addressCity,
+        "addressRegion": addressState,
+        "addressCountry": "US"
+      },
+      "contactPoint": {
+        "@type": "ContactPoint",
+        "contactType": "Board of Directors",
+        "url": `${siteURL}/contact`
+      },
+      "sameAs": []
+    })} />
+    
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Open+Sans:wght@400;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet" />
+    {/* Preload critical images for better performance */}
+    {preloadImages.map((img) => (
+      <link rel="preload" as="image" href={img} fetchpriority="high" />
+    ))}
   </head>
   <body class="min-h-screen bg-gray-50 text-gray-900 font-body">
+    <a href="#main-content" class="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-clr-green focus:text-white focus:rounded-lg focus:font-semibold focus:shadow-lg focus:outline-none focus:ring-2 focus:ring-clr-green focus:ring-offset-2">
+      Skip to main content
+    </a>
     <header class="bg-white/80 backdrop-blur-md border-b border-gray-100 sticky top-0 z-50">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex justify-between items-center py-4">
           <a href="/" class="text-2xl font-heading font-bold text-clr-green">
             Crooked Lake Reserve HOA
           </a>
-          <nav class="hidden md:flex space-x-8">
-            <a href="/" class="text-lg font-medium text-gray-700 hover:text-clr-green transition-colors">Home</a>
-            <a href="/about" class="text-lg font-medium text-gray-700 hover:text-clr-green transition-colors">About</a>
-            <a href="/board" class="text-lg font-medium text-gray-700 hover:text-clr-green transition-colors">Board</a>
-            <a href="/news" class="text-lg font-medium text-gray-700 hover:text-clr-green transition-colors">News</a>
-            <a href="/documents" class="text-lg font-medium text-gray-700 hover:text-clr-green transition-colors">Documents</a>
-            <a href="/map" class="text-lg font-medium text-gray-700 hover:text-clr-green transition-colors">Community Map</a>
-            <a href="/contact" class="text-lg font-medium text-gray-700 hover:text-clr-green transition-colors">Contact</a>
+          <nav class="hidden md:flex space-x-6 items-center">
+            <a href="/" class={`text-lg font-medium transition-colors ${isActive('/') ? 'text-clr-green border-b-2 border-clr-green pb-1' : 'text-gray-700 hover:text-clr-green'}`}>Home</a>
+            <a href="/documents" class={`text-lg font-medium transition-colors ${isActive('/documents') ? 'text-clr-green border-b-2 border-clr-green pb-1' : 'text-gray-700 hover:text-clr-green'}`}>Documents</a>
+            <a href="/dues" class={`text-lg font-medium transition-colors ${isActive('/dues') ? 'text-clr-green border-b-2 border-clr-green pb-1' : 'text-gray-700 hover:text-clr-green'}`}>Dues</a>
+            <a href="/board" class={`text-lg font-medium transition-colors ${isActive('/board') ? 'text-clr-green border-b-2 border-clr-green pb-1' : 'text-gray-700 hover:text-clr-green'}`}>Board</a>
+            
+            <!-- Resources Dropdown -->
+            <div class="relative group" id="resources-dropdown">
+              <button
+                type="button"
+                class={`text-lg font-medium transition-colors flex items-center gap-1 ${isActive('/resources') ? 'text-clr-green border-b-2 border-clr-green pb-1' : 'text-gray-700 hover:text-clr-green'}`}
+                aria-expanded="false"
+                aria-haspopup="true"
+                id="resources-dropdown-button"
+              >
+                Resources
+                <svg class="w-4 h-4 transition-transform group-hover:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              <div
+                class="absolute top-full left-0 mt-2 w-72 bg-white rounded-lg shadow-lg border border-gray-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50"
+                role="menu"
+                aria-labelledby="resources-dropdown-button"
+              >
+                <div class="py-2 max-h-96 overflow-y-auto">
+                  {/* Most Frequently Used */}
+                  {resourcesByCategory.main.length > 0 && (
+                    <>
+                      <div class="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Most Used</div>
+                      {resourcesByCategory.main.map((item) => (
+                        <a
+                          href={item.path}
+                          class={`block px-4 py-2 text-sm transition-colors font-body ${isActive(item.path) ? 'bg-clr-beige/30 text-clr-green font-semibold' : 'text-gray-700 hover:bg-clr-beige/30 hover:text-clr-green'}`}
+                          role="menuitem"
+                        >
+                          {item.name}
+                        </a>
+                      ))}
+                      <div class="border-t border-gray-100 my-1"></div>
+                    </>
+                  )}
+                  
+                  {/* Community Resources */}
+                  {resourcesByCategory.community.length > 0 && (
+                    <>
+                      <div class="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Community</div>
+                      {resourcesByCategory.community.map((item) => (
+                        <a
+                          href={item.path}
+                          class={`block px-4 py-2 text-sm transition-colors font-body ${isActive(item.path) ? 'bg-clr-beige/30 text-clr-green font-semibold' : 'text-gray-700 hover:bg-clr-beige/30 hover:text-clr-green'}`}
+                          role="menuitem"
+                        >
+                          {item.name}
+                        </a>
+                      ))}
+                      <div class="border-t border-gray-100 my-1"></div>
+                    </>
+                  )}
+                  
+                  {/* Safety & Preparedness */}
+                  {resourcesByCategory.safety.length > 0 && (
+                    <>
+                      <div class="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Safety</div>
+                      {resourcesByCategory.safety.map((item) => (
+                        <a
+                          href={item.path}
+                          class={`block px-4 py-2 text-sm transition-colors font-body ${isActive(item.path) ? 'bg-clr-beige/30 text-clr-green font-semibold' : 'text-gray-700 hover:bg-clr-beige/30 hover:text-clr-green'}`}
+                          role="menuitem"
+                        >
+                          {item.name}
+                        </a>
+                      ))}
+                      <div class="border-t border-gray-100 my-1"></div>
+                    </>
+                  )}
+                  
+                  {/* Legal & Compliance */}
+                  {resourcesByCategory.legal.length > 0 && (
+                    <>
+                      <div class="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Legal</div>
+                      {resourcesByCategory.legal.map((item) => (
+                        <a
+                          href={item.path}
+                          class={`block px-4 py-2 text-sm transition-colors font-body ${isActive(item.path) ? 'bg-clr-beige/30 text-clr-green font-semibold' : 'text-gray-700 hover:bg-clr-beige/30 hover:text-clr-green'}`}
+                          role="menuitem"
+                        >
+                          {item.name}
+                        </a>
+                      ))}
+                      {resourcesByCategory.maintenance.length > 0 && <div class="border-t border-gray-100 my-1"></div>}
+                    </>
+                  )}
+                  
+                  {/* Maintenance */}
+                  {resourcesByCategory.maintenance.length > 0 && (
+                    <>
+                      <div class="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Maintenance</div>
+                      {resourcesByCategory.maintenance.map((item) => (
+                        <a
+                          href={item.path}
+                          class={`block px-4 py-2 text-sm transition-colors font-body ${isActive(item.path) ? 'bg-clr-beige/30 text-clr-green font-semibold' : 'text-gray-700 hover:bg-clr-beige/30 hover:text-clr-green'}`}
+                          role="menuitem"
+                        >
+                          {item.name}
+                        </a>
+                      ))}
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+            
+            <a href="/news" class={`text-lg font-medium transition-colors ${isActive('/news') ? 'text-clr-green border-b-2 border-clr-green pb-1' : 'text-gray-700 hover:text-clr-green'}`}>News</a>
+            
+            <!-- Quick Contact Button -->
+            <a
+              href="/contact"
+              class="ml-2 bg-clr-orange hover:brightness-110 text-white px-4 py-2 rounded-lg font-semibold text-sm shadow-md hover:shadow-lg transition-all no-print"
+            >
+              Contact Board
+            </a>
           </nav>
-          <button
-            id="mobile-menu-button"
-            class="md:hidden text-gray-700 hover:text-clr-green p-2"
-            aria-label="Toggle menu"
-          >
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          </button>
+          <div class="flex items-center gap-2">
+            <!-- Quick Contact Button (Mobile) -->
+            <a
+              href="/contact"
+              class="md:hidden bg-clr-orange hover:brightness-110 text-white px-3 py-2 rounded-lg font-semibold text-xs shadow-md hover:shadow-lg transition-all no-print"
+            >
+              Contact
+            </a>
+            <button
+              id="mobile-menu-button"
+              class="md:hidden text-gray-700 hover:text-clr-green p-2"
+              aria-label="Toggle menu"
+              aria-expanded="false"
+              aria-controls="mobile-menu"
+            >
+              <svg id="mobile-menu-icon" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+              <svg id="mobile-menu-close-icon" class="w-6 h-6 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
         </div>
-        <nav id="mobile-menu" class="hidden md:hidden pb-4 space-y-2">
-          <a href="/" class="block text-lg font-medium text-gray-700 hover:text-clr-green transition-colors py-2">Home</a>
-          <a href="/about" class="block text-lg font-medium text-gray-700 hover:text-clr-green transition-colors py-2">About</a>
-          <a href="/board" class="block text-lg font-medium text-gray-700 hover:text-clr-green transition-colors py-2">Board</a>
-          <a href="/news" class="block text-lg font-medium text-gray-700 hover:text-clr-green transition-colors py-2">News</a>
-          <a href="/documents" class="block text-lg font-medium text-gray-700 hover:text-clr-green transition-colors py-2">Documents</a>
-          <a href="/map" class="block text-lg font-medium text-gray-700 hover:text-clr-green transition-colors py-2">Community Map</a>
-          <a href="/contact" class="block text-lg font-medium text-gray-700 hover:text-clr-green transition-colors py-2">Contact</a>
+        <nav id="mobile-menu" class="hidden md:hidden pb-4 pt-4 border-t border-gray-200 space-y-1" role="navigation" aria-label="Mobile navigation">
+          <a href="/" class={`block text-lg font-medium transition-colors py-3 px-2 rounded-lg ${isActive('/') ? 'bg-clr-beige/30 text-clr-green font-semibold' : 'text-gray-700 hover:bg-clr-beige/20 hover:text-clr-green'}`}>Home</a>
+          <a href="/documents" class={`block text-lg font-medium transition-colors py-3 px-2 rounded-lg ${isActive('/documents') ? 'bg-clr-beige/30 text-clr-green font-semibold' : 'text-gray-700 hover:bg-clr-beige/20 hover:text-clr-green'}`}>Documents</a>
+          <a href="/dues" class={`block text-lg font-medium transition-colors py-3 px-2 rounded-lg ${isActive('/dues') ? 'bg-clr-beige/30 text-clr-green font-semibold' : 'text-gray-700 hover:bg-clr-beige/20 hover:text-clr-green'}`}>Dues</a>
+          <a href="/board" class={`block text-lg font-medium transition-colors py-3 px-2 rounded-lg ${isActive('/board') ? 'bg-clr-beige/30 text-clr-green font-semibold' : 'text-gray-700 hover:bg-clr-beige/20 hover:text-clr-green'}`}>Board</a>
+          
+          <!-- Mobile Resources Dropdown -->
+          <div>
+            <button
+              type="button"
+              id="mobile-resources-toggle"
+              class={`w-full flex items-center justify-between text-lg font-medium transition-colors py-3 px-2 rounded-lg ${isActive('/resources') ? 'bg-clr-beige/30 text-clr-green font-semibold' : 'text-gray-700 hover:bg-clr-beige/20 hover:text-clr-green'}`}
+              aria-expanded="false"
+              aria-controls="mobile-resources-submenu"
+            >
+              Resources
+              <svg class="w-4 h-4 transition-transform" id="mobile-resources-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            <div id="mobile-resources-submenu" class="hidden pl-4 space-y-1 mt-1">
+              {/* Most Frequently Used */}
+              {resourcesByCategory.main.length > 0 && (
+                <>
+                  <div class="px-2 py-1 text-xs font-semibold text-gray-500 uppercase tracking-wider">Most Used</div>
+                  {resourcesByCategory.main.map((item) => (
+                    <a
+                      href={item.path}
+                      class={`block text-base transition-colors py-2 px-2 rounded-lg font-body mobile-resources-link ${isActive(item.path) ? 'bg-clr-beige/30 text-clr-green font-semibold' : 'text-gray-600 hover:bg-clr-beige/20 hover:text-clr-green'}`}
+                    >
+                      {item.name}
+                    </a>
+                  ))}
+                </>
+              )}
+              
+              {/* Community Resources */}
+              {resourcesByCategory.community.length > 0 && (
+                <>
+                  <div class="px-2 py-1 text-xs font-semibold text-gray-500 uppercase tracking-wider mt-2">Community</div>
+                  {resourcesByCategory.community.map((item) => (
+                    <a
+                      href={item.path}
+                      class={`block text-base transition-colors py-2 px-2 rounded-lg font-body mobile-resources-link ${isActive(item.path) ? 'bg-clr-beige/30 text-clr-green font-semibold' : 'text-gray-600 hover:bg-clr-beige/20 hover:text-clr-green'}`}
+                    >
+                      {item.name}
+                    </a>
+                  ))}
+                </>
+              )}
+              
+              {/* Safety & Preparedness */}
+              {resourcesByCategory.safety.length > 0 && (
+                <>
+                  <div class="px-2 py-1 text-xs font-semibold text-gray-500 uppercase tracking-wider mt-2">Safety</div>
+                  {resourcesByCategory.safety.map((item) => (
+                    <a
+                      href={item.path}
+                      class={`block text-base transition-colors py-2 px-2 rounded-lg font-body mobile-resources-link ${isActive(item.path) ? 'bg-clr-beige/30 text-clr-green font-semibold' : 'text-gray-600 hover:bg-clr-beige/20 hover:text-clr-green'}`}
+                    >
+                      {item.name}
+                    </a>
+                  ))}
+                </>
+              )}
+              
+              {/* Legal & Compliance */}
+              {resourcesByCategory.legal.length > 0 && (
+                <>
+                  <div class="px-2 py-1 text-xs font-semibold text-gray-500 uppercase tracking-wider mt-2">Legal</div>
+                  {resourcesByCategory.legal.map((item) => (
+                    <a
+                      href={item.path}
+                      class={`block text-base transition-colors py-2 px-2 rounded-lg font-body mobile-resources-link ${isActive(item.path) ? 'bg-clr-beige/30 text-clr-green font-semibold' : 'text-gray-600 hover:bg-clr-beige/20 hover:text-clr-green'}`}
+                    >
+                      {item.name}
+                    </a>
+                  ))}
+                </>
+              )}
+              
+              {/* Maintenance */}
+              {resourcesByCategory.maintenance.length > 0 && (
+                <>
+                  <div class="px-2 py-1 text-xs font-semibold text-gray-500 uppercase tracking-wider mt-2">Maintenance</div>
+                  {resourcesByCategory.maintenance.map((item) => (
+                    <a
+                      href={item.path}
+                      class={`block text-base transition-colors py-2 px-2 rounded-lg font-body mobile-resources-link ${isActive(item.path) ? 'bg-clr-beige/30 text-clr-green font-semibold' : 'text-gray-600 hover:bg-clr-beige/20 hover:text-clr-green'}`}
+                    >
+                      {item.name}
+                    </a>
+                  ))}
+                </>
+              )}
+            </div>
+          </div>
+          
+          <a href="/news" class={`block text-lg font-medium transition-colors py-3 px-2 rounded-lg ${isActive('/news') ? 'bg-clr-beige/30 text-clr-green font-semibold' : 'text-gray-700 hover:bg-clr-beige/20 hover:text-clr-green'}`}>News</a>
         </nav>
       </div>
     </header>
 
-    <main>
+    <main id="main-content">
       <slot />
     </main>
 
-    <footer class="bg-clr-green text-white py-12 mt-24">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-        <p class="text-lg mb-4">© 2026 Crooked Lake Reserve HOA. All rights reserved.</p>
-        <p class="text-sm opacity-90">clrhoa.com | Serving our community with transparency and care</p>
-      </div>
-    </footer>
+    <Analytics />
 
     <script>
-      const menuButton = document.getElementById('mobile-menu-button');
-      const mobileMenu = document.getElementById('mobile-menu');
-      if (menuButton && mobileMenu) {
-        menuButton.addEventListener('click', () => {
+      (function () {
+        const menuButton = document.getElementById('mobile-menu-button');
+        const mobileMenu = document.getElementById('mobile-menu');
+        if (!menuButton || !mobileMenu) return;
+
+        const menuLinks = mobileMenu.querySelectorAll('a');
+        const firstLink = menuLinks[0];
+        const lastLink = menuLinks[menuLinks.length - 1];
+
+        const menuIcon = document.getElementById('mobile-menu-icon');
+        const menuCloseIcon = document.getElementById('mobile-menu-close-icon');
+        
+        function toggleMenu() {
+          const isOpen = !mobileMenu.classList.contains('hidden');
           mobileMenu.classList.toggle('hidden');
+          menuButton.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
+          
+          // Toggle icon visibility
+          if (menuIcon && menuCloseIcon) {
+            if (isOpen) {
+              menuIcon.classList.remove('hidden');
+              menuCloseIcon.classList.add('hidden');
+            } else {
+              menuIcon.classList.add('hidden');
+              menuCloseIcon.classList.remove('hidden');
+            }
+          }
+          
+          // Focus management
+          if (!isOpen) {
+            // Menu opening - focus first link
+            setTimeout(() => firstLink?.focus(), 100);
+          }
+        }
+
+        function closeMenu() {
+          mobileMenu.classList.add('hidden');
+          menuButton.setAttribute('aria-expanded', 'false');
+          if (menuIcon && menuCloseIcon) {
+            menuIcon.classList.remove('hidden');
+            menuCloseIcon.classList.add('hidden');
+          }
+          menuButton.focus();
+        }
+
+        // Toggle on button click
+        menuButton.addEventListener('click', toggleMenu);
+
+        // Close on Escape key
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape' && !mobileMenu.classList.contains('hidden')) {
+            closeMenu();
+          }
         });
-      }
+
+        // Focus trap when menu is open
+        function handleTabKey(e) {
+          if (mobileMenu.classList.contains('hidden')) return;
+
+          if (e.key === 'Tab') {
+            if (e.shiftKey) {
+              // Shift + Tab
+              if (document.activeElement === firstLink) {
+                e.preventDefault();
+                lastLink?.focus();
+              }
+            } else {
+              // Tab
+              if (document.activeElement === lastLink) {
+                e.preventDefault();
+                firstLink?.focus();
+              }
+            }
+          }
+        }
+
+        document.addEventListener('keydown', handleTabKey);
+
+        // Close menu when clicking outside
+        document.addEventListener('click', (e) => {
+          if (!mobileMenu.classList.contains('hidden') && 
+              !mobileMenu.contains(e.target) && 
+              !menuButton.contains(e.target)) {
+            closeMenu();
+          }
+        });
+
+        // Close menu when a link is clicked (mobile navigation)
+        menuLinks.forEach(link => {
+          link.addEventListener('click', () => {
+            closeMenu();
+          });
+        });
+
+        // Mobile Resources dropdown toggle
+        const mobileResourcesToggle = document.getElementById('mobile-resources-toggle');
+        const mobileResourcesSubmenu = document.getElementById('mobile-resources-submenu');
+        const mobileResourcesChevron = document.getElementById('mobile-resources-chevron');
+        
+        if (mobileResourcesToggle && mobileResourcesSubmenu && mobileResourcesChevron) {
+          mobileResourcesToggle.addEventListener('click', () => {
+            const isOpen = !mobileResourcesSubmenu.classList.contains('hidden');
+            mobileResourcesSubmenu.classList.toggle('hidden');
+            mobileResourcesToggle.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
+            mobileResourcesChevron.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(180deg)';
+          });
+
+          // Close mobile menu when clicking on a resources submenu link
+          const resourcesSubmenuLinks = mobileResourcesSubmenu.querySelectorAll('.mobile-resources-link');
+          resourcesSubmenuLinks.forEach(link => {
+            link.addEventListener('click', () => {
+              closeMenu();
+            });
+          });
+        }
+
+        // Desktop dropdown keyboard support
+        const resourcesDropdown = document.getElementById('resources-dropdown');
+        const resourcesDropdownButton = document.getElementById('resources-dropdown-button');
+        if (resourcesDropdown && resourcesDropdownButton) {
+          const dropdownMenu = resourcesDropdown.querySelector('[role="menu"]');
+          
+          resourcesDropdownButton.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              dropdownMenu?.classList.toggle('opacity-0');
+              dropdownMenu?.classList.toggle('invisible');
+              dropdownMenu?.classList.toggle('opacity-100');
+              dropdownMenu?.classList.toggle('visible');
+              const isExpanded = dropdownMenu?.classList.contains('visible');
+              resourcesDropdownButton.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
+            }
+            if (e.key === 'Escape') {
+              dropdownMenu?.classList.add('opacity-0', 'invisible');
+              dropdownMenu?.classList.remove('opacity-100', 'visible');
+              resourcesDropdownButton.setAttribute('aria-expanded', 'false');
+            }
+          });
+
+          // Close dropdown when clicking outside
+          document.addEventListener('click', (e) => {
+            if (!resourcesDropdown.contains(e.target as Node)) {
+              dropdownMenu?.classList.add('opacity-0', 'invisible');
+              dropdownMenu?.classList.remove('opacity-100', 'visible');
+              resourcesDropdownButton.setAttribute('aria-expanded', 'false');
+            }
+          });
+        }
+      })();
     </script>
+    <footer class="bg-gray-800 text-gray-300 py-12 mt-20">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="grid md:grid-cols-3 gap-8 mb-8">
+          <div>
+            <h3 class="text-lg font-heading font-semibold text-white mb-4">Crooked Lake Reserve HOA</h3>
+            <p class="text-gray-400 font-body text-sm">
+              Serving our beautiful lakefront community in Eustis, Florida.
+            </p>
+          </div>
+          <div>
+            <h3 class="text-lg font-heading font-semibold text-white mb-4">Quick Links</h3>
+            <ul class="space-y-2 text-sm font-body">
+              <li><a href="/documents" class="hover:text-clr-beige transition-colors">Documents</a></li>
+              <li><a href="/dues" class="hover:text-clr-beige transition-colors">Dues & Payment</a></li>
+              <li><a href="/board" class="hover:text-clr-beige transition-colors">Board & Committees</a></li>
+              <li><a href="/news" class="hover:text-clr-beige transition-colors">News</a></li>
+              <li><a href="/arb-process" class="hover:text-clr-beige transition-colors">ARB Process</a></li>
+              <li><a href="/voting" class="hover:text-clr-beige transition-colors">Voting & Proxy</a></li>
+            </ul>
+          </div>
+          <div>
+            <h3 class="text-lg font-heading font-semibold text-white mb-4">Resources</h3>
+            <ul class="space-y-2 text-sm font-body">
+              <li><a href="/resources" class="hover:text-clr-beige transition-colors">Resources Overview</a></li>
+              <li><a href="/resources/emergency-contacts" class="hover:text-clr-beige transition-colors">Emergency Contacts</a></li>
+              <li><a href="/resources/faq" class="hover:text-clr-beige transition-colors">FAQ</a></li>
+              <li><a href="/contact" class="hover:text-clr-beige transition-colors">Contact Us</a></li>
+              <li><a href="/about" class="hover:text-clr-beige transition-colors">About</a></li>
+            </ul>
+          </div>
+        </div>
+        <div class="border-t border-gray-700 pt-8">
+          <div class="flex flex-col md:flex-row justify-between items-center gap-4">
+            <p class="text-gray-400 font-body text-sm">
+              © {new Date().getFullYear()} Crooked Lake Reserve Homeowners Association. All rights reserved.
+            </p>
+            <div class="flex flex-col md:flex-row items-center gap-6">
+              {/* Social Media Links */}
+              {(facebookUrl || twitterUrl || instagramUrl || nextdoorUrl) && (
+                <div class="flex items-center gap-4 no-print">
+                  {facebookUrl && (
+                    <a
+                      href={facebookUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label="Facebook"
+                      class="text-gray-400 hover:text-clr-beige transition-colors"
+                    >
+                      <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path fill-rule="evenodd" d="M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878v-6.987h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.988C18.343 21.128 22 16.991 22 12z" clip-rule="evenodd" />
+                      </svg>
+                    </a>
+                  )}
+                  {twitterUrl && (
+                    <a
+                      href={twitterUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label="Twitter"
+                      class="text-gray-400 hover:text-clr-beige transition-colors"
+                    >
+                      <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M8.29 20.251c7.547 0 11.675-6.253 11.675-11.675 0-.178 0-.355-.012-.53A8.348 8.348 0 0022 5.92a8.19 8.19 0 01-2.357.646 4.118 4.118 0 001.804-2.27 8.224 8.224 0 01-2.605.996 4.107 4.107 0 00-6.993 3.743 11.65 11.65 0 01-8.457-4.287 4.106 4.106 0 001.27 5.477A4.072 4.072 0 012.8 9.713v.052a4.105 4.105 0 003.292 4.022 4.095 4.095 0 01-1.853.07 4.108 4.108 0 003.834 2.85A8.233 8.233 0 012 18.407a11.616 11.616 0 006.29 1.84" />
+                      </svg>
+                    </a>
+                  )}
+                  {instagramUrl && (
+                    <a
+                      href={instagramUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label="Instagram"
+                      class="text-gray-400 hover:text-clr-beige transition-colors"
+                    >
+                      <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path fill-rule="evenodd" d="M12.315 2c2.43 0 2.784.013 3.808.06 1.064.049 1.791.218 2.427.465a4.902 4.902 0 011.772 1.153 4.902 4.902 0 011.153 1.772c.247.636.416 1.363.465 2.427.048 1.067.06 1.407.06 4.123v.08c0 2.643-.012 2.987-.06 4.043-.049 1.064-.218 1.791-.465 2.427a4.902 4.902 0 01-1.153 1.772 4.902 4.902 0 01-1.772 1.153c-.636.247-1.363.416-2.427.465-1.067.048-1.407.06-4.123.06h-.08c-2.643 0-2.987-.012-4.043-.06-1.064-.049-1.791-.218-2.427-.465a4.902 4.902 0 01-1.772-1.153 4.902 4.902 0 01-1.153-1.772c-.247-.636-.416-1.363-.465-2.427-.047-1.024-.06-1.379-.06-3.808v-.63c0-2.43.013-2.784.06-3.808.049-1.064.218-1.791.465-2.427a4.902 4.902 0 011.153-1.772A4.902 4.902 0 015.45 2.525c.636-.247 1.363-.416 2.427-.465C8.901 2.013 9.256 2 11.685 2h.63zm-.081 1.802h-.468c-2.456 0-2.784.011-3.807.06-.97.045-1.504.207-1.857.344-.467.182-.8.398-1.15.748-.35.35-.566.683-.748 1.15-.137.353-.3.887-.344 1.857-.049 1.023-.06 1.351-.06 3.807v.468c0 2.456.011 2.784.06 3.807.045.97.207 1.504.344 1.857.182.466.399.8.748 1.15.35.35.683.566 1.15.748.353.137.887.3 1.857.344 1.054.048 1.37.06 4.041.06h.08c2.597 0 2.917-.012 3.96-.06.97-.045 1.504-.207 1.857-.344.466-.182.8-.398 1.15-.748.35-.35.566-.683.748-1.15.137-.353.3-.887.344-1.857.048-1.055.06-1.37.06-4.041v-.08c0-2.597-.012-2.917-.06-3.96-.045-.97-.207-1.504-.344-1.857a3.097 3.097 0 00-.748-1.15 3.098 3.098 0 00-1.15-.748c-.353-.137-.887-.3-1.857-.344-1.023-.049-1.351-.06-3.807-.06zM12 6.865a5.135 5.135 0 110 10.27 5.135 5.135 0 010-10.27zm0 1.802a3.333 3.333 0 100 6.666 3.333 3.333 0 000-6.666zm5.338-3.205a1.2 1.2 0 110 2.4 1.2 1.2 0 010-2.4z" clip-rule="evenodd" />
+                      </svg>
+                    </a>
+                  )}
+                  {nextdoorUrl && (
+                    <a
+                      href={nextdoorUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label="Nextdoor"
+                      class="text-gray-400 hover:text-clr-beige transition-colors"
+                    >
+                      <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm0 2.4c5.302 0 9.6 4.298 9.6 9.6 0 5.302-4.298 9.6-9.6 9.6-5.302 0-9.6-4.298-9.6-9.6C2.4 6.698 6.698 2.4 12 2.4zm-1.2 4.8v9.6h2.4V7.2h-2.4zm0-2.4h2.4v2.4h-2.4V4.8z" />
+                      </svg>
+                    </a>
+                  )}
+                </div>
+              )}
+              <div class="flex gap-6 mt-4 md:mt-0">
+                <a href="/privacy" class="text-gray-400 hover:text-clr-beige transition-colors font-body text-sm">Privacy Policy</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </footer>
   </body>
 </html>

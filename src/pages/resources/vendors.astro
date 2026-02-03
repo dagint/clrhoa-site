@@ -1,0 +1,204 @@
+---
+import ResourcesLayout from '../../layouts/ResourcesLayout.astro';
+
+// Vendor list - can be easily updated by the board
+// Structure: name, category, website (optional). No phone numbers are displayed.
+// If no website, a "Request Contact Info" link will appear.
+// See docs/VENDOR_LIST.md for complete instructions
+const vendors = [
+  // Security & Alarm
+  { name: 'ADT Security - David Moore', category: 'Security & Alarm', website: 'https://www.adt.com/local/fl' },
+  // Cabinets & Countertops
+  { name: 'Sunbright Designs', category: 'Cabinets & Countertops', website: 'https://www.sunbrightdesigns.com' },
+  { name: 'Duncan Stone', category: 'Cabinets & Countertops', website: 'https://duncanstoneinc.com' },
+  // Flooring & Tile
+  { name: 'Great Lakes Carpet/Tile', category: 'Flooring & Tile', website: 'https://greatlakescarpet.com' },
+  { name: 'Tripp Rohm', category: 'Flooring & Tile', website: null },
+  // Closet Systems & Insulation
+  { name: 'Suncoast Insulators', category: 'Closet Systems & Insulation', website: 'https://www.suncoastinsulators.com' },
+  // Electrical
+  { name: "Jimmy's Electric", category: 'Electrical Services', website: 'https://www.jimmys-electric.com' },
+  { name: 'Marathon Electrical Svc', category: 'Electrical Services', website: 'https://www.marathonelectricalservices.com' },
+  // Fencing
+  { name: 'Mossy Oak', category: 'Fencing', website: 'https://www.mossyoakfences.com' },
+  { name: 'Allstar Fence', category: 'Fencing', website: 'https://www.allstarfenceflorida.com' },
+  // Glass & Mirror
+  { name: 'Tri City Glass & Mirror', category: 'Glass & Mirror', website: 'https://www.jessestricityglassinc.com' },
+  // Handyman
+  { name: "Jonathan's Handyman Svc", category: 'General Contractors', website: 'https://jonathanshandyman.com' },
+  // HVAC & Plumbing
+  { name: 'Rapture Air', category: 'HVAC & Plumbing', website: 'https://raptureair.com' },
+  { name: 'Blue Sky Plumbers', category: 'HVAC & Plumbing', website: 'https://blueskyplumbingfl.com' },
+  { name: 'Dunstan Plumbing', category: 'HVAC & Plumbing', website: 'https://dunstansplumbing.com' },
+  // Landscaping & Lawn Care
+  { name: 'Yard Stop/Jessie', category: 'Landscaping & Lawn Care', website: 'https://yardstopgardencenter.com' },
+  { name: 'DJL Landscape', category: 'Landscaping & Lawn Care', website: 'https://www.djl-inc.com' },
+  { name: "Benny's Irrigation", category: 'Landscaping & Lawn Care', website: null },
+  { name: "Eddie's Lawn Svc", category: 'Landscaping & Lawn Care', website: null },
+  { name: 'Randle Faber', category: 'Landscaping & Lawn Care', website: null },
+  { name: 'Triple D Services', category: 'Landscaping & Lawn Care', website: 'https://tripledtreeservices.com' },
+  // Painting & Pressure Washing
+  { name: 'Jeff Buckner', category: 'Painting & Pressure Washing', website: null },
+  { name: 'Rian Miller', category: 'Painting & Pressure Washing', website: null },
+  { name: "Eddie's Pressure Washing", category: 'Painting & Pressure Washing', website: null },
+  // Patio & Outdoor
+  { name: 'Corals Casual Patio', category: 'Patio & Outdoor', website: 'https://coralscasualpatio.com' },
+  // Physical Therapy
+  { name: 'Mt Dora Physical Therapy', category: 'Other Services', website: 'https://mdpts.com' },
+  // Roofing & Exterior
+  { name: "Farmer's Roofing & Gutters", category: 'Roofing & Exterior', website: 'https://farmersroofs.com' },
+  { name: 'Danzig Prof. Finishes', category: 'Roofing & Exterior', website: null },
+  // Propane
+  { name: 'TD Propane', category: 'Other Services', website: 'https://tdpropane.com' },
+  // Well Drilling
+  { name: "Allen's Well Drilling", category: 'Well Drilling', website: 'https://allenswelldrilling.com' },
+  { name: 'Wiggins Bros Well Drilling', category: 'Well Drilling', website: 'https://wigginswell.com' },
+];
+
+// Group vendors by category
+const vendorsByCategory = vendors.reduce((acc, vendor) => {
+  if (!acc[vendor.category]) {
+    acc[vendor.category] = [];
+  }
+  acc[vendor.category].push(vendor);
+  return acc;
+}, {} as Record<string, typeof vendors>);
+
+// Category order for display
+const categoryOrder = [
+  'Landscaping & Lawn Care',
+  'Roofing & Exterior',
+  'HVAC & Plumbing',
+  'Electrical Services',
+  'Painting & Pressure Washing',
+  'Flooring & Tile',
+  'Cabinets & Countertops',
+  'Fencing',
+  'Glass & Mirror',
+  'General Contractors',
+  'Security & Alarm',
+  'Well Drilling',
+  'Closet Systems & Insulation',
+  'Patio & Outdoor',
+  'Other Services',
+];
+
+// Contact form URL with vendor request pre-filled
+const contactFormUrl = '/contact';
+---
+
+<ResourcesLayout title="Vendor List" description="Recommended vendors and service providers for Crooked Lake Reserve residents" currentSection="vendors">
+  <div class="max-w-4xl mx-auto">
+    <div class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
+      <div class="flex items-center gap-3 mb-6">
+        <svg class="w-8 h-8 text-clr-orange" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+        </svg>
+        <h1 class="text-3xl font-heading font-bold text-clr-green">Vendor List</h1>
+      </div>
+
+      <div class="space-y-6">
+        <!-- Privacy Notice -->
+        <div class="bg-yellow-50 border-2 border-yellow-200 rounded-lg p-6 mb-6">
+          <div class="flex items-start gap-3">
+            <svg class="w-6 h-6 text-yellow-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <div>
+              <h2 class="text-lg font-heading font-semibold text-yellow-900 mb-2">Protecting Our Vendors</h2>
+              <p class="text-yellow-800 font-body text-sm">
+                To protect our valued vendors from spam, scams, and unwanted solicitations, we only display vendor names and website addresses. For vendors without websites, please use the contact form to request their contact information.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {vendors.length === 0 ? (
+          <!-- Empty State -->
+          <div class="bg-clr-beige/30 border border-gray-200 rounded-lg p-8 text-center">
+            <p class="text-gray-700 font-body mb-4">
+              The vendor list is currently being updated. Please check back soon or contact the Board for vendor recommendations.
+            </p>
+            <a
+              href={contactFormUrl}
+              class="inline-flex items-center gap-2 bg-clr-orange hover:brightness-110 text-white px-6 py-3 rounded-xl font-semibold text-sm shadow-lg hover:shadow-xl transition-all font-body"
+            >
+              Contact the Board →
+            </a>
+          </div>
+        ) : (
+          <!-- Vendor List by Category -->
+          <div class="space-y-8">
+            {categoryOrder.map((category) => {
+              const categoryVendors = vendorsByCategory[category];
+              if (!categoryVendors || categoryVendors.length === 0) return null;
+              
+              return (
+                <div>
+                  <h2 class="text-2xl font-heading font-semibold text-clr-green mb-4">{category}</h2>
+                  <div class="space-y-3">
+                    {categoryVendors.map((vendor) => (
+                      <div class="bg-clr-beige/30 border border-gray-200 rounded-lg p-4 flex items-center justify-between card-hover">
+                        <div class="flex-1">
+                          <h3 class="text-lg font-heading font-semibold text-clr-green mb-1">{vendor.name}</h3>
+                        </div>
+                        <div class="flex items-center gap-3">
+                          {vendor.website ? (
+                            <a
+                              href={vendor.website}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              class="inline-flex items-center gap-2 text-clr-orange hover:underline font-semibold text-sm font-body"
+                            >
+                              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                              </svg>
+                              Visit Website
+                            </a>
+                          ) : (
+                            <a
+                              href={`${contactFormUrl}?recipient=vendor&vendor=${encodeURIComponent(vendor.name)}`}
+                              class="inline-flex items-center gap-2 text-clr-orange hover:underline font-semibold text-sm font-body"
+                            >
+                              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                              </svg>
+                              Request Contact Info
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        <!-- Additional Notes -->
+        <div class="bg-white border border-gray-200 rounded-lg p-6 mt-8">
+          <h2 class="text-xl font-heading font-semibold text-clr-green mb-4">Additional Information</h2>
+          <ul class="space-y-2 text-gray-700 font-body">
+            <li class="flex items-start gap-2">
+              <span class="text-clr-orange font-bold mt-1">•</span>
+              <span><strong>Vendor recommendations:</strong> This list includes vendors that have been used by community residents. The HOA does not endorse any specific vendor.</span>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-clr-orange font-bold mt-1">•</span>
+              <span><strong>Due diligence:</strong> Always verify licenses, insurance, and references before hiring any vendor.</span>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-clr-orange font-bold mt-1">•</span>
+              <span><strong>ARB approval:</strong> Some work may require Architectural Review Board approval. Check the <a href="/documents" class="text-clr-orange hover:underline font-semibold">Documents</a> page for guidelines.</span>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-clr-orange font-bold mt-1">•</span>
+              <span><strong>Suggest a vendor:</strong> If you've had a positive experience with a vendor, you can suggest them to the Board through the <a href={contactFormUrl} class="text-clr-orange hover:underline font-semibold">contact form</a>.</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</ResourcesLayout>

@@ -48,50 +48,11 @@ clrhoa-site/
 
 ## 📝 Content Management
 
-### Adding News Articles
+See **[Content Guide](docs/CONTENT.md)** for complete instructions on adding and updating content.
 
-1. Create a new Markdown file in `src/content/news/`
-2. Use the filename format: `YYYY-MM-DD-slug.md`
-3. Include frontmatter with required fields:
-
-```markdown
----
-title: Your Article Title
-date: 2026-01-15
-summary: A brief summary of the article
-tags:
-  - tag1
-  - tag2
-published: true
----
-
-# Your Article Title
-
-Your article content here...
-```
-
-### Adding Documents
-
-1. Upload the PDF file to `public/documents/files/`
-2. Create a Markdown file in `src/content/documents/`
-3. Include frontmatter:
-
-```markdown
----
-title: Document Name
-category: Governing Documents
-description: Brief description
-fileUrl: /documents/files/your-file.pdf
-effectiveDate: 2026-01-15
-published: true
----
-
-# Document Name
-
-Optional description or notes about the document.
-```
-
-**Categories:** `Governing Documents`, `Policies`, `Forms`, `Meeting Minutes`, `Other`
+**Quick reference:**
+- News articles: `src/content/news/` (format: `YYYY-MM-DD-slug.md`)
+- Documents: `src/content/documents/` (PDFs in `public/documents/files/`)
 
 ## 🏗️ Building for Production
 
@@ -101,61 +62,56 @@ npm run build
 
 This generates a static site in the `dist/` directory, ready for deployment.
 
-## 🌐 Deployment to Cloudflare Pages
+## 🌐 Deployment
 
-### Initial Setup
+See **[Deployment Guide](docs/DEPLOYMENT.md)** for complete deployment instructions.
 
-1. Push your code to GitHub
-2. Go to [Cloudflare Dashboard](https://dash.cloudflare.com) → Pages
-3. Click "Create a project" → "Connect to Git"
-4. Select your GitHub repository
+**Quick setup:**
+1. Push code to GitHub
+2. Connect to Cloudflare Pages
+3. Configure environment variables (see `docs/ENVIRONMENT_VARIABLES.md`)
+4. Deploy automatically on push to `main`
 
-### Build Settings
-
-Configure the following in Cloudflare Pages:
-
-- **Framework preset:** Astro
-- **Build command:** `npm run build`
-- **Build output directory:** `dist`
-- **Root directory:** `/` (or leave empty)
-- **Node version:** 18 or higher
-
-### Environment Variables
-
-No environment variables are required for basic deployment.
-
-### Custom Domain
-
-1. In Cloudflare Pages, go to your project → Custom domains
-2. Add `clrhoa.com` and `www.clrhoa.com`
-3. Follow Cloudflare's DNS configuration instructions
-
-### Automatic Deployments
-
-Cloudflare Pages automatically deploys:
-- Every push to `main` branch → Production
-- Pull requests → Preview deployments
-
-## 🔒 Security Notes
+## 🔒 Security
 
 - This is a static site with no server-side code
-- No third-party analytics or tracking scripts included
+- Privacy-friendly analytics available (opt-in via environment variables)
 - Board-only area has been removed for now; can be re-added with authentication later
 - All content is public
 
-## 📋 Deployment Checklist
+### Security Features
 
-- [ ] Install dependencies: `npm install`
-- [ ] Test locally: `npm run dev`
-- [ ] Build for production: `npm run build`
-- [ ] Verify `dist/` folder is created
-- [ ] Push code to GitHub repository
-- [ ] Connect repository to Cloudflare Pages
-- [ ] Set build command: `npm run build`
-- [ ] Set output directory: `dist`
-- [ ] Configure custom domain: `clrhoa.com`
-- [ ] Test production deployment
-- [ ] Update DNS records if needed
+- ✅ Security headers (CSP, HSTS, X-Frame-Options, etc.)
+- ✅ Cloudflare Turnstile bot protection on contact form
+- ✅ Honeypot spam prevention
+- ✅ Client-side form validation
+- ✅ No exposed email addresses or personal information
+- ✅ robots.txt and security.txt configured
+- ✅ HTTPS/SSL enforced via Cloudflare
+- ✅ Dependabot for automated security updates
+- ✅ Subresource Integrity (SRI) for external scripts
+- ✅ Security monitoring documentation
+
+See **[Security Guide](docs/SECURITY.md)** for complete security documentation.
+
+## 📊 Analytics (Optional)
+
+Privacy-friendly analytics can be enabled via environment variables. See `docs/ANALYTICS_SETUP.md` for setup instructions.
+
+## 🗺️ Sitemap
+
+A sitemap is automatically generated at `/sitemap.xml` and includes all published pages and news articles.
+
+## 📚 Documentation
+
+Complete documentation is available in the `docs/` folder:
+
+- **[Documentation Index](docs/README.md)** - Overview of all documentation
+- **[Quick Start](docs/QUICK_START.md)** - Get started in 5 minutes
+- **[Deployment Guide](docs/DEPLOYMENT.md)** - Complete deployment instructions
+- **[Content Guide](docs/CONTENT.md)** - Content management
+- **[Security Guide](docs/SECURITY.md)** - Security documentation
+- **[Environment Variables](docs/ENVIRONMENT_VARIABLES.md)** - Environment variable setup
 
 ## 🛠️ Development
 
@@ -165,6 +121,10 @@ Cloudflare Pages automatically deploys:
 - `npm run build` - Build for production
 - `npm run preview` - Preview production build locally
 - `npm run astro` - Run Astro CLI commands
+- `npm test` - Run tests in watch mode
+- `npm test -- --run` - Run tests once
+- `npm run test:ui` - Run tests with UI
+- `npm run test:coverage` - Run tests with coverage report
 
 ### Tech Stack
 
@@ -175,7 +135,7 @@ Cloudflare Pages automatically deploys:
 
 ## 📞 Support
 
-For questions about the website or content updates, contact the board at info@clrhoa.com.
+For questions about the website or content updates, please use the contact form on the website to reach the board securely.
 
 ## 📄 License
 

@@ -6,4 +6,15 @@ export default defineConfig({
   integrations: [tailwind()],
   output: 'static',
   site: 'https://clrhoa.com',
+  compressHTML: true,
+  build: {
+    inlineStylesheets: 'auto',
+    assets: '_assets',
+  },
+  vite: {
+    build: {
+      cssMinify: true,
+      minify: 'esbuild',
+    },
+  },
 });

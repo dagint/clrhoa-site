@@ -1,0 +1,232 @@
+---
+import ResourcesLayout from '../../layouts/ResourcesLayout.astro';
+
+const addressCity = import.meta.env.PUBLIC_PHYSICAL_ADDRESS_CITY ?? 'Eustis';
+const addressState = import.meta.env.PUBLIC_PHYSICAL_ADDRESS_STATE ?? 'FL';
+
+// Water restriction information from environment variables
+const waterRestrictionSchedule = import.meta.env.PUBLIC_WATER_RESTRICTION_SCHEDULE ?? '';
+const waterRestrictionPhone = import.meta.env.PUBLIC_WATER_RESTRICTION_PHONE ?? '';
+const waterRestrictionWebsite = import.meta.env.PUBLIC_WATER_RESTRICTION_WEBSITE ?? '';
+const waterUtilityContact = import.meta.env.PUBLIC_WATER_UTILITY_CONTACT ?? '';
+const waterUtilityPhone = import.meta.env.PUBLIC_WATER_UTILITY_PHONE ?? '';
+const waterUtilityWebsite = import.meta.env.PUBLIC_WATER_UTILITY_WEBSITE ?? '';
+---
+
+<ResourcesLayout title="Water Restrictions" description={`Water conservation restrictions and schedules for ${addressCity}, ${addressState}`} currentSection="water-restrictions">
+  <div class="max-w-4xl mx-auto">
+    <div class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
+      <div class="flex items-center gap-3 mb-6">
+        <svg class="w-8 h-8 text-clr-orange" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+        </svg>
+        <h1 class="text-3xl font-heading font-bold text-clr-green">Water Restrictions</h1>
+      </div>
+
+      <div class="space-y-6">
+        <p class="text-gray-700 font-body">
+          Florida has year-round water conservation measures to protect our water resources. Understanding and following water restrictions helps ensure adequate water supply for all residents and protects the environment.
+        </p>
+
+        <!-- Current Restrictions -->
+        {waterRestrictionSchedule && (
+          <div class="bg-clr-green/10 border-2 border-clr-green/30 rounded-2xl p-6">
+            <h2 class="text-xl font-heading font-bold text-clr-green mb-4">Current Watering Schedule</h2>
+            <div class="prose prose-sm max-w-none">
+              <div class="text-gray-700 font-body whitespace-pre-line">{waterRestrictionSchedule}</div>
+            </div>
+            {waterRestrictionPhone && (
+              <p class="text-gray-700 font-body text-sm mt-4">
+                <strong>Phone:</strong>{' '}
+                <a href={`tel:${waterRestrictionPhone.replace(/\D/g, '')}`} class="text-clr-orange hover:underline font-semibold">
+                  {waterRestrictionPhone}
+                </a>
+              </p>
+            )}
+            {waterRestrictionWebsite && (
+              <p class="text-gray-700 font-body text-sm mt-2">
+                <a href={waterRestrictionWebsite} target="_blank" rel="noopener noreferrer" class="text-clr-orange hover:underline font-semibold">
+                  View official restrictions →
+                </a>
+              </p>
+            )}
+          </div>
+        )}
+
+        <!-- General Florida Water Restrictions -->
+        <section class="bg-white border-2 border-clr-green rounded-2xl p-8">
+          <h2 class="text-2xl font-heading font-bold text-clr-green mb-6">Florida Water Restrictions Overview</h2>
+
+          <div class="space-y-6">
+            <div>
+              <h3 class="text-lg font-heading font-semibold text-clr-green mb-3">Year-Round Conservation Measures</h3>
+              <p class="text-gray-700 font-body mb-3">
+                The St. Johns River Water Management District (SJRWMD) and other water management districts in Florida enforce year-round water conservation measures. These typically include:
+              </p>
+              <ul class="text-gray-700 font-body space-y-2 list-disc list-inside ml-4">
+                <li>Lawn watering restrictions based on address and day of week</li>
+                <li>Time-of-day restrictions (typically before 10 AM or after 4 PM)</li>
+                <li>Prohibitions on watering during rain or within 48 hours of rainfall</li>
+                <li>Restrictions on washing vehicles, driveways, and sidewalks</li>
+                <li>Requirements for automatic shut-off nozzles on hoses</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 class="text-lg font-heading font-semibold text-clr-green mb-3">Typical Watering Schedule</h3>
+              <p class="text-gray-700 font-body mb-3">
+                Most Florida communities follow a schedule based on your address:
+              </p>
+              <div class="bg-clr-beige/30 border border-gray-200 rounded-lg p-4 mb-3">
+                <ul class="text-gray-700 font-body space-y-2 text-sm">
+                  <li><strong>Addresses ending in 0 or 1:</strong> Monday</li>
+                  <li><strong>Addresses ending in 2 or 3:</strong> Tuesday</li>
+                  <li><strong>Addresses ending in 4 or 5:</strong> Wednesday</li>
+                  <li><strong>Addresses ending in 6 or 7:</strong> Thursday</li>
+                  <li><strong>Addresses ending in 8 or 9:</strong> Friday</li>
+                  <li><strong>No watering:</strong> Saturday and Sunday (typically)</li>
+                </ul>
+              </div>
+              <p class="text-gray-700 font-body text-sm">
+                <strong>Note:</strong> Schedules may vary by water management district and local ordinances. Always check with your local water utility or water management district for current restrictions.
+              </p>
+            </div>
+
+            <div>
+              <h3 class="text-lg font-heading font-semibold text-clr-green mb-3">Watering Times</h3>
+              <p class="text-gray-700 font-body mb-3">
+                Watering is typically allowed:
+              </p>
+              <ul class="text-gray-700 font-body space-y-2 list-disc list-inside ml-4">
+                <li>Before 10:00 AM, or</li>
+                <li>After 4:00 PM</li>
+              </ul>
+              <p class="text-gray-700 font-body text-sm mt-3">
+                Watering during the heat of the day (10 AM - 4 PM) is generally prohibited as it wastes water through evaporation.
+              </p>
+            </div>
+
+            <div>
+              <h3 class="text-lg font-heading font-semibold text-clr-green mb-3">New Landscaping Exception</h3>
+              <p class="text-gray-700 font-body">
+                Newly installed landscaping (within 30-60 days) may be exempt from watering restrictions. Contact your water management district or local utility for details and required permits.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <!-- Water Conservation Tips -->
+        <section class="bg-white border-2 border-clr-green rounded-2xl p-8">
+          <h2 class="text-2xl font-heading font-bold text-clr-green mb-6">Water Conservation Tips</h2>
+
+          <div class="grid md:grid-cols-2 gap-6">
+            <div class="bg-clr-beige/30 border border-gray-200 rounded-lg p-4">
+              <h3 class="font-heading font-semibold text-clr-green mb-2">Landscaping</h3>
+              <ul class="text-gray-700 font-body text-sm space-y-1 list-disc list-inside">
+                <li>Use native Florida plants that require less water</li>
+                <li>Install drip irrigation systems</li>
+                <li>Apply mulch to retain soil moisture</li>
+                <li>Water deeply but less frequently</li>
+                <li>Adjust sprinklers to avoid pavement</li>
+              </ul>
+            </div>
+
+            <div class="bg-clr-beige/30 border border-gray-200 rounded-lg p-4">
+              <h3 class="font-heading font-semibold text-clr-green mb-2">Home & Garden</h3>
+              <ul class="text-gray-700 font-body text-sm space-y-1 list-disc list-inside">
+                <li>Fix leaks promptly</li>
+                <li>Use rain barrels to collect water</li>
+                <li>Wash vehicles with a bucket and sponge</li>
+                <li>Use a broom, not a hose, for cleaning</li>
+                <li>Install water-efficient fixtures</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <!-- Violations & Penalties -->
+        <section class="bg-yellow-50 border-2 border-yellow-200 rounded-2xl p-6">
+          <h2 class="text-xl font-heading font-bold text-yellow-900 mb-4">Violations & Penalties</h2>
+          <p class="text-yellow-800 font-body mb-3">
+            Violating water restrictions can result in:
+          </p>
+          <ul class="text-yellow-800 font-body space-y-2 list-disc list-inside ml-4">
+            <li>Warning notices for first-time violations</li>
+            <li>Fines ranging from $50 to $500 or more</li>
+            <li>Potential water service interruption for repeat violations</li>
+            <li>Legal action in severe cases</li>
+          </ul>
+        </section>
+
+        <!-- Resources & Contact -->
+        <section class="bg-clr-green/10 border-2 border-clr-green/30 rounded-2xl p-8">
+          <h2 class="text-xl font-heading font-bold text-clr-green mb-4">Resources & Contact Information</h2>
+
+          <div class="space-y-4">
+            {waterUtilityContact && (
+              <div class="bg-white border border-gray-200 rounded-lg p-4">
+                <h3 class="font-heading font-semibold text-clr-green mb-2">Local Water Utility</h3>
+                <p class="text-gray-700 font-body text-sm mb-2">
+                  <strong>{waterUtilityContact}</strong>
+                </p>
+                {waterUtilityPhone && (
+                  <p class="text-gray-700 font-body text-sm mb-2">
+                    <strong>Phone:</strong>{' '}
+                    <a href={`tel:${waterUtilityPhone.replace(/\D/g, '')}`} class="text-clr-orange hover:underline font-semibold">
+                      {waterUtilityPhone}
+                    </a>
+                  </p>
+                )}
+                {waterUtilityWebsite && (
+                  <p class="text-gray-700 font-body text-sm">
+                    <a href={waterUtilityWebsite} target="_blank" rel="noopener noreferrer" class="text-clr-orange hover:underline font-semibold">
+                      Visit website →
+                    </a>
+                  </p>
+                )}
+              </div>
+            )}
+
+            <div class="bg-white border border-gray-200 rounded-lg p-4">
+              <h3 class="font-heading font-semibold text-clr-green mb-2">St. Johns River Water Management District</h3>
+              <p class="text-gray-700 font-body text-sm mb-2">
+                Covers Lake County and surrounding areas. Check their website for current restrictions and water conservation information.
+              </p>
+              <p class="text-gray-700 font-body text-sm">
+                <a href="https://www.sjrwmd.com/waterways/water-conservation/" target="_blank" rel="noopener noreferrer" class="text-clr-orange hover:underline font-semibold">
+                  Visit SJRWMD Water Conservation →
+                </a>
+              </p>
+            </div>
+
+            <div class="bg-white border border-gray-200 rounded-lg p-4">
+              <h3 class="font-heading font-semibold text-clr-green mb-2">Florida Department of Environmental Protection</h3>
+              <p class="text-gray-700 font-body text-sm mb-2">
+                Statewide water conservation resources and information.
+              </p>
+              <p class="text-gray-700 font-body text-sm">
+                <a href="https://floridadep.gov/water/water-content/water-conservation" target="_blank" rel="noopener noreferrer" class="text-clr-orange hover:underline font-semibold">
+                  Visit FDEP Water Conservation →
+                </a>
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <!-- Questions -->
+        <div class="bg-blue-50 border-2 border-blue-200 rounded-lg p-6">
+          <h2 class="text-lg font-heading font-semibold text-blue-900 mb-2">Questions About Water Restrictions?</h2>
+          <p class="text-blue-800 font-body text-sm mb-4">
+            If you have questions about current restrictions or exemptions, contact your local water utility or water management district.
+          </p>
+          <a
+            href="/contact?recipient=board"
+            class="inline-flex items-center gap-2 text-clr-orange hover:underline font-semibold font-body"
+          >
+            Contact Board for Assistance →
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</ResourcesLayout>

@@ -1,14 +1,35 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+
+// Location information from environment variables
+const addressCity = import.meta.env.PUBLIC_PHYSICAL_ADDRESS_CITY ?? 'Eustis';
+const addressState = import.meta.env.PUBLIC_PHYSICAL_ADDRESS_STATE ?? 'FL';
+const meetingLocation = import.meta.env.PUBLIC_MEETING_LOCATION ?? 'Eustis Community Center';
+const meetingStreet = import.meta.env.PUBLIC_MEETING_ADDRESS_STREET ?? '';
+const meetingCity = import.meta.env.PUBLIC_MEETING_ADDRESS_CITY ?? '';
+const meetingState = import.meta.env.PUBLIC_MEETING_ADDRESS_STATE ?? '';
+const meetingZip = import.meta.env.PUBLIC_MEETING_ADDRESS_ZIP ?? '';
+
+// Build full address for display and Google Maps
+const meetingAddressParts = [meetingStreet, meetingCity, meetingState, meetingZip].filter(Boolean);
+const meetingFullAddress = meetingAddressParts.join(', ');
+const hasAddress = meetingStreet && meetingCity && meetingState;
+
+// Google Maps directions URL
+const directionsUrl = hasAddress
+  ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(meetingFullAddress)}`
+  : null;
+
+const aboutDescription = `Learn about Crooked Lake Reserve — 25 custom homes, 45 acres, ${addressCity} ${addressState}`;
 ---
 
-<BaseLayout title="About Our Community" description="Learn about Crooked Lake Reserve — 25 custom homes, 45 acres, lake access, Eustis FL">
+<BaseLayout title="About Our Community" description={aboutDescription}>
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
     <h1 class="text-4xl font-heading font-bold text-clr-green mb-12 text-center">About Crooked Lake Reserve</h1>
 
     <!-- Stats grid -->
     <section class="mb-16">
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-3xl mx-auto">
         <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 text-center card-hover">
           <p class="text-2xl md:text-3xl font-heading font-bold text-clr-green">25</p>
           <p class="text-clr-gray text-sm font-body">Homes</p>
@@ -20,10 +41,6 @@ import BaseLayout from '../layouts/BaseLayout.astro';
         <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 text-center card-hover">
           <p class="text-2xl md:text-3xl font-heading font-bold text-clr-green">1</p>
           <p class="text-clr-gray text-sm font-body">Annual Meeting</p>
-        </div>
-        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 text-center card-hover">
-          <p class="text-2xl md:text-3xl font-heading font-bold text-clr-green">—</p>
-          <p class="text-clr-gray text-sm font-body">Lake Access</p>
         </div>
       </div>
     </section>
@@ -40,9 +57,31 @@ import BaseLayout from '../layouts/BaseLayout.astro';
       <!-- Annual meeting -->
       <section class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 card-hover">
         <h2 class="text-2xl font-heading font-semibold text-clr-green mb-4">Annual Meeting</h2>
-        <p class="text-gray-700 font-body">
-          First Sunday in February, Eustis Community Center. The 2026 annual meeting was February 1, 2026, 2:00 PM–4:15 PM. Details and reminders are posted in <a href="/news" class="text-clr-orange hover:underline font-semibold">News</a>.
+        <p class="text-gray-700 font-body mb-4">
+          First Sunday in February, {meetingLocation}. The 2026 annual meeting was February 1, 2026, 2:00 PM–4:15 PM. Details and reminders are posted in <a href="/news" class="text-clr-orange hover:underline font-semibold">News</a>.
         </p>
+        {hasAddress && (
+          <div class="mt-4 p-4 bg-clr-beige/30 rounded-lg border border-gray-200">
+            <p class="text-gray-700 font-body font-semibold mb-2">Location:</p>
+            <p class="text-gray-700 font-body mb-3">
+              {meetingLocation}<br />
+              {meetingFullAddress}
+            </p>
+            {directionsUrl && (
+              <a
+                href={directionsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="inline-flex items-center gap-2 text-clr-orange hover:underline font-semibold font-body"
+              >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                </svg>
+                Get Directions
+              </a>
+            )}
+          </div>
+        )}
       </section>
 
       <!-- Contact / governance -->

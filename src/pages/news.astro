@@ -10,6 +10,27 @@ const publishedNews = allNews
     ...item,
     slug: item.data.slug || item.id.split('/').pop()?.replace('.md', '') || item.id,
   }));
+
+// Quarterly dues due dates: Jan 1, Apr 1, Jul 1, Oct 1
+const QUARTER_DUE_DATES = [
+  { month: 0, day: 1, quarter: 'Q1', name: 'January' },
+  { month: 3, day: 1, quarter: 'Q2', name: 'April' },
+  { month: 6, day: 1, quarter: 'Q3', name: 'July' },
+  { month: 9, day: 1, quarter: 'Q4', name: 'October' },
+];
+
+// Get the "next" quarter due date (for rendering the reminder card)
+function getNextDueDate(): { dueDate: Date; quarter: string; label: string; year: number } | null {
+  const now = new Date();
+  const year = now.getFullYear();
+  for (const q of QUARTER_DUE_DATES) {
+    const dueDate = new Date(year, q.month, q.day);
+    if (now <= dueDate) return { dueDate, quarter: q.quarter, label: q.name, year };
+  }
+  return { dueDate: new Date(year + 1, 0, 1), quarter: 'Q1', label: 'January', year: year + 1 };
+}
+
+const nextDue = getNextDueDate();
 ---
 
 <BaseLayout title="News & Announcements" description="Latest news and announcements from Crooked Lake Reserve HOA">
@@ -17,10 +38,36 @@ const publishedNews = allNews
     <div class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 max-w-2xl mx-auto">
       <h1 class="text-4xl font-heading font-bold text-clr-green mb-6">News & Announcements</h1>
 
-      {publishedNews.length === 0 ? (
+      {(publishedNews.length === 0 && !nextDue) ? (
         <p class="text-clr-gray font-body">No news items available at this time.</p>
       ) : (
         <div class="space-y-6">
+          {nextDue && (
+            <article
+              id="dues-reminder-card"
+              class="border-b border-gray-100 pb-6 bg-clr-beige/20 -mx-4 px-4 py-4 rounded-xl border border-clr-green/20"
+              data-due-date={nextDue.dueDate.toISOString().slice(0, 10)}
+              style="display: none;"
+            >
+              <div class="flex items-start justify-between gap-4 mb-2 flex-wrap">
+                <h2 class="text-2xl font-heading font-semibold text-clr-green">
+                  <span id="dues-reminder-title">{nextDue.quarter} {nextDue.year} HOA Dues Reminder</span>
+                </h2>
+                <span class="text-sm text-clr-gray whitespace-nowrap font-body" id="dues-reminder-date">
+                  Due {nextDue.dueDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                </span>
+              </div>
+              <p class="text-gray-700 mb-3 font-body">
+                Quarterly HOA dues are due by the 1st of the month. Payment options, mailing address, and drop-off information are on the Dues page.
+              </p>
+              <a
+                href="/dues"
+                class="text-clr-orange font-semibold hover:underline inline-block font-body"
+              >
+                View payment information →
+              </a>
+            </article>
+          )}
           {publishedNews.map((item) => (
             <article class="border-b border-gray-100 pb-6 last:border-b-0">
               <div class="flex items-start justify-between gap-4 mb-2 flex-wrap">
@@ -59,4 +106,19 @@ const publishedNews = allNews
       )}
     </div>
   </div>
+  {nextDue && (
+    <script define:vars={{ dueDateIso: nextDue.dueDate.toISOString().slice(0, 10) }}>
+      (function () {
+        const card = document.getElementById('dues-reminder-card');
+        if (!card) return;
+        const due = new Date(dueDateIso + 'T23:59:59');
+        const now = new Date();
+        const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+        const reminderStart = new Date(due.getTime() - thirtyDaysMs);
+        if (now >= reminderStart && now <= due) {
+          card.style.display = 'block';
+        }
+      })();
+    </script>
+  )}
 </BaseLayout>

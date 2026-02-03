@@ -1,0 +1,281 @@
+---
+import ResourcesLayout from '../../layouts/ResourcesLayout.astro';
+
+const addressCity = import.meta.env.PUBLIC_PHYSICAL_ADDRESS_CITY ?? 'Eustis';
+const addressState = import.meta.env.PUBLIC_PHYSICAL_ADDRESS_STATE ?? 'FL';
+---
+
+<ResourcesLayout title="Flood Insurance" description="Flood insurance information, FEMA flood zones, and flood preparedness for Florida homeowners">
+  <div class="max-w-4xl mx-auto">
+    <div class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
+      <div class="flex items-center gap-3 mb-6">
+        <svg class="w-8 h-8 text-clr-orange" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
+        </svg>
+        <h1 class="text-3xl font-heading font-bold text-clr-green">Flood Insurance</h1>
+      </div>
+
+      <div class="space-y-6">
+        <p class="text-gray-700 font-body">
+          Flooding is Florida's most common natural disaster. Standard homeowners insurance does not cover flood damage. Understanding flood risk and insurance options is essential for protecting your property and financial security.
+        </p>
+
+        <!-- Important Notice -->
+        <div class="bg-yellow-50 border-2 border-yellow-200 rounded-2xl p-6">
+          <h2 class="text-xl font-heading font-bold text-yellow-900 mb-3">Important: Flood Insurance is Separate</h2>
+          <p class="text-yellow-800 font-body mb-3">
+            <strong>Standard homeowners insurance does NOT cover flood damage.</strong> Flood insurance must be purchased separately through the National Flood Insurance Program (NFIP) or private insurers.
+          </p>
+          <p class="text-yellow-800 font-body text-sm">
+            Even if you're not in a high-risk flood zone, flooding can occur anywhere. Consider flood insurance even if it's not required by your mortgage lender.
+          </p>
+        </div>
+
+        <!-- FEMA Flood Zones -->
+        <section class="bg-white border-2 border-clr-green rounded-2xl p-8">
+          <h2 class="text-2xl font-heading font-bold text-clr-green mb-6">Understanding FEMA Flood Zones</h2>
+
+          <div class="space-y-6">
+            <div>
+              <h3 class="text-lg font-heading font-semibold text-clr-green mb-3">High-Risk Zones (Flood Insurance Required)</h3>
+              <div class="bg-red-50 border-2 border-red-200 rounded-lg p-4 mb-4">
+                <ul class="text-red-800 font-body text-sm space-y-2 list-disc list-inside">
+                  <li><strong>Zone A:</strong> Areas with 1% annual chance of flooding (100-year floodplain)</li>
+                  <li><strong>Zone AE:</strong> Areas with 1% annual chance of flooding with base flood elevations</li>
+                  <li><strong>Zone AH:</strong> Areas with 1% annual chance of shallow flooding (1-3 feet)</li>
+                  <li><strong>Zone AO:</strong> Areas with 1% annual chance of shallow flooding (sheet flow)</li>
+                  <li><strong>Zone V:</strong> Coastal areas with 1% annual chance of flooding with wave action</li>
+                  <li><strong>Zone VE:</strong> Coastal areas with 1% annual chance of flooding with base flood elevations</li>
+                </ul>
+              </div>
+              <p class="text-gray-700 font-body text-sm">
+                <strong>Note:</strong> If your property is in a high-risk zone and you have a mortgage, your lender will require flood insurance.
+              </p>
+            </div>
+
+            <div>
+              <h3 class="text-lg font-heading font-semibold text-clr-green mb-3">Moderate to Low-Risk Zones</h3>
+              <div class="bg-blue-50 border-2 border-blue-200 rounded-lg p-4 mb-4">
+                <ul class="text-blue-800 font-body text-sm space-y-2 list-disc list-inside">
+                  <li><strong>Zone X (Shaded):</strong> Areas with 0.2% annual chance of flooding (500-year floodplain)</li>
+                  <li><strong>Zone X (Unshaded):</strong> Areas outside the 500-year floodplain</li>
+                  <li><strong>Zone D:</strong> Areas with undetermined flood risk</li>
+                </ul>
+              </div>
+              <p class="text-gray-700 font-body text-sm">
+                <strong>Important:</strong> Even in low-risk zones, flooding can occur. About 25% of flood insurance claims come from areas outside high-risk zones.
+              </p>
+            </div>
+
+            <div>
+              <h3 class="text-lg font-heading font-semibold text-clr-green mb-3">Check Your Flood Zone</h3>
+              <p class="text-gray-700 font-body mb-3">
+                Use FEMA's Flood Map Service Center to find your property's flood zone:
+              </p>
+              <div class="bg-clr-beige/30 border border-gray-200 rounded-lg p-4">
+                <a
+                  href="https://msc.fema.gov/portal/home"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="inline-flex items-center gap-2 text-clr-orange hover:underline font-semibold font-body"
+                >
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                  FEMA Flood Map Service Center →
+                </a>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- National Flood Insurance Program -->
+        <section class="bg-white border-2 border-clr-green rounded-2xl p-8">
+          <h2 class="text-2xl font-heading font-bold text-clr-green mb-6">National Flood Insurance Program (NFIP)</h2>
+
+          <div class="space-y-6">
+            <div>
+              <h3 class="text-lg font-heading font-semibold text-clr-green mb-3">Coverage Options</h3>
+              <div class="grid md:grid-cols-2 gap-4">
+                <div class="bg-clr-beige/30 border border-gray-200 rounded-lg p-4">
+                  <h4 class="font-heading font-semibold text-clr-green mb-2">Building Coverage</h4>
+                  <ul class="text-gray-700 font-body text-sm space-y-1 list-disc list-inside">
+                    <li>Up to $250,000 coverage</li>
+                    <li>Covers structure and foundation</li>
+                    <li>Electrical and plumbing systems</li>
+                    <li>HVAC systems</li>
+                    <li>Built-in appliances</li>
+                  </ul>
+                </div>
+
+                <div class="bg-clr-beige/30 border border-gray-200 rounded-lg p-4">
+                  <h4 class="font-heading font-semibold text-clr-green mb-2">Contents Coverage</h4>
+                  <ul class="text-gray-700 font-body text-sm space-y-1 list-disc list-inside">
+                    <li>Up to $100,000 coverage</li>
+                    <li>Personal belongings</li>
+                    <li>Furniture and electronics</li>
+                    <li>Clothing and appliances</li>
+                    <li>Valuables (limited)</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <h3 class="text-lg font-heading font-semibold text-clr-green mb-3">Key Information</h3>
+              <ul class="text-gray-700 font-body space-y-2 list-disc list-inside ml-4">
+                <li><strong>30-Day Waiting Period:</strong> Coverage typically begins 30 days after purchase (except for new loans)</li>
+                <li><strong>Annual Premiums:</strong> Vary based on flood zone, elevation, and coverage amount</li>
+                <li><strong>Deductibles:</strong> Separate deductibles for building and contents coverage</li>
+                <li><strong>Renewal:</strong> Policies must be renewed annually</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 class="text-lg font-heading font-semibold text-clr-green mb-3">How to Purchase</h3>
+              <p class="text-gray-700 font-body mb-3">
+                NFIP flood insurance is sold through licensed insurance agents. You can:
+              </p>
+              <ul class="text-gray-700 font-body space-y-2 list-disc list-inside ml-4">
+                <li>Contact your homeowners insurance agent</li>
+                <li>Use the NFIP agent locator to find a local agent</li>
+                <li>Call the NFIP directly at 1-888-379-9531</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <!-- Private Flood Insurance -->
+        <section class="bg-white border-2 border-clr-green rounded-2xl p-8">
+          <h2 class="text-2xl font-heading font-bold text-clr-green mb-6">Private Flood Insurance</h2>
+
+          <div class="space-y-4">
+            <p class="text-gray-700 font-body">
+              In addition to NFIP, private insurers also offer flood insurance. Private policies may offer:
+            </p>
+            <ul class="text-gray-700 font-body space-y-2 list-disc list-inside ml-4">
+              <li>Higher coverage limits</li>
+              <li>Additional coverage options</li>
+              <li>Potentially lower premiums (compare carefully)</li>
+              <li>Shorter waiting periods</li>
+            </ul>
+            <p class="text-gray-700 font-body text-sm mt-4">
+              <strong>Important:</strong> If you have a mortgage, ensure private flood insurance meets your lender's requirements. Compare NFIP and private options to find the best coverage for your needs.
+            </p>
+          </div>
+        </section>
+
+        <!-- Flood Preparedness -->
+        <section class="bg-clr-beige/30 border border-gray-200 rounded-2xl p-8">
+          <h2 class="text-2xl font-heading font-bold text-clr-green mb-6">Flood Preparedness</h2>
+
+          <div class="space-y-6">
+            <div>
+              <h3 class="text-lg font-heading font-semibold text-clr-green mb-3">Before a Flood</h3>
+              <ul class="text-gray-700 font-body space-y-2 list-disc list-inside ml-4">
+                <li>Know your flood risk and evacuation routes</li>
+                <li>Create an inventory of your belongings (photos/video)</li>
+                <li>Store important documents in a waterproof container</li>
+                <li>Elevate valuable items in your home</li>
+                <li>Install sump pumps and check valves</li>
+                <li>Review your flood insurance policy annually</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 class="text-lg font-heading font-semibold text-clr-green mb-3">During a Flood</h3>
+              <ul class="text-gray-700 font-body space-y-2 list-disc list-inside ml-4">
+                <li>Evacuate if advised by authorities</li>
+                <li>Move to higher ground</li>
+                <li>Avoid walking or driving through floodwaters</li>
+                <li>Turn off utilities if instructed</li>
+                <li>Stay informed through local news and weather alerts</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 class="text-lg font-heading font-semibold text-clr-green mb-3">After a Flood</h3>
+              <ul class="text-gray-700 font-body space-y-2 list-disc list-inside ml-4">
+                <li>Document all damage with photos and videos</li>
+                <li>Contact your insurance company immediately</li>
+                <li>Keep records of all expenses related to the flood</li>
+                <li>Do not enter flooded areas until authorities say it's safe</li>
+                <li>Be cautious of electrical hazards and contaminated water</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <!-- Resources -->
+        <section class="bg-clr-green/10 border-2 border-clr-green/30 rounded-2xl p-8">
+          <h2 class="text-xl font-heading font-bold text-clr-green mb-4">Resources & Links</h2>
+
+          <div class="space-y-4">
+            <div class="bg-white border border-gray-200 rounded-lg p-4">
+              <h3 class="font-heading font-semibold text-clr-green mb-2">FEMA Flood Map Service Center</h3>
+              <p class="text-gray-700 font-body text-sm mb-2">
+                Find your property's flood zone and view flood maps.
+              </p>
+              <a
+                href="https://msc.fema.gov/portal/home"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="text-clr-orange hover:underline font-semibold text-sm font-body"
+              >
+                Visit FEMA Flood Maps →
+              </a>
+            </div>
+
+            <div class="bg-white border border-gray-200 rounded-lg p-4">
+              <h3 class="font-heading font-semibold text-clr-green mb-2">National Flood Insurance Program</h3>
+              <p class="text-gray-700 font-body text-sm mb-2">
+                Official NFIP website with information, agent locator, and resources.
+              </p>
+              <p class="text-gray-700 font-body text-sm mb-2">
+                <strong>Phone:</strong>{' '}
+                <a href="tel:18883799531" class="text-clr-orange hover:underline font-semibold">1-888-379-9531</a>
+              </p>
+              <a
+                href="https://www.fema.gov/flood-insurance"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="text-clr-orange hover:underline font-semibold text-sm font-body"
+              >
+                Visit NFIP Website →
+              </a>
+            </div>
+
+            <div class="bg-white border border-gray-200 rounded-lg p-4">
+              <h3 class="font-heading font-semibold text-clr-green mb-2">FloodSmart.gov</h3>
+              <p class="text-gray-700 font-body text-sm mb-2">
+                FEMA's official flood insurance website with cost estimator and resources.
+              </p>
+              <a
+                href="https://www.floodsmart.gov"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="text-clr-orange hover:underline font-semibold text-sm font-body"
+              >
+                Visit FloodSmart.gov →
+              </a>
+            </div>
+          </div>
+        </section>
+
+        <!-- Questions -->
+        <div class="bg-blue-50 border-2 border-blue-200 rounded-lg p-6">
+          <h2 class="text-lg font-heading font-semibold text-blue-900 mb-2">Questions About Flood Insurance?</h2>
+          <p class="text-blue-800 font-body text-sm mb-4">
+            For questions about flood insurance, flood zones, or flood preparedness, contact your insurance agent or FEMA. The Board can provide general information but cannot provide insurance advice.
+          </p>
+          <a
+            href="/contact?recipient=board"
+            class="inline-flex items-center gap-2 text-clr-orange hover:underline font-semibold font-body"
+          >
+            Contact Board for General Information →
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</ResourcesLayout>

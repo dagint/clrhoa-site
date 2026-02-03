@@ -4,18 +4,35 @@ import { heroRotate, heroImages } from '../config/hero';
 
 const showRotation = heroRotate && heroImages.length > 1;
 const heroImage = heroImages[0] ?? '/placeholder-lake.jpg';
+const siteURL = import.meta.env.SITE || 'https://clrhoa.com';
+const meetingLocation = import.meta.env.PUBLIC_MEETING_LOCATION ?? 'Eustis Community Center';
+const meetingStreet = import.meta.env.PUBLIC_MEETING_ADDRESS_STREET ?? '';
+const meetingCity = import.meta.env.PUBLIC_MEETING_ADDRESS_CITY ?? '';
+const meetingState = import.meta.env.PUBLIC_MEETING_ADDRESS_STATE ?? '';
+const meetingZip = import.meta.env.PUBLIC_MEETING_ADDRESS_ZIP ?? '';
+
+// Build full address for display and Google Maps
+const meetingAddressParts = [meetingStreet, meetingCity, meetingState, meetingZip].filter(Boolean);
+const meetingFullAddress = meetingAddressParts.join(', ');
+const hasAddress = meetingStreet && meetingCity && meetingState;
+
+// Google Maps directions URL
+const directionsUrl = hasAddress
+  ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(meetingFullAddress)}`
+  : null;
 ---
 
-<BaseLayout title="Home">
+<BaseLayout title="Home" preloadImages={[heroImage]}>
   <section class="hero-gradient min-h-screen flex items-center text-white relative overflow-hidden">
     <div class="absolute inset-0 bg-black/20" aria-hidden="true"></div>
     {showRotation ? (
-      <div id="hero-slides" class="absolute inset-0" aria-hidden="true">
+      <div id="hero-slides" class="absolute inset-0" role="img" aria-label="Crooked Lake Reserve community images">
         {heroImages.map((src, i) => (
           <div
             class={`hero-slide absolute inset-0 bg-cover bg-center transition-opacity duration-1000 ${i === 0 ? 'hero-slide-active opacity-30' : 'opacity-0'}`}
             style={{ backgroundImage: `url(${src})` }}
             data-hero-index={i}
+            aria-hidden={i !== 0}
           />
         ))}
       </div>
@@ -23,7 +40,8 @@ const heroImage = heroImages[0] ?? '/placeholder-lake.jpg';
       <div
         class="absolute inset-0 bg-cover bg-center opacity-30"
         style={{ backgroundImage: `url(${heroImage})` }}
-        aria-hidden="true"
+        role="img"
+        aria-label="Crooked Lake Reserve community"
       />
     )}
     <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
@@ -67,11 +85,31 @@ const heroImage = heroImages[0] ?? '/placeholder-lake.jpg';
   <section class="py-20 bg-clr-beige/50">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <h2 class="text-3xl font-heading font-bold text-center text-clr-green mb-16">Quick Access</h2>
-      <div class="grid md:grid-cols-3 gap-8">
+      <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
         <div class="card-hover bg-white p-8 rounded-2xl shadow-sm border border-gray-100 text-center max-w-2xl mx-auto md:max-w-none">
           <h3 class="text-2xl font-semibold text-clr-green mb-4">Annual Meeting</h3>
-          <p class="text-clr-gray mb-6">First Sunday in February, Eustis Community Center. 2026: Feb 1, 2:00–4:15 PM</p>
-          <a href="/news" class="text-clr-orange font-semibold hover:underline">Details →</a>
+          <p class="text-clr-gray mb-3">First Sunday in February, {meetingLocation}. 2026: Feb 1, 2:00–4:15 PM</p>
+          {hasAddress && (
+            <p class="text-clr-gray text-sm mb-3 font-body">
+              {meetingFullAddress}
+            </p>
+          )}
+          <div class="flex flex-col gap-2 items-center">
+            <a href="/news" class="text-clr-orange font-semibold hover:underline font-body">Details →</a>
+            {directionsUrl && (
+              <a
+                href={directionsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="inline-flex items-center gap-1 text-clr-orange font-semibold hover:underline text-sm font-body"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                </svg>
+                Get Directions
+              </a>
+            )}
+          </div>
         </div>
         <div class="card-hover bg-white p-8 rounded-2xl shadow-sm border border-gray-100 text-center max-w-2xl mx-auto md:max-w-none">
           <h3 class="text-2xl font-semibold text-clr-green mb-4">Documents & Forms</h3>
@@ -79,9 +117,14 @@ const heroImage = heroImages[0] ?? '/placeholder-lake.jpg';
           <a href="/documents" class="text-clr-orange font-semibold hover:underline">Browse →</a>
         </div>
         <div class="card-hover bg-white p-8 rounded-2xl shadow-sm border border-gray-100 text-center max-w-2xl mx-auto md:max-w-none">
-          <h3 class="text-2xl font-semibold text-clr-green mb-4">Contact the Board</h3>
-          <p class="text-clr-gray mb-6">Questions or feedback</p>
-          <a href="/contact" class="text-clr-orange font-semibold hover:underline">Contact →</a>
+          <h3 class="text-2xl font-semibold text-clr-green mb-4">Resources</h3>
+          <p class="text-clr-gray mb-6">Emergency info, Florida HOA laws, and contacts</p>
+          <a href="/resources" class="text-clr-orange font-semibold hover:underline">View →</a>
+        </div>
+        <div class="card-hover bg-white p-8 rounded-2xl shadow-sm border border-gray-100 text-center max-w-2xl mx-auto md:max-w-none">
+          <h3 class="text-2xl font-semibold text-clr-green mb-4">Dues & Payment</h3>
+          <p class="text-clr-gray mb-6">Payment information and due dates</p>
+          <a href="/dues" class="text-clr-orange font-semibold hover:underline">View Details →</a>
         </div>
       </div>
     </div>

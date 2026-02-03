@@ -1,14 +1,14 @@
 ---
-title: Architectural Review Request Form
+title: ARB Request Form (2026)
 category: Forms
-description: Submit this form to request approval for architectural modifications or improvements to your property.
-fileUrl: /documents/files/architectural-review-form.pdf
+description: Submit this form to request Architectural Review Board (ARB) approval for modifications or improvements to your property.
+fileUrl: /docs/CLR-ARB-Request-Form-2026.docx
 published: true
 ---
 
-# Architectural Review Request Form
+# ARB Request Form (2026)
 
-Use this form to request approval for any modifications to your property, including:
+Use this form to request Architectural Review Board (ARB) approval for modifications to your property, including:
 
 - Exterior paint colors
 - Fence installations

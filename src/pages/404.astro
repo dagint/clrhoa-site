@@ -1,0 +1,34 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="Page Not Found" description="The page you're looking for doesn't exist">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+    <div class="max-w-2xl mx-auto text-center">
+      <div class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
+        <h1 class="text-6xl font-heading font-bold text-clr-green mb-4">404</h1>
+        <h2 class="text-3xl font-heading font-semibold text-clr-green mb-4">Page Not Found</h2>
+        <p class="text-gray-700 mb-8 font-body text-lg">
+          Sorry, the page you're looking for doesn't exist or has been moved.
+        </p>
+        <div class="flex flex-col sm:flex-row gap-4 justify-center">
+          <a href="/" class="inline-flex items-center px-6 py-3 rounded-lg text-sm font-medium text-white bg-clr-green hover:bg-clr-green/90 transition-colors font-body">
+            Go to Homepage
+          </a>
+          <a href="/contact" class="inline-flex items-center px-6 py-3 rounded-lg text-sm font-medium text-clr-green bg-white border-2 border-clr-green hover:bg-clr-beige/30 transition-colors font-body">
+            Contact Us
+          </a>
+        </div>
+        <div class="mt-8 pt-8 border-t border-gray-100">
+          <p class="text-gray-600 mb-4 font-body">Popular pages:</p>
+          <nav class="flex flex-wrap justify-center gap-4" aria-label="Popular pages">
+            <a href="/news" class="text-clr-orange hover:underline font-semibold font-body">News</a>
+            <a href="/documents" class="text-clr-orange hover:underline font-semibold font-body">Documents</a>
+            <a href="/about" class="text-clr-orange hover:underline font-semibold font-body">About</a>
+            <a href="/board" class="text-clr-orange hover:underline font-semibold font-body">Board</a>
+          </nav>
+        </div>
+      </div>
+    </div>
+  </div>
+</BaseLayout>

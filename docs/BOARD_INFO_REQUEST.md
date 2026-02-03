@@ -10,57 +10,50 @@ This is a **simple request** you can send to the board. They can reply by fillin
 
 Hi everyone,
 
-The new Crooked Lake Reserve website (clrhoa.com) is almost ready. I need a few details from the board so we can replace the placeholder text and go live. **You can just reply to this email with the information below**—fill in what you know, and say “skip” or “we’ll get back to you” for anything that needs follow-up.
+The new Crooked Lake Reserve website (clrhoa.com) is almost ready. I need a few details from the board so we can replace the placeholder text and go live. **You can just reply to this email with the information below**—fill in what you know, and say "skip" or "we'll get back to you" for anything that needs follow-up.
 
 ---
 
-### 1. Board & Committees page (who to list)
+### 1. Board & Committees page
 
-**Current board members and their roles.**  
-Example format (use whatever is correct for us):
+**Note:** The site uses a generic approach and does not display individual board member names for privacy. The Board page describes the board's role and directs residents to use the contact form.
 
-- President: [Full name]
-- Vice President: [Full name]
-- Secretary: [Full name]
-- Treasurer: [Full name]
-- (Any other board members: name and role)
-
-If you prefer **only names** (no titles), or a different format, just say how you’d like it to read.
-
-**Architectural Review (ARC):**  
-Should we list a specific contact for ARC requests (e.g. one person’s name), or keep it as “contact the board” for ARC?  
-Reply: [Specific contact name] OR [Keep as “contact the board”]
+**Architectural Review Board (ARB):**  
+The site includes information about the ARB and directs residents to use the contact form, selecting "Architectural Review Board (ARB)" as the recipient. No changes needed unless you want to update the description.
 
 ---
 
 ### 2. Contact page (how residents reach the board)
 
-**Email for homeowner inquiries:**  
-Is **info@clrhoa.com** correct and checked regularly? If not, what email should we show?  
-Reply: [Yes, use info@clrhoa.com] OR [Use this instead: _______________]
+**Contact form:**  
+The site uses a secure contact form (Formspree) that allows residents to select whether they're contacting the Board of Directors or the Architectural Review Board. No email addresses are exposed on the site.
+
+**Formspree configuration:**  
+The contact form needs to be configured with Formspree. The form will route messages to the appropriate recipients based on the selection. You'll need to set up a Formspree account and configure where messages should be delivered.
 
 **Phone number:**  
-The site currently has a fake number. What number should we publish (or should we say “contact by email only”)?  
-Reply: [Phone number] OR [Email only—no phone]
+The site does not display a phone number. All contact is handled through the secure contact form. If you want to add a phone number, we can add it, but it's recommended to use the form for security.
+
+**Note:** No email addresses are displayed on the site to protect board and committee members' privacy.
 
 **Mailing address:**  
 What is the official HOA mailing address? (This will appear on the Contact page.)  
 Is this the same address where residents send dues, or is there a different address for payments?  
 Reply:  
 Address: _______________________________________________  
-Same for dues? [Yes / No — if no, we’ll add payment address separately]
+Same for dues? [Yes / No — if no, we'll add payment address separately]
 
 **How fast does the board usually respond?**  
-The site says “typically within 2–3 business days.” Is that right, or should we say something else (e.g. “within 5 business days” or “best effort”)?  
+The site says "typically within 2–3 business days." Is that right, or should we say something else (e.g. "within 5 business days" or "best effort")?  
 Reply: [Keep as is] OR [Change to: _______________]
 
 ---
 
 ### 3. Documents (PDFs for the website)
 
-We need the **current Covenants** (with all addendums) and **current Bylaws** (with addendum) as PDF files so we can put “Download” links on the Documents page.  
+We need the **current Covenants** (with all addendums) and **current Bylaws** (with addendum) as PDF files so we can put "Download" links on the Documents page.  
 Do you already have these as PDFs, or will someone need to scan/create them?  
-Reply: [We have them—we’ll send them] OR [We need to get them—we’ll follow up by _______________]
+Reply: [We have them—we'll send them] OR [We need to get them—we'll follow up by _______________]
 
 ---
 
@@ -71,21 +64,21 @@ Reply: [We have them—we’ll send them] OR [We need to get them—we’ll foll
 
 ---
 
-Once I have the info above, I’ll update the site and can send you a link to review before we announce it.
+Once I have the info above, I'll update the site and can send you a link to review before we announce it.
 
 Thanks,  
 [Your name]
 
 ---
 
-## Quick Reference: What We’re Replacing on the Site
+## Quick Reference: What We're Replacing on the Site
 
 | Page        | Placeholder / fake info now           | What we need from board              |
 |------------|----------------------------------------|--------------------------------------|
-| Board      | “Board member information will be updated here” | Names + roles (President, Secretary, etc.) |
-| Contact    | Phone (555) 123-4567                   | Real phone or “email only”           |
+| Board      | Generic board information              | No changes needed (no named members) |
+| Contact    | Secure contact form                    | Configure Formspree form routing     |
 | Contact    | P.O. Box 1234, Your City, ST 12345     | Real HOA mailing address             |
-| Contact    | info@clrhoa.com                        | Confirm or correct email             |
+| Contact    | No email displayed                     | Configure Formspree to route messages |
 | Documents  | Download links for Covenants & Bylaws  | The actual PDF files                 |
 
 Nothing in this request requires the board to use the computer in any special way—they can reply in plain email with the information filled in.

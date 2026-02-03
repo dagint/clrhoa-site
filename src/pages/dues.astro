@@ -1,0 +1,219 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Breadcrumbs from '../components/Breadcrumbs.astro';
+
+// Payment information from environment variables
+const quarterlyAmount = import.meta.env.PUBLIC_QUARTERLY_DUES_AMOUNT ?? '';
+const paymentAddressName = import.meta.env.PUBLIC_MAILING_ADDRESS_NAME ?? 'Crooked Lake Reserve HOA';
+const paymentAddressLine1 = import.meta.env.PUBLIC_MAILING_ADDRESS_LINE1 ?? 'P.O. Box 1234';
+const paymentAddressLine2 = import.meta.env.PUBLIC_MAILING_ADDRESS_LINE2 ?? 'Your City, ST 12345';
+const paymentMethods = import.meta.env.PUBLIC_PAYMENT_METHODS ?? 'Check';
+const lateFeeAmount = import.meta.env.PUBLIC_LATE_FEE_AMOUNT ?? '';
+const lateFeeDays = import.meta.env.PUBLIC_LATE_FEE_DAYS ?? '15';
+const paymentInstructions = import.meta.env.PUBLIC_PAYMENT_INSTRUCTIONS ?? '';
+const dropOffLocation = import.meta.env.PUBLIC_PAYMENT_DROP_OFF_LOCATION ?? '';
+
+// Due dates (quarterly: January, April, July, October)
+const dueDates = [
+  { quarter: 'Q1', month: 'January', day: '1' },
+  { quarter: 'Q2', month: 'April', day: '1' },
+  { quarter: 'Q3', month: 'July', day: '1' },
+  { quarter: 'Q4', month: 'October', day: '1' },
+];
+---
+
+<BaseLayout title="Dues & Payment Information" description="HOA dues payment information, due dates, and payment methods for Crooked Lake Reserve">
+  <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+    <Breadcrumbs items={[
+      { label: 'Home', href: '/' },
+      { label: 'Dues & Payment', href: '/dues' },
+    ]} />
+    <div class="max-w-2xl mx-auto mb-12 text-center">
+      <h1 class="text-4xl font-heading font-bold text-clr-green mb-4">Dues & Payment Information</h1>
+      <p class="text-gray-700 font-body text-lg">
+        Quarterly assessments and payment information for Crooked Lake Reserve homeowners.
+      </p>
+    </div>
+
+    <!-- Payment Amount & Schedule -->
+    <section class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 mb-8">
+      <div class="flex items-center gap-3 mb-6">
+        <svg class="w-8 h-8 text-clr-orange" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+        <h2 class="text-2xl font-heading font-bold text-clr-green">Quarterly Assessments</h2>
+      </div>
+
+      {quarterlyAmount && (
+        <div class="bg-clr-beige/30 border border-gray-200 rounded-lg p-6 mb-6">
+          <p class="text-gray-700 font-body mb-2">
+            <strong class="text-clr-green text-lg">Quarterly Amount:</strong>
+          </p>
+          <p class="text-3xl font-heading font-bold text-clr-green mb-4">${quarterlyAmount}</p>
+          <p class="text-gray-700 font-body text-sm">
+            Due on the 1st of each quarter: January, April, July, and October.
+          </p>
+        </div>
+      )}
+
+      <div class="grid md:grid-cols-2 gap-4 mb-6">
+        {dueDates.map((due) => (
+          <div class="bg-clr-beige/30 border border-gray-200 rounded-lg p-4">
+            <h3 class="text-lg font-heading font-semibold text-clr-green mb-1">{due.quarter}</h3>
+            <p class="text-gray-700 font-body">
+              <strong>{due.month} {due.day}</strong>
+            </p>
+          </div>
+        ))}
+      </div>
+
+      {!quarterlyAmount && (
+        <div class="bg-yellow-50 border-2 border-yellow-200 rounded-lg p-4">
+          <p class="text-yellow-800 font-body text-sm">
+            <strong>Note:</strong> The quarterly assessment amount is reviewed annually by the Board during meetings. If there are material changes to the assessment amount, homeowners will be notified by mail. Please contact the Board for the current amount.
+          </p>
+        </div>
+      )}
+    </section>
+
+    <!-- Payment Methods -->
+    <section class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 mb-8">
+      <div class="flex items-center gap-3 mb-6">
+        <svg class="w-8 h-8 text-clr-orange" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+        </svg>
+        <h2 class="text-2xl font-heading font-bold text-clr-green">Payment Methods</h2>
+      </div>
+
+      <div class="space-y-4">
+        {paymentMethods.includes('Check') && (
+          <div class="bg-clr-beige/30 border border-gray-200 rounded-lg p-6">
+            <h3 class="text-lg font-heading font-semibold text-clr-green mb-3">Check or Money Order</h3>
+            <p class="text-gray-700 font-body mb-3">
+              Make checks payable to: <strong>{paymentAddressName}</strong>
+            </p>
+            <div class="bg-white border border-gray-300 rounded-lg p-4 font-mono text-sm text-gray-700 mb-4">
+              <p class="font-semibold mb-1">{paymentAddressName}</p>
+              <p>{paymentAddressLine1}</p>
+              {paymentAddressLine2 && <p>{paymentAddressLine2}</p>}
+            </div>
+            {dropOffLocation && (
+              <div class="bg-blue-50 border-2 border-blue-200 rounded-lg p-4 mb-4">
+                <p class="text-blue-800 font-body text-sm">
+                  <strong>Drop-Off Option:</strong> You can also drop off your payment at {dropOffLocation}.
+                </p>
+              </div>
+            )}
+            {paymentInstructions && (
+              <p class="text-gray-700 font-body text-sm mt-3">
+                <strong>Instructions:</strong> {paymentInstructions}
+              </p>
+            )}
+            <p class="text-gray-700 font-body text-sm mt-3">
+              <strong>Important:</strong> Include your lot number or property address on the memo line of your check.
+            </p>
+          </div>
+        )}
+
+        {paymentMethods.includes('Online') && (
+          <div class="bg-clr-beige/30 border border-gray-200 rounded-lg p-6">
+            <h3 class="text-lg font-heading font-semibold text-clr-green mb-3">Online Payment</h3>
+            <p class="text-gray-700 font-body mb-3">
+              Online payment options may be available. Please contact the Board for current online payment methods and instructions.
+            </p>
+            <a
+              href="/contact?recipient=board"
+              class="inline-flex items-center gap-2 text-clr-orange hover:underline font-semibold font-body"
+            >
+              Contact Board for Online Payment Info →
+            </a>
+          </div>
+        )}
+
+        {paymentMethods.includes('Bank') && (
+          <div class="bg-clr-beige/30 border border-gray-200 rounded-lg p-6">
+            <h3 class="text-lg font-heading font-semibold text-clr-green mb-3">Bank Transfer / ACH</h3>
+            <p class="text-gray-700 font-body mb-3">
+              Bank transfer information is available upon request. Please contact the Board for account details and setup instructions.
+            </p>
+            <a
+              href="/contact?recipient=board"
+              class="inline-flex items-center gap-2 text-clr-orange hover:underline font-semibold font-body"
+            >
+              Contact Board for Bank Transfer Info →
+            </a>
+          </div>
+        )}
+      </div>
+    </section>
+
+    <!-- Late Fees & Important Information -->
+    <section class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 mb-8">
+      <div class="flex items-center gap-3 mb-6">
+        <svg class="w-8 h-8 text-clr-orange" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+        </svg>
+        <h2 class="text-2xl font-heading font-bold text-clr-green">Important Payment Information</h2>
+      </div>
+
+      <div class="space-y-4">
+        {lateFeeAmount && (
+          <div class="bg-yellow-50 border-2 border-yellow-200 rounded-lg p-6">
+            <h3 class="text-lg font-heading font-semibold text-yellow-900 mb-2">Late Fees</h3>
+            <p class="text-yellow-800 font-body">
+              Payments received after the {lateFeeDays}th day of the due month will incur a late fee of <strong>${lateFeeAmount}</strong>.
+            </p>
+          </div>
+        )}
+
+        <div class="bg-clr-beige/30 border border-gray-200 rounded-lg p-6">
+          <h3 class="text-lg font-heading font-semibold text-clr-green mb-3">Payment Guidelines</h3>
+          <ul class="space-y-2 text-gray-700 font-body list-disc list-inside">
+            <li>Payments are due on the 1st of each quarter (January, April, July, October)</li>
+            <li>Include your lot number or property address with all payments</li>
+            <li>Allow 5-7 business days for mail delivery</li>
+            <li>Keep a copy of your payment for your records</li>
+            <li>Contact the Board immediately if you have payment questions or concerns</li>
+          </ul>
+        </div>
+
+        <div class="bg-blue-50 border-2 border-blue-200 rounded-lg p-6">
+          <h3 class="text-lg font-heading font-semibold text-blue-900 mb-2">Payment Questions?</h3>
+          <p class="text-blue-800 font-body mb-3">
+            If you have questions about your assessment amount, payment status, or need to discuss payment arrangements, please contact the Board.
+          </p>
+          <a
+            href="/contact?recipient=board"
+            class="inline-flex items-center gap-2 bg-clr-orange hover:brightness-110 text-white px-6 py-3 rounded-xl font-semibold text-sm shadow-lg hover:shadow-xl transition-all font-body"
+          >
+            Contact Board →
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- Assessment Review Process -->
+    <section class="bg-clr-green/10 border-2 border-clr-green/30 rounded-2xl p-8">
+      <h2 class="text-xl font-heading font-bold text-clr-green mb-4">Assessment Review Process</h2>
+      <p class="text-gray-700 font-body mb-4">
+        The Board reviews the annual assessment amount during Board meetings each year. Assessment amounts typically remain consistent unless material changes are needed.
+      </p>
+      <div class="bg-white border border-gray-200 rounded-lg p-4 mb-4">
+        <h3 class="text-lg font-heading font-semibold text-clr-green mb-2">Notification of Changes</h3>
+        <p class="text-gray-700 font-body text-sm mb-2">
+          If there are <strong>material changes</strong> to the assessment amount, homeowners will be notified by mail. This notification will include:
+        </p>
+        <ul class="space-y-1 text-gray-700 font-body text-sm list-disc list-inside ml-4">
+          <li>Updated assessment amount</li>
+          <li>Effective date of the change</li>
+          <li>Quarterly payment schedule</li>
+          <li>Payment instructions and mailing address</li>
+          <li>Late fee information (if applicable)</li>
+        </ul>
+      </div>
+      <p class="text-gray-700 font-body text-sm">
+        If you have questions about the current assessment amount or need to verify your payment amount, please contact the Board.
+      </p>
+    </section>
+  </div>
+</BaseLayout>

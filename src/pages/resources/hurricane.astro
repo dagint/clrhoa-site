@@ -1,0 +1,105 @@
+---
+import ResourcesLayout from '../../layouts/ResourcesLayout.astro';
+---
+
+<ResourcesLayout title="Hurricane & Storm Preparedness" description="Storm preparation checklists, evacuation information, and recovery resources for Florida residents" currentSection="hurricane">
+  <div class="max-w-4xl mx-auto">
+    <div class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
+      <div class="flex items-center gap-3 mb-6">
+        <svg class="w-8 h-8 text-clr-orange" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
+        </svg>
+        <h1 class="text-3xl font-heading font-bold text-clr-green">Hurricane & Storm Preparedness</h1>
+      </div>
+
+      <div class="space-y-6">
+        <div>
+          <h2 class="text-xl font-heading font-semibold text-clr-green mb-3">Before a Storm</h2>
+          <ul class="space-y-2 text-gray-700 font-body">
+            <li class="flex items-start gap-2">
+              <span class="text-clr-orange font-bold mt-1">•</span>
+              <span><strong>Secure outdoor items:</strong> Bring in or secure patio furniture, grills, decorations, and any loose items that could become projectiles.</span>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-clr-orange font-bold mt-1">•</span>
+              <span><strong>Trim trees:</strong> Remove dead or overhanging branches that could damage property or block roads.</span>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-clr-orange font-bold mt-1">•</span>
+              <span><strong>Check supplies:</strong> Ensure you have flashlights, batteries, non-perishable food, water (1 gallon per person per day), first aid kit, and medications.</span>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-clr-orange font-bold mt-1">•</span>
+              <span><strong>Review insurance:</strong> Verify your homeowner's insurance and flood insurance coverage.</span>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-clr-orange font-bold mt-1">•</span>
+              <span><strong>Document property:</strong> Take photos or videos of your property and belongings for insurance purposes.</span>
+            </li>
+          </ul>
+        </div>
+
+        <div>
+          <h2 class="text-xl font-heading font-semibold text-clr-green mb-3">During a Storm</h2>
+          <ul class="space-y-2 text-gray-700 font-body">
+            <li class="flex items-start gap-2">
+              <span class="text-clr-orange font-bold mt-1">•</span>
+              <span><strong>Stay indoors:</strong> Remain inside away from windows, skylights, and glass doors.</span>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-clr-orange font-bold mt-1">•</span>
+              <span><strong>Monitor weather:</strong> Keep a battery-powered radio or weather alert device nearby.</span>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-clr-orange font-bold mt-1">•</span>
+              <span><strong>Evacuation:</strong> If ordered to evacuate, do so immediately. Follow designated evacuation routes.</span>
+            </li>
+          </ul>
+        </div>
+
+        <div>
+          <h2 class="text-xl font-heading font-semibold text-clr-green mb-3">After a Storm</h2>
+          <ul class="space-y-2 text-gray-700 font-body">
+            <li class="flex items-start gap-2">
+              <span class="text-clr-orange font-bold mt-1">•</span>
+              <span><strong>Safety first:</strong> Check for downed power lines, gas leaks, and structural damage before re-entering your home.</span>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-clr-orange font-bold mt-1">•</span>
+              <span><strong>Document damage:</strong> Take photos of any damage for insurance claims before making temporary repairs.</span>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-clr-orange font-bold mt-1">•</span>
+              <span><strong>Report issues:</strong> Contact the Board if community infrastructure (roads, drainage, etc.) is damaged.</span>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-clr-orange font-bold mt-1">•</span>
+              <span><strong>Community cleanup:</strong> Coordinate with neighbors for debris removal and recovery efforts.</span>
+            </li>
+          </ul>
+        </div>
+
+        <div class="bg-clr-beige/30 border border-gray-200 rounded-lg p-4 mt-6">
+          <h3 class="font-heading font-semibold text-clr-green mb-2">Additional Resources</h3>
+          <ul class="space-y-1 text-gray-700 font-body text-sm">
+            <li>
+              <a href="https://www.lakecountyfl.gov/emergency-management" target="_blank" rel="noopener noreferrer" class="text-clr-orange hover:underline font-semibold">
+                Lake County Emergency Management →
+              </a>
+            </li>
+            <li>
+              <a href="https://www.floridadisaster.org/" target="_blank" rel="noopener noreferrer" class="text-clr-orange hover:underline font-semibold">
+                Florida Division of Emergency Management →
+              </a>
+            </li>
+            <li>
+              <a href="https://www.nhc.noaa.gov/" target="_blank" rel="noopener noreferrer" class="text-clr-orange hover:underline font-semibold">
+                National Hurricane Center →
+              </a>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</ResourcesLayout>

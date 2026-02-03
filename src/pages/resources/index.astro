@@ -1,0 +1,140 @@
+---
+import ResourcesLayout from '../../layouts/ResourcesLayout.astro';
+
+const addressCity = import.meta.env.PUBLIC_PHYSICAL_ADDRESS_CITY ?? 'Eustis';
+const addressState = import.meta.env.PUBLIC_PHYSICAL_ADDRESS_STATE ?? 'FL';
+
+const sections = [
+  {
+    id: 'emergency-contacts',
+    name: 'Emergency Contacts',
+    path: '/resources/emergency-contacts',
+    description: '911, emergency services, utilities, and local government contacts.',
+    icon: 'M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z',
+  },
+  {
+    id: 'local-resources',
+    name: 'Local Resources',
+    path: '/resources/local-resources',
+    description: `Government services, schools, utilities, and community resources for ${addressCity}, ${addressState}.`,
+    icon: 'M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z',
+  },
+  {
+    id: 'vendors',
+    name: 'Vendor List',
+    path: '/resources/vendors',
+    description: 'Recommended vendors and service providers. Contact information available through secure request.',
+    icon: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4',
+  },
+  {
+    id: 'map',
+    name: 'Community Map',
+    path: '/resources/map',
+    description: 'Satellite view and Lake County GIS parcel map for Crooked Lake Reserve.',
+    icon: 'M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z M15 11a3 3 0 11-6 0 3 3 0 016 0z',
+  },
+  {
+    id: 'hurricane',
+    name: 'Hurricane Preparedness',
+    path: '/resources/hurricane',
+    description: 'Storm preparation checklists, evacuation information, and recovery resources.',
+    icon: 'M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z',
+  },
+  {
+    id: 'law',
+    name: 'Florida HOA Law',
+    path: '/resources/law',
+    description: 'Florida statutes, Sunshine Law, and homeowner rights and responsibilities.',
+    icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
+  },
+  {
+    id: 'pest-control',
+    name: 'Pest Control',
+    path: '/resources/pest-control',
+    description: 'Common Florida pests, prevention tips, and professional pest control guidance.',
+    icon: 'M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z',
+  },
+  {
+    id: 'water-restrictions',
+    name: 'Water Restrictions',
+    path: '/resources/water-restrictions',
+    description: 'Florida water conservation restrictions, watering schedules, and conservation tips.',
+    icon: 'M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z',
+  },
+  {
+    id: 'wildlife-safety',
+    name: 'Wildlife Safety',
+    path: '/resources/wildlife-safety',
+    description: 'Florida wildlife safety information, including alligators, snakes, and other native wildlife.',
+    icon: 'M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z',
+  },
+  {
+    id: 'flood-insurance',
+    name: 'Flood Insurance',
+    path: '/resources/flood-insurance',
+    description: 'Flood insurance information, FEMA flood zones, and flood preparedness for Florida homeowners.',
+    icon: 'M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z',
+  },
+  {
+    id: 'faq',
+    name: 'FAQ',
+    path: '/resources/faq',
+    description: 'Common questions and answers about HOA dues, rules, ARB process, and community information.',
+    icon: 'M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
+  },
+];
+---
+
+<ResourcesLayout title="Resources & Emergency Information" description="Emergency preparedness, Florida HOA resources, and important contacts for Crooked Lake Reserve residents">
+  <div class="max-w-4xl mx-auto">
+    <div class="text-center mb-12">
+      <h1 class="text-4xl font-heading font-bold text-clr-green mb-4">Resources & Emergency Information</h1>
+      <p class="text-gray-700 font-body text-lg">
+        Important resources, emergency preparedness information, and contacts for Crooked Lake Reserve residents.
+      </p>
+    </div>
+
+    <!-- Section Cards -->
+    <div class="grid md:grid-cols-2 gap-6 mb-12">
+      {sections.map((section) => (
+        <a
+          href={section.path}
+          class="card-hover bg-white p-8 rounded-2xl shadow-sm border border-gray-100 block transition-all hover:shadow-md"
+        >
+          <div class="flex items-start gap-4">
+            <div class="flex-shrink-0">
+              <div class="w-12 h-12 bg-clr-beige/30 rounded-lg flex items-center justify-center">
+                <svg class="w-6 h-6 text-clr-orange" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={section.icon} />
+                </svg>
+              </div>
+            </div>
+            <div class="flex-1">
+              <h2 class="text-2xl font-heading font-semibold text-clr-green mb-2">{section.name}</h2>
+              <p class="text-gray-700 font-body mb-3">{section.description}</p>
+              <span class="inline-flex items-center gap-1 text-clr-orange font-semibold text-sm">
+                Learn more →
+              </span>
+            </div>
+          </div>
+        </a>
+      ))}
+    </div>
+
+    <!-- Quick Links -->
+    <div class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
+      <h2 class="text-2xl font-heading font-semibold text-clr-green mb-6 text-center">Quick Links</h2>
+      <div class="grid md:grid-cols-3 gap-4">
+        <a href="/contact" class="card-hover bg-clr-beige/30 border border-gray-200 rounded-lg p-4 text-center">
+          <p class="text-clr-green font-heading font-semibold">Contact the Board</p>
+        </a>
+        <a href="/documents" class="card-hover bg-clr-beige/30 border border-gray-200 rounded-lg p-4 text-center">
+          <p class="text-clr-green font-heading font-semibold">HOA Documents</p>
+        </a>
+        <a href="/news" class="card-hover bg-clr-beige/30 border border-gray-200 rounded-lg p-4 text-center">
+          <p class="text-clr-green font-heading font-semibold">Latest News</p>
+        </a>
+      </div>
+    </div>
+  </div>
+</ResourcesLayout>

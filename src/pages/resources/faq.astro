@@ -1,0 +1,281 @@
+---
+import ResourcesLayout from '../../layouts/ResourcesLayout.astro';
+import Breadcrumbs from '../../components/Breadcrumbs.astro';
+
+const breadcrumbs = [
+  { label: 'Home', href: '/' },
+  { label: 'Resources', href: '/resources' },
+  { label: 'FAQ', href: '/resources/faq' },
+];
+---
+
+<ResourcesLayout title="Frequently Asked Questions" description="Common questions and answers about Crooked Lake Reserve HOA, dues, rules, and community information" currentSection="faq">
+  <div class="max-w-4xl mx-auto">
+    <Breadcrumbs items={breadcrumbs} />
+    <div class="max-w-2xl mx-auto mb-12 text-center">
+      <h1 class="text-4xl font-heading font-bold text-clr-green mb-4">Frequently Asked Questions</h1>
+      <p class="text-gray-700 font-body text-lg">
+        Common questions about Crooked Lake Reserve HOA, assessments, rules, and community information.
+      </p>
+    </div>
+
+    <div class="space-y-6">
+      <!-- Dues & Assessments -->
+      <section class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
+        <h2 class="text-2xl font-heading font-bold text-clr-green mb-6 flex items-center gap-3">
+          <svg class="w-6 h-6 text-clr-orange" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          Dues & Assessments
+        </h2>
+
+        <div class="space-y-6">
+          <div>
+            <h3 class="text-lg font-heading font-semibold text-clr-green mb-2">When are HOA dues due?</h3>
+            <p class="text-gray-700 font-body">
+              Quarterly assessments are due on the 1st of each quarter: <strong>January 1</strong>, <strong>April 1</strong>, <strong>July 1</strong>, and <strong>October 1</strong>. See the <a href="/dues" class="text-clr-orange hover:underline font-semibold">Dues & Payment Information</a> page for details.
+            </p>
+          </div>
+
+          <div>
+            <h3 class="text-lg font-heading font-semibold text-clr-green mb-2">How much are the quarterly assessments?</h3>
+            <p class="text-gray-700 font-body">
+              The assessment amount is reviewed annually by the Board during meetings. Assessment amounts typically remain consistent unless material changes are needed. If there are material changes, homeowners will be notified by mail. For the current amount, please contact the Board.
+            </p>
+          </div>
+
+          <div>
+            <h3 class="text-lg font-heading font-semibold text-clr-green mb-2">What payment methods are accepted?</h3>
+            <p class="text-gray-700 font-body">
+              Payments can be made by check or money order sent to the HOA mailing address. Online payment options may be available—contact the Board for current payment methods. See the <a href="/dues" class="text-clr-orange hover:underline font-semibold">Dues & Payment Information</a> page for details.
+            </p>
+          </div>
+
+          <div>
+            <h3 class="text-lg font-heading font-semibold text-clr-green mb-2">What happens if I pay late?</h3>
+            <p class="text-gray-700 font-body">
+              Late fees may apply to payments received after the due date. The specific late fee amount and grace period are outlined in the governing documents. If there are changes to late fee policies, homeowners will be notified by mail. Contact the Board if you have questions about late fees or need to discuss payment arrangements.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ARB & Modifications -->
+      <section class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
+        <h2 class="text-2xl font-heading font-bold text-clr-green mb-6 flex items-center gap-3">
+          <svg class="w-6 h-6 text-clr-orange" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+          </svg>
+          ARB & Property Modifications
+        </h2>
+
+        <div class="space-y-6">
+          <div>
+            <h3 class="text-lg font-heading font-semibold text-clr-green mb-2">What modifications require ARB approval?</h3>
+            <p class="text-gray-700 font-body">
+              Most exterior modifications require approval from the Architectural Review Board (ARB), including fences, decks, roofing changes, paint colors, landscaping changes, and outdoor structures. See the <a href="/arb-process" class="text-clr-orange hover:underline font-semibold">ARB Process Guide</a> for a complete list and process details.
+            </p>
+          </div>
+
+          <div>
+            <h3 class="text-lg font-heading font-semibold text-clr-green mb-2">How do I submit an ARB request?</h3>
+            <p class="text-gray-700 font-body">
+              Submit your request through the <a href="/contact?recipient=arb" class="text-clr-orange hover:underline font-semibold">Contact</a> page, selecting "Architectural Review Board (ARB)" as the recipient. Include detailed information about your proposed modification, plans, materials, and photos. See the <a href="/arb-process" class="text-clr-orange hover:underline font-semibold">ARB Process Guide</a> for step-by-step instructions.
+            </p>
+          </div>
+
+          <div>
+            <h3 class="text-lg font-heading font-semibold text-clr-green mb-2">Is there a fee for ARB approval?</h3>
+            <p class="text-gray-700 font-body">
+              No. The $500 ARB application fee was removed in 2022. There is currently no fee for ARB review requests.
+            </p>
+          </div>
+
+          <div>
+            <h3 class="text-lg font-heading font-semibold text-clr-green mb-2">How long does ARB review take?</h3>
+            <p class="text-gray-700 font-body">
+              The ARB typically reviews requests within 30 days of submission. Complex requests may take longer, especially if additional information is needed. Submit your request well in advance of when you plan to begin work.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Rules & Regulations -->
+      <section class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
+        <h2 class="text-2xl font-heading font-bold text-clr-green mb-6 flex items-center gap-3">
+          <svg class="w-6 h-6 text-clr-orange" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          Rules & Regulations
+        </h2>
+
+        <div class="space-y-6">
+          <div>
+            <h3 class="text-lg font-heading font-semibold text-clr-green mb-2">What are the key rules I should know?</h3>
+            <p class="text-gray-700 font-body mb-2">
+              Key rules include:
+            </p>
+            <ul class="text-gray-700 font-body space-y-1 list-disc list-inside ml-4">
+              <li>Quarterly assessments due January, April, July, and October</li>
+              <li>Minimum 12-month leases per Addendum C to the Covenants</li>
+              <li>ARB approval required for architectural modifications</li>
+              <li>No chain-link fences</li>
+              <li>Specific garage rules apply</li>
+            </ul>
+            <p class="text-gray-700 font-body mt-2">
+              See the <a href="/documents" class="text-clr-orange hover:underline font-semibold">Documents</a> page for complete governing documents and rules.
+            </p>
+          </div>
+
+          <div>
+            <h3 class="text-lg font-heading font-semibold text-clr-green mb-2">What are the leasing requirements?</h3>
+            <p class="text-gray-700 font-body">
+              Per Addendum C to the Covenants, leases must be for a minimum of 12 months. All leases must comply with the governing documents. Contact the Board if you have questions about leasing requirements.
+            </p>
+          </div>
+
+          <div>
+            <h3 class="text-lg font-heading font-semibold text-clr-green mb-2">What are the fence rules?</h3>
+            <p class="text-gray-700 font-body">
+              Chain-link fences are not permitted. Other fence types may be allowed with ARB approval. See the governing documents for specific fence requirements, materials, and height limitations.
+            </p>
+          </div>
+
+          <div>
+            <h3 class="text-lg font-heading font-semibold text-clr-green mb-2">What are the lake access rules?</h3>
+            <p class="text-gray-700 font-body">
+              Lake access varies by lot: Lots 10–14 have access to West Crooked Lake, and Lots 15–24 have access to Lake Dicie (no docks permitted). See the governing documents for complete lake access rules and restrictions.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Board & Meetings -->
+      <section class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
+        <h2 class="text-2xl font-heading font-bold text-clr-green mb-6 flex items-center gap-3">
+          <svg class="w-6 h-6 text-clr-orange" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+          </svg>
+          Board & Meetings
+        </h2>
+
+        <div class="space-y-6">
+          <div>
+            <h3 class="text-lg font-heading font-semibold text-clr-green mb-2">How do I contact the Board?</h3>
+            <p class="text-gray-700 font-body">
+              Use the <a href="/contact?recipient=board" class="text-clr-orange hover:underline font-semibold">Contact</a> page and select "Board of Directors" as the recipient. All communications are handled securely through the contact form.
+            </p>
+          </div>
+
+          <div>
+            <h3 class="text-lg font-heading font-semibold text-clr-green mb-2">When are Board meetings held?</h3>
+            <p class="text-gray-700 font-body">
+              The annual meeting is held the first Sunday in February. Regular Board meetings are scheduled throughout the year. Meeting notices are sent to homeowners. See the <a href="/board" class="text-clr-orange hover:underline font-semibold">Board</a> page for meeting location and information.
+            </p>
+          </div>
+
+          <div>
+            <h3 class="text-lg font-heading font-semibold text-clr-green mb-2">Can I attend Board meetings?</h3>
+            <p class="text-gray-700 font-body">
+              Yes, homeowners are welcome to attend Board meetings. Meeting notices include the date, time, and location. Some meetings may be held via video conference—check meeting notices for details.
+            </p>
+          </div>
+
+          <div>
+            <h3 class="text-lg font-heading font-semibold text-clr-green mb-2">How can I get involved?</h3>
+            <p class="text-gray-700 font-body">
+              Homeowners can participate in committees, including the Architectural Review Board (ARB). Contact the Board to express interest in serving on a committee or running for the Board of Directors.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Documents & Resources -->
+      <section class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
+        <h2 class="text-2xl font-heading font-bold text-clr-green mb-6 flex items-center gap-3">
+          <svg class="w-6 h-6 text-clr-orange" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          Documents & Resources
+        </h2>
+
+        <div class="space-y-6">
+          <div>
+            <h3 class="text-lg font-heading font-semibold text-clr-green mb-2">Where can I find HOA documents?</h3>
+            <p class="text-gray-700 font-body">
+              All official HOA documents, including Covenants, Bylaws, Policies, and Forms, are available on the <a href="/documents" class="text-clr-orange hover:underline font-semibold">Documents</a> page. Documents are organized by category with direct download links.
+            </p>
+          </div>
+
+          <div>
+            <h3 class="text-lg font-heading font-semibold text-clr-green mb-2">What resources are available for residents?</h3>
+            <p class="text-gray-700 font-body">
+              The <a href="/resources" class="text-clr-orange hover:underline font-semibold">Resources</a> section includes emergency contacts, local resources, vendor lists, hurricane preparedness information, Florida HOA law resources, pest control guidance, and community maps.
+            </p>
+          </div>
+
+          <div>
+            <h3 class="text-lg font-heading font-semibold text-clr-green mb-2">How do I request vendor contact information?</h3>
+            <p class="text-gray-700 font-body">
+              The <a href="/resources/vendors" class="text-clr-orange hover:underline font-semibold">Vendor List</a> shows recommended vendors. For vendors without websites, use the "Request Contact Info" link to securely request contact information through the contact form.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- General -->
+      <section class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
+        <h2 class="text-2xl font-heading font-bold text-clr-green mb-6 flex items-center gap-3">
+          <svg class="w-6 h-6 text-clr-orange" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          General Questions
+        </h2>
+
+        <div class="space-y-6">
+          <div>
+            <h3 class="text-lg font-heading font-semibold text-clr-green mb-2">How do I report a concern or question?</h3>
+            <p class="text-gray-700 font-body">
+              If you have concerns or questions about community matters, please contact the Board through the <a href="/contact?recipient=board" class="text-clr-orange hover:underline font-semibold">Contact</a> page, selecting "Board of Directors" as the recipient. The Board will review your concern and respond appropriately.
+            </p>
+          </div>
+
+          <div>
+            <h3 class="text-lg font-heading font-semibold text-clr-green mb-2">How do I update my contact information?</h3>
+            <p class="text-gray-700 font-body">
+              Contact the Board through the <a href="/contact?recipient=board" class="text-clr-orange hover:underline font-semibold">Contact</a> page to update your mailing address, email, or phone number. It's important to keep your contact information current to receive important notices and communications.
+            </p>
+          </div>
+
+          <div>
+            <h3 class="text-lg font-heading font-semibold text-clr-green mb-2">Where can I find community news and updates?</h3>
+            <p class="text-gray-700 font-body">
+              Check the <a href="/news" class="text-clr-orange hover:underline font-semibold">News</a> page for community announcements, updates, and important information from the Board.
+            </p>
+          </div>
+
+          <div>
+            <h3 class="text-lg font-heading font-semibold text-clr-green mb-2">I still have questions. Who should I contact?</h3>
+            <p class="text-gray-700 font-body">
+              If you have questions not answered here, please use the <a href="/contact" class="text-clr-orange hover:underline font-semibold">Contact</a> page to reach the appropriate recipient (Board of Directors, ARB, etc.). The Board is here to help and will respond to your inquiry.
+            </p>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- Still Have Questions -->
+    <section class="bg-clr-green/10 border-2 border-clr-green/30 rounded-2xl p-8 mt-12">
+      <h2 class="text-xl font-heading font-bold text-clr-green mb-4">Still Have Questions?</h2>
+      <p class="text-gray-700 font-body mb-6">
+        If you have questions not answered here, please contact the Board of Directors or the appropriate committee.
+      </p>
+      <a
+        href="/contact"
+        class="inline-flex items-center gap-2 bg-clr-orange hover:brightness-110 text-white px-6 py-3 rounded-xl font-semibold text-sm shadow-lg hover:shadow-xl transition-all font-body"
+      >
+        Contact Us →
+      </a>
+    </section>
+  </div>
+</ResourcesLayout>

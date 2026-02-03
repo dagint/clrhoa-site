@@ -1,0 +1,267 @@
+---
+import ResourcesLayout from '../../layouts/ResourcesLayout.astro';
+
+const addressCity = import.meta.env.PUBLIC_PHYSICAL_ADDRESS_CITY ?? 'Eustis';
+const addressState = import.meta.env.PUBLIC_PHYSICAL_ADDRESS_STATE ?? 'FL';
+---
+
+<ResourcesLayout title="Wildlife Safety" description="Florida wildlife safety information, including alligators, snakes, and other native wildlife">
+  <div class="max-w-4xl mx-auto">
+    <div class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
+      <div class="flex items-center gap-3 mb-6">
+        <svg class="w-8 h-8 text-clr-orange" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+        </svg>
+        <h1 class="text-3xl font-heading font-bold text-clr-green">Wildlife Safety</h1>
+      </div>
+
+      <div class="space-y-6">
+        <p class="text-gray-700 font-body">
+          Florida is home to diverse wildlife, including alligators, snakes, bears, and many other species. Understanding how to coexist safely with wildlife is essential for residents living near lakes, wetlands, and natural areas.
+        </p>
+
+        <!-- Alligator Safety -->
+        <section class="bg-white border-2 border-clr-green rounded-2xl p-8">
+          <h2 class="text-2xl font-heading font-bold text-clr-green mb-6">Alligator Safety</h2>
+
+          <div class="space-y-6">
+            <div>
+              <h3 class="text-lg font-heading font-semibold text-clr-green mb-3">Understanding Alligator Behavior</h3>
+              <p class="text-gray-700 font-body mb-3">
+                Alligators are common in Florida's lakes, ponds, and waterways. They are generally shy and avoid humans, but can become dangerous if provoked or if they associate humans with food.
+              </p>
+            </div>
+
+            <div>
+              <h3 class="text-lg font-heading font-semibold text-clr-green mb-3">Safety Guidelines</h3>
+              <ul class="text-gray-700 font-body space-y-2 list-disc list-inside ml-4">
+                <li><strong>Never feed alligators</strong> - Feeding makes them lose their natural fear of humans</li>
+                <li><strong>Keep your distance</strong> - Stay at least 60 feet away from alligators</li>
+                <li><strong>Never swim</strong> in areas known to have alligators</li>
+                <li><strong>Keep pets on leashes</strong> and away from water's edge</li>
+                <li><strong>Don't approach</strong> alligators, especially during mating season (April-June)</li>
+                <li><strong>Avoid swimming</strong> at dusk or dawn when alligators are most active</li>
+                <li><strong>Never attempt</strong> to move or harass an alligator</li>
+              </ul>
+            </div>
+
+            <div class="bg-yellow-50 border-2 border-yellow-200 rounded-lg p-4">
+              <h3 class="font-heading font-semibold text-yellow-900 mb-2">If You Encounter an Alligator</h3>
+              <ul class="text-yellow-800 font-body text-sm space-y-1 list-disc list-inside ml-4">
+                <li>Back away slowly - never run</li>
+                <li>Give the alligator space to leave</li>
+                <li>If an alligator approaches you, make loud noises and back away</li>
+                <li>Report aggressive or nuisance alligators to the Florida Fish and Wildlife Conservation Commission (FWC)</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 class="text-lg font-heading font-semibold text-clr-green mb-3">Report Nuisance Alligators</h3>
+              <p class="text-gray-700 font-body mb-3">
+                If you see an alligator that poses a threat to people, pets, or property, contact the FWC Nuisance Alligator Hotline:
+              </p>
+              <div class="bg-clr-beige/30 border border-gray-200 rounded-lg p-4">
+                <p class="text-gray-700 font-body">
+                  <strong>FWC Nuisance Alligator Hotline:</strong>{' '}
+                  <a href="tel:18663923926" class="text-clr-orange hover:underline font-semibold">1-866-FWC-GATOR (1-866-392-4286)</a>
+                </p>
+                <p class="text-gray-700 font-body text-sm mt-2">
+                  <a href="https://myfwc.com/wildlifehabitats/wildlife/alligator/" target="_blank" rel="noopener noreferrer" class="text-clr-orange hover:underline font-semibold">
+                    Learn more about alligator safety →
+                  </a>
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Snake Safety -->
+        <section class="bg-white border-2 border-clr-green rounded-2xl p-8">
+          <h2 class="text-2xl font-heading font-bold text-clr-green mb-6">Snake Safety</h2>
+
+          <div class="space-y-6">
+            <div>
+              <h3 class="text-lg font-heading font-semibold text-clr-green mb-3">Venomous Snakes in Florida</h3>
+              <p class="text-gray-700 font-body mb-3">
+                Florida has six species of venomous snakes:
+              </p>
+              <ul class="text-gray-700 font-body space-y-2 list-disc list-inside ml-4">
+                <li>Eastern Diamondback Rattlesnake</li>
+                <li>Timber Rattlesnake</li>
+                <li>Dusky Pygmy Rattlesnake</li>
+                <li>Cottonmouth (Water Moccasin)</li>
+                <li>Coral Snake</li>
+                <li>Copperhead</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 class="text-lg font-heading font-semibold text-clr-green mb-3">Safety Guidelines</h3>
+              <ul class="text-gray-700 font-body space-y-2 list-disc list-inside ml-4">
+                <li><strong>Watch where you step</strong> when walking in tall grass or wooded areas</li>
+                <li><strong>Wear closed-toe shoes</strong> and long pants when hiking</li>
+                <li><strong>Never handle snakes</strong> - even non-venomous snakes can bite</li>
+                <li><strong>Keep yards clear</strong> of debris, wood piles, and tall grass where snakes may hide</li>
+                <li><strong>Use a flashlight</strong> at night when walking outdoors</li>
+                <li><strong>Teach children</strong> to leave snakes alone and tell an adult</li>
+              </ul>
+            </div>
+
+            <div class="bg-red-50 border-2 border-red-200 rounded-lg p-4">
+              <h3 class="font-heading font-semibold text-red-900 mb-2">If Bitten by a Snake</h3>
+              <ol class="text-red-800 font-body text-sm space-y-1 list-decimal list-inside ml-4">
+                <li><strong>Stay calm</strong> and keep the bite area below heart level</li>
+                <li><strong>Call 911 immediately</strong></li>
+                <li><strong>Remove</strong> tight clothing or jewelry near the bite</li>
+                <li><strong>Do NOT</strong> cut the wound, suck out venom, or apply a tourniquet</li>
+                <li><strong>Do NOT</strong> apply ice or drink alcohol</li>
+                <li><strong>Try to remember</strong> the snake's appearance (but don't try to catch it)</li>
+              </ol>
+            </div>
+          </div>
+        </section>
+
+        <!-- Other Wildlife -->
+        <section class="bg-white border-2 border-clr-green rounded-2xl p-8">
+          <h2 class="text-2xl font-heading font-bold text-clr-green mb-6">Other Wildlife Safety</h2>
+
+          <div class="space-y-6">
+            <div>
+              <h3 class="text-lg font-heading font-semibold text-clr-green mb-3">Sandhill Cranes</h3>
+              <p class="text-gray-700 font-body mb-3">
+                Sandhill cranes are common in Florida and are protected by state and federal law. They are large, graceful birds that can be found in wetlands, fields, and residential areas:
+              </p>
+              <ul class="text-gray-700 font-body space-y-2 list-disc list-inside ml-4">
+                <li><strong>Protected species</strong> - It is illegal to harm, harass, or feed sandhill cranes</li>
+                <li><strong>Nesting season</strong> - Cranes are most protective during nesting season (December-April)</li>
+                <li><strong>Keep your distance</strong> - Stay at least 100 feet away from cranes, especially during nesting</li>
+                <li><strong>Never feed cranes</strong> - Feeding makes them lose their natural fear and can lead to aggressive behavior</li>
+                <li><strong>Protect pets</strong> - Keep dogs on leashes and away from cranes, as cranes may defend their territory</li>
+                <li><strong>If approached</strong> - Back away slowly; cranes may charge if they feel threatened</li>
+                <li><strong>Respect their space</strong> - If cranes are nesting in your yard, avoid the area and allow them to raise their young</li>
+              </ul>
+              <div class="bg-blue-50 border-2 border-blue-200 rounded-lg p-4 mt-4">
+                <p class="text-blue-800 font-body text-sm">
+                  <strong>Note:</strong> Sandhill cranes are a protected species under the Migratory Bird Treaty Act. Disturbing nests, eggs, or young cranes is illegal and can result in fines. If you have concerns about cranes in your area, contact FWC for guidance.
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <h3 class="text-lg font-heading font-semibold text-clr-green mb-3">Bears</h3>
+              <p class="text-gray-700 font-body mb-3">
+                While less common in urban areas, black bears may be encountered in some parts of Florida:
+              </p>
+              <ul class="text-gray-700 font-body space-y-2 list-disc list-inside ml-4">
+                <li>Secure trash cans and food sources</li>
+                <li>Never feed bears</li>
+                <li>Make noise when hiking to avoid surprising bears</li>
+                <li>If you encounter a bear, back away slowly and make yourself appear larger</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 class="text-lg font-heading font-semibold text-clr-green mb-3">Wild Pigs</h3>
+              <p class="text-gray-700 font-body mb-3">
+                Feral hogs can be aggressive, especially sows with piglets:
+              </p>
+              <ul class="text-gray-700 font-body space-y-2 list-disc list-inside ml-4">
+                <li>Keep your distance</li>
+                <li>Do not approach or feed</li>
+                <li>Report aggressive hogs to FWC</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 class="text-lg font-heading font-semibold text-clr-green mb-3">Birds & Raptors</h3>
+              <p class="text-gray-700 font-body mb-3">
+                During nesting season (spring), some birds may be protective:
+              </p>
+              <ul class="text-gray-700 font-body space-y-2 list-disc list-inside ml-4">
+                <li>Be aware of nesting areas</li>
+                <li>Avoid disturbing nests</li>
+                <li>Wear a hat in areas with aggressive birds</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <!-- General Safety Tips -->
+        <section class="bg-clr-beige/30 border border-gray-200 rounded-2xl p-8">
+          <h2 class="text-2xl font-heading font-bold text-clr-green mb-6">General Wildlife Safety Tips</h2>
+
+          <div class="grid md:grid-cols-2 gap-6">
+            <div>
+              <h3 class="font-heading font-semibold text-clr-green mb-3">Around Your Home</h3>
+              <ul class="text-gray-700 font-body text-sm space-y-2 list-disc list-inside">
+                <li>Keep yards clean and free of debris</li>
+                <li>Secure trash cans and pet food</li>
+                <li>Remove standing water sources</li>
+                <li>Trim vegetation away from structures</li>
+                <li>Install motion-activated lights</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 class="font-heading font-semibold text-clr-green mb-3">When Outdoors</h3>
+              <ul class="text-gray-700 font-body text-sm space-y-2 list-disc list-inside">
+                <li>Stay on marked trails</li>
+                <li>Be aware of your surroundings</li>
+                <li>Keep pets on leashes</li>
+                <li>Carry a flashlight at night</li>
+                <li>Make noise to alert wildlife</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <!-- Resources -->
+        <section class="bg-clr-green/10 border-2 border-clr-green/30 rounded-2xl p-8">
+          <h2 class="text-xl font-heading font-bold text-clr-green mb-4">Resources & Emergency Contacts</h2>
+
+          <div class="space-y-4">
+            <div class="bg-white border border-gray-200 rounded-lg p-4">
+              <h3 class="font-heading font-semibold text-clr-green mb-2">Florida Fish and Wildlife Conservation Commission (FWC)</h3>
+              <p class="text-gray-700 font-body text-sm mb-2">
+                Report nuisance wildlife, get safety information, and learn about Florida's wildlife.
+              </p>
+              <p class="text-gray-700 font-body text-sm">
+                <strong>Nuisance Alligator Hotline:</strong>{' '}
+                <a href="tel:18663923926" class="text-clr-orange hover:underline font-semibold">1-866-FWC-GATOR</a>
+              </p>
+              <p class="text-gray-700 font-body text-sm mt-2">
+                <a href="https://myfwc.com" target="_blank" rel="noopener noreferrer" class="text-clr-orange hover:underline font-semibold">
+                  Visit FWC Website →
+                </a>
+              </p>
+            </div>
+
+            <div class="bg-white border border-gray-200 rounded-lg p-4">
+              <h3 class="font-heading font-semibold text-clr-green mb-2">Emergency Services</h3>
+              <p class="text-gray-700 font-body text-sm mb-2">
+                For wildlife-related emergencies or attacks, call 911 immediately.
+              </p>
+              <p class="text-gray-700 font-body text-sm">
+                For non-emergency wildlife concerns, contact FWC or your local animal control.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <!-- Questions -->
+        <div class="bg-blue-50 border-2 border-blue-200 rounded-lg p-6">
+          <h2 class="text-lg font-heading font-semibold text-blue-900 mb-2">Questions About Wildlife Safety?</h2>
+          <p class="text-blue-800 font-body text-sm mb-4">
+            For questions about wildlife in the community or to report concerns, contact the Board or FWC.
+          </p>
+          <a
+            href="/contact?recipient=board"
+            class="inline-flex items-center gap-2 text-clr-orange hover:underline font-semibold font-body"
+          >
+            Contact Board →
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</ResourcesLayout>
