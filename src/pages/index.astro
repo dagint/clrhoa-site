@@ -6,6 +6,8 @@ const showRotation = heroRotate && heroImages.length > 1;
 const heroImage = heroImages[0] ?? '/placeholder-lake.jpg';
 const siteURL = import.meta.env.SITE || 'https://clrhoa.com';
 const meetingLocation = import.meta.env.PUBLIC_MEETING_LOCATION ?? 'Eustis Community Center';
+const meetingRoom = import.meta.env.PUBLIC_MEETING_ROOM ?? '';
+const meetingLocationDisplay = meetingRoom ? `${meetingLocation}, ${meetingRoom}` : meetingLocation;
 const meetingStreet = import.meta.env.PUBLIC_MEETING_ADDRESS_STREET ?? '';
 const meetingCity = import.meta.env.PUBLIC_MEETING_ADDRESS_CITY ?? '';
 const meetingState = import.meta.env.PUBLIC_MEETING_ADDRESS_STATE ?? '';
@@ -88,7 +90,7 @@ const directionsUrl = hasAddress
       <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
         <div class="card-hover bg-white p-8 rounded-2xl shadow-sm border border-gray-100 text-center max-w-2xl mx-auto md:max-w-none">
           <h3 class="text-2xl font-semibold text-clr-green mb-4">Annual Meeting</h3>
-          <p class="text-clr-gray mb-3">First Sunday in February, {meetingLocation}. 2026: Feb 1, 2:00–4:15 PM</p>
+          <p class="text-clr-gray mb-3">First Sunday in February, {meetingLocationDisplay}. 2026: Feb 1, 2:00–4:15 PM</p>
           {hasAddress && (
             <p class="text-clr-gray text-sm mb-3 font-body">
               {meetingFullAddress}

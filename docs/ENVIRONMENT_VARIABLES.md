@@ -33,6 +33,7 @@ These variables contain Personally Identifiable Information (PII) and should be 
 ### Meeting Location
 
 - `PUBLIC_MEETING_LOCATION` - Meeting venue name (e.g., `Eustis Community Center`)
+- `PUBLIC_MEETING_ROOM` - Optional room name or number (e.g., `Room 3` or `Conference Room A`)
 - `PUBLIC_MEETING_ADDRESS_STREET` - Street address (e.g., `1090 S Bay St`)
 - `PUBLIC_MEETING_ADDRESS_CITY` - City name (e.g., `Eustis`)
 - `PUBLIC_MEETING_ADDRESS_STATE` - State abbreviation (e.g., `FL`)
@@ -94,6 +95,7 @@ These variables are optional and used to display waste management schedules and 
    PUBLIC_PHYSICAL_ADDRESS_STATE=FL
    PUBLIC_PHYSICAL_ADDRESS_ZIP=32726
    PUBLIC_MEETING_LOCATION=Eustis Community Center
+   PUBLIC_MEETING_ROOM=Room 3
    PUBLIC_MEETING_ADDRESS_STREET=1090 S Bay St
    PUBLIC_MEETING_ADDRESS_CITY=Eustis
    PUBLIC_MEETING_ADDRESS_STATE=FL
@@ -218,6 +220,7 @@ PUBLIC_PHYSICAL_ADDRESS_CITY=
 PUBLIC_PHYSICAL_ADDRESS_STATE=
 PUBLIC_PHYSICAL_ADDRESS_ZIP=
 PUBLIC_MEETING_LOCATION=
+PUBLIC_MEETING_ROOM=
 PUBLIC_MEETING_ADDRESS_STREET=
 PUBLIC_MEETING_ADDRESS_CITY=
 PUBLIC_MEETING_ADDRESS_STATE=

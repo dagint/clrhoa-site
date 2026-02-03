@@ -20,6 +20,7 @@ interface ImportMetaEnv {
   readonly PUBLIC_PHYSICAL_ADDRESS_STATE?: string;
   readonly PUBLIC_PHYSICAL_ADDRESS_ZIP?: string;
   readonly PUBLIC_MEETING_LOCATION?: string;
+  readonly PUBLIC_MEETING_ROOM?: string;
   readonly PUBLIC_MEETING_ADDRESS_STREET?: string;
   readonly PUBLIC_MEETING_ADDRESS_CITY?: string;
   readonly PUBLIC_MEETING_ADDRESS_STATE?: string;
