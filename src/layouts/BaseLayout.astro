@@ -122,6 +122,7 @@ const resourcesByCategory = {
     {preloadImages.map((img) => (
       <link rel="preload" as="image" href={img} fetchpriority="high" />
     ))}
+    <Analytics />
   </head>
   <body class="min-h-screen bg-gray-50 text-gray-900 font-body">
     <a href="#main-content" class="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-clr-green focus:text-white focus:rounded-lg focus:font-semibold focus:shadow-lg focus:outline-none focus:ring-2 focus:ring-clr-green focus:ring-offset-2">
@@ -386,8 +387,6 @@ const resourcesByCategory = {
     <main id="main-content">
       <slot />
     </main>
-
-    <Analytics />
 
     <script>
       (function () {

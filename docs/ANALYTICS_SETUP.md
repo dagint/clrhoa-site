@@ -91,6 +91,15 @@ const gaId = import.meta.env.PUBLIC_GA_ID;
 
 ## Troubleshooting
 
+### "We couldn't detect Plausible on your site"
+
+- **Script must be in `<head>`** – This site places the Plausible script in the `<head>` (required by Plausible). If you customized the layout, ensure the Analytics component is inside `<head>`, not only in the body.
+- **Environment variables at build time** – Cloudflare Pages bakes env vars into the build. Ensure `PUBLIC_ANALYTICS_PROVIDER`, `PUBLIC_PLAUSIBLE_DOMAIN`, and (if used) `PUBLIC_PLAUSIBLE_SCRIPT_SRC` are set for the environment you’re building (e.g. Production). Then trigger a new deploy so the build picks them up.
+- **Exact values** – Use `plausible` (lowercase) for `PUBLIC_ANALYTICS_PROVIDER`. For `PUBLIC_PLAUSIBLE_SCRIPT_SRC`, use only the script URL (e.g. `https://plausible.io/js/script.xxxxx.js`); you can paste the full `<script ... src="...">` tag and the site will extract the URL.
+- **CSP** – The site allows `https://plausible.io` in `script-src` and `connect-src`. If you added stricter CSP rules, ensure plausible.io is still allowed.
+- **New script needs init** – If you use `PUBLIC_PLAUSIBLE_SCRIPT_SRC` (Plausible’s new snippet), the site automatically injects both the script tag and the `plausible.init()` call. You only need to set the script URL (e.g. `https://plausible.io/js/pa-xxxxx.js`).
+- **View page source** – On the live site, open View Page Source and search for `plausible`. You should see in `<head>` either: (1) the new script: `<script async src="https://plausible.io/js/pa-...">` plus a small inline script with `plausible.init()`, or (2) the legacy script: `<script defer data-domain="..." src="https://plausible.io/js/script.js">`. If neither is there, the env vars weren’t available at build time or the domain/provider check failed.
+
 ### Analytics not showing data
 
 - Verify environment variables are set correctly
@@ -102,4 +111,4 @@ const gaId = import.meta.env.PUBLIC_GA_ID;
 
 - Check browser console for errors
 - Verify the domain is correctly configured in Plausible
-- Ensure `PUBLIC_ANALYTICS_PROVIDER` is set to `"plausible"` (with quotes in some configs)
+- Ensure `PUBLIC_ANALYTICS_PROVIDER` is set to `plausible` (lowercase)

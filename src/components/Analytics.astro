@@ -8,11 +8,14 @@
  * from Plausible → Site Settings → General → Site Installation.
  */
 
-const analyticsProvider = import.meta.env.PUBLIC_ANALYTICS_PROVIDER || '';
-const plausibleDomain = import.meta.env.PUBLIC_PLAUSIBLE_DOMAIN || '';
-const plausibleScriptSrc = import.meta.env.PUBLIC_PLAUSIBLE_SCRIPT_SRC || '';
+const analyticsProvider = (import.meta.env.PUBLIC_ANALYTICS_PROVIDER || '').trim().toLowerCase();
+const plausibleDomain = (import.meta.env.PUBLIC_PLAUSIBLE_DOMAIN || '').trim();
+let plausibleScriptSrc = (import.meta.env.PUBLIC_PLAUSIBLE_SCRIPT_SRC || '').trim();
+// If user pasted full script tag, extract src URL
+const srcMatch = plausibleScriptSrc.match(/src=["']([^"']+)["']/);
+if (srcMatch) plausibleScriptSrc = srcMatch[1].trim();
 
-const isPlausibleEnabled = analyticsProvider === 'plausible' && plausibleDomain;
+const isPlausibleEnabled = analyticsProvider === 'plausible' && plausibleDomain.length > 0;
 const useNewScript = plausibleScriptSrc.length > 0;
 const scriptSrc = useNewScript ? plausibleScriptSrc : 'https://plausible.io/js/script.js';
 // Legacy script has a known SRI hash; new script URL is unique per site so no SRI here
@@ -20,11 +23,23 @@ const legacyIntegrity = 'sha384-TDBMBYT3vz715r8UIyVTB4AUTXubXmLI02DeDWgyDahvCXmP
 ---
 
 {isPlausibleEnabled && (
-  <script
-    defer
-    data-domain={plausibleDomain}
-    src={scriptSrc}
-    integrity={useNewScript ? undefined : legacyIntegrity}
-    crossorigin="anonymous"
-  />
+  <>
+    {useNewScript ? (
+      <>
+        <script async src={scriptSrc} crossorigin="anonymous" />
+        <script is:inline>
+          {`window.plausible=window.plausible||function(){(plausible.q=plausible.q||[]).push(arguments)},plausible.init=plausible.init||function(i){plausible.o=i||{}};
+plausible.init()`}
+        </script>
+      </>
+    ) : (
+      <script
+        defer
+        data-domain={plausibleDomain}
+        src={scriptSrc}
+        integrity={legacyIntegrity}
+        crossorigin="anonymous"
+      />
+    )}
+  </>
 )}
