@@ -20,10 +20,9 @@ SRI works by allowing you to provide a cryptographic hash that a fetched resourc
    - When reCAPTCHA is enabled, scripts load from `https://www.google.com` / `https://www.gstatic.com`
    - **Note**: reCAPTCHA scripts update frequently. SRI may need regular updates if you add integrity hashes.
 
-2. **Plausible Analytics** (`src/components/Analytics.astro`)
-   - Script: `https://plausible.io/js/script.js`
-   - Status: ✅ Hash configured
-   - **Note**: Plausible scripts are relatively stable but may update occasionally.
+2. **Cloudflare Web Analytics** (`src/components/Analytics.astro`, when using manual token)
+   - Script: `https://static.cloudflareinsights.com/beacon.min.js`
+   - **Note**: SRI can be added if desired; the beacon script is maintained by Cloudflare.
 
 ## Generating SRI Hashes
 
@@ -32,7 +31,7 @@ SRI works by allowing you to provide a cryptographic hash that a fetched resourc
 1. Visit: https://www.srihash.org/
 2. Enter the script URL:
    - For reCAPTCHA (if used): `https://www.google.com/recaptcha/api.js` or the version you load
-   - For Plausible: `https://plausible.io/js/script.js`
+   - For Cloudflare beacon: `https://static.cloudflareinsights.com/beacon.min.js`
 3. Click "Generate"
 4. Copy the hash (format: `sha384-...`)
 5. Update the `integrity` attribute in the respective file
@@ -40,11 +39,11 @@ SRI works by allowing you to provide a cryptographic hash that a fetched resourc
 ### Using the Provided Script
 
 ```bash
-# Generate hash for Plausible
-node scripts/generate-sri.js https://plausible.io/js/script.js
+# Generate hash for Cloudflare beacon (if adding SRI)
+node scripts/generate-sri.js https://static.cloudflareinsights.com/beacon.min.js
 
 # Or use npm script
-npm run sri https://plausible.io/js/script.js
+npm run sri https://static.cloudflareinsights.com/beacon.min.js
 ```
 
 **Note**: If the script encounters redirects or fails, use the online tool method above.
@@ -52,7 +51,7 @@ npm run sri https://plausible.io/js/script.js
 ### Manual Method (PowerShell)
 
 ```powershell
-$content = (Invoke-WebRequest -Uri "https://plausible.io/js/script.js" -UseBasicParsing).Content
+$content = (Invoke-WebRequest -Uri "https://static.cloudflareinsights.com/beacon.min.js" -UseBasicParsing).Content
 $bytes = [System.Text.Encoding]::UTF8.GetBytes($content)
 $hash = [System.Security.Cryptography.SHA384]::Create().ComputeHash($bytes)
 $base64 = [Convert]::ToBase64String($hash)
@@ -93,7 +92,7 @@ SRI hashes need to be updated when:
 | Script | File | Line | Status |
 |--------|------|------|--------|
 | reCAPTCHA (optional) | `src/pages/contact.astro` | — | Optional; add SRI if used |
-| Plausible | `src/components/Analytics.astro` | ~31 | ✅ Configured |
+| Cloudflare Web Analytics | `src/components/Analytics.astro` | — | Optional; add SRI if desired |
 
 ## SRI Limitations
 

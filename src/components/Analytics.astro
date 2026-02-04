@@ -1,45 +1,21 @@
 ---
 /**
- * Privacy-friendly analytics component
+ * Cloudflare Web Analytics (privacy-friendly, free).
  *
- * Supports Plausible Analytics (legacy and new script).
- * To enable: PUBLIC_ANALYTICS_PROVIDER="plausible" and PUBLIC_PLAUSIBLE_DOMAIN set.
- * To use Plausible's new script: set PUBLIC_PLAUSIBLE_SCRIPT_SRC to the script URL
- * from Plausible → Site Settings → General → Site Installation.
+ * Option A: Enable in Cloudflare Dashboard → Workers & Pages → [project] → Metrics → Web Analytics (no code needed).
+ * Option B: Set PUBLIC_ANALYTICS_PROVIDER=cloudflare and PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN to your token.
  */
 
 const analyticsProvider = (import.meta.env.PUBLIC_ANALYTICS_PROVIDER || '').trim().toLowerCase();
-const plausibleDomain = (import.meta.env.PUBLIC_PLAUSIBLE_DOMAIN || '').trim();
-let plausibleScriptSrc = (import.meta.env.PUBLIC_PLAUSIBLE_SCRIPT_SRC || '').trim();
-// If user pasted full script tag, extract src URL
-const srcMatch = plausibleScriptSrc.match(/src=["']([^"']+)["']/);
-if (srcMatch) plausibleScriptSrc = srcMatch[1].trim();
-
-const isPlausibleEnabled = analyticsProvider === 'plausible' && plausibleDomain.length > 0;
-const useNewScript = plausibleScriptSrc.length > 0;
-const scriptSrc = useNewScript ? plausibleScriptSrc : 'https://plausible.io/js/script.js';
-// Legacy script has a known SRI hash; new script URL is unique per site so no SRI here
-const legacyIntegrity = 'sha384-TDBMBYT3vz715r8UIyVTB4AUTXubXmLI02DeDWgyDahvCXmPV4Vgx2m6yQvI19d/';
-// New script init (injected with set:html so it outputs as real JS, not literal {`...`})
-const plausibleInitInline =
-  'window.plausible=window.plausible||function(){(plausible.q=plausible.q||[]).push(arguments)},plausible.init=plausible.init||function(i){plausible.o=i||{}};\nplausible.init()';
+const cloudflareToken = (import.meta.env.PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN || '').trim();
+const isCloudflareEnabled = analyticsProvider === 'cloudflare' && cloudflareToken.length > 0;
+const cfBeaconPayload = cloudflareToken ? JSON.stringify({ token: cloudflareToken }) : '';
 ---
 
-{isPlausibleEnabled && (
-  <>
-    {useNewScript ? (
-      <>
-        <script async src={scriptSrc} crossorigin="anonymous" />
-        <script is:inline set:html={plausibleInitInline} />
-      </>
-    ) : (
-      <script
-        defer
-        data-domain={plausibleDomain}
-        src={scriptSrc}
-        integrity={legacyIntegrity}
-        crossorigin="anonymous"
-      />
-    )}
-  </>
+{isCloudflareEnabled && (
+  <script
+    defer
+    src="https://static.cloudflareinsights.com/beacon.min.js"
+    data-cf-beacon={cfBeaconPayload}
+  />
 )}

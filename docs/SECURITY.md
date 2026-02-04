@@ -80,7 +80,7 @@ npm run audit:fix    # Fix automatically fixable issues
 
 External scripts are protected with SRI hashes where applicable:
 - reCAPTCHA (when enabled; see contact form)
-- Plausible Analytics
+- Cloudflare Web Analytics (when using manual token)
 
 **Guide**: See `SRI.md` for hash generation and update procedures.
 

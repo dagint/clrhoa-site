@@ -5,9 +5,8 @@ interface ImportMetaEnv {
   readonly PUBLIC_STATICFORMS_API_KEY?: string;
   readonly PUBLIC_RECAPTCHA_SITE_KEY?: string;
   readonly PUBLIC_ANALYTICS_PROVIDER?: string;
-  readonly PUBLIC_PLAUSIBLE_DOMAIN?: string;
-  /** Optional: use Plausible's new script URL from Site Installation (recommended). When set, this replaces the legacy script. */
-  readonly PUBLIC_PLAUSIBLE_SCRIPT_SRC?: string;
+  /** Cloudflare Web Analytics: token from Web Analytics → Add site → Manage site (script snippet). */
+  readonly PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN?: string;
   readonly SITE?: string;
   
   // Contact information (PII)

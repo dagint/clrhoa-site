@@ -93,7 +93,7 @@
 ### Low Priority
 
 7. **Subresource Integrity (SRI)**
-   - Add SRI hashes for external scripts (reCAPTCHA if used, Plausible)
+   - Add SRI hashes for external scripts (reCAPTCHA if used, Cloudflare beacon if desired)
 
 8. **Security Documentation**
    - Document security practices

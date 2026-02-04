@@ -45,9 +45,8 @@ These variables contain Personally Identifiable Information (PII) and should be 
 
 ### Analytics
 
-- `PUBLIC_ANALYTICS_PROVIDER` - Analytics provider (e.g., `plausible`)
-- `PUBLIC_PLAUSIBLE_DOMAIN` - Plausible domain; must match the domain in Plausible (e.g., `clrhoa.com` or `clrhoa-site.pages.dev`)
-- `PUBLIC_PLAUSIBLE_SCRIPT_SRC` - (Optional) New Plausible script URL from Site Installation; when set, replaces the legacy script
+- `PUBLIC_ANALYTICS_PROVIDER` - Set to `cloudflare` for Cloudflare Web Analytics (manual script install). Not needed if you use the one-click enable under Workers & Pages → [project] → Metrics.
+- `PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN` - For Cloudflare Web Analytics (manual install): token UUID from Web Analytics → Manage site snippet. Not needed if you use the one-click enable under Workers & Pages → [project] → Metrics.
 
 ### Site Configuration
 
@@ -239,9 +238,9 @@ PUBLIC_RECYCLING_CENTER_HOURS=
 PUBLIC_RECYCLING_CENTER_PHONE=
 PUBLIC_RECYCLING_CENTER_WEBSITE=
 
-# Analytics (Optional)
+# Analytics (Optional - Cloudflare Web Analytics)
 PUBLIC_ANALYTICS_PROVIDER=
-PUBLIC_PLAUSIBLE_DOMAIN=
+PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN=
 
 # Site Config
 SITE=
