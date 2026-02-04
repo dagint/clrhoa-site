@@ -1,0 +1,128 @@
+---
+import ResourcesLayout from '../../layouts/ResourcesLayout.astro';
+---
+
+<ResourcesLayout title="Internet Services" description="Available internet providers, typical speeds, and options for Crooked Lake Reserve" currentSection="internet-services">
+  <div class="max-w-4xl mx-auto">
+    <div class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
+      <div class="flex items-center gap-3 mb-6">
+        <svg class="w-8 h-8 text-clr-orange" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 14.554a5 5 0 016.778 0M12 17h.01M3 15a9 9 0 0112-2.911M3 15a9 9 0 106.167 4.5" />
+        </svg>
+        <h1 class="text-3xl font-heading font-bold text-clr-green">Internet Services</h1>
+      </div>
+
+      <div class="space-y-6">
+        <p class="text-gray-700 font-body">
+          Several internet options are available to Crooked Lake Reserve residents. Below is an overview of each service type, typical speeds, and links to check availability and sign up.
+        </p>
+
+        <!-- Cable: Xfinity -->
+        <div class="bg-clr-beige/30 border-2 border-clr-green rounded-2xl p-6 md:p-8">
+          <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
+            <h2 class="text-xl font-heading font-bold text-clr-green">Xfinity (Cable)</h2>
+            <a href="https://www.xfinity.com" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 bg-clr-orange hover:brightness-110 text-white px-4 py-2 rounded-lg font-semibold text-sm shadow-md hover:shadow-lg transition-all font-body">
+              Visit Xfinity →
+            </a>
+          </div>
+          <p class="text-gray-700 font-body mb-3">
+            Xfinity delivers internet over the same coaxial cable used for TV. It is widely available in the area and offers a range of plans. Performance is generally consistent and suitable for streaming, work-from-home, and multiple devices.
+          </p>
+          <div class="bg-white/60 rounded-lg p-4 border border-gray-200">
+            <strong class="text-clr-green">Typical speeds:</strong>
+            <span class="text-gray-700 font-body"> Plan-dependent; often 100–200 Mbps on entry tiers up to 1,200 Mbps or higher on higher tiers. Check the Xfinity website for current plans and pricing at your address.</span>
+          </div>
+        </div>
+
+        <!-- Cellular / 5G Home Internet -->
+        <div class="bg-clr-beige/30 border border-gray-200 rounded-2xl p-6 md:p-8">
+          <h2 class="text-xl font-heading font-bold text-clr-green mb-4">Cellular Home Internet (5G / LTE)</h2>
+          <p class="text-gray-700 font-body mb-4">
+            Major wireless carriers offer home internet over their cellular networks. A modem/router is installed at your home and uses the same network as cell phones. Availability and speeds depend on tower coverage at your address.
+          </p>
+          <div class="space-y-4">
+            <div class="bg-white/60 rounded-lg p-4 border border-gray-200">
+              <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+                <strong class="text-clr-green">Verizon Home Internet</strong>
+                <a href="https://www.verizon.com/internet" target="_blank" rel="noopener noreferrer" class="text-clr-orange hover:underline font-semibold text-sm">Check availability →</a>
+              </div>
+              <p class="text-gray-700 font-body text-sm">5G and LTE options. Typical speeds range from about 50 Mbps to 300+ Mbps where 5G is strong.</p>
+            </div>
+            <div class="bg-white/60 rounded-lg p-4 border border-gray-200">
+              <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+                <strong class="text-clr-green">T-Mobile Home Internet</strong>
+                <a href="https://www.t-mobile.com/home-internet" target="_blank" rel="noopener noreferrer" class="text-clr-orange hover:underline font-semibold text-sm">Check availability →</a>
+              </div>
+              <p class="text-gray-700 font-body text-sm">5G-based home internet. Speeds often in the 33–182+ Mbps range, varying by location.</p>
+            </div>
+            <div class="bg-white/60 rounded-lg p-4 border border-gray-200">
+              <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+                <strong class="text-clr-green">AT&T Internet</strong>
+                <a href="https://www.att.com/internet" target="_blank" rel="noopener noreferrer" class="text-clr-orange hover:underline font-semibold text-sm">Check availability →</a>
+              </div>
+              <p class="text-gray-700 font-body text-sm">Fiber and fixed wireless options in some areas. Speeds and availability depend on your address.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Starlink -->
+        <div class="bg-clr-beige/30 border border-gray-200 rounded-2xl p-6 md:p-8">
+          <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
+            <h2 class="text-xl font-heading font-bold text-clr-green">Starlink (Satellite)</h2>
+            <a href="https://www.starlink.com" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 bg-clr-orange hover:brightness-110 text-white px-4 py-2 rounded-lg font-semibold text-sm shadow-md hover:shadow-lg transition-all font-body">
+              Visit Starlink →
+            </a>
+          </div>
+          <p class="text-gray-700 font-body mb-3">
+            Starlink provides internet via low-Earth-orbit satellites. It can be a good option where cable or fiber is limited. The dish needs a clear view of the sky to work properly.
+          </p>
+          <div class="bg-amber-50 border-2 border-amber-200 rounded-lg p-4 mb-3">
+            <p class="text-amber-900 font-body text-sm">
+              <strong>Antenna placement:</strong> For best performance and to comply with community guidelines, Starlink antennas should be mounted at the <strong>rear of the home</strong>, with a clear view of the sky. Contact the ARB if you have questions about placement before installing.
+            </p>
+          </div>
+          <div class="bg-white/60 rounded-lg p-4 border border-gray-200">
+            <strong class="text-clr-green">Typical speeds:</strong>
+            <span class="text-gray-700 font-body"> Often 50–200+ Mbps download; actual speeds vary with plan, obstructions, and network load. Latency is lower than traditional satellite internet.</span>
+          </div>
+        </div>
+
+        <!-- Fiber (Coming Soon) -->
+        <div class="bg-clr-beige/30 border border-gray-200 rounded-2xl p-6 md:p-8 border-dashed">
+          <h2 class="text-xl font-heading font-bold text-clr-green mb-3">Fiber Internet (Coming Soon)</h2>
+          <p class="text-gray-700 font-body mb-3">
+            Fiber-optic internet is planned for the area. Fiber typically offers symmetric upload and download speeds (e.g., 100 Mbps to 1 Gbps or more), low latency, and reliable performance—ideal for video calls, large uploads, and multiple users.
+          </p>
+          <div class="bg-blue-50 border-2 border-blue-200 rounded-lg p-4">
+            <p class="text-blue-800 font-body text-sm">
+              <strong>Status:</strong> Service is expected to become available from the provider in the future. Check with the HOA board or the provider’s website for rollout updates and when sign-up opens for Crooked Lake Reserve.
+            </p>
+          </div>
+        </div>
+
+        <!-- Choosing & Tips -->
+        <div class="bg-white border-2 border-clr-green rounded-2xl p-6 md:p-8">
+          <h2 class="text-xl font-heading font-bold text-clr-green mb-4">Choosing a Provider & Tips</h2>
+          <ul class="space-y-2 text-gray-700 font-body">
+            <li class="flex items-start gap-2">
+              <span class="text-clr-orange font-bold mt-1">•</span>
+              <span><strong>Check your address:</strong> Use each provider’s website to confirm availability and plan options at your specific address.</span>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-clr-orange font-bold mt-1">•</span>
+              <span><strong>Consider usage:</strong> Video calls, streaming, and work-from-home benefit from higher speeds and stable connections; cable and fiber usually offer the most consistent performance.</span>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-clr-orange font-bold mt-1">•</span>
+              <span><strong>Equipment placement:</strong> For Starlink, follow the rear-of-home guideline and ensure a clear view of the sky. For cellular home internet, place the modem near a window or where signal is strongest.</span>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-clr-orange font-bold mt-1">•</span>
+              <span><strong>ARB approval:</strong> Exterior equipment (e.g., Starlink dish, fixed wireless antennas) may require architectural review. Submit an ARB request before installing.</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</ResourcesLayout>
