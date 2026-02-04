@@ -10,13 +10,12 @@
  */
 
 /** Set to true to rotate through multiple hero images; false to show a single static image. */
-export const heroRotate = false;
+export const heroRotate = true;
 
 /**
  * Image paths (from public/). Use one or more, e.g.:
- * ['/placeholder-lake.jpg']
- * ['/images/hero1.webp', '/images/hero2.webp', '/images/hero3.webp']
- * 
- * Note: For best performance, convert images to WebP format and optimize file sizes.
+ * ['/clr-lake-ducie.webp', '/clr-sign.webp', '/clr-tree.webp']
+ *
+ * Note: For best performance, use WebP format and keep file sizes under ~300KB.
  */
-export const heroImages: string[] = ['/placeholder-lake.jpg'];
+export const heroImages: string[] = ['/clr-lake-ducie.webp', '/clr-sign.webp', '/clr-tree.webp'];

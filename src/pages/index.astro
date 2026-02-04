@@ -3,7 +3,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import { heroRotate, heroImages } from '../config/hero';
 
 const showRotation = heroRotate && heroImages.length > 1;
-const heroImage = heroImages[0] ?? '/placeholder-lake.jpg';
+const heroImage = heroImages[0];
 const siteURL = import.meta.env.SITE || 'https://clrhoa.com';
 const meetingLocation = import.meta.env.PUBLIC_MEETING_LOCATION ?? 'Eustis Community Center';
 const meetingRoom = import.meta.env.PUBLIC_MEETING_ROOM ?? '';
@@ -24,7 +24,7 @@ const directionsUrl = hasAddress
   : null;
 ---
 
-<BaseLayout title="Home" preloadImages={[heroImage]}>
+<BaseLayout title="Home" preloadImages={heroImages} image="/clr-lake-ducie.webp">
   <section class="hero-gradient min-h-screen flex items-center text-white relative overflow-hidden">
     <div class="absolute inset-0 bg-black/20" aria-hidden="true"></div>
     {showRotation ? (
