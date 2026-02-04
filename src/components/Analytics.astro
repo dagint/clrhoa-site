@@ -20,6 +20,9 @@ const useNewScript = plausibleScriptSrc.length > 0;
 const scriptSrc = useNewScript ? plausibleScriptSrc : 'https://plausible.io/js/script.js';
 // Legacy script has a known SRI hash; new script URL is unique per site so no SRI here
 const legacyIntegrity = 'sha384-TDBMBYT3vz715r8UIyVTB4AUTXubXmLI02DeDWgyDahvCXmPV4Vgx2m6yQvI19d/';
+// New script init (injected with set:html so it outputs as real JS, not literal {`...`})
+const plausibleInitInline =
+  'window.plausible=window.plausible||function(){(plausible.q=plausible.q||[]).push(arguments)},plausible.init=plausible.init||function(i){plausible.o=i||{}};\nplausible.init()';
 ---
 
 {isPlausibleEnabled && (
@@ -27,10 +30,7 @@ const legacyIntegrity = 'sha384-TDBMBYT3vz715r8UIyVTB4AUTXubXmLI02DeDWgyDahvCXmP
     {useNewScript ? (
       <>
         <script async src={scriptSrc} crossorigin="anonymous" />
-        <script is:inline>
-          {`window.plausible=window.plausible||function(){(plausible.q=plausible.q||[]).push(arguments)},plausible.init=plausible.init||function(i){plausible.o=i||{}};
-plausible.init()`}
-        </script>
+        <script is:inline set:html={plausibleInitInline} />
       </>
     ) : (
       <script
