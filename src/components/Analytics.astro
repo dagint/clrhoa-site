@@ -1,37 +1,30 @@
 ---
 /**
  * Privacy-friendly analytics component
- * 
- * Currently supports:
- * - Plausible Analytics (privacy-friendly, GDPR compliant, no cookies)
- * 
- * To enable:
- * 1. Set PUBLIC_ANALYTICS_PROVIDER="plausible" in environment variables
- * 2. Set PUBLIC_PLAUSIBLE_DOMAIN to your Plausible domain (e.g., "clrhoa.com")
- * 
- * For other providers, extend this component or create provider-specific components.
+ *
+ * Supports Plausible Analytics (legacy and new script).
+ * To enable: PUBLIC_ANALYTICS_PROVIDER="plausible" and PUBLIC_PLAUSIBLE_DOMAIN set.
+ * To use Plausible's new script: set PUBLIC_PLAUSIBLE_SCRIPT_SRC to the script URL
+ * from Plausible → Site Settings → General → Site Installation.
  */
 
 const analyticsProvider = import.meta.env.PUBLIC_ANALYTICS_PROVIDER || '';
 const plausibleDomain = import.meta.env.PUBLIC_PLAUSIBLE_DOMAIN || '';
+const plausibleScriptSrc = import.meta.env.PUBLIC_PLAUSIBLE_SCRIPT_SRC || '';
 
-// Only render analytics if enabled and configured
 const isPlausibleEnabled = analyticsProvider === 'plausible' && plausibleDomain;
+const useNewScript = plausibleScriptSrc.length > 0;
+const scriptSrc = useNewScript ? plausibleScriptSrc : 'https://plausible.io/js/script.js';
+// Legacy script has a known SRI hash; new script URL is unique per site so no SRI here
+const legacyIntegrity = 'sha384-TDBMBYT3vz715r8UIyVTB4AUTXubXmLI02DeDWgyDahvCXmPV4Vgx2m6yQvI19d/';
 ---
 
 {isPlausibleEnabled && (
-  <>
-    {/* Plausible Analytics - Privacy-friendly, GDPR compliant, no cookies */}
-    {/* Note: SRI hash may need updating when Plausible updates their script */}
-    {/* Generate new hash: node scripts/generate-sri.js https://plausible.io/js/script.js */}
-    <script
-      defer
-      data-domain={plausibleDomain}
-      src="https://plausible.io/js/script.js"
-      integrity="sha384-TDBMBYT3vz715r8UIyVTB4AUTXubXmLI02DeDWgyDahvCXmPV4Vgx2m6yQvI19d/"
-      crossorigin="anonymous"
-    />
-    {/* Optional: Enable hash-based routing if using client-side routing */}
-    {/* <script defer data-domain={plausibleDomain} src="https://plausible.io/js/script.hash.js"></script> */}
-  </>
+  <script
+    defer
+    data-domain={plausibleDomain}
+    src={scriptSrc}
+    integrity={useNewScript ? undefined : legacyIntegrity}
+    crossorigin="anonymous"
+  />
 )}

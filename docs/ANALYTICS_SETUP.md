@@ -42,7 +42,7 @@ PUBLIC_PLAUSIBLE_DOMAIN=clrhoa.com
    - `PUBLIC_PLAUSIBLE_DOMAIN` = `clrhoa.com`
 4. Save and redeploy
 
-### 3. Verify Setup
+### 4. Verify Setup
 
 1. Deploy your site
 2. Visit your site and navigate through a few pages

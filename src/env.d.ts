@@ -6,6 +6,8 @@ interface ImportMetaEnv {
   readonly PUBLIC_RECAPTCHA_SITE_KEY?: string;
   readonly PUBLIC_ANALYTICS_PROVIDER?: string;
   readonly PUBLIC_PLAUSIBLE_DOMAIN?: string;
+  /** Optional: use Plausible's new script URL from Site Installation (recommended). When set, this replaces the legacy script. */
+  readonly PUBLIC_PLAUSIBLE_SCRIPT_SRC?: string;
   readonly SITE?: string;
   
   // Contact information (PII)

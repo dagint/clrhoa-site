@@ -46,7 +46,8 @@ These variables contain Personally Identifiable Information (PII) and should be 
 ### Analytics
 
 - `PUBLIC_ANALYTICS_PROVIDER` - Analytics provider (e.g., `plausible`)
-- `PUBLIC_PLAUSIBLE_DOMAIN` - Plausible domain (e.g., `clrhoa.com`)
+- `PUBLIC_PLAUSIBLE_DOMAIN` - Plausible domain; must match the domain in Plausible (e.g., `clrhoa.com` or `clrhoa-site.pages.dev`)
+- `PUBLIC_PLAUSIBLE_SCRIPT_SRC` - (Optional) New Plausible script URL from Site Installation; when set, replaces the legacy script
 
 ### Site Configuration
 
