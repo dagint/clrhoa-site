@@ -17,7 +17,7 @@ const documentsCollection = defineCollection({
   schema: z.object({
     title: z.string(),
     slug: z.string().optional(),
-    category: z.enum(['Governing Documents', 'Policies', 'Forms', 'Meeting Minutes', 'Other']),
+    category: z.enum(['Governing Documents', 'Policies', 'Forms', 'Minutes', 'Other']),
     description: z.string(),
     // Accept full URLs or site-relative paths (e.g. /documents/files/name.pdf)
     fileUrl: z.string().refine((v) => v.startsWith('http') || v.startsWith('/'), {
