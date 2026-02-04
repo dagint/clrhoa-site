@@ -13,7 +13,7 @@ Complete documentation for the Crooked Lake Reserve HOA website.
 ### Setup & Configuration
 
 - **[Environment Variables](ENVIRONMENT_VARIABLES.md)** - Environment variable setup and reference
-- **[Contact Form Setup](CONTACT_FORM_SETUP.md)** - Formspree and Turnstile configuration
+- **[Contact Form Setup](CONTACT_FORM_SETUP.md)** - StaticForms and reCAPTCHA configuration
 - **[Analytics Setup](ANALYTICS_SETUP.md)** - Privacy-friendly analytics configuration
 
 ### Security

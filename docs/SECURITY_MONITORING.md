@@ -122,11 +122,11 @@ npm audit fix
 - Submission volume
 - Spam patterns
 - Failed submissions
-- Turnstile success rate
+- reCAPTCHA success rate (if enabled)
 
 **Where to check**:
-- Formspree Dashboard → Submissions
-- Cloudflare Turnstile Dashboard → Analytics
+- StaticForms Dashboard → Submissions
+- Google reCAPTCHA admin (if enabled)
 
 **What to look for**:
 - Unusual spikes in submissions
@@ -136,7 +136,7 @@ npm audit fix
 
 **Action required**:
 - Review suspicious patterns
-- Adjust Turnstile settings if needed
+- Adjust reCAPTCHA or StaticForms settings if needed
 - Block repeat offenders if possible
 
 ### 5. External Script Integrity
@@ -276,9 +276,9 @@ npm audit fix
    - Monitor: Traffic patterns, threats
    - Access: Cloudflare Dashboard
 
-2. **Cloudflare Turnstile**
-   - Monitor: Bot detection, form abuse
-   - Access: Cloudflare Dashboard → Turnstile
+2. **StaticForms / reCAPTCHA**
+   - Monitor: Form submissions, bot detection (if reCAPTCHA enabled)
+   - Access: StaticForms dashboard; Google reCAPTCHA admin if used
 
 3. **Cloudflare WAF**
    - Monitor: Web application firewall logs

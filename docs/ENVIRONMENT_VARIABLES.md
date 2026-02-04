@@ -15,7 +15,7 @@ These variables contain Personally Identifiable Information (PII) and should be 
 
 ### Security Contact
 
-- `PUBLIC_SECURITY_EMAIL` - Email address for security.txt (e.g., `security@clrhoa.com`)
+- `PUBLIC_SECURITY_EMAIL` - Email address for security.txt (e.g., `security@yourhoa.com`)
 
 ### Mailing Address
 
@@ -25,19 +25,19 @@ These variables contain Personally Identifiable Information (PII) and should be 
 
 ### Physical Address
 
-- `PUBLIC_PHYSICAL_ADDRESS_STREET` - Street address (e.g., `2 Lakes Ln`)
-- `PUBLIC_PHYSICAL_ADDRESS_CITY` - City name (e.g., `Eustis`)
+- `PUBLIC_PHYSICAL_ADDRESS_STREET` - Street address (e.g., `123 Main St`)
+- `PUBLIC_PHYSICAL_ADDRESS_CITY` - City name (e.g., `Your City`)
 - `PUBLIC_PHYSICAL_ADDRESS_STATE` - State abbreviation (e.g., `FL`)
-- `PUBLIC_PHYSICAL_ADDRESS_ZIP` - ZIP code (e.g., `32726`)
+- `PUBLIC_PHYSICAL_ADDRESS_ZIP` - ZIP code (e.g., `12345`)
 
 ### Meeting Location
 
-- `PUBLIC_MEETING_LOCATION` - Meeting venue name (e.g., `Eustis Community Center`)
+- `PUBLIC_MEETING_LOCATION` - Meeting venue name (e.g., `Community Center`)
 - `PUBLIC_MEETING_ROOM` - Optional room name or number (e.g., `Room 3` or `Conference Room A`)
-- `PUBLIC_MEETING_ADDRESS_STREET` - Street address (e.g., `1090 S Bay St`)
-- `PUBLIC_MEETING_ADDRESS_CITY` - City name (e.g., `Eustis`)
+- `PUBLIC_MEETING_ADDRESS_STREET` - Street address (e.g., `456 Oak Ave`)
+- `PUBLIC_MEETING_ADDRESS_CITY` - City name (e.g., `Your City`)
 - `PUBLIC_MEETING_ADDRESS_STATE` - State abbreviation (e.g., `FL`)
-- `PUBLIC_MEETING_ADDRESS_ZIP` - ZIP code (e.g., `32726`)
+- `PUBLIC_MEETING_ADDRESS_ZIP` - ZIP code (e.g., `12345`)
 
 **Note**: If meeting address variables are provided, a "Get Directions" link will automatically appear on pages showing the meeting location.
 
@@ -85,21 +85,21 @@ These variables are optional and used to display waste management schedules and 
 
 2. Edit `.env.local` and fill in your values:
    ```bash
-   # Contact Information
-   PUBLIC_SECURITY_EMAIL=security@clrhoa.com
-   PUBLIC_MAILING_ADDRESS_NAME=Crooked Lake Reserve HOA
+   # Contact Information (replace with your HOA's values)
+   PUBLIC_SECURITY_EMAIL=security@yourhoa.com
+   PUBLIC_MAILING_ADDRESS_NAME=Your HOA Name
    PUBLIC_MAILING_ADDRESS_LINE1=P.O. Box 1234
    PUBLIC_MAILING_ADDRESS_LINE2=Your City, ST 12345
-   PUBLIC_PHYSICAL_ADDRESS_STREET=2 Lakes Ln
-   PUBLIC_PHYSICAL_ADDRESS_CITY=Eustis
+   PUBLIC_PHYSICAL_ADDRESS_STREET=123 Main St
+   PUBLIC_PHYSICAL_ADDRESS_CITY=Your City
    PUBLIC_PHYSICAL_ADDRESS_STATE=FL
-   PUBLIC_PHYSICAL_ADDRESS_ZIP=32726
-   PUBLIC_MEETING_LOCATION=Eustis Community Center
+   PUBLIC_PHYSICAL_ADDRESS_ZIP=12345
+   PUBLIC_MEETING_LOCATION=Community Center
    PUBLIC_MEETING_ROOM=Room 3
-   PUBLIC_MEETING_ADDRESS_STREET=1090 S Bay St
-   PUBLIC_MEETING_ADDRESS_CITY=Eustis
+   PUBLIC_MEETING_ADDRESS_STREET=456 Oak Ave
+   PUBLIC_MEETING_ADDRESS_CITY=Your City
    PUBLIC_MEETING_ADDRESS_STATE=FL
-   PUBLIC_MEETING_ADDRESS_ZIP=32726
+   PUBLIC_MEETING_ADDRESS_ZIP=12345
    ```
 
 3. Restart the dev server:

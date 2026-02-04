@@ -152,7 +152,7 @@ Wait for DNS propagation (up to 24 hours, usually minutes)
 
 ## 📝 Content Updates
 
-- [ ] Configure contact form (Formspree + Turnstile) - See `CONTACT_FORM_SETUP.md`
+- [ ] Configure contact form (StaticForms) - See `CONTACT_FORM_SETUP.md`
 - [ ] Set environment variables - See `ENVIRONMENT_VARIABLES.md`
 - [ ] Upload actual PDF documents to `public/documents/files/`
 - [ ] Update document entries in `src/content/documents/`

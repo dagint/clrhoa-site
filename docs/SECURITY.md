@@ -22,7 +22,7 @@ This site implements multiple layers of security to protect both the site and it
 
 - ✅ Static site architecture (minimal attack surface)
 - ✅ Comprehensive security headers (CSP, HSTS, etc.)
-- ✅ Form security (Turnstile + honeypot)
+- ✅ Form security (StaticForms: honeypot + optional reCAPTCHA)
 - ✅ Privacy protection (no exposed PII)
 - ✅ Automated dependency updates (Dependabot)
 - ✅ External script integrity (SRI)
@@ -78,8 +78,8 @@ npm run audit:fix    # Fix automatically fixable issues
 
 ## Subresource Integrity
 
-External scripts are protected with SRI hashes:
-- Cloudflare Turnstile
+External scripts are protected with SRI hashes where applicable:
+- reCAPTCHA (when enabled; see contact form)
 - Plausible Analytics
 
 **Guide**: See `SRI.md` for hash generation and update procedures.

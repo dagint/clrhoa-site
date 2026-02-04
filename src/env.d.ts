@@ -2,9 +2,7 @@
 
 interface ImportMetaEnv {
   // Form and security
-  readonly PUBLIC_FORMSPREE_FORM_ID?: string;
   readonly PUBLIC_STATICFORMS_API_KEY?: string;
-  readonly PUBLIC_TURNSTILE_SITE_KEY?: string;
   readonly PUBLIC_RECAPTCHA_SITE_KEY?: string;
   readonly PUBLIC_ANALYTICS_PROVIDER?: string;
   readonly PUBLIC_PLAUSIBLE_DOMAIN?: string;

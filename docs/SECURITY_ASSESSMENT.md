@@ -10,10 +10,10 @@
    - No database or backend vulnerabilities
 
 2. **Form Security**
-   - Cloudflare Turnstile bot protection
-   - Honeypot field (`_gotcha`) for spam prevention
+   - StaticForms with optional reCAPTCHA bot protection
+   - Honeypot field for spam prevention
    - Client-side validation with proper error handling
-   - Form submissions handled by trusted third-party (Formspree)
+   - Form submissions handled by trusted third-party (StaticForms)
 
 3. **Privacy Protection**
    - No exposed email addresses
@@ -22,7 +22,7 @@
 
 4. **Environment Variables**
    - Sensitive keys properly excluded from git (`.gitignore`)
-   - Public keys only exposed (Turnstile site key is safe to expose)
+   - Public keys only exposed (reCAPTCHA site key when used is safe to expose)
 
 5. **Dependencies**
    - Modern, actively maintained packages
@@ -51,11 +51,11 @@
    - No security scanning for vulnerabilities
 
 5. **Input Sanitization**
-   - Client-side validation only (server-side handled by Formspree)
+   - Client-side validation only (server-side handled by StaticForms)
    - No additional sanitization for user-generated content display
 
 6. **Rate Limiting**
-   - Form submissions rely on Turnstile only
+   - Form submissions rely on honeypot and optional reCAPTCHA
    - No additional rate limiting at application level
 
 ## Security Recommendations
@@ -93,7 +93,7 @@
 ### Low Priority
 
 7. **Subresource Integrity (SRI)**
-   - Add SRI hashes for external scripts (Turnstile, Plausible)
+   - Add SRI hashes for external scripts (reCAPTCHA if used, Plausible)
 
 8. **Security Documentation**
    - Document security practices

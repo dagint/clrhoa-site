@@ -26,10 +26,10 @@ The site includes information about the ARB and directs residents to use the con
 ### 2. Contact page (how residents reach the board)
 
 **Contact form:**  
-The site uses a secure contact form (Formspree) that allows residents to select whether they're contacting the Board of Directors or the Architectural Review Board. No email addresses are exposed on the site.
+The site uses a secure contact form (StaticForms) that allows residents to select whether they're contacting the Board of Directors or the Architectural Review Board. No email addresses are exposed on the site.
 
-**Formspree configuration:**  
-The contact form needs to be configured with Formspree. The form will route messages to the appropriate recipients based on the selection. You'll need to set up a Formspree account and configure where messages should be delivered.
+**StaticForms configuration:**  
+The contact form needs to be configured with StaticForms. The form will route messages to the appropriate recipients based on the selection. You'll need to set up a StaticForms account and configure where messages should be delivered.
 
 **Phone number:**  
 The site does not display a phone number. All contact is handled through the secure contact form. If you want to add a phone number, we can add it, but it's recommended to use the form for security.
@@ -76,9 +76,9 @@ Thanks,
 | Page        | Placeholder / fake info now           | What we need from board              |
 |------------|----------------------------------------|--------------------------------------|
 | Board      | Generic board information              | No changes needed (no named members) |
-| Contact    | Secure contact form                    | Configure Formspree form routing     |
+| Contact    | Secure contact form                    | Configure StaticForms form routing   |
 | Contact    | P.O. Box 1234, Your City, ST 12345     | Real HOA mailing address             |
-| Contact    | No email displayed                     | Configure Formspree to route messages |
+| Contact    | No email displayed                     | Configure StaticForms to route messages |
 | Documents  | Download links for Covenants & Bylaws  | The actual PDF files                 |
 
 Nothing in this request requires the board to use the computer in any special way—they can reply in plain email with the information filled in.

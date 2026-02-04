@@ -82,7 +82,7 @@ See **[Deployment Guide](docs/DEPLOYMENT.md)** for complete deployment instructi
 ### Security Features
 
 - ✅ Security headers (CSP, HSTS, X-Frame-Options, etc.)
-- ✅ Cloudflare Turnstile bot protection on contact form
+- ✅ StaticForms contact form with honeypot and optional reCAPTCHA
 - ✅ Honeypot spam prevention
 - ✅ Client-side form validation
 - ✅ No exposed email addresses or personal information

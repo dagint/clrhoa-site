@@ -1,7 +1,8 @@
 import type { APIRoute } from 'astro';
 
 export const GET: APIRoute = () => {
-  const securityEmail = import.meta.env.PUBLIC_SECURITY_EMAIL ?? 'security@clrhoa.com';
+  // Use env var; fallback to placeholder so security.txt is valid (replace in production)
+const securityEmail = import.meta.env.PUBLIC_SECURITY_EMAIL ?? 'security@example.com';
   const siteURL = import.meta.env.SITE || 'https://clrhoa.com';
   const expiresDate = new Date();
   expiresDate.setFullYear(expiresDate.getFullYear() + 1); // Expires 1 year from now

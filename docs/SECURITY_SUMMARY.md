@@ -28,11 +28,11 @@ The Crooked Lake Reserve HOA website has a **strong security posture** for a sta
 - ✅ Deployed on Cloudflare Pages (DDoS protection)
 
 ### 2. Form Security
-- ✅ Cloudflare Turnstile bot protection
-- ✅ Honeypot field (`_gotcha`) for spam prevention
+- ✅ StaticForms with optional reCAPTCHA bot protection
+- ✅ Honeypot field for spam prevention
 - ✅ Client-side validation with error handling
-- ✅ Form submissions via trusted third-party (Formspree)
-- ✅ Server-side validation handled by Formspree
+- ✅ Form submissions via trusted third-party (StaticForms)
+- ✅ Server-side validation handled by StaticForms
 
 ### 3. Privacy Protection
 - ✅ No exposed email addresses
@@ -117,7 +117,7 @@ The Crooked Lake Reserve HOA website has a **strong security posture** for a sta
 - ✅ Clickjacking → X-Frame-Options
 - ✅ MIME sniffing → X-Content-Type-Options
 - ✅ Protocol downgrade → HSTS
-- ✅ Form spam → Turnstile + honeypot
+- ✅ Form spam → honeypot + optional reCAPTCHA
 - ✅ Information disclosure → No exposed emails
 
 ### Very Low Risk (Static Site Benefits)
@@ -130,8 +130,7 @@ The Crooked Lake Reserve HOA website has a **strong security posture** for a sta
 
 ### Current Monitoring
 - Cloudflare provides DDoS protection
-- Formspree handles form spam filtering
-- Turnstile provides bot detection
+- StaticForms handles form delivery; honeypot and optional reCAPTCHA reduce spam
 
 ### Recommended Additional Monitoring
 - Dependency vulnerability alerts (Dependabot)
@@ -144,7 +143,7 @@ The Crooked Lake Reserve HOA website has a **strong security posture** for a sta
 ### Current Capabilities
 - Static site = minimal attack surface
 - Cloudflare provides DDoS mitigation
-- Formspree handles form abuse
+- StaticForms handles form delivery and abuse mitigation
 
 ### Recommended Improvements
 - Document incident response procedures

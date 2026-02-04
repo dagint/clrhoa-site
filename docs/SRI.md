@@ -16,10 +16,9 @@ SRI works by allowing you to provide a cryptographic hash that a fetched resourc
 
 ### External Scripts with SRI
 
-1. **Cloudflare Turnstile** (`src/pages/contact.astro`)
-   - Script: `https://challenges.cloudflare.com/turnstile/v0/api.js`
-   - Status: ✅ Hash configured
-   - **Note**: Turnstile scripts update frequently. SRI may need regular updates.
+1. **Google reCAPTCHA** (optional, `src/pages/contact.astro`)
+   - When reCAPTCHA is enabled, scripts load from `https://www.google.com` / `https://www.gstatic.com`
+   - **Note**: reCAPTCHA scripts update frequently. SRI may need regular updates if you add integrity hashes.
 
 2. **Plausible Analytics** (`src/components/Analytics.astro`)
    - Script: `https://plausible.io/js/script.js`
@@ -32,7 +31,7 @@ SRI works by allowing you to provide a cryptographic hash that a fetched resourc
 
 1. Visit: https://www.srihash.org/
 2. Enter the script URL:
-   - For Turnstile: `https://challenges.cloudflare.com/turnstile/v0/api.js`
+   - For reCAPTCHA (if used): `https://www.google.com/recaptcha/api.js` or the version you load
    - For Plausible: `https://plausible.io/js/script.js`
 3. Click "Generate"
 4. Copy the hash (format: `sha384-...`)
@@ -41,14 +40,11 @@ SRI works by allowing you to provide a cryptographic hash that a fetched resourc
 ### Using the Provided Script
 
 ```bash
-# Generate hash for Turnstile
-node scripts/generate-sri.js https://challenges.cloudflare.com/turnstile/v0/api.js
-
 # Generate hash for Plausible
 node scripts/generate-sri.js https://plausible.io/js/script.js
 
 # Or use npm script
-npm run sri https://challenges.cloudflare.com/turnstile/v0/api.js
+npm run sri https://plausible.io/js/script.js
 ```
 
 **Note**: If the script encounters redirects or fails, use the online tool method above.
@@ -56,7 +52,7 @@ npm run sri https://challenges.cloudflare.com/turnstile/v0/api.js
 ### Manual Method (PowerShell)
 
 ```powershell
-$content = (Invoke-WebRequest -Uri "https://challenges.cloudflare.com/turnstile/v0/api.js" -UseBasicParsing).Content
+$content = (Invoke-WebRequest -Uri "https://plausible.io/js/script.js" -UseBasicParsing).Content
 $bytes = [System.Text.Encoding]::UTF8.GetBytes($content)
 $hash = [System.Security.Cryptography.SHA384]::Create().ComputeHash($bytes)
 $base64 = [Convert]::ToBase64String($hash)
@@ -96,14 +92,14 @@ SRI hashes need to be updated when:
 
 | Script | File | Line | Status |
 |--------|------|------|--------|
-| Turnstile | `src/pages/contact.astro` | ~198 | ✅ Configured |
+| reCAPTCHA (optional) | `src/pages/contact.astro` | — | Optional; add SRI if used |
 | Plausible | `src/components/Analytics.astro` | ~31 | ✅ Configured |
 
 ## SRI Limitations
 
 ### Dynamic Scripts
 
-Some scripts update frequently (like Turnstile), which can cause issues:
+Some scripts update frequently (e.g. reCAPTCHA), which can cause issues:
 
 - **Problem**: Hash changes when script updates
 - **Solution**: 

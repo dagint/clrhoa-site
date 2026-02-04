@@ -18,11 +18,8 @@ This document outlines the performance optimizations implemented in the site.
 
 ### JavaScript Minification
 
-- **Enabled**: `minify: 'terser'` with compression options
-- **Effect**: 
-  - Removes console.log statements in production
-  - Removes debugger statements
-  - Minifies JavaScript code
+- **Enabled**: `minify: 'esbuild'` in Vite build config
+- **Effect**: Minifies JavaScript bundles
 - **Benefit**: Smaller JavaScript bundles, faster execution
 
 ### Asset Organization
