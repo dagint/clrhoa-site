@@ -34,6 +34,11 @@ This document outlines the performance optimizations implemented in the site.
 - **Effect**: Automatically inlines small stylesheets
 - **Benefit**: Reduces HTTP requests for small CSS files
 
+### Post-build: Defer all CSS on homepage
+
+- **Issue**: Astro’s CSS code-splitting injects multiple page CSS chunks (e.g. about + emergency-contacts) into `index.html`, causing render-blocking requests.
+- **Fix**: `scripts/defer-index-css.js` runs as `postbuild` and makes **all** `/_assets/*.css` stylesheets on `dist/index.html` non-blocking (`media="print"` then `onload="this.media='all'"`). No CSS blocks initial render; LCP (hero image) paints immediately. A `<noscript>` block is added so users without JS still get styles.
+
 ## Runtime Optimizations
 
 ### Image Preloading
