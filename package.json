@@ -17,9 +17,9 @@
     "optimize:hero": "node scripts/optimize-hero-images.js"
   },
   "dependencies": {
-    "@astrojs/tailwind": "^5.1.0",
+    "@astrojs/tailwind": "^6.0.2",
     "astro": "^5.17.1",
-    "tailwindcss": "^3.4.1"
+    "tailwindcss": "^4.1.18"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",
