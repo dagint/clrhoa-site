@@ -94,6 +94,7 @@ Restart the dev server (`npm run dev`) after changing env vars.
 - **Recipient types**: The form sends a **recipient** field (Board, ARB, Vendor request). All submissions go to the same email; you route by reading that field.
 - **Thank-you page**: On success, StaticForms redirects to `/contact/thanks` (via hidden field `redirectTo`).
 - **Honeypot**: A hidden field named `honeypot` is used for bot detection (and is stripped from the email).
+- **Error handling**: The form is submitted via JavaScript (fetch). If the submission fails (network error, API error, etc.), a user-friendly error message is shown on the page instead of a blank failure or browser error; the user can correct and resubmit.
 
 ---
 

@@ -4,8 +4,20 @@ interface Props {
 }
 
 const { items } = Astro.props;
+const siteURL = Astro.site || 'https://clrhoa.com';
+const breadcrumbList = {
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  itemListElement: items.map((item, i) => ({
+    '@type': 'ListItem',
+    position: i + 1,
+    name: item.label,
+    item: `${siteURL}${item.href}`,
+  })),
+};
 ---
 
+<script type="application/ld+json" set:html={JSON.stringify(breadcrumbList)} />
 <nav aria-label="Breadcrumb" class="mb-6">
   <ol class="flex flex-wrap items-center gap-2 text-sm font-body">
     {items.map((item, index) => (

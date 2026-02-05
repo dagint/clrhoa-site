@@ -3,8 +3,9 @@ import { getCollection } from 'astro:content';
 
 export const GET: APIRoute = async ({ site }) => {
   const siteURL = site || 'https://clrhoa.com';
-  
-  // Get all published news articles
+  // Optional: set SITE_LAST_MODIFIED (ISO date) in env for static page lastmod; otherwise use build time
+  const staticLastmod = import.meta.env.SITE_LAST_MODIFIED ?? new Date().toISOString();
+
   const newsItems = await getCollection('news', ({ data }) => {
     return data.published === true;
   });
@@ -46,12 +47,12 @@ export const GET: APIRoute = async ({ site }) => {
     };
   });
 
-  // Generate URLs for static pages
+  // Generate URLs for static pages (lastmod from env or build time)
   const staticUrls = staticPages.map((path) => {
     const priority = path === '' ? 1.0 : path === '/news' || path === '/documents' ? 0.9 : 0.8;
     return {
       loc: `${siteURL}${path}`,
-      lastmod: new Date().toISOString(),
+      lastmod: staticLastmod,
       changefreq: path === '' ? 'weekly' as const : 'monthly' as const,
       priority,
     };

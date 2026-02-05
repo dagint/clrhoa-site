@@ -7,9 +7,11 @@ interface Props {
   description?: string;
   image?: string;
   preloadImages?: string[];
+  /** When true, adds robots noindex,follow and keeps canonical as self (for 404, thank-you, etc.) */
+  noindex?: boolean;
 }
 
-const { title, description = 'Crooked Lake Reserve Homeowners Association', image, preloadImages = [] } = Astro.props;
+const { title, description = 'Crooked Lake Reserve Homeowners Association', image, preloadImages = [], noindex = false } = Astro.props;
 const canonicalURL = new URL(Astro.url.pathname, Astro.site);
 const siteURL = Astro.site || 'https://clrhoa.com';
 const fullTitle = `${title} | Crooked Lake Reserve HOA`;
@@ -86,10 +88,12 @@ const resourcesByCategory = {
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <meta name="description" content={description} />
+    {noindex && <meta name="robots" content="noindex, follow" />}
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="generator" content={Astro.generator} />
     <title>{fullTitle}</title>
     <link rel="canonical" href={canonicalURL} />
+    <link rel="alternate" type="application/rss+xml" href={`${siteURL}/rss.xml`} title="Crooked Lake Reserve HOA News" />
     
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website" />

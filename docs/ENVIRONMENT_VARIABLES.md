@@ -51,6 +51,7 @@ These variables contain Personally Identifiable Information (PII) and should be 
 ### Site Configuration
 
 - `SITE` - Site URL (defaults to `https://clrhoa.com`)
+- `SITE_LAST_MODIFIED` - Optional. ISO date string (e.g. `2025-02-04`) used as `lastmod` for static pages in `sitemap.xml`. If unset, build time is used.
 
 ### Waste Management & Recycling
 
