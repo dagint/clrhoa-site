@@ -34,10 +34,10 @@ This document outlines the performance optimizations implemented in the site.
 - **Effect**: Automatically inlines small stylesheets
 - **Benefit**: Reduces HTTP requests for small CSS files
 
-### Post-build: Defer second CSS on homepage
+### Post-build: Defer all CSS on homepage
 
 - **Issue**: Astro injects two CSS chunks (about + emergency-contacts) into `index.html`; both would block render.
-- **Fix**: `scripts/defer-index-css.js` defers only the **second** stylesheet so one file blocks (correct initial layout, avoids CLS). Deferring both caused large layout shift when CSS loaded.
+- **Fix**: `scripts/defer-index-css.js` defers **all** `/_assets/*.css` stylesheets (`media="print"` then `onload="this.media='all'"`) so none block. Inline critical CSS in the layout (body + hero, homepage only) keeps initial layout stable and avoids CLS when the full CSS loads. A `<noscript>` fallback provides styles when JS is disabled.
 
 ### Fonts and CLS
 

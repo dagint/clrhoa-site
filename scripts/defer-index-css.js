@@ -1,7 +1,7 @@
 /**
- * Post-build: make the second _assets stylesheet on index.html non-render-blocking.
- * Deferring only the second keeps one CSS file blocking so initial layout is correct (avoids CLS).
- * Deferring both caused large layout shift when CSS loaded. Run after: npm run build
+ * Post-build: make all _assets stylesheets on index.html non-render-blocking.
+ * Homepage has inline critical CSS (body + hero) so deferring full CSS no longer causes large CLS.
+ * Run after: npm run build
  */
 
 import { readFile, writeFile } from 'fs/promises';
@@ -14,16 +14,17 @@ const indexPath = join(__dirname, '..', 'dist', 'index.html');
 const html = await readFile(indexPath, 'utf8');
 
 const re = /<link rel="stylesheet" href="(\/_assets\/[^"]+\.css)"\s*>/g;
-let count = 0;
-const newHtml = html.replace(re, (full, href) => {
-  count++;
-  if (count === 2) {
-    return `<link rel="stylesheet" href="${href}" media="print" onload="this.media='all'">`;
-  }
-  return full;
+const hrefs = [];
+const deferred = html.replace(re, (full, href) => {
+  hrefs.push(href);
+  return `<link rel="stylesheet" href="${href}" media="print" onload="this.media='all'">`;
 });
+const noscript = hrefs.length
+  ? `<noscript>${hrefs.map((h) => `<link rel="stylesheet" href="${h}">`).join('')}</noscript>`
+  : '';
+const newHtml = deferred.replace('</head>', `${noscript}</head>`);
 
 if (newHtml !== html) {
   await writeFile(indexPath, newHtml);
-  console.log('Deferred second stylesheet on index.html (non-render-blocking).');
+  console.log('Deferred all stylesheets on index.html (non-render-blocking).');
 }
