@@ -44,9 +44,9 @@ This document outlines the performance optimizations implemented in the site.
 
 ### Font Optimization
 
-- **Implementation**: `preconnect` links for Google Fonts
-- **Usage**: Preconnects to `fonts.googleapis.com` and `fonts.gstatic.com`
-- **Benefit**: Faster font loading
+- **Implementation**: `preconnect` + async font stylesheet loading in `BaseLayout.astro`
+- **Usage**: Font CSS is loaded with `rel="preload" as="style"` and applied via `onload` so it does not block initial render; `display=swap` keeps text visible immediately
+- **Benefit**: Reduces render-blocking time; preconnect still speeds the font request when it runs
 
 ### Lazy Loading
 
@@ -73,16 +73,17 @@ This document outlines the performance optimizations implemented in the site.
 
 ### Image Optimization
 
-1. **Convert to WebP**: Use WebP format for better compression
-   - Current hero image: `placeholder-lake.jpg` (consider converting)
-   - See `src/config/hero.ts` for image configuration
+1. **Hero images (critical for LCP)**:
+   - Format: WebP (see `src/config/hero.ts`)
+   - Max dimensions: 1920×1080px (or 1920×1280 for taller hero)
+   - **Target file size: under 300KB each.** Lighthouse flags images over ~500KB; 2–5 MB hero images add several seconds to load.
+   - **Build step:** Run `npm run optimize:hero` before deploy (uses `sharp` to resize to max 1920px and re-encode WebP at quality 82). Requires `npm install` (sharp is a devDependency).
+   - Manual: [Squoosh](https://squoosh.app) (WebP, quality 80–85), or `cwebp -q 82 -resize 1920 0 input.jpg -o hero.webp`
 
-2. **Optimize Image Sizes**:
-   - Hero images: 1920x1080px max
-   - Keep file sizes under 300KB
-   - Use appropriate image dimensions
+2. **Current behavior**:
+   - Only the first hero image is preloaded and used for LCP; 2nd and 3rd slides load when the carousel reaches them (lazy-loaded).
 
-3. **Responsive Images**: Consider using `srcset` for responsive images
+3. **Responsive images**: If switching to `<img>` tags, use `srcset` for responsive hero images.
 
 ### Code Splitting
 

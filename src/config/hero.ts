@@ -13,9 +13,9 @@
 export const heroRotate = true;
 
 /**
- * Image paths (from public/). Use one or more, e.g.:
- * ['/clr-lake-ducie.webp', '/clr-sign.webp', '/clr-tree.webp']
+ * Image paths (from public/). Optimized outputs go in public/hero/ via npm run optimize:hero.
+ * Example: ['/hero/clr-lake-ducie.webp', '/hero/clr-sign.webp', '/hero/clr-tree.webp']
  *
- * Note: For best performance, use WebP format and keep file sizes under ~300KB.
+ * Note: For best performance, run optimize:hero so images are resized and re-encoded (~300–500KB each).
  */
-export const heroImages: string[] = ['/clr-lake-ducie.webp', '/clr-sign.webp', '/clr-tree.webp'];
+export const heroImages: string[] = ['/hero/clr-lake-ducie.webp', '/hero/clr-sign.webp', '/hero/clr-tree.webp'];

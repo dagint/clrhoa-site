@@ -24,7 +24,7 @@ const directionsUrl = hasAddress
   : null;
 ---
 
-<BaseLayout title="Home" preloadImages={heroImages} image="/clr-lake-ducie.webp">
+<BaseLayout title="Home" preloadImages={showRotation ? [heroImages[0]] : [heroImage]} image={heroImages[0]}>
   <section class="hero-gradient min-h-screen flex items-center text-white relative overflow-hidden">
     <div class="absolute inset-0 bg-black/20" aria-hidden="true"></div>
     {showRotation ? (
@@ -32,7 +32,8 @@ const directionsUrl = hasAddress
         {heroImages.map((src, i) => (
           <div
             class={`hero-slide absolute inset-0 bg-cover bg-center transition-opacity duration-1000 ${i === 0 ? 'hero-slide-active opacity-30' : 'opacity-0'}`}
-            style={{ backgroundImage: `url(${src})` }}
+            style={i === 0 ? { backgroundImage: `url(${src})` } : undefined}
+            data-bg={i === 0 ? undefined : src}
             data-hero-index={i}
             aria-hidden={i !== 0}
           />
@@ -72,10 +73,19 @@ const directionsUrl = hasAddress
           if (slides.length <= 1) return;
           let index = 0;
           const interval = 5000;
+          function ensureSlideBackground(slide) {
+            const bg = slide.getAttribute('data-bg');
+            if (bg && !slide.style.backgroundImage) {
+              slide.style.backgroundImage = 'url(' + bg + ')';
+            }
+          }
           setInterval(function () {
             slides[index].classList.remove('hero-slide-active', 'opacity-30');
             slides[index].classList.add('opacity-0');
             index = (index + 1) % slides.length;
+            ensureSlideBackground(slides[index]);
+            var nextIndex = (index + 1) % slides.length;
+            ensureSlideBackground(slides[nextIndex]);
             slides[index].classList.remove('opacity-0');
             slides[index].classList.add('hero-slide-active', 'opacity-30');
           }, interval);

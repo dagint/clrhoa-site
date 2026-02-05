@@ -13,7 +13,8 @@
     "test:coverage": "vitest --coverage",
     "audit": "npm audit",
     "audit:fix": "npm audit fix",
-    "sri": "node scripts/generate-sri.js"
+    "sri": "node scripts/generate-sri.js",
+    "optimize:hero": "node scripts/optimize-hero-images.js"
   },
   "dependencies": {
     "@astrojs/tailwind": "^5.1.0",
@@ -24,6 +25,7 @@
     "@types/node": "^20.14.0",
     "@vitest/ui": "^4.0.18",
     "jsdom": "^24.1.0",
+    "sharp": "^0.33.5",
     "terser": "^5.36.0",
     "typescript": "^5.5.0",
     "vitest": "^4.0.18"

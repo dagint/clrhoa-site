@@ -13,7 +13,7 @@ const { title, description = 'Crooked Lake Reserve Homeowners Association', imag
 const canonicalURL = new URL(Astro.url.pathname, Astro.site);
 const siteURL = Astro.site || 'https://clrhoa.com';
 const fullTitle = `${title} | Crooked Lake Reserve HOA`;
-const ogImage = image || `${siteURL}/clr-lake-ducie.webp`;
+const ogImage = image || `${siteURL}/hero/clr-lake-ducie.webp`;
 
 // Get current path for active navigation highlighting
 const currentPath = Astro.url.pathname;
@@ -22,8 +22,10 @@ function isActive(path: string): boolean {
 }
 
 // Address information from environment variables (for structured data)
+const addressStreet = import.meta.env.PUBLIC_PHYSICAL_ADDRESS_STREET ?? '';
 const addressCity = import.meta.env.PUBLIC_PHYSICAL_ADDRESS_CITY ?? 'Eustis';
 const addressState = import.meta.env.PUBLIC_PHYSICAL_ADDRESS_STATE ?? 'FL';
+const addressPostalCode = import.meta.env.PUBLIC_PHYSICAL_ADDRESS_ZIP ?? '';
 
 // Social media links (optional)
 const facebookUrl = import.meta.env.PUBLIC_FACEBOOK_URL ?? '';
@@ -71,8 +73,10 @@ const resourcesByCategory = {
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="description" content={description} />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <meta name="description" content={description} />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="generator" content={Astro.generator} />
     <title>{fullTitle}</title>
@@ -104,8 +108,10 @@ const resourcesByCategory = {
       "description": "Crooked Lake Reserve Homeowners Association serving our beautiful lakefront community in ${addressCity}, ${addressState === 'FL' ? 'Florida' : addressState}",
       "address": {
         "@type": "PostalAddress",
+        ...(addressStreet && { streetAddress: addressStreet }),
         "addressLocality": addressCity,
         "addressRegion": addressState,
+        ...(addressPostalCode && { postalCode: addressPostalCode }),
         "addressCountry": "US"
       },
       "contactPoint": {
@@ -115,10 +121,15 @@ const resourcesByCategory = {
       },
       "sameAs": []
     })} />
-    
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Open+Sans:wght@400;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet" />
+    <script is:inline define:vars={{ fontUrl: 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Open+Sans:wght@400;600;700&family=Playfair+Display:wght@600;700&display=swap' }}>
+      (function(u){var r=requestIdleCallback||function(f){setTimeout(f,1);};r(function(){var l=document.createElement('link');l.rel='stylesheet';l.href=u;document.head.appendChild(l);});})(fontUrl);
+    </script>
+    <noscript>
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Open+Sans:wght@400;600;700&family=Playfair+Display:wght@600;700&display=swap"
+      />
+    </noscript>
     {/* Preload critical images for better performance */}
     {preloadImages.map((img) => (
       <link rel="preload" as="image" href={img} fetchpriority="high" />
