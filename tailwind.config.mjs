@@ -6,8 +6,8 @@ export default {
       colors: {
         'clr-green': '#1e5f38', // Deep lake green
         'clr-beige': '#f4e8d9', // Warm sand beige
-        'clr-orange': '#d97706', // Florida orange
-        'clr-gray': '#6b7280',
+        'clr-orange': '#92400e', // Florida orange (darkened for WCAG AA: white on orange + orange on white)
+        'clr-gray': '#4b5563', // Darker gray for WCAG AA on white cards
       },
       fontFamily: {
         heading: ['"Playfair Display"', 'serif'],
