@@ -12,7 +12,7 @@ const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const publicDir = join(__dirname, '..', 'public');
 const heroOutDir = join(publicDir, 'hero');
 const MAX_WIDTH = 1920;
-const WEBP_QUALITY = 82;
+const WEBP_QUALITY = 78;
 
 async function optimizeHeroImages() {
   let sharp;

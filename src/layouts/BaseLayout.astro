@@ -74,6 +74,15 @@ const resourcesByCategory = {
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    {currentPath === '/' && (
+      <style is:inline set:html={`
+        body{min-height:100vh;background-color:#f9fafb;color:#111827}
+        .hero-gradient{background:linear-gradient(135deg,#1e5f38 0%,#2d8a5e 50%,#f4e8d9 100%);min-height:100vh;display:flex;align-items:center;color:#fff;position:relative;overflow:hidden}
+        .hero-content{max-width:56rem;margin-left:auto;margin-right:auto;padding-left:1rem;padding-right:1rem;text-align:center;position:relative;z-index:10}
+        @media (min-width:640px){.hero-content{padding-left:1.5rem;padding-right:1.5rem}}
+        @media (min-width:1024px){.hero-content{padding-left:2rem;padding-right:2rem}}
+      `} />
+    )}
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <meta name="description" content={description} />
@@ -121,13 +130,13 @@ const resourcesByCategory = {
       },
       "sameAs": []
     })} />
-    <script is:inline define:vars={{ fontUrl: 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Open+Sans:wght@400;600;700&family=Playfair+Display:wght@600;700&display=swap' }}>
+    <script is:inline define:vars={{ fontUrl: 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Open+Sans:wght@400;600;700&family=Playfair+Display:wght@600;700&display=optional' }}>
       (function(u){var r=requestIdleCallback||function(f){setTimeout(f,1);};r(function(){var l=document.createElement('link');l.rel='stylesheet';l.href=u;document.head.appendChild(l);});})(fontUrl);
     </script>
     <noscript>
       <link
         rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Open+Sans:wght@400;600;700&family=Playfair+Display:wght@600;700&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Open+Sans:wght@400;600;700&family=Playfair+Display:wght@600;700&display=optional"
       />
     </noscript>
     {/* Preload critical images for better performance */}

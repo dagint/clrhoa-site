@@ -34,10 +34,14 @@ This document outlines the performance optimizations implemented in the site.
 - **Effect**: Automatically inlines small stylesheets
 - **Benefit**: Reduces HTTP requests for small CSS files
 
-### Post-build: Defer all CSS on homepage
+### Post-build: Defer second CSS on homepage
 
-- **Issue**: Astro’s CSS code-splitting injects multiple page CSS chunks (e.g. about + emergency-contacts) into `index.html`, causing render-blocking requests.
-- **Fix**: `scripts/defer-index-css.js` runs as `postbuild` and makes **all** `/_assets/*.css` stylesheets on `dist/index.html` non-blocking (`media="print"` then `onload="this.media='all'"`). No CSS blocks initial render; LCP (hero image) paints immediately. A `<noscript>` block is added so users without JS still get styles.
+- **Issue**: Astro injects two CSS chunks (about + emergency-contacts) into `index.html`; both would block render.
+- **Fix**: `scripts/defer-index-css.js` defers only the **second** stylesheet so one file blocks (correct initial layout, avoids CLS). Deferring both caused large layout shift when CSS loaded.
+
+### Fonts and CLS
+
+- **font-display: optional** in the Google Fonts URL so the browser does not swap in web fonts after first paint (avoids layout shift from font swap). First-time visitors may see system fallback fonts; repeat visits use cached web fonts.
 
 ## Runtime Optimizations
 
@@ -82,7 +86,7 @@ This document outlines the performance optimizations implemented in the site.
    - Format: WebP (see `src/config/hero.ts`)
    - Max dimensions: 1920×1080px (or 1920×1280 for taller hero)
    - **Target file size: under 300KB each.** Lighthouse flags images over ~500KB; 2–5 MB hero images add several seconds to load.
-   - **Build step:** Run `npm run optimize:hero` before deploy (uses `sharp` to resize to max 1920px and re-encode WebP at quality 82). Requires `npm install` (sharp is a devDependency).
+   - **Build step:** Run `npm run optimize:hero` before deploy (uses `sharp` to resize to max 1920px and re-encode WebP at quality 78 for smaller files). Requires `npm install` (sharp is a devDependency).
    - Manual: [Squoosh](https://squoosh.app) (WebP, quality 80–85), or `cwebp -q 82 -resize 1920 0 input.jpg -o hero.webp`
 
 2. **Current behavior**:

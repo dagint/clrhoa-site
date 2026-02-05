@@ -1,8 +1,7 @@
 /**
- * Post-build: make all _assets stylesheets on index.html non-render-blocking.
- * Astro injects about + emergency-contacts CSS into the index page; we defer
- * both so no CSS blocks render (LCP is the hero image, which doesn't need CSS).
- * Run after: npm run build
+ * Post-build: make the second _assets stylesheet on index.html non-render-blocking.
+ * Deferring only the second keeps one CSS file blocking so initial layout is correct (avoids CLS).
+ * Deferring both caused large layout shift when CSS loaded. Run after: npm run build
  */
 
 import { readFile, writeFile } from 'fs/promises';
@@ -15,19 +14,16 @@ const indexPath = join(__dirname, '..', 'dist', 'index.html');
 const html = await readFile(indexPath, 'utf8');
 
 const re = /<link rel="stylesheet" href="(\/_assets\/[^"]+\.css)"\s*>/g;
-const hrefs = [];
-const deferred = html.replace(re, (full, href) => {
-  hrefs.push(href);
-  return `<link rel="stylesheet" href="${href}" media="print" onload="this.media='all'">`;
+let count = 0;
+const newHtml = html.replace(re, (full, href) => {
+  count++;
+  if (count === 2) {
+    return `<link rel="stylesheet" href="${href}" media="print" onload="this.media='all'">`;
+  }
+  return full;
 });
-
-// Noscript fallback so no-JS users still get styles
-const noscript = hrefs.length
-  ? `<noscript>${hrefs.map((h) => `<link rel="stylesheet" href="${h}">`).join('')}</noscript>`
-  : '';
-const newHtml = deferred.replace('</head>', `${noscript}</head>`);
 
 if (newHtml !== html) {
   await writeFile(indexPath, newHtml);
-  console.log('Deferred all stylesheets on index.html (non-render-blocking).');
+  console.log('Deferred second stylesheet on index.html (non-render-blocking).');
 }
