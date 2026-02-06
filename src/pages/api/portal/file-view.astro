@@ -1,0 +1,54 @@
+---
+/**
+ * GET /api/portal/file-view?key=... — returns minimal HTML that displays one image in isolation.
+ * Used inside an iframe with sandbox="allow-same-origin" (no allow-scripts) so images cannot access the parent or run script.
+ * Only allows keys under arb/ (ARB request attachments).
+ * Note: Browsers may log "Blocked script execution... allow-scripts permission is not set" for sandboxed iframes; this is expected and intentional (we do not allow script).
+ */
+export const prerender = false;
+
+import { getSessionFromCookie } from '../../../lib/auth';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const session = await getSessionFromCookie(
+  Astro.request.headers.get('cookie') ?? undefined,
+  env?.SESSION_SECRET
+);
+
+if (!session) {
+  return new Response('Unauthorized', { status: 401 });
+}
+
+const keyParam = Astro.url.searchParams.get('key');
+if (!keyParam) {
+  return new Response('Bad Request', { status: 400 });
+}
+const key = decodeURIComponent(keyParam);
+if (!key.startsWith('arb/')) {
+  return new Response('Forbidden', { status: 403 });
+}
+
+const fileUrl = `/api/portal/file/${encodeURIComponent(key)}`;
+const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="script-src 'none'; default-src 'none'; img-src 'self'; style-src 'unsafe-inline'">
+  <title>Attachment</title>
+</head>
+<body style="margin:0;background:#f3f4f6;display:flex;align-items:center;justify-content:center;min-height:100vh">
+  <img src="${fileUrl.replace(/"/g, '&quot;')}" alt="Attachment" style="max-width:100%;height:auto;display:block" referrerpolicy="no-referrer" loading="lazy">
+</body>
+</html>`;
+
+return new Response(html, {
+  status: 200,
+  headers: {
+    'Content-Type': 'text/html; charset=utf-8',
+    'X-Frame-Options': 'SAMEORIGIN',
+    'Content-Security-Policy': "script-src 'none'; default-src 'none'; img-src 'self'; style-src 'unsafe-inline'",
+  },
+});
+---

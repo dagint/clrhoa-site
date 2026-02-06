@@ -1,0 +1,158 @@
+---
+/**
+ * POST /api/arb-cancel — owner cancels a pending ARB request.
+ * Body (JSON): requestId.
+ * Removes all attachments from R2 and arb_files; keeps request row with status=cancelled and text fields for reuse.
+ */
+export const prerender = false;
+
+import { getSessionFromCookie, verifyCsrfToken, verifyOrigin } from '../../lib/auth';
+import { createLogger, maskRequestId } from '../../lib/logging';
+import { checkRateLimit, getRateLimitConfig } from '../../lib/rate-limit';
+import { getSecurityMonitor } from '../../lib/monitoring';
+import { getArbRequest, listArbFilesByRequest, deleteAllArbFilesByRequest, cancelArbRequest } from '../../lib/arb-db';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const logger = createLogger('arb-cancel');
+const userAgent = Astro.request.headers.get('user-agent') ?? null;
+const ipAddress = Astro.request.headers.get('cf-connecting-ip') ?? 
+                  Astro.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
+let session = await getSessionFromCookie(
+  Astro.request.headers.get('cookie') ?? undefined,
+  env?.SESSION_SECRET,
+  userAgent,
+  ipAddress
+);
+
+// If session validation fails due to fingerprint mismatch, try without fingerprint check
+if (!session && env?.SESSION_SECRET) {
+  session = await getSessionFromCookie(
+    Astro.request.headers.get('cookie') ?? undefined,
+    env.SESSION_SECRET
+  );
+}
+
+if (!session) {
+  return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
+}
+
+// CSRF protection: verify origin
+const origin = Astro.request.headers.get('origin');
+const referer = Astro.request.headers.get('referer');
+const expectedOrigin = Astro.url.origin;
+if (!verifyOrigin(origin, referer, expectedOrigin)) {
+  return new Response(JSON.stringify({ error: 'Invalid origin. Request blocked for security.' }), {
+    status: 403,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+if (Astro.request.method !== 'POST') {
+  return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405, headers: { 'Content-Type': 'application/json' } });
+}
+
+const db = env?.DB;
+const r2 = env?.CLOURHOA_FILES;
+if (!db) {
+  return new Response(JSON.stringify({ error: 'Server configuration error' }), { status: 503, headers: { 'Content-Type': 'application/json' } });
+}
+
+let body: { requestId?: string; csrfToken?: string };
+try {
+  body = await Astro.request.json();
+} catch {
+  return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+}
+
+// CSRF token verification
+if (!verifyCsrfToken(session, body.csrfToken)) {
+  return new Response(
+    JSON.stringify({ error: 'Invalid security token. Please refresh the page and try again.' }),
+    { status: 403, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+
+const requestId = (body.requestId ?? '').trim();
+if (!requestId) {
+  return new Response(JSON.stringify({ error: 'requestId is required.' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+}
+
+const req = await getArbRequest(db, requestId);
+if (!req || req.owner_email !== session.email.toLowerCase()) {
+  return new Response(JSON.stringify({ error: 'Request not found or you do not own it.' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
+}
+if (req.status !== 'pending') {
+  return new Response(JSON.stringify({ error: 'Only pending requests can be cancelled. This request is already ' + req.status + '.' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+}
+
+// IMPORTANT: Update status FIRST, then delete files
+// This prevents data loss if the status update fails - files remain attached to a cancelled request
+// If we delete files first and status update fails, the request appears "lost"
+
+// Step 1: Update status to cancelled first (most critical operation)
+const updated = await cancelArbRequest(db, requestId, session.email);
+if (!updated) {
+  logger.error('Failed to cancel request - status update failed', { requestId, email: session.email });
+  return new Response(JSON.stringify({ error: 'Could not cancel request. Please try again.' }), { 
+    status: 500, 
+    headers: { 'Content-Type': 'application/json' } 
+  });
+}
+
+// Step 2: Get files list (now that status is cancelled, safe to delete)
+const files = await listArbFilesByRequest(db, requestId);
+const deletedFileKeys: string[] = [];
+let r2DeleteErrors = 0;
+
+// Step 3: Delete R2 objects (non-critical - files can be cleaned up later if this fails)
+if (r2) {
+  for (const file of files) {
+    if (file.reference_only) continue; // Don't delete referenced files from copied requests
+    try {
+      const keys = JSON.parse(file.r2_keys) as { originals?: string[]; review?: string[]; archive?: string[] };
+      const allKeys = [...(keys.originals ?? []), ...(keys.review ?? []), ...(keys.archive ?? [])];
+      for (const key of allKeys) {
+        try {
+          await r2.delete(key);
+          deletedFileKeys.push(key);
+        } catch (e) {
+          logger.warn('R2 delete failed for key', { key, fileId: file.id, error: String(e) });
+          r2DeleteErrors++;
+        }
+      }
+    } catch (e) {
+      logger.warn('Failed to parse R2 keys for file', { fileId: file.id, error: String(e) });
+      r2DeleteErrors++;
+    }
+  }
+}
+
+// Step 4: Delete file records from database (safe now that status is cancelled)
+try {
+  await deleteAllArbFilesByRequest(db, requestId);
+} catch (e) {
+  logger.error('Failed to delete file records from database', { requestId, error: String(e) });
+  // Don't fail the request - status is already cancelled, files can be cleaned up later
+}
+
+// Log results
+if (deletedFileKeys.length > 0) {
+  logger.info('File deletion completed', { 
+    requestId: maskRequestId(requestId), 
+    filesDeleted: deletedFileKeys.length,
+    r2Errors: r2DeleteErrors
+  });
+}
+if (r2DeleteErrors > 0) {
+  logger.warn('Some R2 files could not be deleted', { requestId: maskRequestId(requestId), errors: r2DeleteErrors });
+}
+
+return new Response(
+  JSON.stringify({
+    success: true,
+    message: 'Request cancelled. Attachments have been removed; your form details are kept for reference.',
+  }),
+  { status: 200, headers: { 'Content-Type': 'application/json' } }
+);
+---

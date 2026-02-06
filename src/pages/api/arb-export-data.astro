@@ -1,0 +1,122 @@
+---
+/**
+ * GET /api/arb-export-data — Export user's ARB request data (GDPR/CCPA compliance).
+ * Returns JSON export of all user's requests and associated data.
+ */
+export const prerender = false;
+
+import { getSessionFromCookie, verifyCsrfToken, verifyOrigin } from '../../lib/auth';
+import { listArbRequestsByOwner, listArbFilesByRequest } from '../../lib/arb-db';
+import { getSecurityMonitor } from '../../lib/monitoring';
+import { createLogger } from '../../lib/logging';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const session = await getSessionFromCookie(
+  Astro.request.headers.get('cookie') ?? undefined,
+  env?.SESSION_SECRET
+);
+
+if (!session) {
+  return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+    status: 401,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const logger = createLogger({ endpoint: '/api/arb-export-data', email: session.email });
+const securityMonitor = getSecurityMonitor();
+
+// CSRF protection: verify origin
+const origin = Astro.request.headers.get('origin');
+const referer = Astro.request.headers.get('referer');
+const expectedOrigin = Astro.url.origin;
+const ipAddress = Astro.clientAddress || Astro.request.headers.get('cf-connecting-ip') || null;
+
+if (!verifyOrigin(origin, referer, expectedOrigin)) {
+  securityMonitor.trackCsrfFailure('/api/arb-export-data', ipAddress);
+  return new Response(JSON.stringify({ error: 'Invalid origin. Request blocked for security.' }), {
+    status: 403,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+// CSRF token verification (from query parameter or header)
+const csrfToken = Astro.url.searchParams.get('csrf_token') || Astro.request.headers.get('x-csrf-token');
+if (!verifyCsrfToken(session, csrfToken)) {
+  securityMonitor.trackCsrfFailure('/api/arb-export-data', ipAddress);
+  return new Response(
+    JSON.stringify({ error: 'Invalid security token. Please refresh the page and try again.' }),
+    { status: 403, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+
+const db = env?.DB;
+if (!db) {
+  return new Response(JSON.stringify({ error: 'Server configuration error' }), {
+    status: 503,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+try {
+  // Get all user's requests
+  const requests = await listArbRequestsByOwner(db, session.email);
+  
+  // Get files for each request
+  const exportData = {
+    exportedAt: new Date().toISOString(),
+    userEmail: session.email,
+    requestCount: requests.length,
+    requests: await Promise.all(
+      requests.map(async (req) => {
+        const files = await listArbFilesByRequest(db, req.id);
+        return {
+          id: req.id,
+          applicantName: req.applicant_name,
+          phone: req.phone,
+          propertyAddress: req.property_address,
+          applicationType: req.application_type,
+          description: req.description,
+          status: req.status,
+          ownerNotes: req.owner_notes,
+          createdAt: req.created,
+          updatedAt: req.updated_at,
+          esignTimestamp: req.esign_timestamp,
+          arbEsign: req.arb_esign,
+          reviewDeadline: req.review_deadline,
+          revisionNotes: req.revision_notes,
+          copiedFromId: req.copied_from_id,
+          files: files.map((f) => ({
+            id: f.id,
+            filename: f.filename,
+            originalSize: f.original_size,
+            uploadedAt: f.uploaded_at,
+            // Note: File download URLs are not included for security
+            // Users can download files through the portal interface
+          })),
+        };
+      })
+    ),
+  };
+
+  logger.info('Data export generated', { requestCount: requests.length });
+
+  // Return as JSON with download headers
+  return new Response(JSON.stringify(exportData, null, 2), {
+    status: 200,
+    headers: {
+      'Content-Type': 'application/json',
+      'Content-Disposition': `attachment; filename="arb-data-export-${new Date().toISOString().split('T')[0]}.json"`,
+      'Cache-Control': 'no-store, no-cache, must-revalidate',
+    },
+  });
+} catch (e) {
+  logger.error('Data export failed', { error: String(e) });
+  securityMonitor.trackApiError('/api/arb-export-data', e instanceof Error ? e : new Error(String(e)));
+  return new Response(
+    JSON.stringify({ error: 'Failed to generate export. Please try again.' }),
+    { status: 500, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+---

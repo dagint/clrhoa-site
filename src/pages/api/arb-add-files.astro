@@ -1,0 +1,277 @@
+---
+/**
+ * POST /api/arb-add-files — owner adds attachments to an existing pending request.
+ * Multipart: request_id, file_0, file_1, ... (or files[]). Same limits as arb-upload (5MB/file, 25MB total for request).
+ */
+export const prerender = false;
+
+import { getSessionFromCookie, verifyCsrfToken, verifyOrigin } from '../../lib/auth';
+import { checkRateLimit, getRateLimitConfig } from '../../lib/rate-limit';
+import { getSecurityMonitor } from '../../lib/monitoring';
+import { getArbRequest, listArbFilesByRequest, createArbFileId, insertArbFile } from '../../lib/arb-db';
+
+const MAX_FILE_BYTES = 5 * 1024 * 1024;
+const MAX_TOTAL_BYTES = 25 * 1024 * 1024;
+const MAX_REQUEST_SIZE_BYTES = 100 * 1024 * 1024; // 100MB max request size
+const REQUEST_TIMEOUT_MS = 30 * 1000; // 30 seconds timeout
+
+function isAllowedType(t: string): boolean {
+  if (t.startsWith('image/')) return true;
+  if (t === 'application/pdf') return true;
+  return false;
+}
+
+// Server-side file type validation: check actual MIME type, not just extension
+async function validateFileMimeType(file: File): Promise<boolean> {
+  const buffer = await file.arrayBuffer();
+  const bytes = new Uint8Array(buffer);
+  
+  // JPEG: FF D8 FF
+  if (bytes[0] === 0xFF && bytes[1] === 0xD8 && bytes[2] === 0xFF) {
+    return file.type === 'image/jpeg' || file.type === 'image/jpg';
+  }
+  // PNG: 89 50 4E 47
+  if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4E && bytes[3] === 0x47) {
+    return file.type === 'image/png';
+  }
+  // GIF: 47 49 46 38
+  if (bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x38) {
+    return file.type === 'image/gif';
+  }
+  // WebP: RIFF...WEBP
+  if (bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46) {
+    if (bytes.length >= 12 && 
+        bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50) {
+      return file.type === 'image/webp';
+    }
+  }
+  // PDF: %PDF
+  if (bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46) {
+    return file.type === 'application/pdf';
+  }
+  // HEIC: ftyp...heic
+  if (bytes.length >= 12 && 
+      bytes[4] === 0x66 && bytes[5] === 0x74 && bytes[6] === 0x79 && bytes[7] === 0x70) {
+    const brand = String.fromCharCode(bytes[8], bytes[9], bytes[10], bytes[11]);
+    if (brand === 'heic' || brand === 'mif1' || brand === 'msf1') {
+      return file.type === 'image/heic' || file.type === 'image/heif';
+    }
+  }
+  
+  return isAllowedType(file.type) || file.type === 'application/pdf';
+}
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const session = await getSessionFromCookie(
+  Astro.request.headers.get('cookie') ?? undefined,
+  env?.SESSION_SECRET
+);
+
+if (!session) {
+  return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
+}
+
+// CSRF protection: verify origin
+const origin = Astro.request.headers.get('origin');
+const referer = Astro.request.headers.get('referer');
+const expectedOrigin = Astro.url.origin;
+if (!verifyOrigin(origin, referer, expectedOrigin)) {
+  return new Response(JSON.stringify({ error: 'Invalid origin. Request blocked for security.' }), {
+    status: 403,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+if (Astro.request.method !== 'POST') {
+  return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405, headers: { 'Content-Type': 'application/json' } });
+}
+
+const db = env?.DB;
+const r2 = env?.CLOURHOA_FILES;
+if (!db || !r2) {
+  return new Response(JSON.stringify({ error: 'Server configuration error' }), { status: 503, headers: { 'Content-Type': 'application/json' } });
+}
+
+// Set up timeout protection
+const timeoutPromise = new Promise<never>((_, reject) => {
+  setTimeout(() => reject(new Error('Request timeout')), REQUEST_TIMEOUT_MS);
+});
+
+let formData: FormData;
+try {
+  // Race between formData parsing and timeout
+  const formDataPromise = Astro.request.formData();
+  formData = await Promise.race([formDataPromise, timeoutPromise]);
+  
+  // Check request size
+  const contentLength = Astro.request.headers.get('content-length');
+  if (contentLength) {
+    const sizeBytes = parseInt(contentLength, 10);
+    if (sizeBytes > MAX_REQUEST_SIZE_BYTES) {
+      return new Response(
+        JSON.stringify({
+          error: `Request too large. Maximum size is ${(MAX_REQUEST_SIZE_BYTES / 1024 / 1024).toFixed(0)}MB.`,
+        }),
+        { status: 413, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+  }
+} catch (e) {
+  if (e instanceof Error && e.message === 'Request timeout') {
+    return new Response(
+      JSON.stringify({ error: 'Request timed out. Please try again with smaller files.' }),
+      { status: 408, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+  return new Response(
+    JSON.stringify({ error: 'Invalid form data. Please try again.' }),
+    { status: 400, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+
+// CSRF token verification
+const csrfToken = formData.get('csrf_token') as string | null;
+if (!verifyCsrfToken(session, csrfToken)) {
+  return new Response(
+    JSON.stringify({ error: 'Invalid security token. Please refresh the page and try again.' }),
+    { status: 403, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+
+const requestId = (formData.get('request_id') as string)?.trim();
+if (!requestId) {
+  return new Response(JSON.stringify({ error: 'request_id is required.' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+}
+
+const req = await getArbRequest(db, requestId);
+if (!req || req.owner_email !== session.email.toLowerCase() || req.status !== 'pending') {
+  return new Response(JSON.stringify({ error: 'Request not found or not editable.' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
+}
+
+const existingFiles = await listArbFilesByRequest(db, requestId);
+const existingTotal = existingFiles.reduce((sum, f) => sum + f.original_size, 0);
+
+const fileGroups: { name: string; type: string; size: number; original: Blob; review?: Blob; archive?: Blob }[] = [];
+const indices = new Set<number>();
+for (const key of formData.keys()) {
+  const m = /^file_(\d+)$/.exec(key);
+  if (m) indices.add(parseInt(m[1]!, 10));
+}
+const sortedIndices = Array.from(indices).sort((a, b) => a - b);
+for (const i of sortedIndices) {
+  const original = formData.get('file_' + i);
+  if (!(original instanceof File) || original.size === 0) continue;
+  const review = formData.get('file_' + i + '_review');
+  const archive = formData.get('file_' + i + '_archive');
+  fileGroups.push({
+    name: original.name || 'file',
+    type: original.type,
+    size: original.size,
+    original,
+    review: review instanceof File && review.size > 0 ? review : undefined,
+    archive: archive instanceof File && archive.size > 0 ? archive : undefined,
+  });
+}
+if (fileGroups.length === 0) {
+  const fileList = formData.getAll('files');
+  for (const entry of fileList) {
+    if (entry instanceof File && entry.size > 0) {
+      fileGroups.push({
+        name: entry.name || 'file',
+        type: entry.type,
+        size: entry.size,
+        original: entry,
+      });
+    }
+  }
+}
+
+if (fileGroups.length === 0) {
+  return new Response(JSON.stringify({ error: 'No files to add.' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+}
+
+let newTotal = 0;
+for (const f of fileGroups) {
+  if (f.size > MAX_FILE_BYTES) {
+    return new Response(JSON.stringify({ error: `File "${f.name}" exceeds 5MB.` }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+  }
+  
+  // Server-side MIME type validation
+  const isValidMime = await validateFileMimeType(f.original);
+  if (!isValidMime) {
+    return new Response(
+      JSON.stringify({
+        error: `File "${f.name}" has invalid type or content. Allowed: images (JPEG, PNG, GIF, WebP, HEIC) and PDF only. The file content does not match the declared type.`,
+      }),
+      { status: 400, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+  
+  // Also validate review and archive versions if present
+  if (f.review) {
+    const isValidReview = await validateFileMimeType(f.review);
+    if (!isValidReview) {
+      return new Response(
+        JSON.stringify({
+          error: `Review version of "${f.name}" has invalid type or content.`,
+        }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+  }
+  if (f.archive) {
+    const isValidArchive = await validateFileMimeType(f.archive);
+    if (!isValidArchive) {
+      return new Response(
+        JSON.stringify({
+          error: `Archive version of "${f.name}" has invalid type or content.`,
+        }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+  }
+  
+  newTotal += f.size;
+}
+if (existingTotal + newTotal > MAX_TOTAL_BYTES) {
+  return new Response(
+    JSON.stringify({ error: `Total attachments would exceed 25MB (existing + new). Remove some or add fewer files.` }),
+    { status: 400, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+
+const r2Prefix = `arb/${requestId}`;
+for (const f of fileGroups) {
+  const fileId = createArbFileId();
+  const ext = f.name.includes('.') ? f.name.split('.').pop()! : 'bin';
+  const safeName = `${fileId}.${ext}`;
+  const originalKey = `${r2Prefix}/originals/${safeName}`;
+
+  const origBuf = await f.original.arrayBuffer();
+  await r2.put(originalKey, origBuf, { httpMetadata: { contentType: f.type || 'application/octet-stream' } });
+
+  let reviewKey: string | null = null;
+  let archiveKey: string | null = null;
+  if (f.review) {
+    reviewKey = `${r2Prefix}/review/${fileId}.jpg`;
+    await r2.put(reviewKey, await f.review.arrayBuffer(), { httpMetadata: { contentType: 'image/jpeg' } });
+  }
+  if (f.archive) {
+    archiveKey = `${r2Prefix}/archive/${fileId}.jpg`;
+    await r2.put(archiveKey, await f.archive.arrayBuffer(), { httpMetadata: { contentType: 'image/jpeg' } });
+  }
+
+  const r2KeysJson = JSON.stringify({
+    originals: [originalKey],
+    review: reviewKey ? [reviewKey] : [],
+    archive: archiveKey ? [archiveKey] : [],
+  });
+  await insertArbFile(db, fileId, requestId, f.name, r2KeysJson, f.size);
+}
+
+return new Response(
+  JSON.stringify({ success: true, message: `${fileGroups.length} file(s) added.`, count: fileGroups.length }),
+  { status: 200, headers: { 'Content-Type': 'application/json' } }
+);
+---

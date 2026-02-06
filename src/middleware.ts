@@ -1,17 +1,30 @@
 /**
- * Astro Middleware for Security Headers
- * 
- * This middleware adds security headers to all responses.
- * For Cloudflare Pages, headers can also be configured in:
- * - Cloudflare Dashboard → Pages → your project → Settings → Headers
- * 
- * Note: Some headers may be better configured at Cloudflare level
- * for better performance and caching.
+ * Astro Middleware: portal auth + security headers.
+ * - /portal/* (except /portal/login): require session cookie or redirect to login.
+ * - Security headers on all responses.
  */
 
 import type { MiddlewareHandler } from 'astro';
+import { SESSION_COOKIE_NAME } from './lib/auth';
 
 export const onRequest: MiddlewareHandler = async (context, next) => {
+  const pathname = context.url.pathname;
+
+  // Portal: require session cookie for all routes except login
+  if (pathname.startsWith('/portal')) {
+    if (pathname === '/portal/login' || pathname === '/portal/login/') {
+      // If already logged in, redirect to dashboard
+      if (context.cookies.has(SESSION_COOKIE_NAME)) {
+        return context.redirect('/portal/dashboard');
+      }
+    } else {
+      // Protected portal route: no cookie => login
+      if (!context.cookies.has(SESSION_COOKIE_NAME)) {
+        return context.redirect('/portal/login');
+      }
+    }
+  }
+
   const response = await next();
   
   // Skip middleware during static generation if headers are not available
@@ -21,9 +34,12 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
   }
   
   try {
+    // Allow same-origin framing for /api/portal/file-view (sandboxed attachment viewer in portal iframes)
+    const allowSameOriginFrame = pathname.startsWith('/api/portal/file-view');
+
     // Add security headers
     response.headers.set('X-Content-Type-Options', 'nosniff');
-    response.headers.set('X-Frame-Options', 'DENY');
+    response.headers.set('X-Frame-Options', allowSameOriginFrame ? 'SAMEORIGIN' : 'DENY');
     response.headers.set('X-XSS-Protection', '1; mode=block');
     response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
     response.headers.set('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
@@ -35,6 +51,8 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
     
     // Content Security Policy
     // form-action: StaticForms (contact form); script-src/frame-src: reCAPTCHA (optional)
+    // frame-ancestors: 'self' so portal can embed file-view in iframes; use 'none' for all other routes
+    const frameAncestors = allowSameOriginFrame ? "'self'" : "'none'";
     const csp = [
       "default-src 'self'",
       "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com https://static.cloudflareinsights.com https://www.google.com https://www.gstatic.com",
@@ -46,7 +64,7 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
       "object-src 'none'",
       "base-uri 'self'",
       "form-action 'self' https://api.staticforms.dev",
-      "frame-ancestors 'none'",
+      `frame-ancestors ${frameAncestors}`,
       "upgrade-insecure-requests",
     ].join('; ');
     

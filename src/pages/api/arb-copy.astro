@@ -1,0 +1,117 @@
+---
+/**
+ * POST /api/arb-copy — owner copies an approved or rejected request into a new pending request.
+ * Body (JSON): requestId (source request to copy).
+ * New request gets form data + attachment pointers (no duplicate R2 objects). Removing an
+ * attachment from the new request only removes the pointer, not the original.
+ */
+export const prerender = false;
+
+import { getSessionFromCookie, verifyCsrfToken, verifyOrigin } from '../../lib/auth';
+import { checkRateLimit, getRateLimitConfig } from '../../lib/rate-limit';
+import { getSecurityMonitor } from '../../lib/monitoring';
+import { copyArbRequest } from '../../lib/arb-db';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const session = await getSessionFromCookie(
+  Astro.request.headers.get('cookie') ?? undefined,
+  env?.SESSION_SECRET
+);
+
+if (!session) {
+  return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
+}
+
+// IP-based rate limiting
+const ipAddress = Astro.clientAddress || Astro.request.headers.get('cf-connecting-ip') || null;
+const rateLimitKv = env?.KV;
+const endpoint = '/api/arb-copy';
+const rateLimitConfig = getRateLimitConfig(endpoint);
+const securityMonitor = getSecurityMonitor();
+
+if (rateLimitConfig && rateLimitKv) {
+  const rateLimit = await checkRateLimit(
+    rateLimitKv,
+    endpoint,
+    ipAddress,
+    rateLimitConfig.maxRequests,
+    rateLimitConfig.windowSeconds
+  );
+  
+  if (!rateLimit.allowed) {
+    securityMonitor.trackRateLimit(endpoint, session.email, ipAddress);
+    return new Response(
+      JSON.stringify({
+        error: `Rate limit exceeded. Maximum ${rateLimitConfig.maxRequests} requests per ${rateLimitConfig.windowSeconds} seconds. Please try again later.`,
+      }),
+      {
+        status: 429,
+        headers: {
+          'Content-Type': 'application/json',
+          'X-RateLimit-Limit': rateLimitConfig.maxRequests.toString(),
+          'X-RateLimit-Remaining': '0',
+          'X-RateLimit-Reset': rateLimit.resetAt.toString(),
+        },
+      }
+    );
+  }
+}
+
+// CSRF protection: verify origin
+const origin = Astro.request.headers.get('origin');
+const referer = Astro.request.headers.get('referer');
+const expectedOrigin = Astro.url.origin;
+if (!verifyOrigin(origin, referer, expectedOrigin)) {
+  securityMonitor.trackCsrfFailure(endpoint, ipAddress);
+  return new Response(JSON.stringify({ error: 'Invalid origin. Request blocked for security.' }), {
+    status: 403,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+if (Astro.request.method !== 'POST') {
+  return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405, headers: { 'Content-Type': 'application/json' } });
+}
+
+const db = env?.DB;
+if (!db) {
+  return new Response(JSON.stringify({ error: 'Server configuration error' }), { status: 503, headers: { 'Content-Type': 'application/json' } });
+}
+
+let body: { requestId?: string; csrfToken?: string };
+try {
+  body = await Astro.request.json();
+} catch {
+  return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+}
+
+// CSRF token verification
+if (!verifyCsrfToken(session, body.csrfToken)) {
+  return new Response(
+    JSON.stringify({ error: 'Invalid security token. Please refresh the page and try again.' }),
+    { status: 403, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+
+const requestId = (body.requestId ?? '').trim();
+if (!requestId) {
+  return new Response(JSON.stringify({ error: 'requestId is required.' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+}
+
+try {
+  const newId = await copyArbRequest(db, requestId, session.email);
+  return new Response(
+    JSON.stringify({
+      success: true,
+      requestId: newId,
+      message: 'Request copied. You can edit the new request and remove or add attachments before submitting.',
+    }),
+    { status: 200, headers: { 'Content-Type': 'application/json' } }
+  );
+} catch (e) {
+  const msg = e instanceof Error ? e.message : 'Copy failed.';
+  const status = msg.includes('not found') || msg.includes('do not own') ? 404 : msg.includes('Only approved') ? 400 : 500;
+  return new Response(JSON.stringify({ error: msg }), { status, headers: { 'Content-Type': 'application/json' } });
+}
+---

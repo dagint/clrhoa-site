@@ -1,0 +1,764 @@
+---
+export const prerender = false;
+
+import '../../styles/tailwind.css';
+import ProtectedPage from '../../components/ProtectedPage.astro';
+import PortalElevatedRoleBanner from '../../components/PortalElevatedRoleBanner.astro';
+import { getSessionFromCookie, updateSessionActivity } from '../../lib/auth';
+import { listArbRequestsByOwner, listArbFilesByRequest } from '../../lib/arb-db';
+import type { ArbFile } from '../../lib/arb-db';
+import { sanitizeForDisplay } from '../../lib/sanitize';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const userAgent = Astro.request.headers.get('user-agent') ?? null;
+const ipAddress = Astro.request.headers.get('cf-connecting-ip') ?? 
+                  Astro.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
+const cookieHeader = Astro.request.headers.get('cookie') ?? undefined;
+let session = await getSessionFromCookie(
+  cookieHeader,
+  env?.SESSION_SECRET,
+  userAgent,
+  ipAddress
+);
+
+// If session validation fails due to fingerprint mismatch, try without fingerprint check
+if (!session && env?.SESSION_SECRET) {
+  session = await getSessionFromCookie(
+    cookieHeader,
+    env.SESSION_SECRET
+  );
+}
+
+if (!session) {
+  return Astro.redirect('/portal/login');
+}
+
+const db = env?.DB;
+const requests = db ? await listArbRequestsByOwner(db, session.email) : [];
+const filesByRequestId: Record<string, ArbFile[]> = {};
+const draftCount = requests.filter(r => r.status === 'pending').length;
+if (db) {
+  for (const req of requests) {
+    filesByRequestId[req.id] = await listArbFilesByRequest(db, req.id);
+  }
+}
+
+function getFileViewUrl(r2KeysJson: string): string | null {
+  try {
+    const o = JSON.parse(r2KeysJson) as { originals?: string[]; review?: string[]; archive?: string[] };
+    const key = o.originals?.[0] ?? o.review?.[0] ?? o.archive?.[0];
+    return key ? `/api/portal/file/${encodeURIComponent(key)}` : null;
+  } catch {
+    return null;
+  }
+}
+
+function getFileViewerUrl(r2KeysJson: string): string | null {
+  try {
+    const o = JSON.parse(r2KeysJson) as { originals?: string[]; review?: string[]; archive?: string[] };
+    const key = o.originals?.[0] ?? o.review?.[0] ?? o.archive?.[0];
+    return key ? `/api/portal/file-view?key=${encodeURIComponent(key)}` : null;
+  } catch {
+    return null;
+  }
+}
+
+const IMAGE_EXT = /\.(jpe?g|png|gif|webp|heic)$/i;
+function isImageFilename(filename: string): boolean {
+  return IMAGE_EXT.test(filename);
+}
+
+const APPLICATION_TYPES = ['Exterior Paint', 'Landscape Installation', 'Swimming Pool', 'Recreational Equipment', 'Fencing', 'Other'];
+function selectedTypes(applicationType: string | null): string[] {
+  return applicationType ? applicationType.split(',').map((s) => s.trim()).filter(Boolean) : [];
+}
+
+/** Parse arb_esign (format: "STATUS | Name | email | date") for display. */
+function formatApproval(arbEsign: string | null, esignTimestamp: string | null): { status: string; by: string; date: string } | null {
+  if (!arbEsign?.trim()) return null;
+  const parts = arbEsign.split('|').map((p) => p.trim());
+  const status = (parts[0] ?? '').toLowerCase();
+  if (status !== 'approved' && status !== 'rejected') return null;
+  const by = parts[1] ?? arbEsign;
+  const dateStr = esignTimestamp ?? parts[3];
+  const date = dateStr ? new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
+  return { status, by, date };
+}
+---
+
+<ProtectedPage>
+  <div class="min-h-screen bg-gray-50 font-body">
+    <header class="bg-white border-b border-gray-200">
+      <div class="max-w-4xl mx-auto px-4 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h1 class="text-xl font-heading font-bold text-clr-green">Member Portal</h1>
+          <p class="text-sm text-gray-500">Crooked Lake Reserve HOA</p>
+        </div>
+        <nav class="flex items-center gap-4">
+          <a href="/portal/dashboard" class="text-gray-600 hover:text-clr-green">Dashboard</a>
+          <a href="/portal/my-requests" class="text-clr-green font-medium relative">
+            My requests
+            {draftCount > 0 && (
+              <span class="absolute -top-1 -right-1 bg-amber-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center" title={`${draftCount} draft${draftCount === 1 ? '' : 's'}`}>
+                {draftCount}
+              </span>
+            )}
+          </a>
+          <a href="/portal/arb-request" class="text-gray-600 hover:text-clr-green">New ARB request</a>
+          <a href="/portal/documents" class="text-gray-600 hover:text-clr-green">Documents</a>
+          {(session.role === 'arb' || session.role === 'board' || session.role === 'admin') && (
+            <a href="/portal/arb-dashboard" class="text-gray-600 hover:text-clr-green">ARB Dashboard</a>
+          )}
+          <a href="/api/logout" class="text-sm text-gray-500 hover:text-clr-orange">Sign out</a>
+        </nav>
+      </div>
+    </header>
+
+    <PortalElevatedRoleBanner role={session.role} />
+
+    <main class="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+      <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+        <h2 class="text-2xl font-heading font-bold text-clr-green">My ARB requests</h2>
+        {requests.filter(r => r.status === 'pending').length > 0 && (
+          <div class="flex flex-wrap items-center gap-2 no-print">
+            <label class="inline-flex items-center gap-2 text-sm">
+              <input type="checkbox" id="select-all-pending" class="rounded border-gray-300 text-clr-green focus:ring-clr-green" />
+              <span>Select all pending</span>
+            </label>
+            <button
+              type="button"
+              id="bulk-cancel-btn"
+              class="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled
+            >
+              Cancel selected
+            </button>
+          </div>
+        )}
+      </div>
+
+      <p class="text-gray-600 mb-6">
+        <a href="/portal/arb-request" class="text-clr-green font-semibold hover:underline">Submit a new ARB request &rarr;</a>
+        <span class="text-gray-500"> · </span>
+        <a href="/arb-request-how-to" class="text-clr-orange hover:underline">How to submit (guide)</a>
+      </p>
+
+      {requests.length === 0 ? (
+        <p class="text-gray-500">You have not submitted any ARB requests yet.</p>
+      ) : (
+        <ul class="space-y-4" id="request-list">
+          {requests.map((req) => {
+            const files = filesByRequestId[req.id] ?? [];
+            const approval = formatApproval(req.arb_esign ?? null, req.esign_timestamp ?? null);
+            const isPending = req.status === 'pending';
+            return (
+              <li class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+                {isPending ? (
+                  <div class="flex items-start gap-2 p-2 no-print border-b border-gray-100">
+                    <input type="checkbox" class="request-checkbox mt-2 rounded border-gray-300 text-clr-green focus:ring-clr-green" value={req.id} data-status="pending" />
+                    <div class="flex-1">
+                      <button
+                        type="button"
+                        class="request-summary w-full text-left p-4 sm:p-6 flex flex-wrap justify-between gap-2 items-start hover:bg-gray-50 transition-colors"
+                        data-request-id={req.id}
+                        aria-expanded="false"
+                      >
+                        <div class="flex-1 min-w-0">
+                          <div class="flex flex-wrap justify-between gap-2 mb-2">
+                            <span class="font-mono text-sm text-gray-500">#{req.id}</span>
+                            <span
+                              class={`inline-flex px-2 py-1 rounded text-xs font-semibold shrink-0 ${
+                                req.status === 'pending'
+                                  ? 'bg-amber-100 text-amber-800'
+                                  : req.status === 'in_review'
+                                    ? 'bg-blue-100 text-blue-800'
+                                    : req.status === 'approved'
+                                      ? 'bg-green-100 text-green-800'
+                                      : req.status === 'cancelled'
+                                        ? 'bg-gray-100 text-gray-600'
+                                        : 'bg-red-100 text-red-800'
+                              }`}
+                            >
+                              {req.status === 'in_review' ? 'In review' : req.status === 'cancelled' ? 'Cancelled' : req.status}
+                            </span>
+                          </div>
+                          <p class="text-gray-700 line-clamp-2" set:html={sanitizeForDisplay(req.description)}></p>
+                          <p class="text-xs text-gray-400 mt-2">Submitted: {new Date(req.created).toLocaleString()}</p>
+                        </div>
+                        <span class="request-chevron text-gray-400 shrink-0 ml-2" aria-hidden="true">&#9660;</span>
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    class="request-summary w-full text-left p-4 sm:p-6 flex flex-wrap justify-between gap-2 items-start hover:bg-gray-50 transition-colors"
+                    data-request-id={req.id}
+                    aria-expanded="false"
+                  >
+                    <div class="flex-1 min-w-0">
+                      <div class="flex flex-wrap justify-between gap-2 mb-2">
+                        <span class="font-mono text-sm text-gray-500">#{req.id}</span>
+                        <span
+                          class={`inline-flex px-2 py-1 rounded text-xs font-semibold shrink-0 ${
+                            req.status === 'pending'
+                              ? 'bg-amber-100 text-amber-800'
+                              : req.status === 'in_review'
+                                ? 'bg-blue-100 text-blue-800'
+                                : req.status === 'approved'
+                                  ? 'bg-green-100 text-green-800'
+                                  : req.status === 'cancelled'
+                                    ? 'bg-gray-100 text-gray-600'
+                                    : 'bg-red-100 text-red-800'
+                          }`}
+                        >
+                          {req.status === 'in_review' ? 'In review' : req.status === 'cancelled' ? 'Cancelled' : req.status}
+                        </span>
+                      </div>
+                      <p class="text-gray-700 line-clamp-2" set:html={sanitizeForDisplay(req.description)}></p>
+                      <p class="text-xs text-gray-400 mt-2">Submitted: {new Date(req.created).toLocaleString()}</p>
+                    </div>
+                    <span class="request-chevron text-gray-400 shrink-0 ml-2" aria-hidden="true">&#9660;</span>
+                  </button>
+                )}
+                <div class="request-details hidden border-t border-gray-100 bg-gray-50/50" data-request-id={req.id}>
+                  <div class="p-4 sm:p-6 request-details-screen">
+                    <p class="text-xs text-gray-500 mb-3 italic no-print">Read-only view. To change details or attachments, click &quot;Edit this request&quot; below.</p>
+                    {req.status === 'pending' && req.revision_notes && (
+                      <div class="mb-4 rounded-xl border-2 border-amber-200 bg-amber-50 p-4">
+                        <p class="text-sm font-semibold text-amber-900 mb-1">ARB requested revisions</p>
+                        <p class="text-sm text-amber-900 whitespace-pre-wrap">{req.revision_notes}</p>
+                        <p class="text-xs text-amber-700 mt-2 no-print">Please update your request as requested above, then submit for review again.</p>
+                      </div>
+                    )}
+                    <div class="rounded-xl border border-gray-200 bg-white p-4 sm:p-6 space-y-4 text-sm read-only-form">
+                      <h3 class="text-lg font-heading font-bold text-clr-green border-b border-gray-100 pb-2 mb-2">Architectural Review Application</h3>
+                      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label class="block text-sm font-semibold text-gray-500 mb-1">Association</label>
+                          <div class="w-full rounded-lg border border-gray-200 bg-gray-100 px-3 py-2 text-gray-600 cursor-not-allowed">Crooked Lake Reserve</div>
+                        </div>
+                        <div>
+                          <label class="block text-sm font-semibold text-gray-500 mb-1">Date of application</label>
+                          <div class="w-full rounded-lg border border-gray-200 bg-gray-100 px-3 py-2 text-gray-600 cursor-not-allowed">{new Date(req.created).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
+                        </div>
+                      </div>
+                      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label class="block text-sm font-semibold text-gray-500 mb-1">Applicant&apos;s name</label>
+                          <div class="w-full rounded-lg border border-gray-200 bg-gray-100 px-3 py-2 text-gray-700 cursor-not-allowed">{sanitizeForDisplay(req.applicant_name) || '—'}</div>
+                        </div>
+                        <div>
+                          <label class="block text-sm font-semibold text-gray-500 mb-1">Phone number</label>
+                          <div class="w-full rounded-lg border border-gray-200 bg-gray-100 px-3 py-2 text-gray-700 cursor-not-allowed">{req.phone ?? '—'}</div>
+                        </div>
+                      </div>
+                      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label class="block text-sm font-semibold text-gray-500 mb-1">Property address</label>
+                          <div class="w-full rounded-lg border border-gray-200 bg-gray-100 px-3 py-2 text-gray-700 cursor-not-allowed">{sanitizeForDisplay(req.property_address) || '—'}</div>
+                        </div>
+                        <div>
+                          <label class="block text-sm font-semibold text-gray-500 mb-1">Email address</label>
+                          <div class="w-full rounded-lg border border-gray-200 bg-gray-100 px-3 py-2 text-gray-700 cursor-not-allowed">{req.owner_email}</div>
+                        </div>
+                      </div>
+                      <div>
+                        <span class="block text-sm font-semibold text-gray-500 mb-2">Application for</span>
+                        <div class="flex flex-wrap gap-x-6 gap-y-2">
+                          {APPLICATION_TYPES.map((type) => (
+                            <label class="inline-flex items-center gap-2 text-gray-600 cursor-default">
+                              <input type="checkbox" disabled checked={selectedTypes(req.application_type).includes(type)} class="rounded border-gray-300 bg-gray-100" />
+                              <span class="text-sm">{type}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <label class="block text-sm font-semibold text-gray-500 mb-1">Description of changes</label>
+                        <div class="w-full rounded-lg border border-gray-200 bg-gray-100 px-3 py-2 text-gray-700 whitespace-pre-wrap cursor-not-allowed min-h-[100px]" set:html={sanitizeForDisplay(req.description)}></div>
+                      </div>
+                      <p class="text-xs text-gray-500">Submitted: {new Date(req.created).toLocaleString()}{req.updated_at ? ` · Last updated: ${new Date(req.updated_at).toLocaleString()}` : ''}</p>
+                      {req.owner_notes && (
+                        <div class="mt-3 rounded-lg border border-purple-200 bg-purple-50 p-3">
+                          <p class="text-xs font-semibold text-purple-900 mb-1">Your Notes</p>
+                          <p class="text-sm text-purple-900 whitespace-pre-wrap" set:html={sanitizeForDisplay(req.owner_notes)}></p>
+                        </div>
+                      )}
+                      {(req.status === 'approved' || req.status === 'rejected') && approval && (
+                        <div class={`rounded-xl border-2 p-4 ${approval.status === 'approved' ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}`}>
+                          <p class={`text-sm font-semibold ${approval.status === 'approved' ? 'text-green-900' : 'text-red-900'}`}>
+                            {approval.status === 'approved' ? 'Approved' : 'Rejected'} on {approval.date} by {approval.by}
+                          </p>
+                        </div>
+                      )}
+                      {files.length > 0 && (
+                        <div class="print-attachments-section pt-2 border-t border-gray-200">
+                          <p class="font-semibold text-gray-700 mb-2 text-sm">Attachments ({files.length})</p>
+                          <ul class="space-y-3">
+                            {files.map((file) => {
+                              const viewUrl = getFileViewUrl(file.r2_keys);
+                              const viewerUrl = getFileViewerUrl(file.r2_keys);
+                              const isImage = isImageFilename(file.filename);
+                              return (
+                                <li class="border border-gray-200 rounded-lg p-2 bg-gray-50">
+                                  <p class="text-gray-700 text-sm font-medium mb-1">{file.filename}</p>
+                                  {isImage && viewerUrl && (
+                                    <iframe
+                                      src={viewerUrl}
+                                      title={`View ${file.filename}`}
+                                      sandbox="allow-same-origin"
+                                      class="w-full max-w-md aspect-video object-contain rounded border-0 bg-gray-100"
+                                      style="min-height: 120px;"
+                                    />
+                                  )}
+                                  {viewUrl && (
+                                    <a href={viewUrl} target="_blank" rel="noopener noreferrer" class="text-clr-green font-semibold hover:underline text-xs inline-block mt-1">View / download</a>
+                                  )}
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                    {req.status === 'pending' && (
+                      <div class="no-print pt-4 space-y-3">
+                        {req.updated_at && req.updated_at !== req.created && (
+                          <p class="text-xs text-gray-500">
+                            Last saved: {new Date(req.updated_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                          </p>
+                        )}
+                        <div class="flex flex-wrap gap-3 items-center">
+                          <button type="button" class="submit-for-review px-4 py-2 rounded-lg bg-clr-green hover:brightness-110 text-white text-sm font-semibold" data-request-id={req.id}>Submit for review</button>
+                          <a href={`/portal/arb-request/edit/${req.id}`} class="inline-flex items-center gap-1 text-clr-green font-semibold hover:underline">Edit this request &rarr;</a>
+                        </div>
+                        <p class="text-sm text-gray-500">
+                          <button type="button" class="cancel-request text-gray-500 hover:text-red-600 hover:underline font-medium" data-request-id={req.id}>Cancel this request</button>
+                        </p>
+                      </div>
+                    )}
+                    {req.status === 'in_review' && (
+                      <p class="no-print pt-4 text-sm text-blue-700">In review by the ARB. Edits are locked until the ARB returns it for revision.</p>
+                    )}
+                    {req.status === 'cancelled' && (
+                      <p class="no-print pt-4 text-sm text-gray-600">This request was cancelled. Attachments were removed; form details are kept for your reference.</p>
+                    )}
+                    {(req.status === 'approved' || req.status === 'rejected') && (
+                      <div class="no-print pt-4 border-t border-gray-200">
+                        <p class="text-sm text-gray-600 mb-2">Copy this request to start a new one with the same form details and attachments. Approval/rejection and any revision notes are not copied; the new request will be pending with only the application content and attachments. You can remove or add attachments before submitting.</p>
+                        <button type="button" class="copy-request px-4 py-2 rounded-lg border border-clr-green bg-white hover:bg-clr-green/5 text-clr-green text-sm font-semibold" data-request-id={req.id}>Copy request (includes attachments)</button>
+                      </div>
+                    )}
+                    <div class="no-print pt-4 border-t border-gray-200 flex flex-wrap items-center gap-3">
+                      <label class="inline-flex items-center gap-2 text-sm">
+                        <input type="checkbox" class="print-include-attachments rounded border-gray-300 text-clr-green focus:ring-clr-green" checked />
+                        Include attachments in PDF
+                      </label>
+                      <button type="button" class="print-to-pdf px-4 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-sm font-semibold text-gray-700">Print / Save as PDF</button>
+                    </div>
+                  </div>
+                  <div class="print-form-view hidden p-6" aria-hidden="true">
+                    <h3 class="text-lg font-bold text-gray-800 mb-4">Architectural Review Application</h3>
+                    <div class="space-y-3 text-sm">
+                      <div class="grid grid-cols-2 gap-4">
+                        <div><span class="font-semibold text-gray-600">Association:</span> Crooked Lake Reserve</div>
+                        <div><span class="font-semibold text-gray-600">Date of application:</span> {new Date(req.created).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
+                      </div>
+                      <div class="grid grid-cols-2 gap-4">
+                        <div><span class="font-semibold text-gray-600">Applicant:</span> {sanitizeForDisplay(req.applicant_name) || '—'}</div>
+                        <div><span class="font-semibold text-gray-600">Phone:</span> {sanitizeForDisplay(req.phone) || '—'}</div>
+                      </div>
+                      <div class="grid grid-cols-2 gap-4">
+                        <div><span class="font-semibold text-gray-600">Property address:</span> {sanitizeForDisplay(req.property_address) || '—'}</div>
+                        <div><span class="font-semibold text-gray-600">Email:</span> {sanitizeForDisplay(req.owner_email)}</div>
+                      </div>
+                      <div><span class="font-semibold text-gray-600">Application for:</span> {sanitizeForDisplay(req.application_type) || '—'}</div>
+                      <div><span class="font-semibold text-gray-600">Description:</span></div>
+                      <div class="whitespace-pre-wrap border border-gray-200 p-3 rounded" set:html={sanitizeForDisplay(req.description)}></div>
+                      <div class="text-xs text-gray-500">Submitted: {new Date(req.created).toLocaleString()}</div>
+                      {files.length > 0 && (
+                        <div class="print-attachments-section pt-2 border-t">
+                          <p class="font-semibold">Attachments ({files.length})</p>
+                          <ul class="list-disc pl-5">
+                            {files.map((f) => (<li>{f.filename}</li>))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </main>
+  </div>
+
+  <style>
+    @media print {
+      @page {
+        margin: 0.5in;
+      }
+      header, .no-print, .request-summary, [role="status"] { display: none !important; }
+      main > p:first-of-type { display: none !important; }
+      #request-list > li:not(.print-this-card) { display: none !important; }
+      .print-this-card .request-details { display: block !important; }
+      .print-this-card .request-details-screen { display: block !important; }
+      .print-this-card .print-form-view { display: block !important; }
+      body:not(.print-with-attachments) .print-attachments-section { display: none !important; }
+      .print-this-card { 
+        break-inside: avoid; 
+        box-shadow: none; 
+        border: 1px solid #e5e7eb; 
+        page-break-inside: avoid;
+        margin-bottom: 1rem;
+        padding: 1rem;
+      }
+      .print-this-card .request-details-screen iframe { display: none !important; }
+      /* Ensure print-form-view is visible when printing */
+      .print-this-card .print-form-view.hidden { display: block !important; }
+      .print-this-card .print-form-view[aria-hidden="true"] { display: block !important; }
+    }
+  </style>
+
+  <script>
+    document.querySelectorAll('.request-summary').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const id = this.getAttribute('data-request-id');
+        const details = document.querySelector('.request-details[data-request-id="' + id + '"]');
+        const chevron = this.querySelector('.request-chevron');
+        if (!details) return;
+        const isExpanded = !details.classList.contains('hidden');
+        details.classList.toggle('hidden', isExpanded);
+        this.setAttribute('aria-expanded', isExpanded ? 'false' : 'true');
+        if (chevron) chevron.style.transform = isExpanded ? '' : 'rotate(180deg)';
+      });
+    });
+
+    document.querySelectorAll('.print-to-pdf').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const card = this.closest('li');
+        const includeAtt = card?.querySelector('.print-include-attachments');
+        if (!card) return;
+        card.classList.add('print-this-card');
+        document.body.classList.toggle('print-with-attachments', includeAtt?.checked ?? true);
+        window.onafterprint = function () {
+          card.classList.remove('print-this-card');
+          document.body.classList.remove('print-with-attachments');
+          window.onafterprint = null;
+        };
+        window.print();
+      });
+    });
+
+    document.querySelectorAll('.submit-for-review').forEach(function (btn) {
+      btn.addEventListener('click', async function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const requestId = this.getAttribute('data-request-id');
+        if (!requestId) return;
+        this.disabled = true;
+        this.textContent = 'Submitting…';
+        try {
+          const res = await fetch('/api/arb-resubmit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ requestId, csrfToken: (typeof window !== 'undefined' && window.csrfToken) || '' }),
+          });
+          const data = await res.json().catch(function () { return {}; });
+          if (res.ok && data.success) {
+            window.location.reload();
+          } else {
+            alert(data.error || 'Submit for review failed.');
+            this.disabled = false;
+            this.textContent = 'Submit for review';
+          }
+        } catch (err) {
+          alert('Network error. Please try again.');
+          this.disabled = false;
+          this.textContent = 'Submit for review';
+        }
+      });
+    });
+
+    document.querySelectorAll('.cancel-request').forEach(function (btn) {
+      btn.addEventListener('click', async function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const requestId = this.getAttribute('data-request-id');
+        if (!requestId) return;
+        if (!confirm('Cancel this request? All attachments will be removed. Your form details (name, address, description, etc.) will be kept so you can reference or reuse them.')) return;
+        
+        const originalText = this.textContent;
+        const originalDisabled = this.disabled;
+        this.disabled = true;
+        this.textContent = 'Cancelling…';
+        
+        try {
+          const csrfToken = (typeof window !== 'undefined' && window.csrfToken) || '';
+          if (!csrfToken) {
+            alert('Security token missing. Please refresh the page and try again.');
+            this.disabled = originalDisabled;
+            this.textContent = originalText;
+            return;
+          }
+          
+          const res = await fetch('/api/arb-cancel', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ requestId, csrfToken }),
+          });
+          
+          const data = await res.json().catch(function () { 
+            return { error: 'Invalid response from server.' }; 
+          });
+          
+          if (res.ok && data.success) {
+            // Success - reload to show updated status
+            window.location.reload();
+          } else {
+            // Error - show message and restore button state
+            const errorMsg = data.error || 'Cancel failed. Please try again.';
+            alert(errorMsg);
+            this.disabled = originalDisabled;
+            this.textContent = originalText;
+          }
+        } catch (err) {
+          // Network or other error - don't reload, restore button
+          console.error('Cancel request error:', err);
+          alert('Network error. Please check your connection and try again.');
+          this.disabled = originalDisabled;
+          this.textContent = originalText;
+        }
+      });
+    });
+
+    // Bulk cancel for pending requests
+    const selectAllPending = document.getElementById('select-all-pending');
+    const bulkCancelBtn = document.getElementById('bulk-cancel-btn');
+    const myRequestCheckboxes = document.querySelectorAll('#request-list .request-checkbox');
+
+    function updateBulkCancelButton() {
+      const checked = Array.from(myRequestCheckboxes).filter(function (cb) {
+        return cb.checked && cb.dataset.status === 'pending';
+      });
+      const count = checked.length;
+      if (bulkCancelBtn) {
+        bulkCancelBtn.disabled = count === 0;
+        bulkCancelBtn.textContent = count > 0 ? `Cancel selected (${count})` : 'Cancel selected';
+      }
+    }
+
+    if (selectAllPending) {
+      selectAllPending.addEventListener('change', function () {
+        const checked = this.checked;
+        document.querySelectorAll('#request-list .request-checkbox[data-status="pending"]').forEach(function (cb) {
+          cb.checked = checked;
+        });
+        updateBulkCancelButton();
+      });
+    }
+
+    myRequestCheckboxes.forEach(function (cb) {
+      cb.addEventListener('change', updateBulkCancelButton);
+    });
+
+    if (bulkCancelBtn) {
+      bulkCancelBtn.addEventListener('click', async function () {
+        const checked = Array.from(myRequestCheckboxes).filter(function (cb) {
+          return cb.checked && cb.dataset.status === 'pending';
+        });
+        if (checked.length === 0) return;
+        const requestIds = checked.map(function(cb) { return cb.value; });
+        if (!confirm(`Cancel ${requestIds.length} request(s)? All attachments will be removed. Form details will be kept for reference.`)) return;
+        
+        const originalText = this.textContent;
+        const originalDisabled = this.disabled;
+        this.disabled = true;
+        this.textContent = 'Cancelling…';
+        
+        try {
+          const csrfToken = (typeof window !== 'undefined' && window.csrfToken) || '';
+          if (!csrfToken) {
+            alert('Security token missing. Please refresh the page and try again.');
+            this.disabled = originalDisabled;
+            this.textContent = originalText;
+            return;
+          }
+          
+          const results = await Promise.all(requestIds.map(function (id) {
+            return fetch('/api/arb-cancel', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ requestId: id, csrfToken }),
+            });
+          }));
+          
+          const resultsData = await Promise.all(results.map(function(r) {
+            return r.json().catch(function() { return { error: 'Invalid response' }; });
+          }));
+          
+          const allOk = results.every(function(r, i) {
+            return r.ok && resultsData[i]?.success;
+          });
+          
+          if (allOk) {
+            // All succeeded - reload to show updated status
+            window.location.reload();
+          } else {
+            // Some failed - show details and restore button
+            const failedCount = results.filter(function(r, i) {
+              return !r.ok || !resultsData[i]?.success;
+            }).length;
+            const errorMsg = failedCount === requestIds.length 
+              ? 'All requests failed to cancel. Please try again.'
+              : `${failedCount} of ${requestIds.length} request(s) failed to cancel. Please try again.`;
+            alert(errorMsg);
+            this.disabled = originalDisabled;
+            this.textContent = originalText;
+          }
+        } catch (err) {
+          // Network or other error - don't reload, restore button
+          console.error('Bulk cancel error:', err);
+          alert('Network error. Please check your connection and try again.');
+          this.disabled = originalDisabled;
+          this.textContent = originalText;
+        }
+      });
+    }
+
+    document.querySelectorAll('.copy-request').forEach(function (btn) {
+      btn.addEventListener('click', async function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const requestId = this.getAttribute('data-request-id');
+        if (!requestId) return;
+        if (!confirm('Copy this request into a new pending request? The new request will include form details and attachments only (no approval/rejection or revision notes). You can then edit and submit. The original request will not be changed.')) return;
+        this.disabled = true;
+        this.textContent = 'Copying…';
+        try {
+          const res = await fetch('/api/arb-copy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ requestId, csrfToken: (typeof window !== 'undefined' && window.csrfToken) || '' }),
+          });
+          const data = await res.json().catch(function () { return {}; });
+          if (res.ok && data.success && data.requestId) {
+            window.location.href = '/portal/arb-request/edit/' + data.requestId;
+          } else {
+            alert(data.error || 'Copy failed.');
+            this.disabled = false;
+            this.textContent = 'Copy request (includes attachments)';
+          }
+        } catch (err) {
+          alert('Network error. Please try again.');
+          this.disabled = false;
+          this.textContent = 'Copy request (includes attachments)';
+        }
+      });
+    });
+  </script>
+  <script define:vars={{ csrfToken: session.csrfToken ?? '' }}>
+    (function () {
+      // Make CSRF token available to scripts
+      if (typeof window !== 'undefined') {
+        window.csrfToken = csrfToken;
+      }
+      
+      // Export data button handler
+      const exportBtn = document.getElementById('export-data-btn');
+      if (exportBtn) {
+        exportBtn.addEventListener('click', async function () {
+          if (!confirm('This will download a JSON file containing all your ARB request data. Continue?')) {
+            return;
+          }
+          
+          try {
+            exportBtn.disabled = true;
+            exportBtn.textContent = 'Generating export...';
+            
+            const url = `/api/arb-export-data?csrf_token=${encodeURIComponent(csrfToken)}`;
+            const response = await fetch(url, {
+              method: 'GET',
+              headers: {
+                'X-CSRF-Token': csrfToken,
+              },
+            });
+            
+            if (!response.ok) {
+              const error = await response.json();
+              throw new Error(error.error || 'Export failed');
+            }
+            
+            // Download the file
+            const blob = await response.blob();
+            const downloadUrl = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = downloadUrl;
+            a.download = `arb-data-export-${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(downloadUrl);
+            
+            exportBtn.textContent = 'Export My Data';
+            alert('Data export downloaded successfully!');
+          } catch (error) {
+            console.error('Export error:', error);
+            alert('Failed to export data. Please try again.');
+            exportBtn.textContent = 'Export My Data';
+          } finally {
+            exportBtn.disabled = false;
+          }
+        });
+      }
+      
+      // Session timeout: Auto-logout after 30 minutes of inactivity
+      const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+      let lastActivity = Date.now();
+      let timeoutWarningShown = false;
+      
+      function resetActivity() {
+        lastActivity = Date.now();
+        timeoutWarningShown = false;
+      }
+      
+      function checkSessionTimeout() {
+        const elapsed = Date.now() - lastActivity;
+        const remaining = SESSION_TIMEOUT_MS - elapsed;
+        
+        if (remaining <= 0) {
+          // Session expired
+          alert('Your session has expired due to inactivity. You will be redirected to the login page.');
+          window.location.href = '/portal/login';
+          return;
+        }
+        
+        // Show warning 2 minutes before timeout
+        if (remaining <= 2 * 60 * 1000 && !timeoutWarningShown) {
+          timeoutWarningShown = true;
+          const confirmed = confirm('Your session will expire in 2 minutes due to inactivity. Click OK to stay logged in, or Cancel to log out now.');
+          if (confirmed) {
+            resetActivity();
+            // Refresh session by making a lightweight request
+            fetch('/portal/my-requests', { method: 'HEAD' }).catch(() => {});
+          } else {
+            window.location.href = '/portal/login';
+            return;
+          }
+        }
+      }
+      
+      // Track user activity
+      ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'].forEach(function (event) {
+        document.addEventListener(event, resetActivity, { passive: true });
+      });
+      
+      // Check timeout every minute
+      setInterval(checkSessionTimeout, 60 * 1000);
+    })();
+  </script>
+</ProtectedPage>

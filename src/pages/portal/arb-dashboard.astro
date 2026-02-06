@@ -1,0 +1,1010 @@
+---
+export const prerender = false;
+
+import '../../styles/tailwind.css';
+import ProtectedPage from '../../components/ProtectedPage.astro';
+import PortalElevatedRoleBanner from '../../components/PortalElevatedRoleBanner.astro';
+import ArbDashboardCard from '../../components/ArbDashboardCard.astro';
+import { getSessionFromCookie, updateSessionActivity } from '../../lib/auth';
+import { listAllArbRequests, listArbFilesByRequest, listArbRequestsByOwner } from '../../lib/arb-db';
+import type { ArbFile } from '../../lib/arb-db';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const session = await getSessionFromCookie(
+  Astro.request.headers.get('cookie') ?? undefined,
+  env?.SESSION_SECRET
+);
+
+if (!session) {
+  return Astro.redirect('/portal/login');
+}
+
+const allowedRoles = ['arb', 'board', 'admin'];
+if (!allowedRoles.includes(session.role)) {
+  return Astro.redirect('/portal/dashboard');
+}
+
+const db = env?.DB;
+const allRequests = db ? await listAllArbRequests(db) : [];
+const filesByRequestId: Record<string, ArbFile[]> = {};
+if (db) {
+  for (const req of allRequests) {
+    filesByRequestId[req.id] = await listArbFilesByRequest(db, req.id);
+  }
+}
+
+// Get draft count for navigation badge (for owner's own requests)
+const ownerRequests = db ? await listArbRequestsByOwner(db, session.email) : [];
+const draftCount = ownerRequests.filter(r => r.status === 'pending').length;
+
+/** Decision date for grouping completed requests (approved/rejected). Uses esign_timestamp; fallback to created. */
+function getYearQuarter(dateStr: string | null): string {
+  const d = dateStr ? new Date(dateStr) : new Date();
+  const year = d.getFullYear();
+  const q = Math.floor(d.getMonth() / 3) + 1;
+  return `${year}-Q${q}`;
+}
+
+const ITEMS_PER_PAGE = 20;
+
+const inReview = allRequests.filter((r) => r.status === 'in_review');
+const pending = allRequests.filter((r) => r.status === 'pending');
+const completed = allRequests.filter((r) => r.status === 'approved' || r.status === 'rejected');
+const completedWithPeriod = completed.map((r) => ({ ...r, yearQuarter: getYearQuarter(r.esign_timestamp ?? r.created) }));
+
+// Pagination for completed requests
+const completedPage = Math.max(1, parseInt(Astro.url.searchParams.get('page') ?? '1', 10));
+const completedStart = (completedPage - 1) * ITEMS_PER_PAGE;
+const completedEnd = completedStart + ITEMS_PER_PAGE;
+const completedPaginated = completedWithPeriod.slice(completedStart, completedEnd);
+const totalCompletedPages = Math.ceil(completedWithPeriod.length / ITEMS_PER_PAGE);
+
+const periodSet = new Set(completedWithPeriod.map((r) => r.yearQuarter));
+const periodOptions: { value: string; label: string }[] = [
+  { value: 'all', label: 'All' },
+  ...Array.from(periodSet)
+    .sort()
+    .reverse()
+    .map((q) => ({ value: q, label: q.replace('-', ' ') })),
+];
+
+function getFileViewUrl(r2KeysJson: string): string | null {
+  try {
+    const o = JSON.parse(r2KeysJson) as { originals?: string[]; review?: string[]; archive?: string[] };
+    const key = o.originals?.[0] ?? o.review?.[0] ?? o.archive?.[0];
+    return key ? `/api/portal/file/${encodeURIComponent(key)}` : null;
+  } catch {
+    return null;
+  }
+}
+
+function getFileViewerUrl(r2KeysJson: string): string | null {
+  try {
+    const o = JSON.parse(r2KeysJson) as { originals?: string[]; review?: string[]; archive?: string[] };
+    const key = o.originals?.[0] ?? o.review?.[0] ?? o.archive?.[0];
+    return key ? `/api/portal/file-view?key=${encodeURIComponent(key)}` : null;
+  } catch {
+    return null;
+  }
+}
+
+const IMAGE_EXT = /\.(jpe?g|png|gif|webp|heic)$/i;
+function isImageFilename(filename: string): boolean {
+  return IMAGE_EXT.test(filename);
+}
+
+const APPLICATION_TYPES = ['Exterior Paint', 'Landscape Installation', 'Swimming Pool', 'Recreational Equipment', 'Fencing', 'Other'];
+function selectedTypes(applicationType: string | null): string[] {
+  return applicationType ? applicationType.split(',').map((s) => s.trim()).filter(Boolean) : [];
+}
+
+/** Parse arb_esign (format: "STATUS | Name | email | date") for display. */
+function formatApproval(arbEsign: string | null, esignTimestamp: string | null): { status: string; by: string; date: string } | null {
+  if (!arbEsign?.trim()) return null;
+  const parts = arbEsign.split('|').map((p) => p.trim());
+  const status = (parts[0] ?? '').toLowerCase();
+  if (status !== 'approved' && status !== 'rejected') return null;
+  const by = parts[1] ?? arbEsign;
+  const dateStr = esignTimestamp ?? parts[3];
+  const date = dateStr ? new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
+  return { status, by, date };
+}
+---
+
+<ProtectedPage>
+  <div class="min-h-screen bg-gray-50 font-body">
+    <header class="bg-white border-b border-gray-200">
+      <div class="max-w-4xl mx-auto px-4 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h1 class="text-xl font-heading font-bold text-clr-green">ARB Dashboard</h1>
+          <p class="text-sm text-gray-500">Review and approve/reject requests</p>
+        </div>
+        <nav class="flex flex-wrap items-center gap-3 sm:gap-4">
+          <a href="/portal/dashboard" class="text-gray-600 hover:text-clr-green">Dashboard</a>
+          <a href="/portal/my-requests" class="text-gray-600 hover:text-clr-green relative">
+            My requests
+            {draftCount > 0 && (
+              <span class="absolute -top-1 -right-1 bg-amber-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center" title={`${draftCount} draft${draftCount === 1 ? '' : 's'}`}>
+                {draftCount}
+              </span>
+            )}
+          </a>
+          <a href="/portal/arb-request" class="text-gray-600 hover:text-clr-green">New ARB request</a>
+          <a href="/portal/documents" class="text-gray-600 hover:text-clr-green">Documents</a>
+          <a href="/portal/arb-dashboard" class="text-clr-green font-medium">ARB Dashboard</a>
+          <a href="/api/logout" class="text-sm text-gray-500 hover:text-clr-orange">Sign out</a>
+        </nav>
+      </div>
+    </header>
+
+    <PortalElevatedRoleBanner role={session.role} />
+
+    <main class="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+      {allRequests.length === 0 ? (
+        <>
+          <h2 class="text-2xl font-heading font-bold text-clr-green mb-6">ARB dashboard</h2>
+          <p class="text-gray-500">No requests yet.</p>
+        </>
+      ) : (
+        <>
+          <section class="mb-10" aria-label="Needs your action">
+            <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
+              <div>
+                <h2 class="text-2xl font-heading font-bold text-clr-green mb-2">Needs your action</h2>
+                <p class="text-sm text-gray-600">
+                  <strong>In review</strong> = ready for you to approve, reject, or return for revision. <strong>Pending</strong> = awaiting owner to submit.
+                </p>
+              </div>
+              <div class="flex-1 max-w-md">
+                <label for="search-input" class="sr-only">Search requests</label>
+                <input
+                  type="text"
+                  id="search-input"
+                  placeholder="Search by ID, email, or address..."
+                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-clr-green focus:ring-1 focus:ring-clr-green"
+                />
+              </div>
+            </div>
+            {inReview.length > 0 && (
+              <>
+                <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+                  <div>
+                    <h3 class="text-lg font-semibold text-gray-800">In review (<span id="in-review-count">{inReview.length}</span>)</h3>
+                    {inReview.some((r: { review_deadline?: string | null }) => {
+                      const deadline = r.review_deadline ? new Date(r.review_deadline) : null;
+                      return deadline && deadline < new Date();
+                    }) && (
+                      <p class="text-sm text-red-600 font-semibold mt-1">Warning: Some requests are past their review deadline</p>
+                    )}
+                  </div>
+                  <div class="flex flex-wrap items-center gap-2 no-print">
+                    <label class="inline-flex items-center gap-2 text-sm">
+                      <input type="checkbox" id="select-all-in-review" class="rounded border-gray-300 text-clr-green focus:ring-clr-green" />
+                      <span>Select all</span>
+                    </label>
+                    <button
+                      type="button"
+                      id="bulk-approve-btn"
+                      class="px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-700 text-white text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                      disabled
+                    >
+                      Approve selected
+                    </button>
+                    <button
+                      type="button"
+                      id="bulk-reject-btn"
+                      class="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                      disabled
+                    >
+                      Reject selected
+                    </button>
+                  </div>
+                </div>
+                <ul class="space-y-4 mb-6 arb-request-list" id="in-review-list">
+                  {inReview.map((req) => {
+                    const files = filesByRequestId[req.id] ?? [];
+                    const approval = formatApproval(req.arb_esign ?? null, req.esign_timestamp ?? null);
+                    return (
+                      <li class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden searchable-card" data-search-text={`${req.id} ${req.owner_email} ${req.property_address ?? ''} ${req.applicant_name ?? ''} ${req.phone ?? ''}`.toLowerCase()}>
+                        <div class="flex items-start gap-2 p-2 no-print">
+                          <input type="checkbox" class="request-checkbox mt-2 rounded border-gray-300 text-clr-green focus:ring-clr-green" value={req.id} data-status="in_review" />
+                          <div class="flex-1">
+                            <ArbDashboardCard request={req} files={files} approval={approval} />
+                          </div>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </>
+            )}
+            {pending.length > 0 && (
+              <>
+                <h3 class="text-lg font-semibold text-gray-800 mb-3">Pending (<span id="pending-count">{pending.length}</span>)</h3>
+                <ul class="space-y-4 arb-request-list" id="pending-list">
+                  {pending.map((req) => {
+                    const files = filesByRequestId[req.id] ?? [];
+                    const approval = formatApproval(req.arb_esign ?? null, req.esign_timestamp ?? null);
+                    return (
+                      <li class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden searchable-card" data-search-text={`${req.id} ${req.owner_email} ${req.property_address ?? ''} ${req.applicant_name ?? ''} ${req.phone ?? ''}`.toLowerCase()}>
+                        <ArbDashboardCard request={req} files={files} approval={approval} />
+                      </li>
+                    );
+                  })}
+                </ul>
+              </>
+            )}
+            {inReview.length === 0 && pending.length === 0 && (
+              <p class="text-gray-500">No items need your action right now.</p>
+            )}
+          </section>
+
+          <section class="border-t border-gray-200 pt-10" aria-label="Completed (approved/denied)">
+            <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
+              <h2 class="text-2xl font-heading font-bold text-clr-green">Completed (approved/denied)</h2>
+              {completedWithPeriod.length > 0 && (
+                <button
+                  type="button"
+                  id="export-csv-btn"
+                  class="no-print px-4 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-sm font-semibold text-gray-700"
+                >
+                  Export CSV
+                </button>
+              )}
+            </div>
+            {completedWithPeriod.length > 0 ? (
+              <>
+                <div class="flex flex-wrap items-center justify-between gap-4 mb-4 no-print">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <label for="completed-period" class="text-sm font-medium text-gray-700">Show:</label>
+                    <select id="completed-period" class="rounded-lg border border-gray-300 px-3 py-2 text-sm bg-white" aria-label="Filter by period">
+                      {periodOptions.map((opt) => (
+                        <option value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {totalCompletedPages > 1 && (
+                    <div class="flex items-center gap-2 text-sm text-gray-600">
+                      <span>Page {completedPage} of {totalCompletedPages}</span>
+                      {completedPage > 1 && (
+                        <a href={`?page=${completedPage - 1}`} class="px-2 py-1 rounded border border-gray-300 hover:bg-gray-50">Previous</a>
+                      )}
+                      {completedPage < totalCompletedPages && (
+                        <a href={`?page=${completedPage + 1}`} class="px-2 py-1 rounded border border-gray-300 hover:bg-gray-50">Next</a>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <ul class="space-y-4 arb-request-list" id="arb-request-list-completed">
+                  {completedPaginated.map((req) => {
+                    const files = filesByRequestId[req.id] ?? [];
+                    const approval = formatApproval(req.arb_esign ?? null, req.esign_timestamp ?? null);
+                    return (
+                      <li class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden completed-card searchable-card" data-year-quarter={req.yearQuarter} data-search-text={`${req.id} ${req.owner_email} ${req.property_address ?? ''} ${req.applicant_name ?? ''} ${req.phone ?? ''}`.toLowerCase()}>
+                        <ArbDashboardCard request={req} files={files} approval={approval} />
+                      </li>
+                    );
+                  })}
+                </ul>
+                {totalCompletedPages > 1 && (
+                  <div class="flex justify-center items-center gap-2 mt-6 no-print">
+                    {completedPage > 1 && (
+                      <a href={`?page=${completedPage - 1}`} class="px-4 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-sm font-semibold text-gray-700">← Previous</a>
+                    )}
+                    <span class="text-sm text-gray-600">Page {completedPage} of {totalCompletedPages}</span>
+                    {completedPage < totalCompletedPages && (
+                      <a href={`?page=${completedPage + 1}`} class="px-4 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-sm font-semibold text-gray-700">Next →</a>
+                    )}
+                  </div>
+                )}
+              </>
+            ) : (
+              <p class="text-gray-500">No completed requests yet.</p>
+            )}
+          </section>
+        </>
+      )}
+    </main>
+
+    <!-- Modal: Set review deadline -->
+    <div id="deadline-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" aria-modal="true" aria-labelledby="deadline-modal-title">
+      <div class="bg-white rounded-xl shadow-xl max-w-lg w-full p-6">
+        <h3 id="deadline-modal-title" class="text-lg font-heading font-bold text-clr-green mb-2">Set Review Deadline</h3>
+        <p class="text-sm text-gray-600 mb-3">Set a deadline for reviewing this request. You'll be alerted if the deadline passes.</p>
+        <form id="deadline-form" class="space-y-4">
+          <label for="deadline-input" class="block text-sm font-semibold text-gray-700">Deadline date</label>
+          <input
+            type="date"
+            id="deadline-input"
+            name="deadline"
+            class="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-clr-green focus:ring-1 focus:ring-clr-green"
+            min={new Date().toISOString().split('T')[0]}
+          />
+          <div class="flex flex-wrap gap-3 justify-end">
+            <button type="button" id="deadline-modal-cancel" class="px-4 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 text-sm font-semibold">Cancel</button>
+            <button type="button" id="deadline-clear-btn" class="px-4 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 text-sm font-semibold">Clear deadline</button>
+            <button type="submit" id="deadline-modal-submit" class="px-4 py-2 rounded-lg bg-clr-green hover:brightness-110 text-white text-sm font-semibold">Set deadline</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Modal: ARB internal notes -->
+    <div id="arb-notes-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" aria-modal="true" aria-labelledby="notes-modal-title">
+      <div class="bg-white rounded-xl shadow-xl max-w-lg w-full p-6">
+        <h3 id="notes-modal-title" class="text-lg font-heading font-bold text-clr-green mb-2">ARB Internal Notes</h3>
+        <p class="text-sm text-gray-600 mb-3">Add private notes for ARB members only. These notes are not visible to the request owner.</p>
+        <form id="arb-notes-form" class="space-y-4">
+          <label for="arb-notes-input" class="block text-sm font-semibold text-gray-700">Notes</label>
+          <textarea
+            id="arb-notes-input"
+            name="arbNotes"
+            rows="6"
+            class="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-clr-green focus:ring-1 focus:ring-clr-green"
+            placeholder="e.g. Discussed at meeting, needs clarification on materials, etc."
+          ></textarea>
+          <div class="flex flex-wrap gap-3 justify-end">
+            <button type="button" id="notes-modal-cancel" class="px-4 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 text-sm font-semibold">Cancel</button>
+            <button type="submit" id="notes-modal-submit" class="px-4 py-2 rounded-lg bg-clr-green hover:brightness-110 text-white text-sm font-semibold">Save notes</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Modal: revision reason (required when ARB clicks "Request revision") -->
+    <div id="revision-reason-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" aria-modal="true" aria-labelledby="revision-modal-title">
+      <div class="bg-white rounded-xl shadow-xl max-w-lg w-full p-6">
+        <h3 id="revision-modal-title" class="text-lg font-heading font-bold text-clr-green mb-2">Return request for revision</h3>
+        <p class="text-sm text-gray-600 mb-3">Provide context for the requestor (required). They will see this when editing their request. Examples: &quot;Please add site survey&quot;, &quot;Item missing - paint color samples needed&quot;, &quot;Requested by requestor to update plans&quot;.</p>
+        <form id="revision-reason-form" class="space-y-4">
+          <label for="revision-notes-input" class="block text-sm font-semibold text-gray-700">Revision notes</label>
+          <textarea
+            id="revision-notes-input"
+            name="revisionNotes"
+            required
+            rows="4"
+            class="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-clr-green focus:ring-1 focus:ring-clr-green"
+            placeholder="e.g. Please add a site survey. Paint color samples are missing."
+          ></textarea>
+          <div class="flex flex-wrap gap-3 justify-end">
+            <button type="button" id="revision-modal-cancel" class="px-4 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 text-sm font-semibold">Cancel</button>
+            <button type="submit" id="revision-modal-submit" class="px-4 py-2 rounded-lg border border-amber-600 text-amber-700 bg-amber-50 hover:bg-amber-100 text-sm font-semibold">Return for revision</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    @media print {
+      header, .no-print, .arb-summary, [role="status"] { display: none !important; }
+      main > p.text-sm { display: none !important; }
+      .arb-request-list > li:not(.print-this-card) { display: none !important; }
+      .print-this-card .arb-details { display: block !important; }
+      .print-this-card .arb-details-screen { display: block !important; }
+      .print-this-card .print-form-view { display: none !important; }
+      body:not(.print-with-attachments) .print-attachments-section { display: none !important; }
+      .print-this-card { break-inside: avoid; box-shadow: none; border: 1px solid #e5e7eb; }
+      .print-this-card .arb-details-screen iframe { display: none !important; }
+    }
+  </style>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" integrity="sha512-XMVd28F1oH/O71fzwBnV7HucLxVwtxJ26+kYN4PgcB9dZNFrqQ7Kef4jKegkV2mG+4O7ZxJ4T7s1l3Xhm1Q==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script define:vars={{ csrfToken: session.csrfToken ?? '' }}>
+    (function () {
+      // Make CSRF token available to scripts
+      if (typeof window !== 'undefined') {
+        window.csrfToken = csrfToken;
+      }
+      document.querySelectorAll('.print-to-pdf').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          const card = this.closest('li');
+          const includeAtt = card?.querySelector('.print-include-attachments');
+          if (!card) return;
+          card.classList.add('print-this-card');
+          document.body.classList.toggle('print-with-attachments', includeAtt?.checked ?? true);
+          window.onafterprint = function () {
+            card.classList.remove('print-this-card');
+            document.body.classList.remove('print-with-attachments');
+            window.onafterprint = null;
+          };
+          window.print();
+        });
+      });
+
+      document.querySelectorAll('.arb-summary').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          const id = this.getAttribute('data-request-id');
+          const details = document.querySelector('.arb-details[data-request-id="' + id + '"]');
+          const chevron = this.querySelector('.arb-chevron');
+          if (!details) return;
+          const isExpanded = !details.classList.contains('hidden');
+          details.classList.toggle('hidden', isExpanded);
+          this.setAttribute('aria-expanded', isExpanded ? 'false' : 'true');
+          if (chevron) chevron.style.transform = isExpanded ? '' : 'rotate(180deg)';
+        });
+      });
+
+      // Set deadline functionality
+      document.querySelectorAll('.arb-set-deadline').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          const requestId = this.getAttribute('data-request-id');
+          const modal = document.getElementById('deadline-modal');
+          const input = document.getElementById('deadline-input');
+          const cancelBtn = document.getElementById('deadline-modal-cancel');
+          const clearBtn = document.getElementById('deadline-clear-btn');
+          const form = document.getElementById('deadline-form');
+          if (!modal || !input || !form) return;
+          modal.dataset.requestId = requestId;
+          // Load existing deadline if any
+          const card = document.querySelector(`[data-request-id="${requestId}"]`)?.closest('li');
+          const existingDeadline = card?.querySelector('[data-deadline]')?.getAttribute('data-deadline');
+          if (existingDeadline) {
+            const date = new Date(existingDeadline);
+            input.value = date.toISOString().split('T')[0];
+          } else {
+            input.value = '';
+          }
+          modal.classList.remove('hidden');
+          input.focus();
+
+          function closeModal() {
+            modal.classList.add('hidden');
+            modal.dataset.requestId = '';
+          }
+
+          cancelBtn.addEventListener('click', closeModal, { once: true });
+          modal.addEventListener('click', function (e) {
+            if (e.target === modal) closeModal();
+          }, { once: true });
+
+          clearBtn.addEventListener('click', async function () {
+            const id = modal.dataset.requestId;
+            if (!id) return;
+            const submitBtn = document.getElementById('deadline-modal-submit');
+            if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Clearing…'; }
+            try {
+              const res = await fetch('/api/arb-deadline', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ requestId: id, deadline: null }),
+              });
+              const data = await res.json().catch(function () { return {}; });
+              if (res.ok && data.success) {
+                window.location.reload();
+              } else {
+                alert(data.error || 'Failed to clear deadline.');
+                if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Set deadline'; }
+              }
+            } catch (err) {
+              alert('Network error.');
+              if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Set deadline'; }
+            }
+          }, { once: true });
+
+          form.onsubmit = async function (e) {
+            e.preventDefault();
+            const deadline = input.value;
+            if (!deadline) {
+              alert('Please select a deadline date.');
+              return;
+            }
+            const id = modal.dataset.requestId;
+            if (!id) return;
+            const submitBtn = document.getElementById('deadline-modal-submit');
+            if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Saving…'; }
+            try {
+              const res = await fetch('/api/arb-deadline', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ requestId: id, deadline: deadline + 'T23:59:59' }),
+              });
+              const data = await res.json().catch(function () { return {}; });
+              if (res.ok && data.success) {
+                window.location.reload();
+              } else {
+                alert(data.error || 'Failed to set deadline.');
+                if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Set deadline'; }
+              }
+            } catch (err) {
+              alert('Network error.');
+              if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Set deadline'; }
+            }
+          };
+        });
+      });
+
+      // ARB notes functionality
+      document.querySelectorAll('.arb-add-notes, .arb-edit-notes').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          const requestId = this.getAttribute('data-request-id');
+          const modal = document.getElementById('arb-notes-modal');
+          const input = document.getElementById('arb-notes-input');
+          const cancelBtn = document.getElementById('notes-modal-cancel');
+          const form = document.getElementById('arb-notes-form');
+          if (!modal || !input || !form) return;
+          modal.dataset.requestId = requestId;
+          // Load existing notes if editing
+          const card = document.querySelector(`[data-request-id="${requestId}"]`)?.closest('li');
+          const existingNotes = card?.querySelector('.arb-internal-notes-text')?.textContent?.trim() || '';
+          input.value = existingNotes;
+          modal.classList.remove('hidden');
+          input.focus();
+
+          function closeModal() {
+            modal.classList.add('hidden');
+            modal.dataset.requestId = '';
+          }
+
+          cancelBtn.addEventListener('click', closeModal, { once: true });
+          modal.addEventListener('click', function (e) {
+            if (e.target === modal) closeModal();
+          }, { once: true });
+
+          form.onsubmit = async function (e) {
+            e.preventDefault();
+            const notes = input.value.trim();
+            const id = modal.dataset.requestId;
+            if (!id) return;
+            const submitBtn = document.getElementById('notes-modal-submit');
+            if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Saving…'; }
+            try {
+              const res = await fetch('/api/arb-notes', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ requestId: id, arbInternalNotes: notes }),
+              });
+              const data = await res.json().catch(function () { return {}; });
+              if (res.ok && data.success) {
+                window.location.reload();
+              } else {
+                alert(data.error || 'Failed to save notes.');
+                if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Save notes'; }
+              }
+            } catch (err) {
+              alert('Network error.');
+              if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Save notes'; }
+            }
+          };
+        });
+      });
+
+      document.querySelectorAll('.arb-action').forEach(function (btn) {
+        btn.addEventListener('click', async function () {
+          const requestId = this.getAttribute('data-request-id');
+          const action = this.getAttribute('data-action');
+
+          if (action === 'request_revision') {
+            const modal = document.getElementById('revision-reason-modal');
+            const input = document.getElementById('revision-notes-input');
+            const cancelBtn = document.getElementById('revision-modal-cancel');
+            const form = document.getElementById('revision-reason-form');
+            if (!modal || !input || !form) return;
+            modal.dataset.requestId = requestId;
+            input.value = '';
+            modal.classList.remove('hidden');
+            input.focus();
+
+            function closeModal() {
+              modal.classList.add('hidden');
+              modal.dataset.requestId = '';
+            }
+
+            cancelBtn.addEventListener('click', closeModal, { once: true });
+            modal.addEventListener('click', function (e) {
+              if (e.target === modal) closeModal();
+            }, { once: true });
+
+            form.onsubmit = async function (e) {
+              e.preventDefault();
+              const notes = input.value.trim();
+              if (!notes) {
+                alert('Please provide revision notes for the requestor.');
+                return;
+              }
+              const id = modal.dataset.requestId;
+              if (!id) return;
+              const submitBtn = document.getElementById('revision-modal-submit');
+              if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Sending…'; }
+              try {
+                const res = await fetch('/api/arb-approve', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ requestId: id, action: 'request_revision', revisionNotes: notes, csrfToken: (typeof window !== 'undefined' && window.csrfToken) || '' }),
+                });
+                const data = await res.json().catch(function () { return {}; });
+                if (res.ok && data.success) {
+                  window.location.reload();
+                } else {
+                  alert(data.error || 'Action failed.');
+                  if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Return for revision'; }
+                }
+              } catch (err) {
+                alert('Network error.');
+                if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Return for revision'; }
+              }
+            };
+            return;
+          }
+
+          // Confirmation for approve/reject
+          const actionText = action === 'approve' ? 'approve' : 'reject';
+          const confirmMsg = action === 'approve'
+            ? 'Are you sure you want to APPROVE this request? This action is final and will notify the requestor.'
+            : 'Are you sure you want to REJECT this request? This action is final and will notify the requestor.';
+          
+          if (!confirm(confirmMsg)) return;
+
+          const arbEsign = window.prompt(
+            'Enter your name/title for the e-signature record (e.g. "Jane Doe, ARB Member"):'
+          );
+          if (!arbEsign?.trim()) return;
+
+          // Disable button and show loading state
+          const originalText = this.textContent;
+          this.disabled = true;
+          this.textContent = action === 'approve' ? 'Approving…' : 'Rejecting…';
+
+          const body = {
+            requestId,
+            action: action === 'reject' ? 'reject' : 'approve',
+            arbEsign: arbEsign.trim(),
+            csrfToken: (typeof window !== 'undefined' && window.csrfToken) || '',
+          };
+
+          try {
+            const res = await fetch('/api/arb-approve', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(body),
+            });
+            const data = await res.json().catch(function () { return {}; });
+            if (res.ok && data.success) {
+              window.location.reload();
+            } else {
+              alert(data.error || 'Action failed.');
+              this.disabled = false;
+              this.textContent = originalText;
+            }
+          } catch (e) {
+            alert('Network error.');
+            this.disabled = false;
+            this.textContent = originalText;
+          }
+        });
+      });
+
+      // Filter completed requests by year/quarter
+      const periodSelect = document.getElementById('completed-period');
+      if (periodSelect) {
+        periodSelect.addEventListener('change', function () {
+          const val = this.value;
+          document.querySelectorAll('#arb-request-list-completed .completed-card').forEach(function (li) {
+            const q = li.getAttribute('data-year-quarter');
+            const display = (val === 'all' || q === val) ? '' : 'none';
+            if (li instanceof HTMLElement) li.style.display = display;
+          });
+          // Re-apply search filter if active
+          const searchInput = document.getElementById('search-input');
+          if (searchInput && searchInput.value) {
+            searchInput.dispatchEvent(new Event('input'));
+          }
+        });
+      }
+
+      // Search/filter functionality
+      const searchInput = document.getElementById('search-input');
+      if (searchInput) {
+        searchInput.addEventListener('input', function () {
+          const query = this.value.trim().toLowerCase();
+          const allCards = document.querySelectorAll('.searchable-card');
+          let inReviewVisible = 0;
+          let pendingVisible = 0;
+          let completedVisible = 0;
+
+          allCards.forEach(function (card) {
+            const searchText = card.getAttribute('data-search-text') || '';
+            const matches = !query || searchText.includes(query);
+            const isCompleted = card.classList.contains('completed-card');
+            const isInReview = card.closest('#in-review-list');
+            const isPending = card.closest('#pending-list');
+            
+            if (card instanceof HTMLElement) {
+              // Also check period filter for completed items
+              if (isCompleted && periodSelect) {
+                const q = card.getAttribute('data-year-quarter');
+                const periodVal = periodSelect.value;
+                const periodMatches = periodVal === 'all' || q === periodVal;
+                card.style.display = (matches && periodMatches) ? '' : 'none';
+                if (matches && periodMatches) completedVisible++;
+              } else {
+                card.style.display = matches ? '' : 'none';
+                if (matches) {
+                  if (isInReview) inReviewVisible++;
+                  else if (isPending) pendingVisible++;
+                  else if (isCompleted) completedVisible++;
+                }
+              }
+            }
+          });
+
+          // Update counts
+          const inReviewCount = document.getElementById('in-review-count');
+          const pendingCount = document.getElementById('pending-count');
+          if (inReviewCount) inReviewCount.textContent = inReviewVisible.toString();
+          if (pendingCount) pendingCount.textContent = pendingVisible.toString();
+        });
+      }
+
+      // Bulk operations for ARB dashboard
+      const selectAllInReview = document.getElementById('select-all-in-review');
+      const bulkApproveBtn = document.getElementById('bulk-approve-btn');
+      const bulkRejectBtn = document.getElementById('bulk-reject-btn');
+      const requestCheckboxes = document.querySelectorAll('.request-checkbox');
+
+      function updateBulkButtons() {
+        const checked = Array.from(requestCheckboxes).filter(function (cb) {
+          return cb.checked && cb.dataset.status === 'in_review';
+        });
+        const count = checked.length;
+        if (bulkApproveBtn) bulkApproveBtn.disabled = count === 0;
+        if (bulkRejectBtn) bulkRejectBtn.disabled = count === 0;
+        if (bulkApproveBtn) bulkApproveBtn.textContent = count > 0 ? `Approve selected (${count})` : 'Approve selected';
+        if (bulkRejectBtn) bulkRejectBtn.textContent = count > 0 ? `Reject selected (${count})` : 'Reject selected';
+      }
+
+      if (selectAllInReview) {
+        selectAllInReview.addEventListener('change', function () {
+          const checked = this.checked;
+          document.querySelectorAll('#in-review-list .request-checkbox').forEach(function (cb) {
+            cb.checked = checked;
+          });
+          updateBulkButtons();
+        });
+      }
+
+      requestCheckboxes.forEach(function (cb) {
+        cb.addEventListener('change', updateBulkButtons);
+      });
+
+      function bulkAction(action) {
+        const checked = Array.from(requestCheckboxes).filter(function (cb) {
+          return cb.checked && cb.dataset.status === 'in_review';
+        });
+        if (checked.length === 0) return;
+        const requestIds = checked.map(cb => cb.value);
+        const actionText = action === 'approve' ? 'APPROVE' : 'REJECT';
+        if (!confirm(`Are you sure you want to ${actionText} ${requestIds.length} request(s)? This action is final.`)) return;
+        const arbEsign = window.prompt(`Enter your name/title for the e-signature record (e.g. "Jane Doe, ARB Member"):`);
+        if (!arbEsign?.trim()) return;
+        const btn = action === 'approve' ? bulkApproveBtn : bulkRejectBtn;
+        if (btn) {
+          btn.disabled = true;
+          btn.textContent = `${actionText === 'APPROVE' ? 'Approving' : 'Rejecting'}…`;
+        }
+        Promise.all(requestIds.map(function (id) {
+          return fetch('/api/arb-approve', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              requestId: id,
+              action: action,
+              arbEsign: arbEsign.trim(),
+              csrfToken: (typeof window !== 'undefined' && window.csrfToken) || '',
+            }),
+          });
+        })).then(function (responses) {
+          const allOk = responses.every(r => r.ok);
+          if (allOk) {
+            window.location.reload();
+          } else {
+            alert(`Some requests failed to ${action}. Please try again.`);
+            if (btn) {
+              btn.disabled = false;
+              btn.textContent = action === 'approve' ? 'Approve selected' : 'Reject selected';
+            }
+          }
+        }).catch(function () {
+          alert('Network error. Please try again.');
+          if (btn) {
+            btn.disabled = false;
+            btn.textContent = action === 'approve' ? 'Approve selected' : 'Reject selected';
+          }
+        });
+      }
+
+      if (bulkApproveBtn) {
+        bulkApproveBtn.addEventListener('click', function () { bulkAction('approve'); });
+      }
+      if (bulkRejectBtn) {
+        bulkRejectBtn.addEventListener('click', function () { bulkAction('reject'); });
+      }
+
+      // Download all files as ZIP
+      document.querySelectorAll('.download-all-files').forEach(function (btn) {
+        btn.addEventListener('click', async function () {
+          const requestId = this.getAttribute('data-request-id');
+          if (!requestId) return;
+          const originalText = this.textContent;
+          this.disabled = true;
+          this.textContent = 'Preparing ZIP…';
+          try {
+            const res = await fetch(`/api/arb-download-zip?requestId=${encodeURIComponent(requestId)}`);
+            const data = await res.json().catch(function () { return {}; });
+            if (res.ok && data.files && data.files.length > 0) {
+              // Use JSZip library if available, or download files individually
+              // For simplicity, we'll open all files in new tabs
+              // In production, you'd want to use a ZIP library like JSZip
+              if (typeof JSZip !== 'undefined') {
+                const zip = new JSZip();
+                for (const file of data.files) {
+                  try {
+                    const fileRes = await fetch(file.url);
+                    const blob = await fileRes.blob();
+                    zip.file(file.filename, blob);
+                  } catch (err) {
+                    console.error('Failed to fetch file:', file.filename, err);
+                  }
+                }
+                const zipBlob = await zip.generateAsync({ type: 'blob' });
+                const url = URL.createObjectURL(zipBlob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `arb-request-${requestId}-attachments.zip`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+              } else {
+                // Fallback: download files one by one
+                alert(`Downloading ${data.files.length} files. Please allow multiple downloads.`);
+                for (const file of data.files) {
+                  const a = document.createElement('a');
+                  a.href = file.url;
+                  a.download = file.filename;
+                  a.target = '_blank';
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                  await new Promise(resolve => setTimeout(resolve, 100)); // Small delay between downloads
+                }
+              }
+            } else {
+              alert(data.error || 'Failed to prepare ZIP file.');
+            }
+          } catch (err) {
+            alert('Network error. Please try again.');
+          }
+          this.disabled = false;
+          this.textContent = originalText;
+        });
+      });
+
+      // CSV Export functionality
+      const exportBtn = document.getElementById('export-csv-btn');
+      if (exportBtn) {
+        exportBtn.addEventListener('click', function () {
+          const visibleCards = Array.from(document.querySelectorAll('#arb-request-list-completed .completed-card:not([style*="display: none"])'));
+          if (visibleCards.length === 0) {
+            alert('No completed requests to export. Adjust filters if needed.');
+            return;
+          }
+
+          const rows = [['Request ID', 'Status', 'Owner Email', 'Applicant Name', 'Phone', 'Property Address', 'Application Type', 'Description', 'Submitted', 'Decision Date', 'Decision By']];
+          
+          visibleCards.forEach(function (card) {
+            const summaryBtn = card.querySelector('.arb-summary');
+            if (!summaryBtn) return;
+            const requestId = summaryBtn.getAttribute('data-request-id');
+            const details = card.querySelector('.arb-details-screen');
+            if (!details) return;
+
+            // Extract data from the card
+            const statusEl = summaryBtn.querySelector('span[class*="bg-"]');
+            const status = statusEl?.textContent?.trim() || '';
+            const emailMatch = summaryBtn.textContent.match(/From:\s*([^\n]+)/);
+            const email = emailMatch ? emailMatch[1].trim() : '';
+            
+            // Get form fields from details
+            const getFieldValue = function (labelText) {
+              const label = Array.from(details.querySelectorAll('label')).find(l => l.textContent.includes(labelText));
+              if (!label) return '';
+              const field = label.nextElementSibling || label.parentElement?.querySelector('.bg-gray-100');
+              return field?.textContent?.trim() || '';
+            };
+
+            const applicantName = getFieldValue('Applicant') || '';
+            const phone = getFieldValue('Phone') || '';
+            const propertyAddress = getFieldValue('Property address') || '';
+            const applicationType = getFieldValue('Application for') || '';
+            const description = getFieldValue('Description') || '';
+            const submitted = getFieldValue('Submitted') || '';
+            
+            // Get approval info
+            const approvalEl = details.querySelector('[class*="border-green-200"], [class*="border-red-200"]');
+            const decisionText = approvalEl?.textContent?.trim() || '';
+            const decisionMatch = decisionText.match(/(Approved|Rejected)\s+on\s+([^b]+)\s+by\s+(.+)/);
+            const decisionDate = decisionMatch ? decisionMatch[2].trim() : '';
+            const decisionBy = decisionMatch ? decisionMatch[3].trim() : '';
+            const finalStatus = decisionText.includes('Approved') ? 'Approved' : decisionText.includes('Rejected') ? 'Rejected' : status;
+
+            // Escape CSV values
+            const escapeCsv = function (val) {
+              if (!val) return '';
+              const str = String(val);
+              if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+                return '"' + str.replace(/"/g, '""') + '"';
+              }
+              return str;
+            };
+
+            rows.push([
+              escapeCsv(requestId),
+              escapeCsv(finalStatus),
+              escapeCsv(email),
+              escapeCsv(applicantName),
+              escapeCsv(phone),
+              escapeCsv(propertyAddress),
+              escapeCsv(applicationType),
+              escapeCsv(description),
+              escapeCsv(submitted),
+              escapeCsv(decisionDate),
+              escapeCsv(decisionBy)
+            ]);
+          });
+
+          const csv = rows.map(r => r.join(',')).join('\n');
+          const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+          const link = document.createElement('a');
+          const url = URL.createObjectURL(blob);
+          link.setAttribute('href', url);
+          link.setAttribute('download', `arb-requests-${new Date().toISOString().split('T')[0]}.csv`);
+          link.style.visibility = 'hidden';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        });
+      }
+    })();
+    
+    // Session timeout: Auto-logout after 30 minutes of inactivity
+    const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+    let lastActivity = Date.now();
+    let timeoutWarningShown = false;
+    
+    function resetActivity() {
+      lastActivity = Date.now();
+      timeoutWarningShown = false;
+    }
+    
+    function checkSessionTimeout() {
+      const elapsed = Date.now() - lastActivity;
+      const remaining = SESSION_TIMEOUT_MS - elapsed;
+      
+      if (remaining <= 0) {
+        alert('Your session has expired due to inactivity. You will be redirected to the login page.');
+        window.location.href = '/portal/login';
+        return;
+      }
+      
+      if (remaining <= 2 * 60 * 1000 && !timeoutWarningShown) {
+        timeoutWarningShown = true;
+        const confirmed = confirm('Your session will expire in 2 minutes due to inactivity. Click OK to stay logged in, or Cancel to log out now.');
+        if (confirmed) {
+          resetActivity();
+          fetch('/portal/arb-dashboard', { method: 'HEAD' }).catch(() => {});
+        } else {
+          window.location.href = '/portal/login';
+          return;
+        }
+      }
+    }
+    
+    ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'].forEach(function (event) {
+      document.addEventListener(event, resetActivity, { passive: true });
+    });
+    
+    setInterval(checkSessionTimeout, 60 * 1000);
+  </script>
+</ProtectedPage>

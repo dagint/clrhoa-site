@@ -1,0 +1,258 @@
+---
+/**
+ * POST /api/arb-auto-save — auto-save draft ARB request.
+ * Body (FormData): description, applicant_name, phone, property_address, application_type, files (optional).
+ * Updates existing pending request or creates new one. Returns requestId and updated_at timestamp.
+ */
+export const prerender = false;
+
+import { getSessionFromCookie, verifyCsrfToken, verifyOrigin, updateSessionActivity, SESSION_COOKIE_NAME } from '../../lib/auth';
+import { createLogger, maskRequestId } from '../../lib/logging';
+import { getSecurityMonitor } from '../../lib/monitoring';
+import {
+  getNextArbRequestId,
+  createArbFileId,
+  insertArbRequest,
+  insertArbFile,
+  getArbRequest,
+  updateArbRequestByOwner,
+  listArbFilesByRequest,
+} from '../../lib/arb-db';
+
+const MAX_FILE_BYTES = 5 * 1024 * 1024;
+const MAX_TOTAL_BYTES = 25 * 1024 * 1024;
+const ALLOWED_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+  'image/heic',
+  'application/pdf',
+];
+
+function isAllowedType(t: string): boolean {
+  if (ALLOWED_TYPES.includes(t)) return true;
+  if (t.startsWith('image/')) return true;
+  return false;
+}
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const logger = createLogger({ endpoint: '/api/arb-auto-save' });
+const userAgent = Astro.request.headers.get('user-agent') ?? null;
+const ipAddress = Astro.request.headers.get('cf-connecting-ip') ?? 
+                  Astro.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
+let session = await getSessionFromCookie(
+  Astro.request.headers.get('cookie') ?? undefined,
+  env?.SESSION_SECRET,
+  userAgent,
+  ipAddress
+);
+
+// Fingerprint fallback
+if (!session && env?.SESSION_SECRET) {
+  session = await getSessionFromCookie(
+    Astro.request.headers.get('cookie') ?? undefined,
+    env.SESSION_SECRET
+  );
+}
+
+if (!session) {
+  return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+    status: 401,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+// CSRF protection
+const origin = Astro.request.headers.get('origin');
+const referer = Astro.request.headers.get('referer');
+const expectedOrigin = Astro.url.origin;
+const clientIpAddress = Astro.clientAddress || ipAddress;
+const securityMonitor = getSecurityMonitor();
+
+if (!verifyOrigin(origin, referer, expectedOrigin)) {
+  securityMonitor.trackCsrfFailure('/api/arb-auto-save', clientIpAddress);
+  return new Response(JSON.stringify({ error: 'Invalid origin. Request blocked for security.' }), {
+    status: 403,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+if (Astro.request.method !== 'POST') {
+  return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405, headers: { 'Content-Type': 'application/json' } });
+}
+
+const db = env?.DB;
+const r2 = env?.CLOURHOA_FILES;
+if (!db) {
+  return new Response(JSON.stringify({ error: 'Server configuration error' }), { status: 503, headers: { 'Content-Type': 'application/json' } });
+}
+
+let formData: FormData;
+let csrfToken: string | null = null;
+let description = '';
+let applicantName: string | null = null;
+let phone: string | null = null;
+let propertyAddress: string | null = null;
+let applicationType: string | null = null;
+let requestId: string | null = null;
+let isUpdate = false;
+
+try {
+  formData = await Astro.request.formData();
+  csrfToken = (formData.get('csrf_token') as string)?.trim() || null;
+  requestId = (formData.get('request_id') as string)?.trim() || null; // Optional: for updating existing draft
+  
+  // CSRF validation with fallback
+  let csrfValid = false;
+  if (csrfToken && session.csrfToken) {
+    csrfValid = verifyCsrfToken(session, csrfToken);
+  }
+  
+  // Fallback: try updating session if CSRF token is missing
+  if (!csrfValid && env?.SESSION_SECRET) {
+    if (!session.csrfToken) {
+      await updateSessionActivity(session, env.SESSION_SECRET);
+      // Re-fetch session
+      session = await getSessionFromCookie(
+        Astro.request.headers.get('cookie') ?? undefined,
+        env.SESSION_SECRET,
+        userAgent,
+        ipAddress
+      ) || await getSessionFromCookie(
+        Astro.request.headers.get('cookie') ?? undefined,
+        env.SESSION_SECRET
+      );
+      if (session && csrfToken) {
+        csrfValid = verifyCsrfToken(session, csrfToken);
+      }
+    }
+  }
+  
+  if (!csrfValid) {
+    logger.warn('CSRF token validation failed for auto-save', { 
+      hasSessionToken: !!session?.csrfToken,
+      hasRequestToken: !!csrfToken,
+      sessionEmail: session?.email 
+    });
+    securityMonitor.trackCsrfFailure('/api/arb-auto-save', clientIpAddress);
+    return new Response(
+      JSON.stringify({ error: 'Invalid security token. Please refresh the page.' }),
+      { status: 403, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+  
+  description = (formData.get('description') as string)?.trim() ?? '';
+  applicantName = (formData.get('applicant_name') as string)?.trim() || null;
+  phone = (formData.get('phone') as string)?.trim() || null;
+  propertyAddress = (formData.get('property_address') as string)?.trim() || null;
+  const types = formData.getAll('application_type');
+  applicationType = Array.isArray(types) && types.length > 0
+    ? types.map((t) => String(t).trim()).filter(Boolean).join(', ')
+    : null;
+} catch (e) {
+  logger.error('Form data parsing failed', { error: String(e) });
+  return new Response(
+    JSON.stringify({ error: 'Invalid form data. Please try again.' }),
+    { status: 400, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+
+// Validate description is not empty
+if (!description) {
+  return new Response(
+    JSON.stringify({ error: 'Description is required.' }),
+    { status: 400, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+
+// Check if updating existing draft
+if (requestId) {
+  const existingReq = await getArbRequest(db, requestId);
+  if (existingReq && existingReq.owner_email === session.email.toLowerCase() && existingReq.status === 'pending') {
+    isUpdate = true;
+    // Update existing draft
+    try {
+      const updated = await updateArbRequestByOwner(
+        db,
+        requestId,
+        session.email,
+        description,
+        {
+          applicantName,
+          phone,
+          propertyAddress,
+          applicationType,
+        }
+      );
+      if (updated) {
+        // Get updated timestamp
+        const updatedReq = await getArbRequest(db, requestId);
+        return new Response(
+          JSON.stringify({
+            success: true,
+            requestId,
+            updated_at: updatedReq?.updated_at || new Date().toISOString(),
+            message: 'Draft saved automatically.',
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+    } catch (e) {
+      logger.error('Failed to update draft', { requestId, error: String(e) });
+    }
+  }
+}
+
+// Create new draft if not updating
+if (!isUpdate) {
+  try {
+    requestId = await getNextArbRequestId(db);
+  } catch (e) {
+    logger.error('getNextArbRequestId failed', { error: String(e) });
+    return new Response(
+      JSON.stringify({ error: 'Could not generate request number. Please try again.' }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+
+  try {
+    await insertArbRequest(db, requestId, session.email, description, {
+      applicantName,
+      phone,
+      propertyAddress,
+      applicationType,
+    });
+    
+    // Get created timestamp
+    const newReq = await getArbRequest(db, requestId);
+    return new Response(
+      JSON.stringify({
+        success: true,
+        requestId,
+        updated_at: newReq?.updated_at || newReq?.created || new Date().toISOString(),
+        message: 'Draft saved automatically.',
+      }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } }
+    );
+  } catch (e) {
+    logger.error('ARB insertArbRequest failed', { error: String(e) });
+    return new Response(
+      JSON.stringify({
+        error: 'Could not save draft. Please try again.',
+      }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+}
+
+// Fallback response
+return new Response(
+  JSON.stringify({
+    success: false,
+    error: 'Could not save draft.',
+  }),
+  { status: 500, headers: { 'Content-Type': 'application/json' } }
+);
+---

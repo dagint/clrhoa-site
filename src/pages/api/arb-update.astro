@@ -1,0 +1,124 @@
+---
+/**
+ * POST /api/arb-update — owner can update a pending ARB request (applicant_name, phone, property_address, application_type, description).
+ * Form: request_id, applicant_name, phone, property_address, application_type (multiple), description.
+ */
+export const prerender = false;
+
+import { getSessionFromCookie, verifyCsrfToken, verifyOrigin } from '../../lib/auth';
+import { createLogger, maskRequestId } from '../../lib/logging';
+import { checkRateLimit, getRateLimitConfig } from '../../lib/rate-limit';
+import { getSecurityMonitor } from '../../lib/monitoring';
+import { updateArbRequestByOwner } from '../../lib/arb-db';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const logger = createLogger('arb-update');
+const userAgent = Astro.request.headers.get('user-agent') ?? null;
+const ipAddress = Astro.request.headers.get('cf-connecting-ip') ?? 
+                  Astro.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
+const session = await getSessionFromCookie(
+  Astro.request.headers.get('cookie') ?? undefined,
+  env?.SESSION_SECRET,
+  userAgent,
+  ipAddress
+);
+
+if (!session) {
+  return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+    status: 401,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+// CSRF protection: verify origin
+const origin = Astro.request.headers.get('origin');
+const referer = Astro.request.headers.get('referer');
+const expectedOrigin = Astro.url.origin;
+if (!verifyOrigin(origin, referer, expectedOrigin)) {
+  return new Response(JSON.stringify({ error: 'Invalid origin. Request blocked for security.' }), {
+    status: 403,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+if (Astro.request.method !== 'POST') {
+  return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+    status: 405,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const db = env?.DB;
+if (!db) {
+  return new Response(JSON.stringify({ error: 'Server configuration error' }), {
+    status: 503,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+try {
+  const formData = await Astro.request.formData();
+  
+  // CSRF token verification
+  const csrfToken = formData.get('csrf_token') as string | null;
+  if (!verifyCsrfToken(session, csrfToken)) {
+    return new Response(
+      JSON.stringify({ error: 'Invalid security token. Please refresh the page and try again.' }),
+      { status: 403, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+  
+  const requestId = (formData.get('request_id') as string)?.trim();
+  if (!requestId) {
+    return new Response(JSON.stringify({ error: 'Request ID is required.' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  const description = (formData.get('description') as string)?.trim();
+  if (!description) {
+    return new Response(JSON.stringify({ error: 'Description is required.' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  const applicantName = (formData.get('applicant_name') as string)?.trim() || null;
+  const phone = (formData.get('phone') as string)?.trim() || null;
+  const propertyAddress = (formData.get('property_address') as string)?.trim() || null;
+  const types = formData.getAll('application_type');
+  const applicationType = Array.isArray(types) && types.length > 0
+    ? types.map((t) => String(t).trim()).filter(Boolean).join(', ')
+    : null;
+  const ownerNotes = (formData.get('owner_notes') as string)?.trim() || null;
+
+  const updated = await updateArbRequestByOwner(db, requestId, session.email, {
+    applicantName,
+    phone,
+    propertyAddress,
+    applicationType,
+    description,
+    ownerNotes,
+  });
+
+  if (!updated) {
+    return new Response(
+      JSON.stringify({ error: 'Request not found, already decided, or you are not the owner.' }),
+      { status: 404, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+
+  return new Response(
+    JSON.stringify({ success: true, message: 'Your request has been updated.' }),
+    { status: 200, headers: { 'Content-Type': 'application/json' } }
+  );
+} catch (e) {
+  logger.error('ARB update failed', { error: String(e) });
+  return new Response(
+    JSON.stringify({ error: 'Update failed. Please try again.' }),
+    { status: 500, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+---

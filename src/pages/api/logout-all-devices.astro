@@ -1,0 +1,104 @@
+---
+/**
+ * POST /api/logout-all-devices — Invalidate all sessions for the current user.
+ * Body (JSON): csrfToken.
+ * This creates a new session with a new sessionId, effectively invalidating all previous sessions.
+ */
+export const prerender = false;
+
+import { getSessionFromCookie, createSessionCookieValue, SESSION_COOKIE_NAME, verifyCsrfToken, verifyOrigin } from '../../lib/auth';
+import { getSecurityMonitor } from '../../lib/monitoring';
+import { createLogger } from '../../lib/logging';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const session = await getSessionFromCookie(
+  Astro.request.headers.get('cookie') ?? undefined,
+  env?.SESSION_SECRET,
+  Astro.request.headers.get('user-agent'),
+  Astro.clientAddress || Astro.request.headers.get('cf-connecting-ip') || null
+);
+
+if (!session) {
+  return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+    status: 401,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const logger = createLogger({ endpoint: '/api/logout-all-devices', email: session.email });
+const securityMonitor = getSecurityMonitor();
+
+// CSRF protection: verify origin
+const origin = Astro.request.headers.get('origin');
+const referer = Astro.request.headers.get('referer');
+const expectedOrigin = Astro.url.origin;
+const ipAddress = Astro.clientAddress || Astro.request.headers.get('cf-connecting-ip') || null;
+
+if (!verifyOrigin(origin, referer, expectedOrigin)) {
+  securityMonitor.trackCsrfFailure('/api/logout-all-devices', ipAddress);
+  return new Response(JSON.stringify({ error: 'Invalid origin. Request blocked for security.' }), {
+    status: 403,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+if (Astro.request.method !== 'POST') {
+  return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+    status: 405,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+let body: { csrfToken?: string };
+try {
+  body = await Astro.request.json();
+} catch {
+  return new Response(JSON.stringify({ error: 'Invalid JSON' }), {
+    status: 400,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+// CSRF token verification
+if (!verifyCsrfToken(session, body.csrfToken)) {
+  securityMonitor.trackCsrfFailure('/api/logout-all-devices', ipAddress);
+  return new Response(
+    JSON.stringify({ error: 'Invalid security token. Please refresh the page and try again.' }),
+    { status: 403, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+
+const secret = env?.SESSION_SECRET;
+if (!secret) {
+  return new Response(JSON.stringify({ error: 'Server configuration error' }), {
+    status: 503,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+// Create a new session (new sessionId) - this invalidates all previous sessions
+const userAgent = Astro.request.headers.get('user-agent');
+const newCookieValue = await createSessionCookieValue(
+  { email: session.email, role: session.role, name: session.name },
+  secret,
+  userAgent,
+  ipAddress
+);
+
+logger.info('All devices logged out', { email: session.email });
+
+const isSecure = Astro.url.protocol === 'https:';
+const response = new Response(
+  JSON.stringify({ success: true, message: 'All devices have been logged out. You will need to sign in again.' }),
+  {
+    status: 200,
+    headers: {
+      'Content-Type': 'application/json',
+      'Set-Cookie': `${SESSION_COOKIE_NAME}=${newCookieValue}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${60 * 60 * 24 * 7}${isSecure ? '; Secure' : ''}`,
+    },
+  }
+);
+
+return response;
+---

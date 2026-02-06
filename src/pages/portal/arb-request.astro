@@ -1,0 +1,710 @@
+---
+export const prerender = false;
+
+import '../../styles/tailwind.css';
+import ProtectedPage from '../../components/ProtectedPage.astro';
+import PortalElevatedRoleBanner from '../../components/PortalElevatedRoleBanner.astro';
+import { getSessionFromCookie, updateSessionActivity, SESSION_COOKIE_NAME } from '../../lib/auth';
+import { listArbRequestsByOwner } from '../../lib/arb-db';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const userAgent = Astro.request.headers.get('user-agent') ?? null;
+const ipAddress = Astro.request.headers.get('cf-connecting-ip') ?? 
+                  Astro.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
+const cookieHeader = Astro.request.headers.get('cookie') ?? undefined;
+// First try with fingerprint verification
+let session = await getSessionFromCookie(
+  cookieHeader,
+  env?.SESSION_SECRET,
+  userAgent,
+  ipAddress
+);
+
+// If session validation fails due to fingerprint mismatch, try without fingerprint check
+// This handles cases where IP/userAgent changed but session is still valid
+if (!session && env?.SESSION_SECRET) {
+  session = await getSessionFromCookie(
+    cookieHeader,
+    env.SESSION_SECRET
+    // Don't pass userAgent/ipAddress - this allows legacy sessions or sessions with changed fingerprint
+  );
+}
+
+if (!session) {
+  return Astro.redirect('/portal/login');
+}
+
+// Always ensure session has a CSRF token (update activity and refresh token if needed)
+// This handles old sessions that were created before CSRF tokens were added
+if (!session.csrfToken && env?.SESSION_SECRET) {
+  // Generate CSRF token and update session
+  const crypto = globalThis.crypto;
+  const array = new Uint8Array(32);
+  crypto.getRandomValues(array);
+  const csrfToken = Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+  
+  // Update session payload with CSRF token
+  const updatedPayload = {
+    ...session,
+    csrfToken,
+    lastActivity: Math.floor(Date.now() / 1000),
+  };
+  
+  // Sign the updated payload
+  const encoder = new TextEncoder();
+  const data = encoder.encode(JSON.stringify(updatedPayload));
+  const key = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(env.SESSION_SECRET),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  const sig = await crypto.subtle.sign('HMAC', key, data);
+  const payloadB64 = btoa(String.fromCharCode(...new Uint8Array(data)))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+  const sigB64 = btoa(String.fromCharCode(...new Uint8Array(sig)))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+  const newCookieValue = `${payloadB64}.${sigB64}`;
+  
+  // Update session object and set cookie
+  session = updatedPayload;
+  const isSecure = Astro.url.protocol === 'https:';
+  const secureFlag = isSecure ? '; Secure' : '';
+  Astro.response.headers.set(
+    'Set-Cookie',
+    `${SESSION_COOKIE_NAME}=${newCookieValue}; HttpOnly${secureFlag}; SameSite=Lax; Path=/; Max-Age=${7 * 24 * 60 * 60}`
+  );
+}
+
+// Final check: if session still doesn't have CSRF token, something is wrong
+if (!session.csrfToken) {
+  return Astro.redirect('/portal/login');
+}
+
+// Get draft count for navigation badge
+const db = env?.DB;
+const allRequests = db ? await listArbRequestsByOwner(db, session.email) : [];
+const draftCount = allRequests.filter(r => r.status === 'pending').length;
+---
+
+<ProtectedPage>
+  <div class="min-h-screen bg-gray-50 font-body">
+    <header class="bg-white border-b border-gray-200">
+      <div class="max-w-4xl mx-auto px-4 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h1 class="text-xl font-heading font-bold text-clr-green">Member Portal</h1>
+          <p class="text-sm text-gray-500">Crooked Lake Reserve HOA</p>
+        </div>
+        <nav class="flex flex-wrap items-center gap-3 sm:gap-4">
+          <a href="/portal/dashboard" class="text-gray-600 hover:text-clr-green">Dashboard</a>
+          <a href="/portal/my-requests" class="text-gray-600 hover:text-clr-green relative">
+            My requests
+            {draftCount > 0 && (
+              <span class="absolute -top-1 -right-1 bg-amber-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center" title={`${draftCount} draft${draftCount === 1 ? '' : 's'}`}>
+                {draftCount}
+              </span>
+            )}
+          </a>
+          <a href="/portal/arb-request" class="text-clr-green font-medium">New ARB request</a>
+          <a href="/portal/documents" class="text-gray-600 hover:text-clr-green">Documents</a>
+          {(session.role === 'arb' || session.role === 'board' || session.role === 'admin') && (
+            <a href="/portal/arb-dashboard" class="text-gray-600 hover:text-clr-green">ARB Dashboard</a>
+          )}
+          <a href="/api/logout" class="text-sm text-gray-500 hover:text-clr-orange">Sign out</a>
+        </nav>
+      </div>
+    </header>
+
+    <PortalElevatedRoleBanner role={session.role} />
+
+    <main class="max-w-2xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+      <h2 class="text-2xl font-heading font-bold text-clr-green mb-2">Architectural Review Application</h2>
+
+      <p class="text-gray-700 mb-4 text-sm sm:text-base">
+        Complete this form and submit it electronically. Your application will be sent to the Association's Architectural Review Board for review. <strong>Do not commence work until you receive approval</strong> from the ARB.
+      </p>
+      <p class="text-sm text-gray-500 mb-4">This is a digital submission. You will confirm your submission with an electronic signature below.</p>
+      <div class="flex flex-wrap items-center gap-4 mb-6">
+        <a href="/arb-request-how-to" class="text-clr-orange font-semibold hover:underline text-sm">How to submit an ARB request</a>
+        <span class="text-gray-400">|</span>
+        <a href="/contact" class="text-clr-green font-semibold hover:underline text-sm">ARB Guidelines & Requirements</a>
+      </div>
+
+      <form
+        id="arb-form"
+        class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8 space-y-5"
+        method="post"
+        action="/api/arb-upload"
+        enctype="multipart/form-data"
+      >
+        <input type="hidden" name="csrf_token" id="csrf-token" value={session.csrfToken ?? ''} />
+        <input type="hidden" name="request_id" id="request-id" value="" />
+        <div id="auto-save-status" class="text-xs text-gray-500 flex items-center gap-2 mb-2">
+          <span id="last-saved-text" class="hidden">Last saved: <span id="last-saved-time"></span></span>
+          <span id="auto-save-indicator" class="hidden flex items-center gap-1">
+            <span class="inline-block w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+            Saving...
+          </span>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label for="association" class="block text-sm font-semibold text-gray-700 mb-1">Association</label>
+            <input id="association" type="text" value="Crooked Lake Reserve" readonly class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-gray-600" />
+          </div>
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-1">Date of application</label>
+            <p id="app-date" class="text-gray-600 py-2">{new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label for="applicant_name" class="block text-sm font-semibold text-gray-700 mb-1">
+              Applicant's name <span class="text-gray-400 font-normal">(optional)</span>
+              <span class="ml-1 text-gray-400 cursor-help" title="The name of the person submitting this application. If different from property owner, provide owner's name in description." aria-label="Help: Applicant name">(i)</span>
+            </label>
+            <input id="applicant_name" name="applicant_name" type="text" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-clr-green focus:ring-1 focus:ring-clr-green" placeholder="Your full name" />
+          </div>
+          <div>
+            <label for="phone" class="block text-sm font-semibold text-gray-700 mb-1">Phone number <span class="text-gray-400 font-normal">(optional)</span></label>
+            <input id="phone" name="phone" type="tel" pattern="[0-9\s\(\)\-\+\.]+" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-clr-green focus:ring-1 focus:ring-clr-green" placeholder="(555) 555-5555" aria-describedby="phone-help" />
+            <p id="phone-help" class="mt-1 text-xs text-gray-500">Format: (555) 555-5555 or 555-555-5555</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label for="property_address" class="block text-sm font-semibold text-gray-700 mb-1">
+              Property address <span class="text-gray-400 font-normal">(optional)</span>
+              <span class="ml-1 text-gray-400 cursor-help" title="Street address, lot number, or property identifier for the location of the proposed changes" aria-label="Help: Property address">(i)</span>
+            </label>
+            <input id="property_address" name="property_address" type="text" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-clr-green focus:ring-1 focus:ring-clr-green" placeholder="Street, lot or address" />
+          </div>
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-1">Email address</label>
+            <p id="owner-email" class="text-gray-600 py-2 font-medium">{session?.email ?? ''}</p>
+          </div>
+        </div>
+
+          <div>
+            <span class="block text-sm font-semibold text-gray-700 mb-2">Application for <span class="text-gray-400 font-normal">(optional)</span></span>
+          <div class="flex flex-wrap gap-x-6 gap-y-2">
+            <label class="inline-flex items-center gap-2">
+              <input type="checkbox" name="application_type" value="Exterior Paint" class="rounded border-gray-300 text-clr-green focus:ring-clr-green" />
+              <span class="text-sm">Exterior Paint</span>
+            </label>
+            <label class="inline-flex items-center gap-2">
+              <input type="checkbox" name="application_type" value="Landscape Installation" class="rounded border-gray-300 text-clr-green focus:ring-clr-green" />
+              <span class="text-sm">Landscape Installation</span>
+            </label>
+            <label class="inline-flex items-center gap-2">
+              <input type="checkbox" name="application_type" value="Swimming Pool" class="rounded border-gray-300 text-clr-green focus:ring-clr-green" />
+              <span class="text-sm">Swimming Pool</span>
+            </label>
+            <label class="inline-flex items-center gap-2">
+              <input type="checkbox" name="application_type" value="Recreational Equipment" class="rounded border-gray-300 text-clr-green focus:ring-clr-green" />
+              <span class="text-sm">Recreational Equipment</span>
+            </label>
+            <label class="inline-flex items-center gap-2">
+              <input type="checkbox" name="application_type" value="Fencing" class="rounded border-gray-300 text-clr-green focus:ring-clr-green" />
+              <span class="text-sm">Fencing</span>
+            </label>
+            <label class="inline-flex items-center gap-2">
+              <input type="checkbox" name="application_type" value="Other" class="rounded border-gray-300 text-clr-green focus:ring-clr-green" />
+              <span class="text-sm">Other</span>
+            </label>
+          </div>
+        </div>
+
+        <div>
+          <label for="description" class="block text-sm font-semibold text-gray-700 mb-2">
+            Description of changes <span class="text-red-600" aria-label="required">*</span>
+            <span class="ml-1 text-gray-400 cursor-help" title="Provide detailed information about your proposed changes. Include dimensions, materials, colors, and any other relevant details. Attach supporting documents as files." aria-label="Help: Description">(i)</span>
+          </label>
+          <p class="text-sm text-gray-500 mb-2">
+            Include lot surveys, site plans, diagrams, color chips, material specifications, sample products, photographs, and any information that describes the finished project. Landscaping plans must include size, number, and type of plants.
+          </p>
+          <textarea
+            id="description"
+            name="description"
+            rows="5"
+            required
+            class="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-clr-green focus:ring-1 focus:ring-clr-green"
+            placeholder="Describe the modification or project in detail..."
+          />
+          <p class="mt-1 text-sm font-semibold text-amber-800">Failure to provide complete information will delay the approval process.</p>
+        </div>
+
+        <p class="text-sm text-gray-600 rounded-lg bg-gray-50 p-3 border border-gray-100">
+          <strong>Note:</strong> It is the property owner's responsibility to ensure that all requests conform to applicable zoning and building regulations and that approved projects are properly permitted in accordance with city, state, and municipal requirements.
+        </p>
+
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-2">
+            Attachments <span class="text-gray-400 font-normal">(optional but recommended)</span>
+            <span class="ml-1 text-gray-400 cursor-help" title="Upload supporting documents, photos, plans, or specifications. Images are automatically resized for faster review. PDFs are kept in original quality." aria-label="Help: Attachments">(i)</span>
+          </label>
+          <p class="text-sm text-gray-500 mb-2">Submit as applicable: written description, lot survey, specifications (plans, dimensions, materials, colors), paint/color samples, photos, brochures. Max 5MB per file, 25MB total. Images are resized for review. Allowed: JPEG, PNG, GIF, WebP, HEIC, PDF.</p>
+          <input
+            type="file"
+            name="files"
+            multiple
+            accept="image/*,application/pdf"
+            class="w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-clr-beige file:text-clr-green file:font-semibold"
+          />
+          <p id="file-size-preview" class="mt-2 text-sm text-gray-600 hidden" role="status"></p>
+          <p id="file-error" class="mt-1 text-sm text-red-600 hidden" role="alert"></p>
+        </div>
+
+        <div id="esign-container" class="flex items-start gap-3 rounded-lg bg-gray-50 border border-gray-200 p-4">
+          <input
+            type="checkbox"
+            id="esign"
+            name="esign"
+            class="mt-1 h-4 w-4 rounded border-gray-300 text-clr-green focus:ring-clr-green"
+          />
+          <label for="esign" class="text-sm text-gray-700">
+            <strong>Electronic signature:</strong> <span id="esign-required" class="text-red-600" aria-label="required">*</span> By checking this box, I certify that the information provided is accurate and complete to the best of my knowledge. I understand this constitutes my electronic signature. <span id="esign-submit-note" class="font-semibold text-gray-600">Required when submitting for review.</span>
+          </label>
+        </div>
+
+        <div id="form-error" class="hidden rounded-lg bg-red-50 border border-red-200 p-4 text-sm text-red-700" role="alert"></div>
+        <div id="form-success" class="hidden rounded-lg bg-green-50 border border-green-200 p-4 text-sm text-green-800" role="alert"></div>
+
+        <div class="flex flex-col sm:flex-row gap-3">
+          <button
+            type="button"
+            id="save-draft-btn"
+            class="w-full sm:w-auto px-6 py-3 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-xl shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+            aria-label="Save as draft"
+          >
+            Save as Draft
+          </button>
+          <button
+            type="button"
+            id="submit-btn"
+            class="w-full sm:w-auto px-6 py-3 bg-clr-green hover:brightness-110 text-white font-semibold rounded-xl shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-clr-green focus:ring-offset-2"
+            aria-label="Submit for review"
+          >
+            Submit for Review
+          </button>
+        </div>
+      </form>
+    </main>
+  </div>
+
+  <script define:vars={{ maxFileBytes: 5 * 1024 * 1024, maxTotalBytes: 25 * 1024 * 1024, reviewMaxWidth: 2000, archiveMaxWidth: 1200 }}>
+    (function () {
+      const form = document.getElementById('arb-form');
+      const fileInput = form?.querySelector('input[name="files"]');
+      const fileError = document.getElementById('file-error');
+      const fileSizePreview = document.getElementById('file-size-preview');
+      const formError = document.getElementById('form-error');
+      const formSuccess = document.getElementById('form-success');
+      const submitBtn = document.getElementById('submit-btn');
+      const requestIdInput = document.getElementById('request-id');
+      const lastSavedText = document.getElementById('last-saved-text');
+      const lastSavedTime = document.getElementById('last-saved-time');
+      const autoSaveIndicator = document.getElementById('auto-save-indicator');
+      
+      let currentRequestId = null;
+      let autoSaveInterval = null;
+      let lastSaveTime = null;
+      let isAutoSaving = false;
+
+      function showErr(el, msg) {
+        if (el) { el.textContent = msg; el.classList.remove('hidden'); }
+      }
+      function hideErr(el) {
+        if (el) { el.textContent = ''; el.classList.add('hidden'); }
+      }
+
+      function isImageType(type) {
+        return type && type.startsWith('image/') && type !== 'image/heic';
+      }
+
+      function resizeImage(file, maxWidth, quality) {
+        return new Promise(function (resolve, reject) {
+          const img = new Image();
+          const url = URL.createObjectURL(file);
+          img.onload = function () {
+            URL.revokeObjectURL(url);
+            let w = img.naturalWidth;
+            let h = img.naturalHeight;
+            if (w <= maxWidth) {
+              w = img.naturalWidth;
+              h = img.naturalHeight;
+            } else {
+              h = Math.round((h * maxWidth) / w);
+              w = maxWidth;
+            }
+            const canvas = document.createElement('canvas');
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) { reject(new Error('Canvas not supported')); return; }
+            ctx.drawImage(img, 0, 0, w, h);
+            canvas.toBlob(function (blob) {
+              resolve(blob ? new File([blob], file.name.replace(/\.[^.]+$/i, '.jpg'), { type: 'image/jpeg' }) : null);
+            }, 'image/jpeg', quality);
+          };
+          img.onerror = function () {
+            URL.revokeObjectURL(url);
+            reject(new Error('Failed to load image'));
+          };
+          img.src = url;
+        });
+      }
+
+      function formatBytes(bytes) {
+        if (bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+      }
+      
+      function formatTimestamp(timestamp) {
+        if (!timestamp) return '';
+        const date = new Date(timestamp);
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        
+        if (diffMins < 1) return 'just now';
+        if (diffMins < 60) return `${diffMins} minute${diffMins === 1 ? '' : 's'} ago`;
+        if (diffHours < 24) return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`;
+        return date.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+      }
+      
+      function updateLastSaved(timestamp) {
+        if (lastSavedTime && timestamp) {
+          lastSaveTime = timestamp;
+          lastSavedTime.textContent = formatTimestamp(timestamp);
+          lastSavedText.classList.remove('hidden');
+        }
+      }
+      
+      // Auto-save function
+      async function autoSave() {
+        if (isAutoSaving) return;
+        const description = form.querySelector('[name="description"]')?.value ?? '';
+        if (!description || description.trim().length < 10) return; // Don't auto-save if description is too short
+        
+        isAutoSaving = true;
+        if (autoSaveIndicator) autoSaveIndicator.classList.remove('hidden');
+        
+        const formData = new FormData();
+        const csrfTokenInput = form.querySelector('[name="csrf_token"]');
+        const csrfToken = (csrfTokenInput && csrfTokenInput.value) || (typeof window !== 'undefined' && window.csrfToken) || '';
+        if (!csrfToken) {
+          isAutoSaving = false;
+          if (autoSaveIndicator) autoSaveIndicator.classList.add('hidden');
+          return;
+        }
+        
+        formData.set('csrf_token', csrfToken);
+        if (currentRequestId) formData.set('request_id', currentRequestId);
+        formData.set('description', description);
+        const applicantName = form.querySelector('[name="applicant_name"]')?.value?.trim() ?? '';
+        const phone = form.querySelector('[name="phone"]')?.value?.trim() ?? '';
+        const propertyAddress = form.querySelector('[name="property_address"]')?.value?.trim() ?? '';
+        const applicationTypeEls = form.querySelectorAll('[name="application_type"]:checked');
+        
+        if (applicantName) formData.set('applicant_name', applicantName);
+        if (phone) formData.set('phone', phone);
+        if (propertyAddress) formData.set('property_address', propertyAddress);
+        applicationTypeEls.forEach(function (el) {
+          if (el.value) formData.append('application_type', el.value);
+        });
+        
+        try {
+          const res = await fetch('/api/arb-auto-save', { method: 'POST', body: formData });
+          const data = await res.json().catch(() => ({}));
+          if (res.ok && data.success) {
+            currentRequestId = data.requestId;
+            if (requestIdInput) requestIdInput.value = currentRequestId || '';
+            updateLastSaved(data.updated_at);
+          }
+        } catch (err) {
+          console.warn('Auto-save failed:', err);
+        } finally {
+          isAutoSaving = false;
+          if (autoSaveIndicator) autoSaveIndicator.classList.add('hidden');
+        }
+      }
+      
+      // Start auto-save interval (every 30 seconds)
+      if (form) {
+        let lastInputTime = Date.now();
+        const inputFields = form.querySelectorAll('input, textarea, select');
+        inputFields.forEach(function(field) {
+          field.addEventListener('input', function() {
+            lastInputTime = Date.now();
+          });
+        });
+        
+        // Auto-save every 30 seconds if there's been recent input
+        autoSaveInterval = setInterval(function() {
+          const timeSinceLastInput = Date.now() - lastInputTime;
+          if (timeSinceLastInput < 60000) { // Only auto-save if input was within last minute
+            autoSave();
+          }
+        }, 30000); // 30 seconds
+      }
+
+      if (fileInput) {
+        fileInput.addEventListener('change', function () {
+          hideErr(fileError);
+          const files = Array.from(this.files || []);
+          let total = 0;
+          for (const f of files) {
+            if (f.size > maxFileBytes) {
+              showErr(fileError, `"${f.name}" exceeds 5MB. Maximum 5MB per file.`);
+              if (fileSizePreview) { fileSizePreview.classList.add('hidden'); }
+              return;
+            }
+            total += f.size;
+          }
+          if (total > maxTotalBytes) {
+            showErr(fileError, `Total size ${(total / 1024 / 1024).toFixed(1)}MB exceeds 25MB limit.`);
+          }
+          // Show file size preview
+          if (fileSizePreview && files.length > 0) {
+            const totalMB = (total / 1024 / 1024).toFixed(1);
+            const maxMB = (maxTotalBytes / 1024 / 1024).toFixed(0);
+            const isOverLimit = total > maxTotalBytes;
+            fileSizePreview.textContent = `Total: ${totalMB} MB / ${maxMB} MB${files.length > 1 ? ` (${files.length} files)` : ''}`;
+            fileSizePreview.className = `mt-2 text-sm ${isOverLimit ? 'text-red-600 font-semibold' : total > maxTotalBytes * 0.8 ? 'text-amber-600' : 'text-gray-600'}`;
+            fileSizePreview.classList.remove('hidden');
+          } else if (fileSizePreview) {
+            fileSizePreview.classList.add('hidden');
+          }
+        });
+      }
+
+      // Handle form submission with action (draft or submit)
+      function submitForm(action) {
+        return async function(e) {
+          e.preventDefault();
+          hideErr(formError);
+          hideErr(fileError);
+          formSuccess.classList.add('hidden');
+          
+          const isSubmit = action === 'submit';
+          const isDraft = action === 'draft';
+          const activeBtn = isSubmit ? submitBtn : document.getElementById('save-draft-btn');
+          
+          // Validate esign for submit action
+          const esign = form.querySelector('[name="esign"]')?.checked ?? false;
+          if (isSubmit && !esign) {
+            showErr(formError, 'You must check the electronic signature box to submit for review.');
+            const esignRequired = document.getElementById('esign-required');
+            if (esignRequired) esignRequired.classList.remove('hidden');
+            return;
+          }
+          
+          if (activeBtn) activeBtn.disabled = true;
+          if (activeBtn) activeBtn.textContent = isSubmit ? 'Preparing files…' : 'Saving…';
+
+          const description = form.querySelector('[name="description"]')?.value ?? '';
+          const applicantName = form.querySelector('[name="applicant_name"]')?.value?.trim() ?? '';
+          const phone = form.querySelector('[name="phone"]')?.value?.trim() ?? '';
+          const propertyAddress = form.querySelector('[name="property_address"]')?.value?.trim() ?? '';
+          const applicationTypeEls = form.querySelectorAll('[name="application_type"]:checked');
+          const formData = new FormData();
+          
+          // Include CSRF token from hidden input or window variable
+          const csrfTokenInput = form.querySelector('[name="csrf_token"]');
+          const csrfToken = (csrfTokenInput && csrfTokenInput.value) || (typeof window !== 'undefined' && window.csrfToken) || '';
+          if (!csrfToken) {
+            showErr(formError, 'Missing security token. Please refresh the page and try again.');
+            if (activeBtn) { activeBtn.disabled = false; activeBtn.textContent = isSubmit ? 'Submit for Review' : 'Save as Draft'; }
+            return;
+          }
+          
+          formData.set('csrf_token', csrfToken);
+          formData.set('action', action); // 'draft' or 'submit'
+          formData.set('description', description);
+          formData.set('esign', esign ? 'on' : '');
+          if (applicantName) formData.set('applicant_name', applicantName);
+          if (phone) formData.set('phone', phone);
+          if (propertyAddress) formData.set('property_address', propertyAddress);
+          applicationTypeEls.forEach(function (el) {
+            if (el.value) formData.append('application_type', el.value);
+          });
+
+          const files = Array.from(fileInput?.files || []);
+          try {
+            for (let i = 0; i < files.length; i++) {
+              const file = files[i];
+              formData.append('file_' + i, file);
+              if (isImageType(file.type)) {
+                try {
+                  const reviewFile = await resizeImage(file, reviewMaxWidth, 0.82);
+                  if (reviewFile) formData.append('file_' + i + '_review', reviewFile);
+                  const archiveFile = await resizeImage(file, archiveMaxWidth, 0.70);
+                  if (archiveFile) formData.append('file_' + i + '_archive', archiveFile);
+                } catch (err) {
+                  console.warn('Resize failed for ' + file.name, err);
+                }
+              }
+            }
+          } catch (err) {
+            showErr(formError, 'Failed to prepare images. Please try again.');
+            if (activeBtn) { activeBtn.disabled = false; activeBtn.textContent = isSubmit ? 'Submit for Review' : 'Save as Draft'; }
+            return;
+          }
+
+          if (activeBtn) activeBtn.textContent = isSubmit ? 'Submitting…' : 'Saving…';
+
+          try {
+            const res = await fetch(form.action, { method: 'POST', body: formData });
+            const data = await res.json().catch(() => ({}));
+            if (res.ok && data.success) {
+              // Stop auto-save interval
+              if (autoSaveInterval) {
+                clearInterval(autoSaveInterval);
+                autoSaveInterval = null;
+              }
+              
+              if (isSubmit) {
+                formSuccess.innerHTML = '<strong>Success!</strong> Your request has been submitted for review. Redirecting to your requests...';
+                formSuccess.classList.remove('hidden');
+                form.reset();
+                setTimeout(() => { window.location.href = '/portal/my-requests'; }, 2000);
+              } else {
+                // Draft saved - show success with option to stay or go
+                currentRequestId = data.requestId || currentRequestId;
+                if (requestIdInput && currentRequestId) requestIdInput.value = currentRequestId;
+                updateLastSaved(data.updated_at);
+                
+                formSuccess.innerHTML = '<strong>Draft saved!</strong> Your request has been saved. <a href="/portal/my-requests" class="underline font-semibold">View all requests</a> or continue editing.';
+                formSuccess.classList.remove('hidden');
+                
+                // Don't auto-redirect for drafts - let user continue editing
+              }
+            } else {
+              const errorMsg = data.error || (isSubmit ? 'Submission failed. Please try again.' : 'Save failed. Please try again.');
+              if (data.duplicateRequestId) {
+                showErr(formError, errorMsg + ` <a href="/portal/my-requests" class="underline font-semibold">View your requests</a>`);
+              } else {
+                showErr(formError, errorMsg);
+              }
+            }
+          } catch (err) {
+            showErr(formError, 'Network error. Please try again.');
+          }
+          if (activeBtn) { activeBtn.disabled = false; activeBtn.textContent = isSubmit ? 'Submit for Review' : 'Save as Draft'; }
+        };
+      }
+
+      if (form) {
+        // Remove default submit handler - we'll use button click handlers instead
+        form.addEventListener('submit', function(e) { e.preventDefault(); });
+        
+        // Add click handlers for both buttons
+        const saveDraftBtn = document.getElementById('save-draft-btn');
+        if (saveDraftBtn) {
+          saveDraftBtn.addEventListener('click', submitForm('draft'));
+        }
+        if (submitBtn) {
+          submitBtn.addEventListener('click', submitForm('submit'));
+        }
+      }
+      
+      // Update esign label visibility based on which button is focused/hovered
+      const esignRequired = document.getElementById('esign-required');
+      const esignSubmitNote = document.getElementById('esign-submit-note');
+      
+      if (submitBtn && esignRequired && esignSubmitNote) {
+        // Show required indicator when hovering/focusing submit button
+        submitBtn.addEventListener('mouseenter', function() {
+          esignRequired.classList.remove('hidden');
+          esignSubmitNote.classList.remove('hidden');
+        });
+        submitBtn.addEventListener('focus', function() {
+          esignRequired.classList.remove('hidden');
+          esignSubmitNote.classList.remove('hidden');
+        });
+        submitBtn.addEventListener('mouseleave', function() {
+          // Keep visible for submit button
+          esignRequired.classList.remove('hidden');
+          esignSubmitNote.classList.remove('hidden');
+        });
+        
+        const saveDraftBtn = document.getElementById('save-draft-btn');
+        if (saveDraftBtn) {
+          // Hide required indicator when hovering/focusing draft button
+          saveDraftBtn.addEventListener('mouseenter', function() {
+            esignRequired.classList.add('hidden');
+            esignSubmitNote.classList.add('hidden');
+          });
+          saveDraftBtn.addEventListener('focus', function() {
+            esignRequired.classList.add('hidden');
+            esignSubmitNote.classList.add('hidden');
+          });
+          saveDraftBtn.addEventListener('mouseleave', function() {
+            // Show again when leaving draft button
+            esignRequired.classList.remove('hidden');
+            esignSubmitNote.classList.remove('hidden');
+          });
+        }
+      }
+    })();
+  </script>
+  <script define:vars={{ csrfToken: session.csrfToken ?? '' }}>
+    (function () {
+      // Make CSRF token available to scripts
+      if (typeof window !== 'undefined') {
+        window.csrfToken = csrfToken;
+      }
+      
+      // Session timeout: Auto-logout after 30 minutes of inactivity
+      const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+      let lastActivity = Date.now();
+      let timeoutWarningShown = false;
+      
+      function resetActivity() {
+        lastActivity = Date.now();
+        timeoutWarningShown = false;
+      }
+      
+      function checkSessionTimeout() {
+        const elapsed = Date.now() - lastActivity;
+        const remaining = SESSION_TIMEOUT_MS - elapsed;
+        
+        if (remaining <= 0) {
+          alert('Your session has expired due to inactivity. You will be redirected to the login page.');
+          window.location.href = '/portal/login';
+          return;
+        }
+        
+        if (remaining <= 2 * 60 * 1000 && !timeoutWarningShown) {
+          timeoutWarningShown = true;
+          const confirmed = confirm('Your session will expire in 2 minutes due to inactivity. Click OK to stay logged in, or Cancel to log out now.');
+          if (confirmed) {
+            resetActivity();
+            fetch('/portal/arb-request', { method: 'HEAD' }).catch(() => {});
+          } else {
+            window.location.href = '/portal/login';
+            return;
+          }
+        }
+      }
+      
+      ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'].forEach(function (event) {
+        document.addEventListener(event, resetActivity, { passive: true });
+      });
+      
+      setInterval(checkSessionTimeout, 60 * 1000);
+    })();
+  </script>
+</ProtectedPage>

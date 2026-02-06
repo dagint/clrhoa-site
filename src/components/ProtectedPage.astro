@@ -1,0 +1,21 @@
+---
+/**
+ * Wrapper for portal pages that require auth. Validates session server-side and
+ * redirects to /portal/login if invalid. Pass user to slot via Astro.props.
+ */
+export const prerender = false;
+
+import { getSessionFromCookie } from '../lib/auth';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const secret = env?.SESSION_SECRET;
+const cookieHeader = Astro.request.headers.get('cookie') ?? undefined;
+const session = await getSessionFromCookie(cookieHeader, secret);
+
+if (!session) {
+  return Astro.redirect('/portal/login');
+}
+---
+
+<slot />

@@ -1,0 +1,117 @@
+---
+export const prerender = false;
+
+import '../../styles/tailwind.css';
+import ProtectedPage from '../../components/ProtectedPage.astro';
+import PortalElevatedRoleBanner from '../../components/PortalElevatedRoleBanner.astro';
+import { getSessionFromCookie } from '../../lib/auth';
+import { listArbRequestsByOwner } from '../../lib/arb-db';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const session = await getSessionFromCookie(
+  Astro.request.headers.get('cookie') ?? undefined,
+  env?.SESSION_SECRET
+);
+
+if (!session) {
+  return Astro.redirect('/portal/login');
+}
+
+// Get draft count for navigation badge
+const db = env?.DB;
+const allRequests = db ? await listArbRequestsByOwner(db, session.email) : [];
+const draftCount = allRequests.filter(r => r.status === 'pending').length;
+
+const r2 = env?.CLOURHOA_FILES;
+let files: { key: string; size?: number; uploaded?: Date }[] = [];
+
+// List only compliance/member docs; exclude ARB request attachments (stored under arb/)
+if (r2) {
+  try {
+    const listed = await r2.list({ limit: 500 });
+    files = (listed.objects ?? [])
+      .filter((o) => o.key != null && !o.key.startsWith('arb/'))
+      .map((o) => ({
+        key: o.key!,
+        size: o.size,
+        uploaded: o.uploaded ? new Date(o.uploaded) : undefined,
+      }));
+  } catch (e) {
+    console.error('R2 list error:', e);
+  }
+}
+
+function displayName(key: string): string {
+  return key.split('/').pop() ?? key;
+}
+---
+
+<ProtectedPage>
+  <div class="min-h-screen bg-gray-50 font-body">
+    <header class="bg-white border-b border-gray-200">
+      <div class="max-w-4xl mx-auto px-4 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h1 class="text-xl font-heading font-bold text-clr-green">Member Portal</h1>
+          <p class="text-sm text-gray-500">Crooked Lake Reserve HOA</p>
+        </div>
+        <nav class="flex flex-wrap items-center gap-3 sm:gap-4">
+          <a href="/portal/dashboard" class="text-gray-600 hover:text-clr-green">Dashboard</a>
+          <a href="/portal/my-requests" class="text-gray-600 hover:text-clr-green relative">
+            My requests
+            {draftCount > 0 && (
+              <span class="absolute -top-1 -right-1 bg-amber-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center" title={`${draftCount} draft${draftCount === 1 ? '' : 's'}`}>
+                {draftCount}
+              </span>
+            )}
+          </a>
+          <a href="/portal/arb-request" class="text-gray-600 hover:text-clr-green">New ARB request</a>
+          <a href="/portal/documents" class="text-clr-green font-medium">Documents</a>
+          {(session.role === 'arb' || session.role === 'board' || session.role === 'admin') && (
+            <a href="/portal/arb-dashboard" class="text-gray-600 hover:text-clr-green">ARB Dashboard</a>
+          )}
+          <a href="/" class="text-gray-500 text-sm hover:text-clr-green">Public site</a>
+          <a href="/api/logout" class="text-sm text-gray-500 hover:text-clr-orange">Sign out</a>
+        </nav>
+      </div>
+    </header>
+
+    <PortalElevatedRoleBanner role={session.role} />
+
+    <main class="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+      <h2 class="text-2xl font-heading font-bold text-clr-green mb-2">Compliance Documents</h2>
+      <p class="text-gray-600 mb-6">
+        Redacted minutes, budgets, and other member-only files.
+      </p>
+
+      {files.length === 0 ? (
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center text-gray-500">
+          No files in the portal yet. Check back later or contact the board.
+        </div>
+      ) : (
+        <ul class="space-y-2">
+          {files.map((file) => (
+            <li>
+              <a
+                href={`/api/portal/file/${encodeURIComponent(file.key)}`}
+                class="flex items-center gap-3 bg-white rounded-xl border border-gray-100 p-4 shadow-sm hover:shadow-md hover:border-clr-green/30 transition-all"
+              >
+                <span class="text-clr-green font-medium flex-1">{displayName(file.key)}</span>
+                {file.uploaded && (
+                  <span class="text-sm text-gray-500">
+                    {file.uploaded.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+                  </span>
+                )}
+                <span class="text-clr-orange font-medium text-sm">Download</span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <p class="mt-8 text-sm text-gray-500">
+        <a href="/documents" class="text-clr-green hover:underline">View public documents</a> (covenants, bylaws, forms).
+      </p>
+    </main>
+  </div>
+</ProtectedPage>

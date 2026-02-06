@@ -1,0 +1,120 @@
+---
+/**
+ * POST /api/arb-remove-file — owner removes one attachment from a pending request.
+ * Body (JSON): requestId, fileId.
+ */
+export const prerender = false;
+
+import { getSessionFromCookie, verifyCsrfToken, verifyOrigin } from '../../lib/auth';
+import { createLogger } from '../../lib/logging';
+import { checkRateLimit, getRateLimitConfig } from '../../lib/rate-limit';
+import { getSecurityMonitor } from '../../lib/monitoring';
+import { getArbRequest, getArbFile, deleteArbFile } from '../../lib/arb-db';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const session = await getSessionFromCookie(
+  Astro.request.headers.get('cookie') ?? undefined,
+  env?.SESSION_SECRET
+);
+
+if (!session) {
+  return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
+}
+
+// CSRF protection: verify origin
+const origin = Astro.request.headers.get('origin');
+const referer = Astro.request.headers.get('referer');
+const expectedOrigin = Astro.url.origin;
+if (!verifyOrigin(origin, referer, expectedOrigin)) {
+  return new Response(JSON.stringify({ error: 'Invalid origin. Request blocked for security.' }), {
+    status: 403,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+if (Astro.request.method !== 'POST') {
+  return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405, headers: { 'Content-Type': 'application/json' } });
+}
+
+const db = env?.DB;
+const r2 = env?.CLOURHOA_FILES;
+if (!db) {
+  return new Response(JSON.stringify({ error: 'Server configuration error' }), { status: 503, headers: { 'Content-Type': 'application/json' } });
+}
+
+let body: { requestId?: string; fileId?: string; csrfToken?: string };
+try {
+  body = await Astro.request.json();
+} catch {
+  return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+}
+
+// CSRF token verification
+if (!verifyCsrfToken(session, body.csrfToken)) {
+  return new Response(
+    JSON.stringify({ error: 'Invalid security token. Please refresh the page and try again.' }),
+    { status: 403, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+
+const requestId = (body.requestId ?? '').trim();
+const fileId = (body.fileId ?? '').trim();
+if (!requestId || !fileId) {
+  return new Response(JSON.stringify({ error: 'requestId and fileId are required.' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+}
+
+const req = await getArbRequest(db, requestId);
+if (!req || req.owner_email !== session.email.toLowerCase() || req.status !== 'pending') {
+  return new Response(JSON.stringify({ error: 'Request not found or not editable.' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
+}
+
+const file = await getArbFile(db, fileId, requestId);
+if (!file) {
+  return new Response(JSON.stringify({ error: 'File not found.' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
+}
+
+const deleted = await deleteArbFile(db, fileId, requestId);
+if (!deleted) {
+  return new Response(JSON.stringify({ error: 'Remove failed.' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+}
+
+// Only delete from R2 if this file is owned (not a reference from a copied request). Reference-only rows point at the original; removing removes just the pointer.
+// Secure deletion: delete from R2 first, then verify deletion before proceeding
+if (r2 && !file.reference_only) {
+  try {
+    const keys = JSON.parse(file.r2_keys) as { originals?: string[]; review?: string[]; archive?: string[] };
+    const allKeys = [...(keys.originals ?? []), ...(keys.review ?? []), ...(keys.archive ?? [])];
+    const deletedKeys: string[] = [];
+    
+    for (const key of allKeys) {
+      try {
+        await r2.delete(key);
+        deletedKeys.push(key);
+        // Verify deletion (optional - R2 delete is idempotent, but good practice)
+        try {
+          await r2.head(key);
+          // If head succeeds, file still exists - log warning
+          logger.warn('File still exists after delete attempt', { key, requestId, fileId });
+        } catch {
+          // File doesn't exist - deletion successful
+        }
+      } catch (e) {
+        logger.warn('R2 delete failed for key', { key, requestId, fileId, error: String(e) });
+      }
+    }
+    
+    if (deletedKeys.length > 0) {
+      logger.info('Secure file deletion completed', { 
+        requestId, 
+        fileId,
+        keysDeleted: deletedKeys.length 
+      });
+    }
+  } catch (e) {
+    logger.warn('R2 delete failed for file', { fileId, requestId, error: String(e) });
+  }
+}
+
+return new Response(JSON.stringify({ success: true, message: 'Attachment removed.' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+---

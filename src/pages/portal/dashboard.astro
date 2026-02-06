@@ -1,0 +1,126 @@
+---
+export const prerender = false;
+
+import '../../styles/tailwind.css';
+import ProtectedPage from '../../components/ProtectedPage.astro';
+import PortalElevatedRoleBanner from '../../components/PortalElevatedRoleBanner.astro';
+import { getSessionFromCookie } from '../../lib/auth';
+import { getArbRequestCountsByStatus, listArbRequestsByOwner } from '../../lib/arb-db';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const userAgent = Astro.request.headers.get('user-agent') ?? null;
+const ipAddress = Astro.request.headers.get('cf-connecting-ip') ?? 
+                  Astro.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
+const cookieHeader = Astro.request.headers.get('cookie') ?? undefined;
+let session = await getSessionFromCookie(
+  cookieHeader,
+  env?.SESSION_SECRET,
+  userAgent,
+  ipAddress
+);
+
+// If session validation fails due to fingerprint mismatch, try without fingerprint check
+if (!session && env?.SESSION_SECRET) {
+  session = await getSessionFromCookie(
+    cookieHeader,
+    env.SESSION_SECRET
+  );
+}
+
+if (!session) {
+  return Astro.redirect('/portal/login');
+}
+
+const { email, role, name } = session;
+const db = env?.DB;
+let arbCounts: { pending: number; in_review: number } = { pending: 0, in_review: 0 };
+if (db && (role === 'arb' || role === 'board' || role === 'admin')) {
+  const counts = await getArbRequestCountsByStatus(db);
+  arbCounts = { pending: counts.pending, in_review: counts.in_review };
+}
+
+// Get draft count for navigation badge
+const allRequests = db ? await listArbRequestsByOwner(db, email) : [];
+const draftCount = allRequests.filter(r => r.status === 'pending').length;
+---
+
+<ProtectedPage>
+  <div class="min-h-screen bg-gray-50 font-body">
+    <header class="bg-white border-b border-gray-200">
+      <div class="max-w-4xl mx-auto px-4 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h1 class="text-xl font-heading font-bold text-clr-green">Member Portal</h1>
+          <p class="text-sm text-gray-500">Crooked Lake Reserve HOA</p>
+        </div>
+        <nav class="flex flex-wrap items-center gap-3 sm:gap-4">
+          <a href="/portal/dashboard" class="text-clr-green font-medium">Dashboard</a>
+          <a href="/portal/my-requests" class="text-gray-600 hover:text-clr-green relative">
+            My requests
+            {draftCount > 0 && (
+              <span class="absolute -top-1 -right-1 bg-amber-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center" title={`${draftCount} draft${draftCount === 1 ? '' : 's'}`}>
+                {draftCount}
+              </span>
+            )}
+          </a>
+          <a href="/portal/arb-request" class="text-gray-600 hover:text-clr-green">New ARB request</a>
+          <a href="/portal/documents" class="text-gray-600 hover:text-clr-green">Documents</a>
+          {(role === 'arb' || role === 'board' || role === 'admin') && (
+            <a href="/portal/arb-dashboard" class="text-gray-600 hover:text-clr-green">ARB Dashboard</a>
+          )}
+          <a href="/" class="text-gray-500 text-sm hover:text-clr-green">Public site</a>
+          <a href="/api/logout" class="text-sm text-gray-500 hover:text-clr-orange">Sign out</a>
+        </nav>
+      </div>
+    </header>
+
+    <PortalElevatedRoleBanner role={role} />
+
+    <main class="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+      <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8">
+        <h2 class="text-2xl font-heading font-bold text-clr-green mb-2">Welcome back</h2>
+        <p class="text-gray-600 mb-6">
+          {name ? `${name} (` : ''}{email}{name ? ')' : ''}
+        </p>
+        <p class="text-sm text-gray-500">
+          Your role: <strong class="text-clr-green">{role}</strong>
+        </p>
+        <p class="text-sm text-gray-600 mt-4">
+          <a href="/arb-request-how-to" class="text-clr-orange hover:underline">How to submit an ARB request</a>
+        </p>
+        <div class="mt-6 flex flex-wrap gap-4">
+          <a
+            href="/portal/arb-request"
+            class="inline-flex items-center gap-2 bg-clr-green hover:brightness-110 text-white px-6 py-3 rounded-xl font-semibold text-sm shadow-md transition-all"
+          >
+            New ARB request
+          </a>
+          <a
+            href="/portal/my-requests"
+            class="inline-flex items-center gap-2 bg-clr-beige hover:brightness-95 text-clr-green px-6 py-3 rounded-xl font-semibold text-sm transition-all"
+          >
+            My ARB requests
+          </a>
+          <a
+            href="/portal/documents"
+            class="inline-flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-800 px-6 py-3 rounded-xl font-semibold text-sm transition-all"
+          >
+            Compliance documents
+          </a>
+          <a
+            href="/documents"
+            class="inline-flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-800 px-6 py-3 rounded-xl font-semibold text-sm transition-all"
+          >
+            Public documents
+          </a>
+        </div>
+        {(role === 'arb' || role === 'board' || role === 'admin') && (
+          <p class="mt-4">
+            <a href="/portal/arb-dashboard" class="text-clr-green font-semibold hover:underline">ARB Dashboard &rarr;</a>
+            <span class="text-gray-500 text-sm ml-1">({arbCounts.pending} pending, {arbCounts.in_review} in review)</span>
+          </p>
+        )}
+      </div>
+    </main>
+  </div>
+</ProtectedPage>

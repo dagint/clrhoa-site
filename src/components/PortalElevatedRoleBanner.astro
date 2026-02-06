@@ -1,0 +1,20 @@
+---
+interface Props {
+  role: string;
+}
+
+const { role } = Astro.props;
+
+const isElevated = role === 'arb' || role === 'board' || role === 'admin';
+if (!isElevated) {
+  return null;
+}
+
+const label = role === 'admin' ? 'Administrator' : role === 'arb' ? 'ARB Member' : 'Board Member';
+---
+
+<div class="bg-amber-50 border-b border-amber-200 px-4 py-2 no-print" role="status" aria-live="polite">
+  <p class="text-sm text-amber-900 text-center font-medium max-w-4xl mx-auto">
+    You are signed in with elevated access: <strong>{label}</strong>. Your actions in the portal may affect other members. Use responsibly.
+  </p>
+</div>

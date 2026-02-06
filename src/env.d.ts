@@ -1,5 +1,19 @@
 /// <reference types="astro/client" />
 
+// Cloudflare portal bindings (D1, KV, R2, SESSION_SECRET)
+interface Env {
+  DB: D1Database;
+  CLOURHOA_USERS: KVNamespace;
+  CLOURHOA_FILES: R2Bucket;
+  SESSION_SECRET: string;
+}
+
+type Runtime = import('@astrojs/cloudflare').Runtime<Env>;
+
+declare namespace App {
+  interface Locals extends Runtime {}
+}
+
 interface ImportMetaEnv {
   // Form and security
   readonly PUBLIC_STATICFORMS_API_KEY?: string;
