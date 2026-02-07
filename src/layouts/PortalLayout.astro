@@ -1,0 +1,29 @@
+---
+/**
+ * Layout for portal (member) pages. Ensures UTF-8 charset and consistent document structure
+ * so special characters (e.g. ellipsis …) and formatting render correctly.
+ */
+import '../styles/tailwind.css';
+
+interface Props {
+  title?: string;
+}
+
+const { title = 'Member Portal | Crooked Lake Reserve HOA' } = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{title}</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#1e5f38" />
+    <meta name="robots" content="noindex, nofollow" />
+  </head>
+  <body class="min-h-screen bg-gray-50 text-gray-900 font-body">
+    <slot />
+  </body>
+</html>

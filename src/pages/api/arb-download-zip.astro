@@ -48,7 +48,7 @@ if (!request) {
 }
 
 // Check permissions: owner or ARB/Board/Admin
-const allowedRoles = ['arb', 'board', 'admin'];
+const allowedRoles = ['arb', 'board', 'admin', 'arb_board'];
 const isOwner = request.owner_email.toLowerCase() === session.email.toLowerCase();
 const isAuthorized = isOwner || allowedRoles.includes(session.role);
 

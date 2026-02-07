@@ -1,0 +1,64 @@
+---
+/**
+ * POST /api/maintenance-update — board updates status/vendor for a request.
+ * Body: id, status?, vendor_assigned?
+ */
+export const prerender = false;
+
+import { getSessionFromCookie } from '../../lib/auth';
+import { getMaintenanceById, updateMaintenanceRequest } from '../../lib/maintenance-db';
+
+function jsonResponse(data: object, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const session = await getSessionFromCookie(
+  Astro.request.headers.get('cookie') ?? undefined,
+  env?.SESSION_SECRET
+);
+
+if (!session) return jsonResponse({ error: 'Unauthorized' }, 401);
+const isBoard = session.role === 'board' || session.role === 'admin' || session.role === 'arb_board';
+if (!isBoard) return jsonResponse({ error: 'Forbidden' }, 403);
+
+const db = env?.DB;
+if (!db) return jsonResponse({ error: 'Server configuration error' }, 503);
+
+if (Astro.request.method !== 'POST' && Astro.request.method !== 'PUT') {
+  return new Response(null, { status: 405, headers: { Allow: 'POST, PUT' } });
+}
+
+let body: Record<string, unknown>;
+try {
+  const ct = Astro.request.headers.get('content-type') ?? '';
+  body = ct.includes('application/json') ? await Astro.request.json() : Object.fromEntries(await Astro.request.formData());
+} catch {
+  return jsonResponse({ error: 'Invalid body' }, 400);
+}
+
+const id = String(body.id ?? '').trim();
+if (!id) return jsonResponse({ error: 'id is required' }, 400);
+
+const status = body.status != null ? String(body.status).trim() : undefined;
+const vendorAssigned = body.vendor_assigned !== undefined ? (body.vendor_assigned ? String(body.vendor_assigned).trim() : null) : undefined;
+
+const validStatuses = ['reported', 'in_progress', 'completed'];
+if (status !== undefined && !validStatuses.includes(status)) {
+  return jsonResponse({ error: 'status must be reported, in_progress, or completed' }, 400);
+}
+
+const existing = await getMaintenanceById(db, id);
+if (!existing) return jsonResponse({ error: 'Request not found' }, 404);
+
+await updateMaintenanceRequest(db, id, {
+  status: status ?? existing.status,
+  vendor_assigned: vendorAssigned !== undefined ? vendorAssigned : existing.vendor_assigned,
+});
+
+return jsonResponse({ success: true, message: 'Updated' });
+---

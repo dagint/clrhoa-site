@@ -71,3 +71,15 @@ export function sanitizePhone(phone: string | null | undefined): string | null {
   if (cleaned.length < 10) return null; // Minimum 10 digits
   return cleaned.trim();
 }
+
+/**
+ * Sanitize a string before passing to Astro define:vars to avoid breaking inlined script.
+ * Prevents </script> from closing the tag and trims problematic characters/length.
+ */
+export function sanitizeForScriptInjection(text: string | null | undefined): string {
+  if (text == null) return '';
+  return String(text)
+    .replace(/<\/script>/gi, '')
+    .replace(/\r?\n/g, ' ')
+    .slice(0, 2000);
+}

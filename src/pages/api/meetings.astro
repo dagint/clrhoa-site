@@ -1,0 +1,135 @@
+---
+/**
+ * /api/meetings — CRUD for meetings.
+ * GET: list (all authenticated get upcoming; board gets all).
+ * POST: create (board only). Body: title, datetime, location, description, optional agenda_r2_key.
+ * PUT: update (board only). Body: id, title?, datetime?, location?, description?, agenda_r2_key?.
+ * DELETE: delete (board only). Body: id or ?id=.
+ */
+export const prerender = false;
+
+import { getSessionFromCookie } from '../../lib/auth';
+import {
+  listUpcomingMeetings,
+  listAllMeetings,
+  getMeetingById,
+  createMeetingId,
+  insertMeeting,
+  updateMeeting,
+  deleteMeeting,
+} from '../../lib/meetings-db';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const db = env?.DB;
+
+function jsonResponse(data: object, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const session = await getSessionFromCookie(
+  Astro.request.headers.get('cookie') ?? undefined,
+  env?.SESSION_SECRET
+);
+
+if (!session) {
+  return jsonResponse({ error: 'Unauthorized' }, 401);
+}
+
+if (!db) {
+  return jsonResponse({ error: 'Server configuration error' }, 503);
+}
+
+const isBoard = session.role === 'board' || session.role === 'admin' || session.role === 'arb_board';
+
+if (Astro.request.method === 'GET') {
+  const meetings = isBoard ? await listAllMeetings(db) : await listUpcomingMeetings(db);
+  return jsonResponse({ meetings });
+}
+
+if (Astro.request.method === 'POST') {
+  if (!isBoard) return jsonResponse({ error: 'Forbidden' }, 403);
+  let body: Record<string, unknown>;
+  try {
+    const ct = Astro.request.headers.get('content-type') ?? '';
+    if (ct.includes('application/json')) {
+      body = await Astro.request.json();
+    } else {
+      const form = await Astro.request.formData();
+      body = {
+        title: form.get('title'),
+        datetime: form.get('datetime'),
+        location: form.get('location'),
+        description: form.get('description'),
+        agenda_r2_key: form.get('agenda_r2_key') || undefined,
+      };
+    }
+  } catch {
+    return jsonResponse({ error: 'Invalid body' }, 400);
+  }
+  const title = String(body.title ?? '').trim();
+  const datetime = String(body.datetime ?? '').trim();
+  if (!title || !datetime) {
+    return jsonResponse({ error: 'Title and datetime are required' }, 400);
+  }
+  const id = createMeetingId();
+  await insertMeeting(db, id, {
+    title,
+    description: body.description != null ? String(body.description).trim() : null,
+    datetime,
+    location: body.location != null ? String(body.location).trim() : null,
+    agenda_r2_key: body.agenda_r2_key != null ? String(body.agenda_r2_key).trim() : null,
+    created_by: session.email,
+  });
+  return jsonResponse({ success: true, id, message: 'Meeting created' });
+}
+
+if (Astro.request.method === 'PUT') {
+  if (!isBoard) return jsonResponse({ error: 'Forbidden' }, 403);
+  let body: Record<string, unknown>;
+  try {
+    const ct = Astro.request.headers.get('content-type') ?? '';
+    body = ct.includes('application/json') ? await Astro.request.json() : Object.fromEntries(await Astro.request.formData());
+  } catch {
+    return jsonResponse({ error: 'Invalid body' }, 400);
+  }
+  const id = String(body.id ?? '').trim();
+  if (!id) return jsonResponse({ error: 'id is required' }, 400);
+  const existing = await getMeetingById(db, id);
+  if (!existing) return jsonResponse({ error: 'Meeting not found' }, 404);
+  await updateMeeting(db, id, {
+    title: body.title !== undefined ? String(body.title).trim() : undefined,
+    description: body.description !== undefined ? (body.description ? String(body.description).trim() : null) : undefined,
+    datetime: body.datetime !== undefined ? String(body.datetime).trim() : undefined,
+    location: body.location !== undefined ? (body.location ? String(body.location).trim() : null) : undefined,
+    agenda_r2_key: body.agenda_r2_key !== undefined ? (body.agenda_r2_key ? String(body.agenda_r2_key).trim() : null) : undefined,
+  });
+  return jsonResponse({ success: true, message: 'Meeting updated' });
+}
+
+if (Astro.request.method === 'DELETE') {
+  if (!isBoard) return jsonResponse({ error: 'Forbidden' }, 403);
+  let id: string;
+  const url = new URL(Astro.request.url);
+  id = url.searchParams.get('id') ?? '';
+  if (!id) {
+    try {
+      const body = Astro.request.headers.get('content-type')?.includes('application/json')
+        ? await Astro.request.json()
+        : Object.fromEntries(await Astro.request.formData());
+      id = String((body as Record<string, unknown>).id ?? '').trim();
+    } catch {
+      id = '';
+    }
+  }
+  if (!id) return jsonResponse({ error: 'id is required' }, 400);
+  const ok = await deleteMeeting(db, id);
+  if (!ok) return jsonResponse({ error: 'Meeting not found' }, 404);
+  return jsonResponse({ success: true, message: 'Meeting deleted' });
+}
+
+return new Response(null, { status: 405, headers: { Allow: 'GET, POST, PUT, DELETE' } });
+---

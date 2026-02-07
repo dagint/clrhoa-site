@@ -1,0 +1,33 @@
+---
+/**
+ * GET /api/search?q=... — Search ARB, meetings, vendors, owners (authenticated).
+ */
+export const prerender = false;
+
+import { getSessionFromCookie } from '../../lib/auth';
+import { runPortalSearch } from '../../lib/search';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const db = env?.DB;
+
+function jsonResponse(data: object, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const session = await getSessionFromCookie(
+  Astro.request.headers.get('cookie') ?? undefined,
+  env?.SESSION_SECRET
+);
+
+if (!session) return jsonResponse({ error: 'Unauthorized' }, 401);
+if (!db) return jsonResponse({ error: 'Server configuration error' }, 503);
+
+const url = new URL(Astro.request.url);
+const q = (url.searchParams.get('q') ?? '').trim();
+const result = await runPortalSearch(db, q, { email: session.email, role: session.role });
+return jsonResponse(result);
+---

@@ -32,6 +32,18 @@ export interface ArbFile {
   reference_only?: number;
 }
 
+export interface ArbAuditLogRow {
+  id: number;
+  request_id: string;
+  action: string;
+  old_status: string | null;
+  new_status: string | null;
+  changed_by_email: string | null;
+  changed_by_role: string | null;
+  notes: string | null;
+  created: string | null;
+}
+
 const ID_LEN = 21; // nanoid-like length
 
 function generateId(): string {
@@ -342,6 +354,21 @@ export async function listArbFilesByRequest(
     .prepare('SELECT id, request_id, filename, r2_keys, original_size, reference_only FROM arb_files WHERE request_id = ?')
     .bind(requestId)
     .all<ArbFile>();
+  return results ?? [];
+}
+
+/** List ARB audit log entries (newest first) for the board audit-logs page. */
+export async function listArbAuditLog(
+  db: D1Database,
+  limit: number = 500
+): Promise<ArbAuditLogRow[]> {
+  const { results } = await db
+    .prepare(
+      `SELECT id, request_id, action, old_status, new_status, changed_by_email, changed_by_role, notes, created
+       FROM arb_audit_log ORDER BY created DESC LIMIT ?`
+    )
+    .bind(Math.max(1, Math.min(limit, 2000)))
+    .all<ArbAuditLogRow>();
   return results ?? [];
 }
 

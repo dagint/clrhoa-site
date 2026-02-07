@@ -1,0 +1,25 @@
+{
+  "name": "CLR HOA Portal",
+  "short_name": "CLRHOA",
+  "description": "Crooked Lake Reserve HOA member portal",
+  "start_url": "/portal/login",
+  "scope": "/",
+  "display": "standalone",
+  "theme_color": "#3B82F6",
+  "background_color": "#f9fafb",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icons/192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

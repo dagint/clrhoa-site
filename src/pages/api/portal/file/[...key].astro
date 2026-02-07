@@ -1,10 +1,12 @@
 ---
 /**
  * GET /api/portal/file/[...key] — stream R2 object. Requires valid session cookie.
+ * Allowed keys: arb/<requestId>/... (owner or elevated), member-docs/... (any member).
  */
 export const prerender = false;
 
-import { getSessionFromCookie } from '../../../../lib/auth';
+import { getSessionFromCookie, isElevatedRole } from '../../../../lib/auth';
+import { getArbRequest } from '../../../../lib/arb-db';
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
@@ -25,6 +27,47 @@ if (!rawKey) {
 const key = Array.isArray(rawKey)
   ? rawKey.map((s) => decodeURIComponent(s)).join('/')
   : decodeURIComponent(rawKey);
+
+if (key.includes('..')) {
+  return new Response('Forbidden', { status: 403 });
+}
+
+// Member documents: any logged-in member can access
+if (key.startsWith('member-docs/')) {
+  const r2 = env?.CLOURHOA_FILES;
+  if (!r2) return new Response('Service unavailable', { status: 503 });
+  const object = await r2.get(key);
+  if (!object) return new Response('Not Found', { status: 404 });
+  const headers = new Headers();
+  const ct = object.httpMetadata?.contentType;
+  if (ct) headers.set('Content-Type', ct);
+  headers.set('Content-Disposition', `attachment; filename="${key.split('/').pop() ?? 'download'}"`);
+  return new Response(object.body as ReadableStream, { headers });
+}
+
+// ARB attachment keys: must be request owner or elevated
+if (!key.startsWith('arb/')) {
+  return new Response('Forbidden', { status: 403 });
+}
+
+const db = env?.DB;
+if (!db) {
+  return new Response('Service unavailable', { status: 503 });
+}
+const segments = key.split('/');
+const requestId = segments[1];
+if (!requestId) {
+  return new Response('Forbidden', { status: 403 });
+}
+const request = await getArbRequest(db, requestId);
+if (!request) {
+  return new Response('Not Found', { status: 404 });
+}
+const isOwner = request.owner_email.toLowerCase() === session.email.toLowerCase();
+const isElevated = isElevatedRole(session.role);
+if (!isOwner && !isElevated) {
+  return new Response('Forbidden', { status: 403 });
+}
 
 const r2 = env?.CLOURHOA_FILES;
 if (!r2) {

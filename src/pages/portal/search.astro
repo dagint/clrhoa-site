@@ -1,0 +1,49 @@
+---
+export const prerender = false;
+
+import PortalLayout from '../../layouts/PortalLayout.astro';
+import ProtectedPage from '../../components/ProtectedPage.astro';
+import PortalNav from '../../components/PortalNav.astro';
+import GlobalSearch from '../../components/GlobalSearch.astro';
+import SearchResults from '../../components/SearchResults.astro';
+import { getSessionFromCookie } from '../../lib/auth';
+import { listArbRequestsByOwner } from '../../lib/arb-db';
+import { runPortalSearch } from '../../lib/search';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const cookieHeader = Astro.request.headers.get('cookie') ?? undefined;
+let session = await getSessionFromCookie(cookieHeader, env?.SESSION_SECRET);
+if (!session && env?.SESSION_SECRET) session = await getSessionFromCookie(cookieHeader, env.SESSION_SECRET);
+if (!session) return Astro.redirect('/portal/login');
+
+const db = env?.DB;
+const url = new URL(Astro.request.url);
+const q = (url.searchParams.get('q') ?? '').trim();
+const result = q && db
+  ? await runPortalSearch(db, q, { email: session.email, role: session.role })
+  : { arb: [], meetings: [], vendors: [], owners: [], feedback_docs: [], preapproval: [] };
+
+const allRequests = db ? await listArbRequestsByOwner(db, session.email) : [];
+const draftCount = allRequests.filter((r) => r.status === 'pending').length;
+---
+
+<PortalLayout title="Search | Member Portal | Crooked Lake Reserve HOA">
+  <ProtectedPage>
+  <div class="min-h-screen bg-gray-50 portal-theme-bg font-body">
+    <GlobalSearch fixed={true} class="portal-theme-header" />
+    <div class="pt-14">
+      <PortalNav currentPath="/portal/search" draftCount={draftCount} role={session.role} />
+
+      <main class="max-w-4xl mx-auto px-4 sm:px-6 py-8">
+        <h2 class="text-2xl font-heading font-bold text-clr-green mb-4">Search</h2>
+        {q ? (
+          <SearchResults arb={result.arb} meetings={result.meetings} vendors={result.vendors} owners={result.owners} feedback_docs={result.feedback_docs} preapproval={result.preapproval} query={q} />
+        ) : (
+          <p class="text-gray-500 portal-theme-text-muted">Enter a term above to search ARB requests, meetings, vendors, directory, feedback, and the pre-approval library.</p>
+        )}
+      </main>
+    </div>
+  </div>
+  </ProtectedPage>
+</PortalLayout>

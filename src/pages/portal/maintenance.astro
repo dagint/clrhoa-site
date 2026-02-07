@@ -1,0 +1,167 @@
+---
+export const prerender = false;
+
+import PortalLayout from '../../layouts/PortalLayout.astro';
+import ProtectedPage from '../../components/ProtectedPage.astro';
+import PortalNav from '../../components/PortalNav.astro';
+import { getSessionFromCookie } from '../../lib/auth';
+import { listArbRequestsByOwner } from '../../lib/arb-db';
+import { listMaintenanceByOwner, parsePhotosJson, MAINTENANCE_CATEGORIES } from '../../lib/maintenance-db';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const userAgent = Astro.request.headers.get('user-agent') ?? null;
+const ipAddress = Astro.request.headers.get('cf-connecting-ip') ?? 
+  Astro.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
+const cookieHeader = Astro.request.headers.get('cookie') ?? undefined;
+let session = await getSessionFromCookie(
+  cookieHeader,
+  env?.SESSION_SECRET,
+  userAgent,
+  ipAddress
+);
+
+if (!session && env?.SESSION_SECRET) {
+  session = await getSessionFromCookie(cookieHeader, env.SESSION_SECRET);
+}
+
+if (!session) {
+  return Astro.redirect('/portal/login');
+}
+
+const db = env?.DB;
+const draftCount = db
+  ? (await listArbRequestsByOwner(db, session.email)).filter((r) => r.status === 'pending').length
+  : 0;
+const requests = db ? await listMaintenanceByOwner(db, session.email) : [];
+
+const categories = MAINTENANCE_CATEGORIES;
+
+function categoryLabel(cat: string): string {
+  return cat === 'general' ? 'General' : cat.charAt(0).toUpperCase() + cat.slice(1);
+}
+
+function formatDate(s: string): string {
+  try {
+    return new Date(s).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+  } catch {
+    return s;
+  }
+}
+---
+
+<PortalLayout title="Maintenance | Member Portal | Crooked Lake Reserve HOA">
+  <ProtectedPage>
+  <div class="min-h-screen portal-theme-bg font-body">
+    <PortalNav currentPath="/portal/maintenance" draftCount={draftCount} role={session.role} />
+
+    <main class="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+      <h2 class="text-2xl font-heading font-bold text-clr-green mb-2">Maintenance requests</h2>
+      <p class="text-gray-600 mb-6">
+        Report common-area maintenance or repair issues. The board will review and update status.
+      </p>
+
+      <section class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-8">
+        <h3 class="text-lg font-heading font-semibold text-clr-green mb-4">New request</h3>
+        <form id="maintenance-form" class="space-y-4">
+          <div>
+            <label for="maint-category" class="block text-sm font-medium text-gray-700">Category *</label>
+            <select id="maint-category" name="category" required class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2">
+              {categories.map((c) => (
+                <option value={c}>{categoryLabel(c)}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label for="maint-description" class="block text-sm font-medium text-gray-700">Description *</label>
+            <textarea id="maint-description" name="description" required rows="4" class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2" placeholder="Describe the issue and location..."></textarea>
+          </div>
+          <div>
+            <label for="maint-photos" class="block text-sm font-medium text-gray-700">Photos (optional)</label>
+            <input type="file" id="maint-photos" name="photos" accept="image/*" multiple class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-clr-green file:text-white" />
+            <p class="text-xs text-gray-500 mt-1">Images only, 5MB per file, 25MB total.</p>
+          </div>
+          <button type="submit" class="bg-clr-green hover:brightness-110 text-white px-6 py-2 rounded-xl font-semibold text-sm">
+            Submit request
+          </button>
+        </form>
+      </section>
+
+      <h3 class="text-lg font-heading font-semibold text-clr-green mb-3">Your requests</h3>
+      {requests.length === 0 ? (
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center text-gray-500">
+          No maintenance requests yet.
+        </div>
+      ) : (
+        <ul class="space-y-4">
+          {requests.map((r) => {
+            const photos = parsePhotosJson(r.photos);
+            return (
+              <li class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+                <div class="flex flex-wrap justify-between gap-2">
+                  <div>
+                    <span class="font-medium text-clr-green">{categoryLabel(r.category)}</span>
+                    <span class="text-sm text-gray-500 ml-2">{formatDate(r.created)}</span>
+                    <span class={`ml-2 text-xs font-medium px-2 py-0.5 rounded ${r.status === 'completed' ? 'bg-green-100 text-green-800' : r.status === 'in_progress' ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-700'}`}>
+                      {r.status}
+                    </span>
+                  </div>
+                </div>
+                <p class="text-gray-600 text-sm mt-1 line-clamp-2">{r.description}</p>
+                {r.vendor_assigned && (
+                  <p class="text-sm text-gray-500 mt-1">Vendor: {r.vendor_assigned}</p>
+                )}
+                {photos.length > 0 && (
+                  <div class="flex flex-wrap gap-2 mt-2">
+                    {photos.slice(0, 5).map((key) => (
+                      <a
+                        href={`/api/portal/file/${encodeURIComponent(key)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="text-sm text-clr-green hover:underline"
+                      >
+                        View photo
+                      </a>
+                    ))}
+                    {photos.length > 5 && <span class="text-sm text-gray-500">+{photos.length - 5} more</span>}
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </main>
+  </div>
+  </ProtectedPage>
+</PortalLayout>
+
+<script>
+  document.getElementById('maintenance-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const form = e.target as HTMLFormElement;
+    const category = (form.querySelector('[name="category"]') as HTMLSelectElement).value;
+    const description = (form.querySelector('[name="description"]') as HTMLTextAreaElement).value.trim();
+    if (!description) {
+      alert('Please enter a description');
+      return;
+    }
+    const fd = new FormData();
+    fd.set('category', category);
+    fd.set('description', description);
+    const fileInput = form.querySelector('[name="photos"]') as HTMLInputElement;
+    if (fileInput?.files) {
+      for (let i = 0; i < fileInput.files.length; i++) {
+        fd.append('photos', fileInput.files[i]!);
+      }
+    }
+    try {
+      const res = await fetch('/api/maintenance-submit', { method: 'POST', body: fd, credentials: 'same-origin' });
+      const data = await res.json();
+      if (data.success) window.location.reload();
+      else alert(data.error || 'Failed to submit');
+    } catch {
+      alert('Network error. Please try again.');
+    }
+  });
+</script>

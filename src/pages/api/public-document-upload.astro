@@ -1,0 +1,128 @@
+---
+/**
+ * POST /api/public-document-upload — Board: bylaws, covenants, proxy-form. ARB/Board/Admin: arb-request-form.
+ * FormData: slug, file. Replaces the public document file; stored in R2, metadata in D1.
+ * These documents are publicly accessible on the Documents page.
+ */
+export const prerender = false;
+
+import { getSessionFromCookie, verifyCsrfToken, verifyOrigin } from '../../lib/auth';
+import {
+  isManagedPublicDocSlug,
+  BOARD_ONLY_SLUGS,
+  ARB_FORM_SLUG,
+  setPublicDocumentFile,
+  getPublicDocument,
+} from '../../lib/public-documents-db';
+import { sanitizeFileName } from '../../lib/sanitize';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const session = await getSessionFromCookie(
+  Astro.request.headers.get('cookie') ?? undefined,
+  env?.SESSION_SECRET
+);
+
+if (!session) {
+  return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+    status: 401,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const origin = Astro.request.headers.get('origin');
+const referer = Astro.request.headers.get('referer');
+if (!verifyOrigin(origin, referer, Astro.url.origin)) {
+  return new Response(JSON.stringify({ error: 'Invalid origin' }), { status: 403, headers: { 'Content-Type': 'application/json' } });
+}
+
+if (Astro.request.method !== 'POST') {
+  return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+    status: 405,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+let body: FormData;
+try {
+  body = await Astro.request.formData();
+} catch {
+  return new Response(JSON.stringify({ error: 'Invalid form' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+}
+
+const csrf = body.get('csrf_token')?.toString();
+if (!verifyCsrfToken(csrf, session)) {
+  return new Response(JSON.stringify({ error: 'Invalid CSRF token' }), { status: 403, headers: { 'Content-Type': 'application/json' } });
+}
+
+const slug = body.get('slug')?.toString()?.trim()?.toLowerCase();
+if (!slug || !isManagedPublicDocSlug(slug)) {
+  return new Response(JSON.stringify({ error: 'Invalid slug. Use: bylaws, covenants, proxy-form, arb-request-form' }), {
+    status: 400,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const isBoard = session.role === 'board' || session.role === 'admin' || session.role === 'arb_board';
+const canEditBoardDocs = isBoard;
+const canEditArbForm = isBoard || session.role === 'arb';
+
+const allowedBoard = BOARD_ONLY_SLUGS.includes(slug as typeof BOARD_ONLY_SLUGS[number]);
+const isArbForm = slug === ARB_FORM_SLUG;
+
+if (allowedBoard && !canEditBoardDocs) {
+  return new Response(JSON.stringify({ error: 'Forbidden. Only Board can update this document.' }), {
+    status: 403,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+if (isArbForm && !canEditArbForm) {
+  return new Response(JSON.stringify({ error: 'Forbidden. Only ARB or Board can update the ARB request form.' }), {
+    status: 403,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const file = body.get('file');
+if (!file || !(file instanceof File) || file.size === 0) {
+  return new Response(JSON.stringify({ error: 'No file provided' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+}
+
+const allowedTypes = [
+  'application/pdf',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
+  'application/msword', // .doc
+];
+if (!allowedTypes.includes(file.type)) {
+  return new Response(JSON.stringify({ error: 'File must be PDF or Word (.pdf, .docx, .doc)' }), {
+    status: 400,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const db = env?.DB;
+const r2 = env?.CLOURHOA_FILES;
+if (!db || !r2) {
+  return new Response(JSON.stringify({ error: 'Server configuration error' }), { status: 503, headers: { 'Content-Type': 'application/json' } });
+}
+
+const ext = file.name.includes('.') ? file.name.split('.').pop()?.toLowerCase() ?? 'pdf' : 'pdf';
+const safeExt = ['pdf', 'docx', 'doc'].includes(ext) ? ext : 'pdf';
+const fileKey = `public-docs/${slug}.${safeExt}`;
+
+const buf = await file.arrayBuffer();
+await r2.put(fileKey, buf, {
+  httpMetadata: { contentType: file.type },
+});
+
+await setPublicDocumentFile(db, slug, fileKey, file.type, session.email, session.role);
+
+return new Response(
+  JSON.stringify({
+    success: true,
+    slug,
+    message: 'Document updated. It is publicly accessible on the Documents page.',
+  }),
+  { status: 200, headers: { 'Content-Type': 'application/json' } }
+);
+---

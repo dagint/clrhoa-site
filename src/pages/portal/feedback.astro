@@ -1,0 +1,187 @@
+---
+export const prerender = false;
+
+import PortalLayout from '../../layouts/PortalLayout.astro';
+import ProtectedPage from '../../components/ProtectedPage.astro';
+import PortalNav from '../../components/PortalNav.astro';
+import { getSessionFromCookie } from '../../lib/auth';
+import { listArbRequestsByOwner } from '../../lib/arb-db';
+import { listActiveFeedbackDocs } from '../../lib/feedback-db';
+import { getFeedbackResponse } from '../../lib/feedback-db';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const userAgent = Astro.request.headers.get('user-agent') ?? null;
+const ipAddress = Astro.request.headers.get('cf-connecting-ip') ?? 
+  Astro.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
+const cookieHeader = Astro.request.headers.get('cookie') ?? undefined;
+let session = await getSessionFromCookie(
+  cookieHeader,
+  env?.SESSION_SECRET,
+  userAgent,
+  ipAddress
+);
+
+if (!session && env?.SESSION_SECRET) {
+  session = await getSessionFromCookie(cookieHeader, env.SESSION_SECRET);
+}
+
+if (!session) {
+  return Astro.redirect('/portal/login');
+}
+
+const db = env?.DB;
+const draftCount = db
+  ? (await listArbRequestsByOwner(db, session.email)).filter((r) => r.status === 'pending').length
+  : 0;
+const docs = db ? await listActiveFeedbackDocs(db) : [];
+const docsWithMyResponse = db
+  ? await Promise.all(
+      docs.map(async (d) => {
+        const myResponse = await getFeedbackResponse(db, d.id, session!.email);
+        return {
+          ...d,
+          my_response: myResponse
+            ? {
+                acknowledged: myResponse.acknowledged === 1,
+                approved: myResponse.approved === 1 ? true : myResponse.approved === 0 ? false : null,
+                comments: myResponse.comments,
+                responded: myResponse.responded,
+              }
+            : null,
+        };
+      })
+    )
+  : [];
+
+function formatDate(s: string | null): string {
+  if (!s) return '-';
+  try {
+    return new Date(s).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+  } catch {
+    return s;
+  }
+}
+---
+
+<PortalLayout title="Feedback | Member Portal | Crooked Lake Reserve HOA">
+  <ProtectedPage>
+  <div class="min-h-screen portal-theme-bg font-body">
+    <PortalNav currentPath="/portal/feedback" draftCount={draftCount} role={session.role} />
+
+    <main class="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+      <h2 class="text-2xl font-heading font-bold text-clr-green mb-2">Document feedback</h2>
+      <p class="text-gray-600 mb-6">
+        Read proposed documents and record your acknowledgment and approval or rejection.
+      </p>
+
+      {docsWithMyResponse.length === 0 ? (
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center text-gray-500">
+          No active feedback requests at this time.
+        </div>
+      ) : (
+        <ul class="space-y-6">
+          {docsWithMyResponse.map((d) => (
+            <li class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6" data-doc-id={d.id}>
+              <h3 class="text-lg font-heading font-semibold text-clr-green mb-1">{d.title || 'Document'}</h3>
+              {d.deadline && (
+                <p class="text-sm text-gray-500 mb-2">Responses due by {formatDate(d.deadline)}</p>
+              )}
+              {d.description && <p class="text-gray-600 text-sm mb-3 whitespace-pre-wrap">{d.description}</p>}
+              {d.r2_key && (
+                <p class="mb-3">
+                  <a
+                    href={`/api/portal/file/${encodeURIComponent(d.r2_key)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="text-clr-green font-medium hover:underline"
+                  >
+                    View / download PDF
+                  </a>
+                </p>
+              )}
+              <div class="feedback-response border-t border-gray-100 pt-4 mt-4">
+                {d.my_response ? (
+                  <p class="text-sm text-green-700 font-medium">Thank you, your vote recorded.</p>
+                ) : (
+                  <>
+                    <div class="flex flex-wrap items-center gap-3 mb-2">
+                      <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" class="feedback-ack rounded border-gray-300 text-clr-green" data-doc-id={d.id} />
+                        <span class="text-sm">I&apos;ve read this document</span>
+                      </label>
+                      <button type="button" class="feedback-approve px-3 py-1.5 rounded-lg text-sm font-medium bg-green-100 text-green-800 hover:bg-green-200" data-doc-id={d.id} data-approved="1">
+                        Approve
+                      </button>
+                      <button type="button" class="feedback-reject px-3 py-1.5 rounded-lg text-sm font-medium bg-red-100 text-red-800 hover:bg-red-200" data-doc-id={d.id} data-approved="0">
+                        Reject
+                      </button>
+                    </div>
+                    <div class="mt-2">
+                      <label for={`comments-${d.id}`} class="sr-only">Comments (optional)</label>
+                      <textarea
+                        id={`comments-${d.id}`}
+                        class="feedback-comments w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                        rows={2}
+                        placeholder="Comments (optional)"
+                        data-doc-id={d.id}
+                      ></textarea>
+                    </div>
+                    <button type="button" class="feedback-submit mt-2 bg-clr-green hover:brightness-110 text-white px-4 py-2 rounded-lg text-sm font-medium" data-doc-id={d.id}>
+                      Submit response
+                    </button>
+                  </>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </main>
+  </div>
+  </ProtectedPage>
+</PortalLayout>
+
+<script>
+  document.querySelectorAll('.feedback-submit').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const docId = (btn as HTMLElement).dataset.docId;
+      if (!docId) return;
+      const card = btn.closest('li');
+      const ack = (card?.querySelector('.feedback-ack') as HTMLInputElement)?.checked ?? false;
+      const approvedEl = card?.querySelector('.feedback-approve');
+      const rejectedEl = card?.querySelector('.feedback-reject');
+      let approved: boolean | null = null;
+      if (approvedEl?.classList.contains('ring-2')) approved = true;
+      if (rejectedEl?.classList.contains('ring-2')) approved = false;
+      const comments = (card?.querySelector('.feedback-comments') as HTMLTextAreaElement)?.value?.trim() ?? '';
+      try {
+        const res = await fetch('/api/feedback', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'response', doc_id: docId, acknowledged: ack, approved, comments }),
+          credentials: 'same-origin',
+        });
+        const data = await res.json();
+        if (data.success) window.location.reload();
+        else alert(data.error || 'Failed to submit');
+      } catch {
+        alert('Network error. Please try again.');
+      }
+    });
+  });
+  document.querySelectorAll('.feedback-approve').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const card = btn.closest('li');
+      card?.querySelector('.feedback-reject')?.classList.remove('ring-2', 'ring-green-600');
+      btn.classList.add('ring-2', 'ring-green-600');
+    });
+  });
+  document.querySelectorAll('.feedback-reject').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const card = btn.closest('li');
+      card?.querySelector('.feedback-approve')?.classList.remove('ring-2', 'ring-green-600');
+      btn.classList.add('ring-2', 'ring-red-600');
+    });
+  });
+</script>

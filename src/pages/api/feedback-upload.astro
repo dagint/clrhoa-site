@@ -1,0 +1,60 @@
+---
+/**
+ * POST /api/feedback-upload — board uploads PDF for a feedback doc.
+ * Returns { key } for use in feedback doc create.
+ */
+export const prerender = false;
+
+import { getSessionFromCookie } from '../../lib/auth';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const r2 = env?.CLOURHOA_FILES;
+
+function jsonResponse(data: object, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const session = await getSessionFromCookie(
+  Astro.request.headers.get('cookie') ?? undefined,
+  env?.SESSION_SECRET
+);
+
+if (!session) return jsonResponse({ error: 'Unauthorized' }, 401);
+const isBoard = session.role === 'board' || session.role === 'admin' || session.role === 'arb_board';
+if (!isBoard) return jsonResponse({ error: 'Forbidden' }, 403);
+if (!r2) return jsonResponse({ error: 'Server configuration error' }, 503);
+
+if (Astro.request.method !== 'POST') {
+  return new Response(null, { status: 405, headers: { Allow: 'POST' } });
+}
+
+let file: File;
+try {
+  const form = await Astro.request.formData();
+  const f = form.get('file');
+  if (!(f instanceof File) || f.size === 0) {
+    return jsonResponse({ error: 'No file or empty file' }, 400);
+  }
+  if (f.type !== 'application/pdf') {
+    return jsonResponse({ error: 'Only PDF files are allowed' }, 400);
+  }
+  if (f.size > 10 * 1024 * 1024) {
+    return jsonResponse({ error: 'File must be under 10MB' }, 400);
+  }
+  file = f;
+} catch {
+  return jsonResponse({ error: 'Invalid form data' }, 400);
+}
+
+const id = crypto.randomUUID?.() ?? Math.random().toString(36).slice(2) + Date.now().toString(36);
+const key = `feedback/${id}.pdf`;
+await r2.put(key, await file.arrayBuffer(), {
+  httpMetadata: { contentType: 'application/pdf' },
+});
+
+return jsonResponse({ success: true, key });
+---

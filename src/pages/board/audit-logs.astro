@@ -1,0 +1,153 @@
+---
+export const prerender = false;
+
+import BoardLayout from '../../layouts/BoardLayout.astro';
+import { getSessionFromCookie } from '../../lib/auth';
+import { listOwners, listDirectoryLogs } from '../../lib/directory-db';
+import { listArbAuditLog, listArbRequestsByOwner } from '../../lib/arb-db';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const cookieHeader = Astro.request.headers.get('cookie') ?? undefined;
+const session = await getSessionFromCookie(cookieHeader, env?.SESSION_SECRET);
+
+if (!session) {
+  return Astro.redirect('/portal/login');
+}
+
+if (session.role !== 'board' && session.role !== 'admin' && session.role !== 'arb' && session.role !== 'arb_board') {
+  return Astro.redirect('/portal/dashboard');
+}
+
+const db = env?.DB;
+const directoryLogs = db ? await listDirectoryLogs(db, 500) : [];
+const arbLogs = db ? await listArbAuditLog(db, 500) : [];
+const owners = db ? await listOwners(db) : [];
+const ownersWithCreator = owners.filter((o) => o.created_by_email?.trim());
+const allRequests = db ? await listArbRequestsByOwner(db, session.email) : [];
+const draftCount = allRequests.filter((r) => r.status === 'pending').length;
+
+const BLANK = '-';
+
+function formatDate(s: string | null): string {
+  if (!s) return BLANK;
+  try {
+    const d = new Date(s);
+    return Number.isNaN(d.getTime()) ? s : d.toLocaleString();
+  } catch {
+    return s ?? BLANK;
+  }
+}
+---
+
+<BoardLayout title="Audit logs" subtitle="Transparency for elevated access (Board, ARB, Admin)" draftCount={draftCount} role={session.role} mainWide showRoleBanner={false}>
+  <p class="text-gray-600 mb-8">
+        Full audit logs for transparency: who revealed contact info, who added directory members, and ARB status changes (approvals, sent back for requestor updates, etc.).
+  </p>
+
+  <!-- Directory: contact reveal log -->
+      <section aria-labelledby="dir-reveal-heading">
+        <h2 id="dir-reveal-heading" class="text-lg font-heading font-semibold text-clr-green mb-3">Contact reveal log (directory)</h2>
+        <p class="text-sm text-gray-600 mb-3">Who viewed whose phone or email. Board, ARB, and Admin access is recorded here even when the member has opted out of sharing with other members. Target &quot;(full directory export)&quot; means the viewer downloaded the full member list (names, emails, phones) as CSV; one log entry per export.</p>
+        <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          {directoryLogs.length === 0 ? (
+            <p class="p-4 text-gray-500">No directory reveal entries yet.</p>
+          ) : (
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead class="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">When</th>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">Viewer (who looked)</th>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">Viewer role</th>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">Target (whose info was revealed)</th>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">Phone</th>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">Email</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {directoryLogs.map((row) => (
+                    <tr class="border-b border-gray-100 hover:bg-gray-50/50">
+                      <td class="py-2 px-3 text-gray-600">{formatDate(row.timestamp)}</td>
+                      <td class="py-2 px-3">{row.viewer_email ?? BLANK}</td>
+                      <td class="py-2 px-3">{row.viewer_role ?? BLANK}</td>
+                      <td class="py-2 px-3">{row.target_name ?? BLANK}</td>
+                      <td class="py-2 px-3 font-mono text-gray-700">{row.target_phone ?? BLANK}</td>
+                      <td class="py-2 px-3 font-mono text-gray-700">{row.target_email ?? BLANK}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </section>
+
+      <!-- Who added which owner -->
+      <section aria-labelledby="dir-added-heading">
+        <h2 id="dir-added-heading" class="text-lg font-heading font-semibold text-clr-green mb-3">Directory: who added which owner</h2>
+        <p class="text-sm text-gray-600 mb-3">Owners added via the board directory (with recorded creator).</p>
+        <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          {ownersWithCreator.length === 0 ? (
+            <p class="p-4 text-gray-500">No directory add records (created_by_email) yet.</p>
+          ) : (
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead class="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">Owner (name / email)</th>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">Added by</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ownersWithCreator.map((o) => (
+                    <tr class="border-b border-gray-100 hover:bg-gray-50/50">
+                      <td class="py-2 px-3">{o.name ?? BLANK} / {o.email ?? BLANK}</td>
+                      <td class="py-2 px-3">{o.created_by_email ?? BLANK}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </section>
+
+      <!-- ARB audit log -->
+      <section aria-labelledby="arb-audit-heading">
+        <h2 id="arb-audit-heading" class="text-lg font-heading font-semibold text-clr-green mb-3">ARB audit log</h2>
+        <p class="text-sm text-gray-600 mb-3">Status changes: who approved, sent back for requestor updates, etc.</p>
+        <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          {arbLogs.length === 0 ? (
+            <p class="p-4 text-gray-500">No ARB audit entries yet.</p>
+          ) : (
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead class="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">When</th>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">Request</th>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">Action</th>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">Old &rarr; New status</th>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">By (email / role)</th>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {arbLogs.map((row) => (
+                    <tr class="border-b border-gray-100 hover:bg-gray-50/50">
+                      <td class="py-2 px-3 text-gray-600">{formatDate(row.created)}</td>
+                      <td class="py-2 px-3 font-mono">{row.request_id}</td>
+                      <td class="py-2 px-3">{row.action}</td>
+                      <td class="py-2 px-3">{row.old_status ?? BLANK} &rarr; {row.new_status ?? BLANK}</td>
+                      <td class="py-2 px-3">{row.changed_by_email ?? BLANK} ({row.changed_by_role ?? BLANK})</td>
+                      <td class="py-2 px-3 text-gray-600 max-w-xs truncate" title={row.notes ?? undefined}>{row.notes ?? BLANK}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </section>
+</BoardLayout>

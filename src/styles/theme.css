@@ -1,0 +1,73 @@
+/**
+ * Portal theme: members-only identity + dark mode.
+ * Light mode uses a subtle green tint so the portal feels distinct from the public site.
+ * Toggle persists in localStorage (key: clrhoa_theme).
+ */
+
+:root {
+  --portal-bg: #f1f6f3;
+  --portal-header-bg: #ffffff;
+  --portal-header-border: #e5e7eb;
+  --portal-accent: #1e5f38;
+  --portal-card-bg: #ffffff;
+  --portal-card-border: #e5e7eb;
+  --portal-text: #111827;
+  --portal-text-muted: #4b5563;
+  --portal-input-bg: #ffffff;
+  --portal-input-border: #e5e7eb;
+}
+
+.dark {
+  --portal-bg: #0f172a;
+  --portal-header-bg: #1e293b;
+  --portal-header-border: #334155;
+  --portal-accent: #34d399;
+  --portal-card-bg: #1e293b;
+  --portal-card-border: #334155;
+  --portal-text: #f1f5f9;
+  --portal-text-muted: #94a3b8;
+  --portal-input-bg: #334155;
+  --portal-input-border: #475569;
+}
+
+/* Apply theme to portal (light and dark) */
+.portal-theme-bg {
+  background-color: var(--portal-bg);
+}
+html.dark .portal-theme-bg {
+  background-color: var(--portal-bg);
+}
+html.dark .portal-theme-header {
+  background-color: var(--portal-header-bg);
+  border-color: var(--portal-header-border);
+}
+html.dark .portal-theme-card {
+  background-color: var(--portal-card-bg);
+  border-color: var(--portal-card-border);
+}
+html.dark .portal-theme-text {
+  color: var(--portal-text);
+}
+html.dark .portal-theme-text-muted {
+  color: var(--portal-text-muted);
+}
+html.dark .portal-theme-input {
+  background-color: var(--portal-input-bg);
+  border-color: var(--portal-input-border);
+  color: var(--portal-text);
+}
+
+/* Portal page wrapper: use with min-h-screen for consistent members-area background */
+.portal-page-bg {
+  background-color: var(--portal-bg);
+}
+
+/* Header accent bar (members area indicator) */
+.portal-header-accent {
+  border-bottom: 2px solid var(--portal-accent);
+}
+
+/* Main content cards: subtle left accent so portal feels polished and distinct */
+.portal-card-accent {
+  border-left: 4px solid var(--portal-accent);
+}

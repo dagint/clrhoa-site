@@ -15,7 +15,7 @@ import {
   createArbFileId,
   insertArbRequest,
   insertArbFile,
-  submitForReview,
+  setArbRequestInReview,
 } from '../../lib/arb-db';
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
@@ -281,6 +281,28 @@ if (!description) {
   );
 }
 
+const applicantNameTrim = (applicantName ?? '').trim();
+const phoneTrim = (phone ?? '').trim();
+const propertyAddressTrim = (propertyAddress ?? '').trim();
+if (!applicantNameTrim) {
+  return new Response(
+    JSON.stringify({ error: "Applicant's name is required." }),
+    { status: 400, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+if (!phoneTrim) {
+  return new Response(
+    JSON.stringify({ error: 'Phone number is required.' }),
+    { status: 400, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+if (!propertyAddressTrim) {
+  return new Response(
+    JSON.stringify({ error: 'Property address is required.' }),
+    { status: 400, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+
 // Validate action parameter
 const isSubmit = action === 'submit';
 const isDraft = action === 'draft';
@@ -471,7 +493,7 @@ try {
   
   // If submitting for review, update status from 'pending' to 'in_review'
   if (isSubmit) {
-    const submitted = await submitForReview(db, requestId, session.email);
+    const submitted = await setArbRequestInReview(db, requestId, session.email);
     if (!submitted) {
       logger.warn('Failed to update status to in_review', { requestId });
       // Don't fail the request - it's saved as pending, user can resubmit later
@@ -592,8 +614,12 @@ try {
   );
 }
 
-// Optional: notify arb@clrhoa.com (configure email provider via env; placeholder)
-// e.g. await sendArbNotification(requestId, session.email, description);
+if (isSubmit && env?.NOTIFY_ARB_EMAIL) {
+  const { sendEmail } = await import('../../lib/notifications');
+  const link = `${Astro.url.origin}/portal/arb-dashboard`;
+  const body = `<p>New ARB request <strong>#${requestId}</strong> submitted by ${session.email}.</p><p><a href="${link}">View ARB Dashboard</a></p>`;
+  await sendEmail(env, env.NOTIFY_ARB_EMAIL, `New ARB Request #${requestId}`, body);
+}
 
 return new Response(
   JSON.stringify({

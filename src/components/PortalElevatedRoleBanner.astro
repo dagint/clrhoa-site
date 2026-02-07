@@ -5,12 +5,12 @@ interface Props {
 
 const { role } = Astro.props;
 
-const isElevated = role === 'arb' || role === 'board' || role === 'admin';
+const isElevated = role === 'arb' || role === 'board' || role === 'admin' || role === 'arb_board';
 if (!isElevated) {
   return null;
 }
 
-const label = role === 'admin' ? 'Administrator' : role === 'arb' ? 'ARB Member' : 'Board Member';
+const label = role === 'admin' ? 'Administrator' : role === 'arb_board' ? 'ARB + Board' : role === 'arb' ? 'ARB Member' : 'Board Member';
 ---
 
 <div class="bg-amber-50 border-b border-amber-200 px-4 py-2 no-print" role="status" aria-live="polite">

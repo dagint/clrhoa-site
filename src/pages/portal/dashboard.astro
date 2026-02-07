@@ -1,11 +1,19 @@
 ---
 export const prerender = false;
 
-import '../../styles/tailwind.css';
+import PortalLayout from '../../layouts/PortalLayout.astro';
 import ProtectedPage from '../../components/ProtectedPage.astro';
-import PortalElevatedRoleBanner from '../../components/PortalElevatedRoleBanner.astro';
+import GlobalSearch from '../../components/GlobalSearch.astro';
+import PortalNav from '../../components/PortalNav.astro';
+import PWAInstallPrompt from '../../components/PWAInstallPrompt.astro';
 import { getSessionFromCookie } from '../../lib/auth';
 import { getArbRequestCountsByStatus, listArbRequestsByOwner } from '../../lib/arb-db';
+import { listPendingSubmissions } from '../../lib/vendor-submissions-db';
+import { getRecentOwnersCount, listOwners } from '../../lib/directory-db';
+import { getRecentVendorsCount } from '../../lib/vendors-db';
+import { listMaintenanceByOwner } from '../../lib/maintenance-db';
+import { listUpcomingWithCountsAndUser } from '../../lib/meetings-db';
+import { listActiveFeedbackDocs, getFeedbackResponse } from '../../lib/feedback-db';
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
@@ -35,92 +43,171 @@ if (!session) {
 const { email, role, name } = session;
 const db = env?.DB;
 let arbCounts: { pending: number; in_review: number } = { pending: 0, in_review: 0 };
-if (db && (role === 'arb' || role === 'board' || role === 'admin')) {
+let pendingVendorCount = 0;
+if (db && (role === 'arb' || role === 'board' || role === 'admin' || role === 'arb_board')) {
   const counts = await getArbRequestCountsByStatus(db);
   arbCounts = { pending: counts.pending, in_review: counts.in_review };
+  const pendingSubmissions = await listPendingSubmissions(db);
+  pendingVendorCount = pendingSubmissions.length;
 }
 
 // Get draft count for navigation badge
 const allRequests = db ? await listArbRequestsByOwner(db, email) : [];
 const draftCount = allRequests.filter(r => r.status === 'pending').length;
+
+// Quick action badge counts
+let maintenanceOpenCount = 0;
+let meetingsRsvpCount = 0;
+let feedbackDueCount = 0;
+if (db) {
+  const maintenanceList = await listMaintenanceByOwner(db, email);
+  maintenanceOpenCount = maintenanceList.filter((m) => m.status !== 'completed').length;
+  const upcomingMeetings = await listUpcomingWithCountsAndUser(db, email);
+  meetingsRsvpCount = upcomingMeetings.filter((m) => m.user_response == null).length;
+  const activeFeedback = await listActiveFeedbackDocs(db);
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowStr = tomorrow.toISOString().slice(0, 10);
+  for (const doc of activeFeedback) {
+    const resp = await getFeedbackResponse(db, doc.id, email);
+    if (!resp && (doc.deadline == null || doc.deadline <= tomorrowStr)) feedbackDueCount += 1;
+  }
+}
+const directoryCount = db ? (await listOwners(db)).length : 0;
+
+// Notices: new vendors and new directory members (last 30 days)
+const RECENT_DAYS = 30;
+let recentVendorsCount = 0;
+let recentOwnersCount = 0;
+if (db) {
+  recentVendorsCount = await getRecentVendorsCount(db, RECENT_DAYS);
+  recentOwnersCount = await getRecentOwnersCount(db, RECENT_DAYS);
+}
+const hasNewNotices = recentVendorsCount > 0 || recentOwnersCount > 0;
+
+// ARB badge for dashboard tile: my pending drafts (or for staff, board pending count)
+const arbBadgeCount = (role === 'arb' || role === 'board' || role === 'admin' || role === 'arb_board') ? arbCounts.pending : draftCount;
 ---
 
-<ProtectedPage>
-  <div class="min-h-screen bg-gray-50 font-body">
-    <header class="bg-white border-b border-gray-200">
-      <div class="max-w-4xl mx-auto px-4 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h1 class="text-xl font-heading font-bold text-clr-green">Member Portal</h1>
-          <p class="text-sm text-gray-500">Crooked Lake Reserve HOA</p>
-        </div>
-        <nav class="flex flex-wrap items-center gap-3 sm:gap-4">
-          <a href="/portal/dashboard" class="text-clr-green font-medium">Dashboard</a>
-          <a href="/portal/my-requests" class="text-gray-600 hover:text-clr-green relative">
-            My requests
-            {draftCount > 0 && (
-              <span class="absolute -top-1 -right-1 bg-amber-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center" title={`${draftCount} draft${draftCount === 1 ? '' : 's'}`}>
-                {draftCount}
+<PortalLayout title="Dashboard | Member Portal | Crooked Lake Reserve HOA">
+  <ProtectedPage>
+  <div class="min-h-screen bg-gray-50 portal-theme-bg font-body" id="portal-root">
+    <GlobalSearch fixed={true} class="portal-theme-header" />
+    <div class="pt-14">
+      <PortalNav currentPath="/portal/dashboard" draftCount={draftCount} role={role} />
+
+      <main class="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 portal-theme-card portal-card-accent p-6 sm:p-8">
+          <h2 class="text-2xl font-heading font-bold text-clr-green mb-1">Welcome back</h2>
+          <p class="text-gray-600 portal-theme-text-muted mb-6">
+            {name ? `${name} (` : ''}{email}{name ? ')' : ''}
+          </p>
+
+          <!-- 2x2 Quick actions grid -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8" role="navigation" aria-label="Quick actions">
+            <a href="/portal/arb-request" class="flex flex-col items-center justify-center p-6 rounded-2xl bg-clr-green hover:brightness-110 text-white shadow-md transition-all min-h-[140px]">
+              <span class="mb-2 w-10 h-10 flex items-center justify-center" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg></span>
+              <span class="font-heading font-semibold text-center">New ARB request</span>
+              {arbBadgeCount > 0 && (
+                <span class="mt-2 text-sm font-medium opacity-90">{arbBadgeCount} pending</span>
+              )}
+            </a>
+            <a href="/portal/maintenance" class="flex flex-col items-center justify-center p-6 rounded-2xl bg-clr-beige hover:brightness-95 text-clr-green shadow-md transition-all min-h-[140px]">
+              <span class="mb-2 w-10 h-10 flex items-center justify-center" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></span>
+              <span class="font-heading font-semibold text-center">Maintenance</span>
+              {maintenanceOpenCount > 0 && (
+                <span class="mt-2 text-sm font-medium">{maintenanceOpenCount} open</span>
+              )}
+            </a>
+            <a href="/portal/meetings" class="flex flex-col items-center justify-center p-6 rounded-2xl bg-gray-100 hover:bg-gray-200 text-gray-800 portal-theme-card transition-all min-h-[140px]">
+              <span class="mb-2 w-10 h-10 flex items-center justify-center" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
+              <span class="font-heading font-semibold text-center">Upcoming meetings</span>
+              {meetingsRsvpCount > 0 && (
+                <span class="mt-2 text-sm font-medium text-gray-600 portal-theme-text-muted">RSVP for {meetingsRsvpCount}</span>
+              )}
+            </a>
+            <a href="/portal/directory" class="flex flex-col items-center justify-center p-6 rounded-2xl bg-gray-100 hover:bg-gray-200 text-gray-800 portal-theme-card transition-all min-h-[140px]">
+              <span class="mb-2 w-10 h-10 flex items-center justify-center" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+              <span class="font-heading font-semibold text-center">Owner directory</span>
+              {directoryCount > 0 && (
+                <span class="mt-2 text-sm font-medium text-gray-600 portal-theme-text-muted">{directoryCount} members</span>
+              )}
+            </a>
+          </div>
+
+          <!-- Notification badges summary -->
+          <div class="flex flex-wrap gap-3 mb-6" role="status" aria-label="Notification summary">
+            {arbBadgeCount > 0 && (
+              <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-100 text-amber-800 text-sm">
+                <span aria-hidden="true">ARB:</span> {arbBadgeCount} pending
               </span>
             )}
-          </a>
-          <a href="/portal/arb-request" class="text-gray-600 hover:text-clr-green">New ARB request</a>
-          <a href="/portal/documents" class="text-gray-600 hover:text-clr-green">Documents</a>
-          {(role === 'arb' || role === 'board' || role === 'admin') && (
-            <a href="/portal/arb-dashboard" class="text-gray-600 hover:text-clr-green">ARB Dashboard</a>
-          )}
-          <a href="/" class="text-gray-500 text-sm hover:text-clr-green">Public site</a>
-          <a href="/api/logout" class="text-sm text-gray-500 hover:text-clr-orange">Sign out</a>
-        </nav>
-      </div>
-    </header>
+            {maintenanceOpenCount > 0 && (
+              <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-100 text-blue-800 text-sm">
+                Maintenance: {maintenanceOpenCount} open
+              </span>
+            )}
+            {meetingsRsvpCount > 0 && (
+              <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-100 text-gray-800 portal-theme-card text-sm">
+                Meetings: RSVP for {meetingsRsvpCount}
+              </span>
+            )}
+            {feedbackDueCount > 0 && (
+              <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-clr-green/15 text-clr-green text-sm">
+                Feedback: {feedbackDueCount} due
+              </span>
+            )}
+          </div>
 
-    <PortalElevatedRoleBanner role={role} />
-
-    <main class="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
-      <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8">
-        <h2 class="text-2xl font-heading font-bold text-clr-green mb-2">Welcome back</h2>
-        <p class="text-gray-600 mb-6">
-          {name ? `${name} (` : ''}{email}{name ? ')' : ''}
-        </p>
-        <p class="text-sm text-gray-500">
-          Your role: <strong class="text-clr-green">{role}</strong>
-        </p>
-        <p class="text-sm text-gray-600 mt-4">
-          <a href="/arb-request-how-to" class="text-clr-orange hover:underline">How to submit an ARB request</a>
-        </p>
-        <div class="mt-6 flex flex-wrap gap-4">
-          <a
-            href="/portal/arb-request"
-            class="inline-flex items-center gap-2 bg-clr-green hover:brightness-110 text-white px-6 py-3 rounded-xl font-semibold text-sm shadow-md transition-all"
-          >
-            New ARB request
-          </a>
-          <a
-            href="/portal/my-requests"
-            class="inline-flex items-center gap-2 bg-clr-beige hover:brightness-95 text-clr-green px-6 py-3 rounded-xl font-semibold text-sm transition-all"
-          >
-            My ARB requests
-          </a>
-          <a
-            href="/portal/documents"
-            class="inline-flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-800 px-6 py-3 rounded-xl font-semibold text-sm transition-all"
-          >
-            Compliance documents
-          </a>
-          <a
-            href="/documents"
-            class="inline-flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-800 px-6 py-3 rounded-xl font-semibold text-sm transition-all"
-          >
-            Public documents
-          </a>
-        </div>
-        {(role === 'arb' || role === 'board' || role === 'admin') && (
-          <p class="mt-4">
-            <a href="/portal/arb-dashboard" class="text-clr-green font-semibold hover:underline">ARB Dashboard &rarr;</a>
-            <span class="text-gray-500 text-sm ml-1">({arbCounts.pending} pending, {arbCounts.in_review} in review)</span>
+          <p class="text-sm text-gray-500 portal-theme-text-muted">
+            Your role: <strong class="text-clr-green">{role}</strong>
           </p>
-        )}
-      </div>
-    </main>
+          <p class="text-sm text-gray-600 mt-4">
+            <a href="/arb-request-how-to" class="text-clr-orange hover:underline">How to submit an ARB request</a>
+          </p>
+          {hasNewNotices && (
+            <div class="mt-4 p-4 rounded-xl bg-clr-green/10 border border-clr-green/20" role="region" aria-label="Recent updates">
+              <p class="text-sm font-semibold text-clr-green mb-2">Recent updates</p>
+              <ul class="text-sm text-gray-700 portal-theme-text space-y-1">
+                {recentVendorsCount > 0 && (
+                  <li>
+                    <a href="/portal/vendors" class="text-clr-green hover:underline font-medium">
+                      {recentVendorsCount} new vendor{recentVendorsCount === 1 ? '' : 's'} added
+                    </a>
+                    <span class="text-gray-500 portal-theme-text-muted"> in the last {RECENT_DAYS} days</span>
+                  </li>
+                )}
+                {recentOwnersCount > 0 && (
+                  <li>
+                    <a href="/portal/directory" class="text-clr-green hover:underline font-medium">
+                      {recentOwnersCount} new member{recentOwnersCount === 1 ? '' : 's'} in the directory
+                    </a>
+                    <span class="text-gray-500 portal-theme-text-muted"> in the last {RECENT_DAYS} days</span>
+                  </li>
+                )}
+              </ul>
+            </div>
+          )}
+          {(role === 'arb' || role === 'board' || role === 'admin' || role === 'arb_board') && (
+            <div class="mt-4 flex flex-wrap items-center gap-4 gap-y-1">
+              {(role === 'arb' || role === 'admin' || role === 'arb_board') && (
+                <p>
+                  <a href="/portal/arb-dashboard" class="text-clr-green font-semibold hover:underline">ARB Dashboard &rarr;</a>
+                  <span class="text-gray-500 portal-theme-text-muted text-sm ml-1">({arbCounts.pending} pending, {arbCounts.in_review} in review)</span>
+                </p>
+              )}
+              {(role === 'board' || role === 'admin' || role === 'arb_board') && (
+                <p>
+                  <a href="/portal/board" class="text-clr-green font-semibold hover:underline">Board &rarr;</a>
+                  {pendingVendorCount > 0 && <span class="text-gray-500 portal-theme-text-muted text-sm ml-1">({pendingVendorCount} pending)</span>}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      </main>
+    </div>
   </div>
-</ProtectedPage>
+  <PWAInstallPrompt />
+  </ProtectedPage>
+</PortalLayout>

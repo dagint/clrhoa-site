@@ -1,0 +1,125 @@
+---
+/**
+ * Display search results from API (arb, meetings, vendors, owners, feedback_docs, preapproval).
+ */
+interface Props {
+  arb: { id: string; description: string; application_type: string | null; status: string }[];
+  meetings: { id: string; title: string | null; datetime: string }[];
+  vendors: { id: string; name: string | null; category: string | null }[];
+  owners: { id: string; name: string | null; address: string | null }[];
+  feedback_docs: { id: string; title: string | null; description: string | null }[];
+  preapproval: { id: string; category: string | null; title: string | null; description: string | null; rules: string | null }[];
+  query: string;
+}
+const { arb, meetings, vendors, owners, feedback_docs = [], preapproval = [], query } = Astro.props;
+
+function formatDate(s: string): string {
+  try {
+    return new Date(s).toLocaleDateString('en-US', { dateStyle: 'medium' });
+  } catch {
+    return s;
+  }
+}
+---
+<div class="search-results space-y-6">
+  {arb.length > 0 && (
+    <section aria-label="ARB requests">
+      <h3 class="text-lg font-heading font-semibold text-clr-green mb-2">ARB requests</h3>
+      <ul class="space-y-2">
+        {arb.map((r) => (
+          <li>
+            <a href={`/portal/my-requests#${r.id}`} class="block p-3 rounded-lg bg-gray-50 hover:bg-gray-100 portal-theme-card border border-gray-100">
+              <span class="font-medium text-gray-900 portal-theme-text">{r.description?.slice(0, 80) || 'ARB request'}{r.description && r.description.length > 80 ? '…' : ''}</span>
+              <span class="block text-sm text-gray-500 mt-1">Type: {r.application_type ?? '-'} | {r.status}</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )}
+
+  {meetings.length > 0 && (
+    <section aria-label="Meetings">
+      <h3 class="text-lg font-heading font-semibold text-clr-green mb-2">Meetings</h3>
+      <ul class="space-y-2">
+        {meetings.map((m) => (
+          <li>
+            <a href="/portal/meetings" class="block p-3 rounded-lg bg-gray-50 hover:bg-gray-100 portal-theme-card border border-gray-100">
+              <span class="font-medium text-gray-900 portal-theme-text">{m.title ?? 'Meeting'}</span>
+              <span class="block text-sm text-gray-500 mt-1">{formatDate(m.datetime)}</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )}
+
+  {vendors.length > 0 && (
+    <section aria-label="Vendors">
+      <h3 class="text-lg font-heading font-semibold text-clr-green mb-2">Vendors</h3>
+      <ul class="space-y-2">
+        {vendors.map((v) => (
+          <li>
+            <a href="/portal/vendors" class="block p-3 rounded-lg bg-gray-50 hover:bg-gray-100 portal-theme-card border border-gray-100">
+              <span class="font-medium text-gray-900 portal-theme-text">{v.name ?? 'Vendor'}</span>
+              {v.category && <span class="block text-sm text-gray-500 mt-1">{v.category}</span>}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )}
+
+  {owners.length > 0 && (
+    <section aria-label="Directory">
+      <h3 class="text-lg font-heading font-semibold text-clr-green mb-2">Directory</h3>
+      <ul class="space-y-2">
+        {owners.map((o) => (
+          <li>
+            <a href="/portal/directory" class="block p-3 rounded-lg bg-gray-50 hover:bg-gray-100 portal-theme-card border border-gray-100">
+              <span class="font-medium text-gray-900 portal-theme-text">{o.name ?? '-'}</span>
+              {o.address && <span class="block text-sm text-gray-500 mt-1">{o.address}</span>}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )}
+
+  {feedback_docs.length > 0 && (
+    <section aria-label="Feedback documents">
+      <h3 class="text-lg font-heading font-semibold text-clr-green mb-2">Feedback</h3>
+      <ul class="space-y-2">
+        {feedback_docs.map((d) => (
+          <li>
+            <a href="/portal/feedback" class="block p-3 rounded-lg bg-gray-50 hover:bg-gray-100 portal-theme-card border border-gray-100">
+              <span class="font-medium text-gray-900 portal-theme-text">{d.title ?? 'Document'}</span>
+              {d.description && <span class="block text-sm text-gray-500 mt-1">{d.description.slice(0, 80)}{d.description.length > 80 ? '...' : ''}</span>}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )}
+
+  {preapproval.length > 0 && (
+    <section aria-label="Pre-approval library">
+      <h3 class="text-lg font-heading font-semibold text-clr-green mb-2">Pre-approval library</h3>
+      <ul class="space-y-2">
+        {preapproval.map((p) => (
+          <li>
+            <a href={`/portal/library#${p.id}`} class="block p-3 rounded-lg bg-gray-50 hover:bg-gray-100 portal-theme-card border border-gray-100">
+              <span class="font-medium text-gray-900 portal-theme-text">{p.title ?? 'Item'}</span>
+              {p.category && <span class="text-sm text-gray-500">({p.category})</span>}
+              {p.rules && <span class="block text-sm text-gray-500 mt-1">{p.rules.slice(0, 60)}{p.rules.length > 60 ? '...' : ''}</span>}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )}
+
+  {query && arb.length === 0 && meetings.length === 0 && vendors.length === 0 && owners.length === 0 && feedback_docs.length === 0 && preapproval.length === 0 && (
+    <p class="text-gray-500 portal-theme-text-muted">No results for &quot;{query}&quot;.</p>
+  )}
+</div>

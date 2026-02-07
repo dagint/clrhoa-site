@@ -42,10 +42,11 @@ Open a terminal in the project folder (`c:\Users\dagin\Documents\code\clrhoa-sit
 npx wrangler d1 create clrhoa_db
 # → copy database_id into wrangler.toml [[d1_databases]].database_id
 
-# KV namespaces (email whitelist + adapter session placeholder)
+# KV namespaces (email whitelist, session, rate limiting)
 npx wrangler kv namespace create clrhoa_users
 npx wrangler kv namespace create SESSION
-# → copy ids into wrangler.toml (CLOURHOA_USERS and SESSION)
+npx wrangler kv namespace create RATE_LIMIT
+# → copy ids into wrangler.toml (CLOURHOA_USERS, SESSION, and KV = RATE_LIMIT id)
 
 # R2 bucket (portal documents)
 # If you get "Please enable R2 through the Cloudflare Dashboard", enable R2 first:
@@ -57,7 +58,7 @@ npx wrangler r2 bucket create clrhoa-files
 # → bucket_name is clrhoa-files (binding in wrangler.toml is already set)
 ```
 
-Then **in your editor**, open `wrangler.toml` and replace `YOUR_D1_DATABASE_ID`, `YOUR_KV_NAMESPACE_ID`, and `YOUR_SESSION_KV_NAMESPACE_ID` with the values the commands printed.
+Then **in your editor**, open `wrangler.toml` and paste the printed IDs: D1 `database_id`, `CLOURHOA_USERS` id, `SESSION` id, and **KV** = the id from `RATE_LIMIT` (used for rate limiting and login lockout). Replace `REPLACE_WITH_RATE_LIMIT_KV_ID` in the `KV` binding with that id.
 
 ## 2. D1 schema (run on your computer, or run SQL in dashboard)
 
@@ -108,6 +109,19 @@ npx wrangler kv key put "board@example.com" "{\"role\":\"admin\"}" --binding=CLO
 ```
 
 **Option B — in Cloudflare dashboard:** Workers & Pages → KV → select `clrhoa_users` → Add entry (key = email, value = `1` or `{"role":"admin"}`). Dashboard edits apply to **remote** only; local dev still needs the `--local` commands above.
+
+## 4b. Rate limiting and login lockout (KV binding `KV`)
+
+The portal uses a **separate KV namespace** bound as **`KV`** in `wrangler.toml` for:
+
+- **Rate limiting** — CSV upload (10/hour per IP), directory phone/email reveal (60/min per IP), ARB submit/copy and other endpoints (see `src/lib/rate-limit.ts`).
+- **Login lockout** — Temporary lockout after repeated failed logins.
+
+**Setup:** In section 1 you created `RATE_LIMIT` and set its id in `wrangler.toml` as the `KV` binding. If **`KV` is not bound** (or the id is missing), the app still runs but rate limits and login lockout are **not enforced** (graceful degradation).
+
+**Pages deployment:** When connecting the project to Cloudflare Pages, attach the same KV namespace (the one whose id is in `KV`) to the Pages project so production has rate limiting and lockout.
+
+**Full details:** Endpoint limits, key format, and login lockout are documented in **docs/RATE_LIMITING.md**.
 
 ## 5. R2 portal files
 

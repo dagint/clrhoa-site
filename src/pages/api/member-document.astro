@@ -1,0 +1,84 @@
+---
+/**
+ * DELETE /api/member-document — Board: delete a member document by id.
+ * Body: JSON { id: number, csrf_token: string }. Removes row from D1; R2 object can remain (or delete for cleanliness).
+ */
+export const prerender = false;
+
+import { getSessionFromCookie, verifyCsrfToken, verifyOrigin } from '../../lib/auth';
+import { getMemberDocument, deleteMemberDocument } from '../../lib/member-documents-db';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const session = await getSessionFromCookie(
+  Astro.request.headers.get('cookie') ?? undefined,
+  env?.SESSION_SECRET
+);
+
+if (!session) {
+  return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+    status: 401,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const isBoard = session.role === 'board' || session.role === 'admin' || session.role === 'arb_board';
+if (!isBoard) {
+  return new Response(JSON.stringify({ error: 'Forbidden' }), {
+    status: 403,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const origin = Astro.request.headers.get('origin');
+const referer = Astro.request.headers.get('referer');
+if (!verifyOrigin(origin, referer, Astro.url.origin)) {
+  return new Response(JSON.stringify({ error: 'Invalid origin' }), { status: 403, headers: { 'Content-Type': 'application/json' } });
+}
+
+if (Astro.request.method !== 'DELETE') {
+  return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+    status: 405,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+let body: { id?: number; csrf_token?: string };
+try {
+  body = await Astro.request.json();
+} catch {
+  return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+}
+
+if (!verifyCsrfToken(body.csrf_token, session)) {
+  return new Response(JSON.stringify({ error: 'Invalid CSRF token' }), { status: 403, headers: { 'Content-Type': 'application/json' } });
+}
+
+const id = typeof body.id === 'number' ? body.id : parseInt(String(body.id), 10);
+if (!Number.isInteger(id) || id < 1) {
+  return new Response(JSON.stringify({ error: 'Invalid id' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+}
+
+const db = env?.DB;
+const r2 = env?.CLOURHOA_FILES;
+if (!db) {
+  return new Response(JSON.stringify({ error: 'Server configuration error' }), { status: 503, headers: { 'Content-Type': 'application/json' } });
+}
+
+const row = await getMemberDocument(db, id);
+if (!row) {
+  return new Response(JSON.stringify({ error: 'Not found' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
+}
+
+await deleteMemberDocument(db, id);
+if (r2 && row.file_key) {
+  try {
+    await r2.delete(row.file_key);
+  } catch (_) {}
+}
+
+return new Response(
+  JSON.stringify({ success: true, message: 'Document deleted.' }),
+  { status: 200, headers: { 'Content-Type': 'application/json' } }
+);
+---

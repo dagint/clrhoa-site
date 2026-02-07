@@ -1,0 +1,54 @@
+---
+/**
+ * POST /api/meeting-rsvp — owner RSVP for a meeting.
+ * Body: meeting_id, response ('yes' | 'no' | 'maybe').
+ */
+export const prerender = false;
+
+import { getSessionFromCookie } from '../../lib/auth';
+import { getMeetingById, setRsvp } from '../../lib/meetings-db';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const db = env?.DB;
+
+function jsonResponse(data: object, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const session = await getSessionFromCookie(
+  Astro.request.headers.get('cookie') ?? undefined,
+  env?.SESSION_SECRET
+);
+
+if (!session) return jsonResponse({ error: 'Unauthorized' }, 401);
+if (!db) return jsonResponse({ error: 'Server configuration error' }, 503);
+
+if (Astro.request.method !== 'POST') {
+  return new Response(null, { status: 405, headers: { Allow: 'POST' } });
+}
+
+let body: Record<string, unknown>;
+try {
+  const ct = Astro.request.headers.get('content-type') ?? '';
+  body = ct.includes('application/json') ? await Astro.request.json() : Object.fromEntries(await Astro.request.formData());
+} catch {
+  return jsonResponse({ error: 'Invalid body' }, 400);
+}
+
+const meetingId = String(body.meeting_id ?? '').trim();
+const response = String(body.response ?? '').trim().toLowerCase();
+if (!meetingId) return jsonResponse({ error: 'meeting_id is required' }, 400);
+if (!['yes', 'no', 'maybe'].includes(response)) {
+  return jsonResponse({ error: 'response must be yes, no, or maybe' }, 400);
+}
+
+const meeting = await getMeetingById(db, meetingId);
+if (!meeting) return jsonResponse({ error: 'Meeting not found' }, 404);
+
+await setRsvp(db, meetingId, session.email, response);
+return jsonResponse({ success: true, response });
+---

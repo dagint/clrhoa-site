@@ -66,6 +66,8 @@ export const RATE_LIMITS = {
   '/api/arb-deadline': { maxRequests: 20, windowSeconds: 60 }, // 20 deadline updates per minute
   '/api/arb-add-files': { maxRequests: 10, windowSeconds: 60 * 60 }, // 10 file additions per hour
   '/api/arb-copy': { maxRequests: 10, windowSeconds: 60 }, // 10 copies per minute
+  '/api/owners/upload-csv': { maxRequests: 10, windowSeconds: 60 * 60 }, // 10 uploads per hour per IP
+  '/api/log-phone-view': { maxRequests: 60, windowSeconds: 60 }, // 60 reveals (phone or email) per minute per IP
 } as const;
 
 /**

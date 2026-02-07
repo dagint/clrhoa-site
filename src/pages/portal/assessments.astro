@@ -1,0 +1,177 @@
+---
+export const prerender = false;
+
+import PortalLayout from '../../layouts/PortalLayout.astro';
+import ProtectedPage from '../../components/ProtectedPage.astro';
+import PortalNav from '../../components/PortalNav.astro';
+import { getSessionFromCookie } from '../../lib/auth';
+import { listArbRequestsByOwner } from '../../lib/arb-db';
+import { getAssessmentByOwner, getPaymentHistory } from '../../lib/assessments-db';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const userAgent = Astro.request.headers.get('user-agent') ?? null;
+const ipAddress = Astro.request.headers.get('cf-connecting-ip') ?? 
+  Astro.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
+const cookieHeader = Astro.request.headers.get('cookie') ?? undefined;
+let session = await getSessionFromCookie(
+  cookieHeader,
+  env?.SESSION_SECRET,
+  userAgent,
+  ipAddress
+);
+
+if (!session && env?.SESSION_SECRET) {
+  session = await getSessionFromCookie(cookieHeader, env.SESSION_SECRET);
+}
+
+if (!session) {
+  return Astro.redirect('/portal/login');
+}
+
+const db = env?.DB;
+const draftCount = db
+  ? (await listArbRequestsByOwner(db, session.email)).filter((r) => r.status === 'pending').length
+  : 0;
+const assessment = db ? await getAssessmentByOwner(db, session.email) : null;
+const paymentHistory = db ? await getPaymentHistory(db, session.email) : [];
+
+const lateFeeDays = typeof import.meta.env.PUBLIC_LATE_FEE_DAYS !== 'undefined' ? Number(import.meta.env.PUBLIC_LATE_FEE_DAYS) : 3;
+const lateFeeAmount = typeof import.meta.env.PUBLIC_LATE_FEE_AMOUNT !== 'undefined' ? Number(import.meta.env.PUBLIC_LATE_FEE_AMOUNT) : 25;
+
+const now = new Date();
+now.setHours(0, 0, 0, 0);
+// When paid_through is set and today <= paid_through, owner is current (e.g. full-year payers) — no overdue/due reminders
+const isPaidThrough =
+  !!assessment?.paid_through &&
+  new Date(assessment.paid_through + 'T23:59:59') >= now;
+
+let isOverdue = false;
+let daysOverdue = 0;
+let lateFeeMessage = '';
+if (!isPaidThrough && assessment?.next_due) {
+  const due = new Date(assessment.next_due);
+  due.setHours(0, 0, 0, 0);
+  if (due < now) {
+    isOverdue = true;
+    daysOverdue = Math.floor((now.getTime() - due.getTime()) / (24 * 60 * 60 * 1000));
+    const fee = lateFeeAmount;
+    lateFeeMessage = `${daysOverdue} day${daysOverdue === 1 ? '' : 's'} late = +$${fee}`;
+  }
+}
+
+function formatDate(s: string | null): string {
+  if (!s) return '-';
+  try {
+    return new Date(s).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+  } catch {
+    return s;
+  }
+}
+
+function formatCurrency(n: number): string {
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n);
+}
+
+function daysRemaining(nextDue: string | null): number | null {
+  if (!nextDue) return null;
+  const due = new Date(nextDue);
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  due.setHours(0, 0, 0, 0);
+  const diff = Math.ceil((due.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
+  return diff;
+}
+---
+
+<PortalLayout title="Assessments | Member Portal | Crooked Lake Reserve HOA">
+  <ProtectedPage>
+  <div class="min-h-screen portal-theme-bg font-body">
+    <PortalNav currentPath="/portal/assessments" draftCount={draftCount} role={session.role} />
+
+    <main class="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+      <h2 class="text-2xl font-heading font-bold text-clr-green mb-2">Assessment balance</h2>
+      <p class="text-gray-600 mb-6">
+        View your balance and payment history. No payment processing here; pay by the method specified by the board.
+      </p>
+
+      {!assessment ? (
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center text-gray-500">
+          No assessment record found for your account. Contact the board if you believe this is an error.
+        </div>
+      ) : (
+        <>
+          <div class={`rounded-2xl shadow-sm border p-6 mb-6 ${isOverdue ? 'bg-red-50 border-red-200' : 'bg-white border-gray-100'}`}>
+            <p class="text-sm text-gray-500 mb-1">Current balance</p>
+            <p class={`text-3xl font-heading font-bold ${isOverdue ? 'text-red-700' : 'text-clr-green'}`}>
+              {formatCurrency(assessment.balance)}
+              {assessment.next_due && !isPaidThrough && (
+                <span class="text-lg font-normal ml-2">
+                  Due {formatDate(assessment.next_due)}
+                </span>
+              )}
+              {isPaidThrough && assessment.paid_through && (
+                <span class="text-lg font-normal ml-2 text-clr-green">
+                  Paid through {formatDate(assessment.paid_through)}
+                </span>
+              )}
+            </p>
+            {isPaidThrough && assessment.paid_through && (
+              <p class="text-sm text-gray-600 mt-2">Current and future dues are paid. No action needed.</p>
+            )}
+            {!isPaidThrough && assessment.next_due && daysRemaining(assessment.next_due) !== null && !isOverdue && (
+              <p class="text-sm text-gray-600 mt-2">
+                {daysRemaining(assessment.next_due)! > 0
+                  ? `${daysRemaining(assessment.next_due)} days remaining`
+                  : 'Due today'}
+              </p>
+            )}
+            {isOverdue && lateFeeMessage && (
+              <p class="text-sm font-semibold text-red-700 mt-2">Late fee: {lateFeeMessage}</p>
+            )}
+          </div>
+
+          {assessment.invoice_r2_key && (
+            <p class="mb-6">
+              <a
+                href={`/api/portal/file/${encodeURIComponent(assessment.invoice_r2_key)}`}
+                class="inline-flex items-center gap-2 bg-clr-green hover:brightness-110 text-white px-6 py-3 rounded-xl font-semibold text-sm"
+              >
+                Download latest invoice (PDF)
+              </a>
+            </p>
+          )}
+
+          <h3 class="text-lg font-heading font-semibold text-clr-green mb-3">Payment history (last 12 months)</h3>
+          {paymentHistory.length === 0 ? (
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 text-center text-gray-500">
+              No payment history in the last 12 months.
+            </div>
+          ) : (
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+              <table class="w-full text-sm">
+                <thead>
+                  <tr class="border-b border-gray-100 bg-gray-50">
+                    <th class="text-left py-3 px-4 font-semibold text-gray-700">Date</th>
+                    <th class="text-right py-3 px-4 font-semibold text-gray-700">Amount</th>
+                    <th class="text-right py-3 px-4 font-semibold text-gray-700">Balance after</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paymentHistory.map((p) => (
+                    <tr class="border-b border-gray-100">
+                      <td class="py-3 px-4">{formatDate(p.paid_at)}</td>
+                      <td class="py-3 px-4 text-right">{formatCurrency(p.amount)}</td>
+                      <td class="py-3 px-4 text-right">{formatCurrency(p.balance_after)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
+      )}
+    </main>
+  </div>
+  </ProtectedPage>
+</PortalLayout>

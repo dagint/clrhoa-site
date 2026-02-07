@@ -1,0 +1,181 @@
+---
+export const prerender = false;
+
+import BoardLayout from '../../layouts/BoardLayout.astro';
+import { getSessionFromCookie } from '../../lib/auth';
+import { listAllFeedbackDocs, getFeedbackResponseCounts } from '../../lib/feedback-db';
+import { listOwners } from '../../lib/directory-db';
+import { listArbRequestsByOwner } from '../../lib/arb-db';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const cookieHeader = Astro.request.headers.get('cookie') ?? undefined;
+let session = await getSessionFromCookie(cookieHeader, env?.SESSION_SECRET);
+
+if (!session) {
+  return Astro.redirect('/portal/login');
+}
+
+const isBoard = session.role === 'board' || session.role === 'admin' || session.role === 'arb_board';
+if (!isBoard) {
+  return Astro.redirect('/portal/dashboard');
+}
+
+const db = env?.DB;
+const docs = db ? await listAllFeedbackDocs(db) : [];
+const owners = db ? await listOwners(db) : [];
+const totalOwners = owners.length;
+const allRequests = db ? await listArbRequestsByOwner(db, session.email) : [];
+const draftCount = allRequests.filter((r) => r.status === 'pending').length;
+const docsWithCounts = db
+  ? await Promise.all(
+      docs.map(async (d) => {
+        const counts = await getFeedbackResponseCounts(db, d.id);
+        return { ...d, counts };
+      })
+    )
+  : [];
+
+function formatDate(s: string | null): string {
+  if (!s) return '-';
+  try {
+    return new Date(s).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+  } catch {
+    return s;
+  }
+}
+---
+
+<BoardLayout title="Feedback" subtitle="Manage document feedback requests" draftCount={draftCount} role={session.role}>
+  <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+        <h2 class="text-xl font-heading font-bold text-clr-green">Feedback documents</h2>
+        <button type="button" id="btn-new-feedback" class="inline-flex items-center gap-2 bg-clr-green hover:brightness-110 text-white px-4 py-2 rounded-xl font-semibold text-sm">
+          New feedback request
+        </button>
+      </div>
+
+      <div id="form-panel" class="hidden bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-8">
+        <h3 class="text-lg font-heading font-semibold text-clr-green mb-4">New feedback document</h3>
+        <form id="feedback-form" class="space-y-4">
+          <input type="hidden" name="r2_key" id="form-r2-key" value="" />
+          <div>
+            <label for="form-title" class="block text-sm font-medium text-gray-700">Title *</label>
+            <input type="text" id="form-title" name="title" required class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2" />
+          </div>
+          <div>
+            <label for="form-description" class="block text-sm font-medium text-gray-700">Description</label>
+            <textarea id="form-description" name="description" rows="3" class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2"></textarea>
+          </div>
+          <div>
+            <label for="form-deadline" class="block text-sm font-medium text-gray-700">Deadline (responses due by)</label>
+            <input type="date" id="form-deadline" name="deadline" class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2" />
+          </div>
+          <div>
+            <label for="form-pdf" class="block text-sm font-medium text-gray-700">PDF document</label>
+            <input type="file" id="form-pdf" name="file" accept=".pdf,application/pdf" class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-clr-green file:text-white" />
+          </div>
+          <div class="flex gap-2">
+            <button type="submit" class="bg-clr-green hover:brightness-110 text-white px-4 py-2 rounded-lg font-medium text-sm">Create</button>
+            <button type="button" id="btn-cancel-form" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg font-medium text-sm">Cancel</button>
+          </div>
+        </form>
+      </div>
+
+      {docsWithCounts.length === 0 ? (
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center text-gray-500">
+          No feedback documents yet. Click &quot;New feedback request&quot; to add one.
+        </div>
+      ) : (
+        <ul class="space-y-4">
+          {docsWithCounts.map((d) => {
+            const responded = d.counts.total;
+            const pct = totalOwners > 0 ? Math.round((responded / totalOwners) * 100) : 0;
+            return (
+              <li class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h3 class="font-semibold text-clr-green">{d.title || 'Document'}</h3>
+                  <p class="text-sm text-gray-500">Due {formatDate(d.deadline)}</p>
+                  <p class="text-sm text-gray-600 mt-1">
+                    {responded}/{totalOwners} owners responded ({pct}%) - {d.counts.approved} approved, {d.counts.rejected} rejected
+                  </p>
+                </div>
+                <div class="flex gap-2">
+                  {d.r2_key && (
+                    <a
+                      href={`/api/portal/file/${encodeURIComponent(d.r2_key)}`}
+                      class="text-sm text-clr-green hover:underline"
+                    >
+                      PDF
+                    </a>
+                  )}
+                  <a
+                    href={`/api/feedback?export=csv&id=${encodeURIComponent(d.id)}`}
+                    class="text-sm text-clr-green hover:underline"
+                    download
+                  >
+                    Export CSV
+                  </a>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+<script>
+  const formPanel = document.getElementById('form-panel');
+  const form = document.getElementById('feedback-form') as HTMLFormElement;
+  const formR2Key = document.getElementById('form-r2-key') as HTMLInputElement;
+  const pdfInput = document.getElementById('form-pdf') as HTMLInputElement;
+
+  document.getElementById('btn-new-feedback')?.addEventListener('click', () => {
+    form?.reset();
+    formR2Key.value = '';
+    formPanel?.classList.remove('hidden');
+  });
+
+  document.getElementById('btn-cancel-form')?.addEventListener('click', () => {
+    formPanel?.classList.add('hidden');
+  });
+
+  pdfInput?.addEventListener('change', async () => {
+    const file = pdfInput.files?.[0];
+    if (!file) return;
+    const fd = new FormData();
+    fd.set('file', file);
+    try {
+      const res = await fetch('/api/feedback-upload', { method: 'POST', body: fd, credentials: 'same-origin' });
+      const data = await res.json();
+      if (data.key) formR2Key.value = data.key;
+      else alert(data.error || 'Upload failed');
+    } catch {
+      alert('Upload failed');
+    }
+  });
+
+  form?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const title = (document.getElementById('form-title') as HTMLInputElement).value.trim();
+    const description = (document.getElementById('form-description') as HTMLTextAreaElement).value.trim();
+    const deadline = (document.getElementById('form-deadline') as HTMLInputElement).value.trim() || null;
+    const r2_key = formR2Key.value.trim() || null;
+    if (!title) {
+      alert('Title is required');
+      return;
+    }
+    try {
+      const res = await fetch('/api/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'create', title, description, deadline, r2_key }),
+        credentials: 'same-origin',
+      });
+      const data = await res.json();
+      if (data.success) window.location.reload();
+      else alert(data.error || 'Failed to create');
+    } catch {
+      alert('Network error');
+    }
+  });
+</script>
+</BoardLayout>

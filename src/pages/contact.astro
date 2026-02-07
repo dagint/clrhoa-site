@@ -1,9 +1,9 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 
-// StaticForms: https://www.staticforms.xyz/ — uses apiKey, redirectTo, honeypot; optional reCAPTCHA/ALTCHA in dashboard
+// StaticForms (optional) or Phase 3.5 /api/contact (MailChannels → NOTIFY_BOARD_EMAIL)
 const staticformsApiKey = import.meta.env.PUBLIC_STATICFORMS_API_KEY ?? '';
-const formAction = staticformsApiKey ? 'https://api.staticforms.dev/submit' : '#';
+const formAction = staticformsApiKey ? 'https://api.staticforms.dev/submit' : '/api/contact';
 const thanksUrl = `${import.meta.env.SITE ?? 'https://clrhoa.com'}/contact/thanks`;
 const recaptchaSiteKey = import.meta.env.PUBLIC_RECAPTCHA_SITE_KEY ?? '';
 
@@ -35,14 +35,17 @@ const prefillMessage = vendorParam
           This form does not accept file attachments. If your matter requires documents or photos, send your message here and a member of the Board or ARB will reach out to you to arrange sharing attachments.
         </p>
 
-        <!-- Contact form (StaticForms: honeypot + optional reCAPTCHA in dashboard) -->
-        {staticformsApiKey ? (
-          <div class="bg-clr-beige/30 border border-gray-100 rounded-xl p-6 mb-8">
-            <h2 class="text-xl font-heading font-semibold text-clr-green mb-4">Send a message</h2>
-            <form id="contact-form" action={formAction} method="POST" class="space-y-4" novalidate data-redirect-to={thanksUrl}>
-              <input type="text" name="honeypot" class="hidden" tabindex="-1" autocomplete="off" aria-hidden="true" />
-              <input type="hidden" name="apiKey" value={staticformsApiKey} />
-              <input type="hidden" name="redirectTo" value={thanksUrl} />
+        <!-- Contact form: StaticForms (if configured) or /api/contact (MailChannels → NOTIFY_BOARD_EMAIL) -->
+        <div class="bg-clr-beige/30 border border-gray-100 rounded-xl p-6 mb-8">
+          <h2 class="text-xl font-heading font-semibold text-clr-green mb-4">Send a message</h2>
+          <form id="contact-form" action={formAction} method="POST" class="space-y-4" novalidate data-redirect-to={thanksUrl}>
+            <input type="text" name="honeypot" class="hidden" tabindex="-1" autocomplete="off" aria-hidden="true" />
+            {staticformsApiKey && (
+              <>
+                <input type="hidden" name="apiKey" value={staticformsApiKey} />
+                <input type="hidden" name="redirectTo" value={thanksUrl} />
+              </>
+            )}
               
               <!-- Recipient field -->
               <div>
@@ -141,13 +144,6 @@ const prefillMessage = vendorParam
               </button>
             </form>
           </div>
-        ) : (
-          <div class="bg-clr-beige/30 border border-gray-100 rounded-xl p-6 mb-8">
-            <p class="text-gray-700 font-body">
-              The contact form is currently being configured. Please check back soon or use the mailing address below.
-            </p>
-          </div>
-        )}
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
           <div class="card-hover bg-clr-beige/30 p-6 rounded-2xl border border-gray-100">
@@ -158,7 +154,7 @@ const prefillMessage = vendorParam
             </p>
             {!staticformsApiKey && (
               <p class="text-clr-gray font-body text-sm mt-2">
-                <strong>Note:</strong> Contact form is being configured. For urgent matters, please use the mailing address.
+                <strong>Note:</strong> Messages are sent via the portal to the board. Set NOTIFY_BOARD_EMAIL in wrangler for delivery.
               </p>
             )}
           </div>

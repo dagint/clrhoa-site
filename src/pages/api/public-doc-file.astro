@@ -1,0 +1,41 @@
+---
+/**
+ * GET /api/public-doc-file?slug= — Serve a public document file from R2 (no auth).
+ * Used when board/ARB have uploaded a replacement; otherwise /documents uses content collection links.
+ */
+export const prerender = false;
+
+import { getPublicDocument } from '../../lib/public-documents-db';
+
+const slug = Astro.url.searchParams.get('slug')?.trim()?.toLowerCase();
+if (!slug) {
+  return new Response('Missing slug', { status: 400 });
+}
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const db = env?.DB;
+const r2 = env?.CLOURHOA_FILES;
+
+if (!db || !r2) {
+  return new Response('Service unavailable', { status: 503 });
+}
+
+const row = await getPublicDocument(db, slug);
+if (!row?.file_key) {
+  return new Response('Not found', { status: 404 });
+}
+
+const object = await r2.get(row.file_key);
+if (!object) {
+  return new Response('Not found', { status: 404 });
+}
+
+const headers = new Headers();
+const ct = object.httpMetadata?.contentType ?? row.content_type ?? 'application/octet-stream';
+headers.set('Content-Type', ct);
+headers.set('Content-Disposition', `inline; filename="${slug}.${row.file_key.split('.').pop() ?? 'bin'}"`);
+headers.set('Cache-Control', 'public, max-age=3600');
+
+return new Response(object.body as ReadableStream, { headers });
+---

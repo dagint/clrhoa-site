@@ -1,0 +1,149 @@
+---
+/**
+ * /api/preapproval
+ * GET: list all items (optional category filter) - any authenticated.
+ * POST: create item + upload photos (board/arb/admin). FormData: category, title, description, rules, file_0..file_4.
+ * PUT: update item (board/arb/admin). JSON: id, category?, title?, description?, rules?, photos?.
+ * DELETE: delete item (board/arb/admin). JSON: id.
+ */
+export const prerender = false;
+
+import { getSessionFromCookie, verifyCsrfToken, verifyOrigin } from '../../lib/auth';
+import {
+  listPreapprovalItems,
+  getPreapprovalById,
+  insertPreapprovalItem,
+  updatePreapprovalItem,
+  deletePreapprovalItem,
+  createPreapprovalId,
+  parsePhotos,
+  type PreapprovalPhoto,
+} from '../../lib/preapproval-db';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const db = env?.DB;
+const r2 = env?.CLOURHOA_FILES;
+
+function jsonResponse(data: object, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const session = await getSessionFromCookie(
+  Astro.request.headers.get('cookie') ?? undefined,
+  env?.SESSION_SECRET
+);
+if (!session) return jsonResponse({ error: 'Unauthorized' }, 401);
+if (!db) return jsonResponse({ error: 'Server configuration error' }, 503);
+
+const origin = Astro.request.headers.get('origin');
+const referer = Astro.request.headers.get('referer');
+if (!verifyOrigin(origin, referer, Astro.url.origin)) {
+  return jsonResponse({ error: 'Invalid origin.' }, 403);
+}
+
+const isReviewer = session.role === 'board' || session.role === 'admin' || session.role === 'arb' || session.role === 'arb_board';
+
+// GET: list (any authenticated)
+if (Astro.request.method === 'GET') {
+  const url = new URL(Astro.request.url);
+  const category = url.searchParams.get('category') || undefined;
+  const items = await listPreapprovalItems(db, { category: category || undefined });
+  return jsonResponse({ items });
+}
+
+// POST: create + upload photos (reviewers only)
+if (Astro.request.method === 'POST') {
+  if (!isReviewer) return jsonResponse({ error: 'Forbidden' }, 403);
+  let formData: FormData;
+  try {
+    formData = await Astro.request.formData();
+  } catch {
+    return jsonResponse({ error: 'Invalid form data' }, 400);
+  }
+  const csrf = (formData.get('csrf_token') as string) ?? '';
+  if (!verifyCsrfToken(session, csrf)) return jsonResponse({ error: 'Invalid security token.' }, 403);
+
+  const title = (formData.get('title') as string)?.trim();
+  if (!title) return jsonResponse({ error: 'Title is required.' }, 400);
+
+  const category = (formData.get('category') as string)?.trim() || null;
+  const description = (formData.get('description') as string)?.trim() || null;
+  const rules = (formData.get('rules') as string)?.trim() || null;
+
+  const id = createPreapprovalId();
+  const photos: PreapprovalPhoto[] = [];
+
+  if (r2) {
+    for (let i = 0; i < 5; i++) {
+      const file = formData.get('file_' + i);
+      if (!(file instanceof File) || file.size === 0) continue;
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 80) || 'image';
+      const ext = safeName.includes('.') ? safeName.slice(safeName.lastIndexOf('.')) : '.jpg';
+      const key = `preapproval/${id}/${i}${ext}`;
+      const buf = await file.arrayBuffer();
+      if (buf.byteLength > 10 * 1024 * 1024) continue;
+      await r2.put(key, buf, { httpMetadata: { contentType: file.type || 'image/jpeg' } });
+      photos.push({ name: file.name, key: key });
+    }
+  }
+
+  await insertPreapprovalItem(db, id, {
+    category,
+    title,
+    description,
+    rules,
+    photos: photos.length > 0 ? JSON.stringify(photos) : null,
+    created_by: session.email,
+  });
+  return jsonResponse({ success: true, id });
+}
+
+// PUT: update (reviewers only)
+if (Astro.request.method === 'PUT') {
+  if (!isReviewer) return jsonResponse({ error: 'Forbidden' }, 403);
+  let body: { id: string; category?: string; title?: string; description?: string; rules?: string; photos?: string; csrf_token?: string };
+  try {
+    body = await Astro.request.json();
+  } catch {
+    return jsonResponse({ error: 'Invalid JSON' }, 400);
+  }
+  if (!verifyCsrfToken(session, body.csrf_token ?? '')) return jsonResponse({ error: 'Invalid security token.' }, 403);
+  const id = (body.id ?? '').trim();
+  if (!id) return jsonResponse({ error: 'id required' }, 400);
+
+  const updated = await updatePreapprovalItem(db, id, {
+    category: body.category,
+    title: body.title,
+    description: body.description,
+    rules: body.rules,
+    photos: body.photos ?? undefined,
+  });
+  if (!updated) return jsonResponse({ error: 'Item not found' }, 404);
+  return jsonResponse({ success: true });
+}
+
+// DELETE (reviewers only)
+if (Astro.request.method === 'DELETE') {
+  if (!isReviewer) return jsonResponse({ error: 'Forbidden' }, 403);
+  let body: { id: string; csrf_token?: string };
+  try {
+    body = await Astro.request.json();
+  } catch {
+    return jsonResponse({ error: 'Invalid JSON' }, 400);
+  }
+  if (!verifyCsrfToken(session, body.csrf_token ?? '')) return jsonResponse({ error: 'Invalid security token.' }, 403);
+  const id = (body.id ?? '').trim();
+  if (!id) return jsonResponse({ error: 'id required' }, 400);
+  const item = await getPreapprovalById(db, id);
+  if (!item) return jsonResponse({ error: 'Item not found' }, 404);
+  const deleted = await deletePreapprovalItem(db, id);
+  if (!deleted) return jsonResponse({ error: 'Delete failed' }, 500);
+  return jsonResponse({ success: true });
+}
+
+return jsonResponse({ error: 'Method not allowed' }, 405);
+---

@@ -1,6 +1,9 @@
 ---
+export const prerender = false;
+
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { getCollection } from 'astro:content';
+import { listPublicDocuments } from '../lib/public-documents-db';
 
 const allDocuments = await getCollection('documents');
 const publishedDocuments = allDocuments.filter((item) => item.data.published);
@@ -14,7 +17,14 @@ const documentsByCategory = publishedDocuments.reduce((acc, doc) => {
   return acc;
 }, {} as Record<string, typeof publishedDocuments>);
 
-const categories = ['Governing Documents', 'Policies', 'Forms', 'Other'] as const;
+const categories = ['Governing Documents', 'Policies', 'Forms', 'Minutes', 'Other'] as const;
+
+// Board/ARB may have uploaded replacements; use those links when present
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const db = env?.DB;
+const publicOverrides = db ? await listPublicDocuments(db) : [];
+const overrideBySlug = Object.fromEntries(publicOverrides.filter((r) => r.file_key).map((r) => [r.slug, r]));
 
 const keyRules = [
   { title: 'Quarterly assessments', detail: 'Due January, April, July, and October.' },
@@ -71,7 +81,12 @@ const keyRules = [
         <section class="mb-12">
           <h2 class="text-2xl font-heading font-bold text-clr-green mb-6">{category}</h2>
           <div class="grid md:grid-cols-2 gap-6">
-            {docs.map((doc) => (
+            {docs.map((doc) => {
+              const slug = doc.data.slug;
+              const override = slug ? overrideBySlug[slug] : null;
+              const linkUrl = override?.file_key ? `/api/public-doc-file?slug=${encodeURIComponent(slug!)}` : doc.data.fileUrl;
+              const isPdf = linkUrl.toLowerCase().includes('.pdf') || (override?.content_type?.toLowerCase().includes('pdf'));
+              return (
               <div class="card-hover bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
                 <h3 class="text-xl font-heading font-semibold text-clr-green mb-2">{doc.data.title}</h3>
                 <p class="text-clr-gray text-sm font-body mb-4">{doc.data.description}</p>
@@ -85,15 +100,16 @@ const keyRules = [
                   </p>
                 )}
                 <a
-                  href={doc.data.fileUrl}
+                  href={linkUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   class="inline-flex items-center gap-2 bg-clr-orange hover:brightness-110 text-white px-6 py-3 rounded-xl font-semibold text-sm shadow-lg hover:shadow-xl transition-all font-body"
                 >
-                  <span aria-hidden="true">↓</span> {doc.data.fileUrl.toLowerCase().endsWith('.pdf') ? 'Download PDF' : 'Download'}
+                  <span aria-hidden="true">↓</span> {isPdf ? 'Download PDF' : 'Download'}
                 </a>
               </div>
-            ))}
+            );
+            })}
           </div>
         </section>
       );

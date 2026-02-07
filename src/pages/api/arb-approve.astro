@@ -37,7 +37,7 @@ if (!verifyOrigin(origin, referer, expectedOrigin)) {
   });
 }
 
-const allowedRoles = ['arb', 'board', 'admin'];
+const allowedRoles = ['arb', 'board', 'admin', 'arb_board'];
 if (!allowedRoles.includes(session.role)) {
   return new Response(JSON.stringify({ error: 'Forbidden. ARB or Board role required.' }), {
     status: 403,

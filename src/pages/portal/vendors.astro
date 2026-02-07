@@ -1,0 +1,214 @@
+---
+export const prerender = false;
+
+import PortalLayout from '../../layouts/PortalLayout.astro';
+import ProtectedPage from '../../components/ProtectedPage.astro';
+import PortalNav from '../../components/PortalNav.astro';
+import { getSessionFromCookie } from '../../lib/auth';
+import { listVendors } from '../../lib/vendors-db';
+import { listArbRequestsByOwner } from '../../lib/arb-db';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const userAgent = Astro.request.headers.get('user-agent') ?? null;
+const ipAddress = Astro.request.headers.get('cf-connecting-ip') ?? 
+  Astro.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
+const cookieHeader = Astro.request.headers.get('cookie') ?? undefined;
+let session = await getSessionFromCookie(
+  cookieHeader,
+  env?.SESSION_SECRET,
+  userAgent,
+  ipAddress
+);
+
+if (!session && env?.SESSION_SECRET) {
+  session = await getSessionFromCookie(cookieHeader, env.SESSION_SECRET);
+}
+
+if (!session) {
+  return Astro.redirect('/portal/login');
+}
+
+const db = env?.DB;
+const vendorsList = db ? await listVendors(db) : [];
+const allRequests = db ? await listArbRequestsByOwner(db, session.email) : [];
+const draftCount = allRequests.filter((r) => r.status === 'pending').length;
+
+// Group by category
+const byCategory: Record<string, typeof vendorsList> = {};
+for (const v of vendorsList) {
+  const cat = v.category?.trim() || 'Other';
+  if (!byCategory[cat]) byCategory[cat] = [];
+  byCategory[cat].push(v);
+}
+const categories = Object.keys(byCategory).sort();
+const submitted = Astro.url.searchParams.get('submitted') === '1';
+
+function parseFiles(filesJson: string | null): { name: string; key: string }[] {
+  if (!filesJson) return [];
+  try {
+    const arr = JSON.parse(filesJson);
+    if (!Array.isArray(arr)) return [];
+    return arr.filter((f) => f && typeof f === 'object' && f.key).map((f) => ({ name: (f && f.name) ?? 'File', key: f.key }));
+  } catch {
+    return [];
+  }
+}
+---
+
+<PortalLayout title="Vendors | Member Portal | Crooked Lake Reserve HOA">
+  <ProtectedPage>
+  <div class="min-h-screen portal-theme-bg font-body">
+    <PortalNav currentPath="/portal/vendors" draftCount={draftCount} role={session.role} />
+
+    <main class="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+      {submitted && (
+        <div class="mb-6 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-green-800 text-sm" role="status">
+          Your suggestion has been submitted. A board or committee member will review it before it appears on the vendor list.
+        </div>
+      )}
+      <h2 class="text-2xl font-heading font-bold text-clr-green mb-2">Recommended Vendors</h2>
+      <p class="text-gray-600 mb-6">
+        Board-recommended service providers. Contact info and optional documents are listed below.
+        You can suggest a vendor for the list; board or committee members will review before it is published.
+      </p>
+
+      <details class="mb-8 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <summary class="px-4 py-3 cursor-pointer font-medium text-clr-green hover:bg-gray-50">
+          Suggest a vendor
+        </summary>
+        <div class="px-4 pb-4 pt-2 border-t border-gray-100">
+          <form id="suggest-vendor-form" method="post" action="/api/vendor-submissions" enctype="multipart/form-data" class="space-y-3 max-w-xl">
+            <input type="hidden" name="csrf_token" id="suggest-csrf" value={session.csrfToken ?? ''} />
+            <div>
+              <label for="suggest-name" class="block text-sm font-medium text-gray-700">Vendor name *</label>
+              <input type="text" id="suggest-name" name="name" required class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2" />
+            </div>
+            <div>
+              <label for="suggest-category" class="block text-sm font-medium text-gray-700">Category (e.g. Landscaping, Plumbing)</label>
+              <input type="text" id="suggest-category" name="category" class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2" />
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label for="suggest-phone" class="block text-sm font-medium text-gray-700">Phone</label>
+                <input type="text" id="suggest-phone" name="phone" class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2" />
+              </div>
+              <div>
+                <label for="suggest-email" class="block text-sm font-medium text-gray-700">Email</label>
+                <input type="email" id="suggest-email" name="email" class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2" />
+              </div>
+            </div>
+            <div>
+              <label for="suggest-website" class="block text-sm font-medium text-gray-700">Website (optional)</label>
+              <input type="url" id="suggest-website" name="website" placeholder="https://example.com" class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2" />
+            </div>
+            <div>
+              <label for="suggest-notes" class="block text-sm font-medium text-gray-700">Notes (optional)</label>
+              <textarea id="suggest-notes" name="notes" rows={2} class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2"></textarea>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700">Attachments (optional)</label>
+              <input type="file" id="suggest-files" name="file_0" multiple class="mt-1 block w-full text-sm text-gray-500 file:mr-2 file:rounded file:border-0 file:bg-clr-green file:px-3 file:py-1.5 file:text-white file:text-sm" />
+            </div>
+            <div class="flex items-center gap-3">
+              <button type="submit" id="suggest-submit" class="px-4 py-2 bg-clr-green text-white rounded-lg font-medium hover:brightness-110 text-sm">Submit suggestion</button>
+              <span id="suggest-message" class="text-sm text-gray-500"></span>
+            </div>
+          </form>
+        </div>
+      </details>
+
+      {vendorsList.length === 0 ? (
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center text-gray-500">
+          No vendors listed yet. The board can add recommendations from Board: Vendors.
+        </div>
+      ) : (
+        <div class="space-y-8">
+          {categories.map((cat) => (
+            <section>
+              <h3 class="text-lg font-heading font-semibold text-clr-green mb-3 capitalize">{cat}</h3>
+              <div class="space-y-4">
+                {byCategory[cat].map((v) => {
+                  const files = parseFiles(v.files);
+                  return (
+                    <div class="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
+                      <div class="font-medium text-gray-900">{v.name ?? '-'}</div>
+                      <div class="mt-2 text-sm text-gray-600 space-y-1">
+                        {v.phone && <div>Phone: {v.phone}</div>}
+                        {v.email && <div>Email: <a href={`mailto:${v.email}`} class="text-clr-green hover:underline">{v.email}</a></div>}
+                        {v.website && (
+                          <div>Website: <a href={v.website.startsWith('http') ? v.website : `https://${v.website}`} target="_blank" rel="noopener noreferrer" class="text-clr-green hover:underline">{v.website}</a></div>
+                        )}
+                      </div>
+                      {v.notes && (
+                        <p class="mt-2 text-sm text-gray-500">{v.notes}</p>
+                      )}
+                      {files.length > 0 && (
+                        <div class="mt-3 flex flex-wrap gap-2">
+                          {files.map((f) => (
+                            <a
+                              href={`/api/portal/file/${encodeURIComponent(f.key)}`}
+                              class="text-sm text-clr-green hover:underline"
+                            >
+                              {f.name}
+                            </a>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          ))}
+        </div>
+      )}
+    </main>
+  </div>
+
+  <script is:inline>
+    (function () {
+      var form = document.getElementById('suggest-vendor-form');
+      var submitBtn = document.getElementById('suggest-submit');
+      var messageEl = document.getElementById('suggest-message');
+      var csrfInput = document.getElementById('suggest-csrf');
+      var fileInput = document.getElementById('suggest-files');
+      if (!form) return;
+
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        if (!messageEl) return;
+        messageEl.textContent = '';
+        var token = (csrfInput && csrfInput.value) || '';
+        var formData = new FormData(form);
+        formData.set('csrf_token', token);
+        if (fileInput && fileInput.files && fileInput.files.length) {
+          for (var i = 0; i < fileInput.files.length; i++) {
+            formData.set('file_' + i, fileInput.files[i]);
+          }
+        }
+        submitBtn.disabled = true;
+        fetch('/api/vendor-submissions', { method: 'POST', body: formData })
+          .then(function (res) { return res.json().then(function (data) { return { res: res, data: data }; }); })
+          .then(function (_) {
+            var res = _.res, data = _.data;
+            if (res.ok && data.success) {
+              messageEl.textContent = data.message || 'Submitted. A reviewer will approve it before it appears on the list.';
+              messageEl.className = 'text-sm text-clr-green';
+              form.reset();
+              if (fileInput) fileInput.value = '';
+            } else {
+              messageEl.textContent = data.error || 'Submission failed.';
+              messageEl.className = 'text-sm text-red-600';
+            }
+          })
+          .catch(function () {
+            messageEl.textContent = 'Network error. Try again.';
+            messageEl.className = 'text-sm text-red-600';
+          })
+          .then(function () { submitBtn.disabled = false; });
+      });
+    })();
+  </script>
+  </ProtectedPage>
+</PortalLayout>

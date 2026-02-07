@@ -88,6 +88,25 @@ try {
   const applicantName = (formData.get('applicant_name') as string)?.trim() || null;
   const phone = (formData.get('phone') as string)?.trim() || null;
   const propertyAddress = (formData.get('property_address') as string)?.trim() || null;
+
+  if (!applicantName) {
+    return new Response(JSON.stringify({ error: "Applicant's name is required." }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  if (!phone) {
+    return new Response(JSON.stringify({ error: 'Phone number is required.' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  if (!propertyAddress) {
+    return new Response(JSON.stringify({ error: 'Property address is required.' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
   const types = formData.getAll('application_type');
   const applicationType = Array.isArray(types) && types.length > 0
     ? types.map((t) => String(t).trim()).filter(Boolean).join(', ')

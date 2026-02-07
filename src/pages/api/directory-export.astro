@@ -1,0 +1,71 @@
+---
+/**
+ * GET /api/directory-export — Elevated only. Returns full directory as CSV (name, email, phones).
+ * Logs a single audit entry (full directory export), not one per member.
+ */
+export const prerender = false;
+
+import { getSessionFromCookie, isElevatedRole } from '../../lib/auth';
+import { listOwners, getPhonesArray, insertDirectoryExportLog } from '../../lib/directory-db';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const session = await getSessionFromCookie(
+  Astro.request.headers.get('cookie') ?? undefined,
+  env?.SESSION_SECRET
+);
+
+if (!session) {
+  return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+    status: 401,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+if (!isElevatedRole(session.role)) {
+  return new Response(JSON.stringify({ error: 'Forbidden' }), {
+    status: 403,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const db = env?.DB;
+if (!db) {
+  return new Response(JSON.stringify({ error: 'Server configuration error' }), {
+    status: 503,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const owners = await listOwners(db);
+
+function escapeCsv(value: string | null | undefined): string {
+  if (value == null) return '';
+  const s = String(value).trim();
+  if (s.includes('"') || s.includes(',') || s.includes('\n') || s.includes('\r')) {
+    return `"${s.replace(/"/g, '""')}"`;
+  }
+  return s;
+}
+
+// Header: name, email, phone (primary), phones (all comma-separated in one column)
+const header = 'name,email,phone,phones\n';
+const rows = owners.map((o) => {
+  const phones = getPhonesArray(o);
+  const primaryPhone = phones[0] ?? o.phone ?? '';
+  const phonesStr = phones.join('; ');
+  return [escapeCsv(o.name), escapeCsv(o.email), escapeCsv(primaryPhone), escapeCsv(phonesStr)].join(',');
+});
+const csv = header + rows.join('\n');
+
+// Log once for this export (not per user)
+await insertDirectoryExportLog(db, session.email, session.role);
+
+const filename = `directory-export-${new Date().toISOString().slice(0, 10)}.csv`;
+return new Response(csv, {
+  headers: {
+    'Content-Type': 'text/csv; charset=utf-8',
+    'Content-Disposition': `attachment; filename="${filename}"`,
+  },
+});
+---

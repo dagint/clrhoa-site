@@ -1,0 +1,60 @@
+---
+/**
+ * PWA install prompt: show "Add CLR HOA to your home screen" after 2+ portal visits.
+ * Dismissible; preference stored in localStorage.
+ */
+---
+<div id="pwa-install-prompt" class="hidden fixed bottom-0 left-0 right-0 z-50 p-4 bg-clr-green text-white shadow-lg" role="region" aria-label="Add to home screen">
+  <div class="max-w-4xl mx-auto flex flex-wrap items-center justify-between gap-3">
+    <p class="text-sm font-medium">
+      Add <strong>CLR HOA</strong> to your home screen for quick access.
+    </p>
+    <div class="flex items-center gap-2">
+      <a
+        href="/portal/dashboard"
+        class="px-4 py-2 rounded-lg bg-white text-clr-green font-semibold text-sm hover:brightness-95"
+      >
+        Open app
+      </a>
+      <button
+        type="button"
+        id="pwa-install-dismiss"
+        class="px-4 py-2 rounded-lg border border-white/60 text-sm hover:bg-white/10"
+        aria-label="Dismiss"
+      >
+        Not now
+      </button>
+    </div>
+  </div>
+</div>
+
+<script define:vars={{}}>
+  (function () {
+    const STORAGE_KEY = 'clrhoa_pwa_visits';
+    const DISMISSED_KEY = 'clrhoa_pwa_dismissed';
+    const MIN_VISITS = 2;
+
+    const el = document.getElementById('pwa-install-prompt');
+    const dismissBtn = document.getElementById('pwa-install-dismiss');
+    if (!el || !dismissBtn) return;
+
+    try {
+      if (localStorage.getItem(DISMISSED_KEY) === '1') return;
+
+      let visits = parseInt(localStorage.getItem(STORAGE_KEY) || '0', 10);
+      visits += 1;
+      localStorage.setItem(STORAGE_KEY, String(visits));
+
+      if (visits >= MIN_VISITS) {
+        el.classList.remove('hidden');
+      }
+    } catch (_) {}
+
+    dismissBtn.addEventListener('click', () => {
+      try {
+        localStorage.setItem(DISMISSED_KEY, '1');
+      } catch (_) {}
+      el.classList.add('hidden');
+    });
+  })();
+</script>

@@ -1,11 +1,13 @@
 ---
 export const prerender = false;
 
-import '../../styles/tailwind.css';
+import PortalLayout from '../../layouts/PortalLayout.astro';
 import ProtectedPage from '../../components/ProtectedPage.astro';
-import PortalElevatedRoleBanner from '../../components/PortalElevatedRoleBanner.astro';
+import PortalNav from '../../components/PortalNav.astro';
 import { getSessionFromCookie, updateSessionActivity, SESSION_COOKIE_NAME } from '../../lib/auth';
 import { listArbRequestsByOwner } from '../../lib/arb-db';
+import { getOwnerByEmail, getPhonesArray } from '../../lib/directory-db';
+import { getPreapprovalById } from '../../lib/preapproval-db';
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
@@ -91,37 +93,30 @@ if (!session.csrfToken) {
 const db = env?.DB;
 const allRequests = db ? await listArbRequestsByOwner(db, session.email) : [];
 const draftCount = allRequests.filter(r => r.status === 'pending').length;
+
+// Prefill from directory if user has an owner row (property address, name, phone)
+const ownerForPrefill = db ? await getOwnerByEmail(db, session.email) : null;
+const prefillName = ownerForPrefill?.name ?? '';
+const prefillAddress = ownerForPrefill?.address ?? '';
+const prefillPhone = ownerForPrefill ? (getPhonesArray(ownerForPrefill)[0] ?? ownerForPrefill.phone ?? '') : '';
+
+// Prefill description from Pre-Approval Library template (Phase 6)
+const templateId = new URL(Astro.request.url).searchParams.get('template')?.trim();
+let prefillDescription = '';
+if (db && templateId) {
+  const templateItem = await getPreapprovalById(db, templateId);
+  if (templateItem) {
+    const title = templateItem.title ?? 'Pre-approved design';
+    const rules = templateItem.rules?.trim() ?? '';
+    prefillDescription = `Requesting: ${title}.${rules ? ` Notes: ${rules}` : ''}`;
+  }
+}
 ---
 
-<ProtectedPage>
-  <div class="min-h-screen bg-gray-50 font-body">
-    <header class="bg-white border-b border-gray-200">
-      <div class="max-w-4xl mx-auto px-4 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h1 class="text-xl font-heading font-bold text-clr-green">Member Portal</h1>
-          <p class="text-sm text-gray-500">Crooked Lake Reserve HOA</p>
-        </div>
-        <nav class="flex flex-wrap items-center gap-3 sm:gap-4">
-          <a href="/portal/dashboard" class="text-gray-600 hover:text-clr-green">Dashboard</a>
-          <a href="/portal/my-requests" class="text-gray-600 hover:text-clr-green relative">
-            My requests
-            {draftCount > 0 && (
-              <span class="absolute -top-1 -right-1 bg-amber-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center" title={`${draftCount} draft${draftCount === 1 ? '' : 's'}`}>
-                {draftCount}
-              </span>
-            )}
-          </a>
-          <a href="/portal/arb-request" class="text-clr-green font-medium">New ARB request</a>
-          <a href="/portal/documents" class="text-gray-600 hover:text-clr-green">Documents</a>
-          {(session.role === 'arb' || session.role === 'board' || session.role === 'admin') && (
-            <a href="/portal/arb-dashboard" class="text-gray-600 hover:text-clr-green">ARB Dashboard</a>
-          )}
-          <a href="/api/logout" class="text-sm text-gray-500 hover:text-clr-orange">Sign out</a>
-        </nav>
-      </div>
-    </header>
-
-    <PortalElevatedRoleBanner role={session.role} />
+<PortalLayout title="New ARB Request | Member Portal | Crooked Lake Reserve HOA">
+  <ProtectedPage>
+  <div class="min-h-screen portal-theme-bg font-body">
+    <PortalNav currentPath="/portal/arb-request" draftCount={draftCount} role={session.role} />
 
     <main class="max-w-2xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
       <h2 class="text-2xl font-heading font-bold text-clr-green mb-2">Architectural Review Application</h2>
@@ -129,9 +124,11 @@ const draftCount = allRequests.filter(r => r.status === 'pending').length;
       <p class="text-gray-700 mb-4 text-sm sm:text-base">
         Complete this form and submit it electronically. Your application will be sent to the Association's Architectural Review Board for review. <strong>Do not commence work until you receive approval</strong> from the ARB.
       </p>
-      <p class="text-sm text-gray-500 mb-4">This is a digital submission. You will confirm your submission with an electronic signature below.</p>
+      <p class="text-sm text-gray-500 mb-4">This is a digital submission. You will confirm your submission with an electronic signature below. If you have saved your contact and property address in <a href="/portal/profile" class="text-clr-green hover:underline">Profile</a>, those fields are prefilled below; you can change them as needed.</p>
       <div class="flex flex-wrap items-center gap-4 mb-6">
         <a href="/arb-request-how-to" class="text-clr-orange font-semibold hover:underline text-sm">How to submit an ARB request</a>
+        <span class="text-gray-400">|</span>
+        <a href="/portal/library" class="text-clr-green font-semibold hover:underline text-sm">Pre-approval library</a>
         <span class="text-gray-400">|</span>
         <a href="/contact" class="text-clr-green font-semibold hover:underline text-sm">ARB Guidelines & Requirements</a>
       </div>
@@ -166,14 +163,14 @@ const draftCount = allRequests.filter(r => r.status === 'pending').length;
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label for="applicant_name" class="block text-sm font-semibold text-gray-700 mb-1">
-              Applicant's name <span class="text-gray-400 font-normal">(optional)</span>
+              Applicant's name <span class="text-red-600" aria-label="required">*</span>
               <span class="ml-1 text-gray-400 cursor-help" title="The name of the person submitting this application. If different from property owner, provide owner's name in description." aria-label="Help: Applicant name">(i)</span>
             </label>
-            <input id="applicant_name" name="applicant_name" type="text" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-clr-green focus:ring-1 focus:ring-clr-green" placeholder="Your full name" />
+            <input id="applicant_name" name="applicant_name" type="text" required class="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-clr-green focus:ring-1 focus:ring-clr-green" placeholder="Your full name" value={prefillName} />
           </div>
           <div>
-            <label for="phone" class="block text-sm font-semibold text-gray-700 mb-1">Phone number <span class="text-gray-400 font-normal">(optional)</span></label>
-            <input id="phone" name="phone" type="tel" pattern="[0-9\s\(\)\-\+\.]+" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-clr-green focus:ring-1 focus:ring-clr-green" placeholder="(555) 555-5555" aria-describedby="phone-help" />
+            <label for="phone" class="block text-sm font-semibold text-gray-700 mb-1">Phone number <span class="text-red-600" aria-label="required">*</span></label>
+            <input id="phone" name="phone" type="tel" required pattern="[0-9 ()+\-.]+" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-clr-green focus:ring-1 focus:ring-clr-green" placeholder="(555) 555-5555" value={prefillPhone} aria-describedby="phone-help" />
             <p id="phone-help" class="mt-1 text-xs text-gray-500">Format: (555) 555-5555 or 555-555-5555</p>
           </div>
         </div>
@@ -181,10 +178,10 @@ const draftCount = allRequests.filter(r => r.status === 'pending').length;
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label for="property_address" class="block text-sm font-semibold text-gray-700 mb-1">
-              Property address <span class="text-gray-400 font-normal">(optional)</span>
+              Property address <span class="text-red-600" aria-label="required">*</span>
               <span class="ml-1 text-gray-400 cursor-help" title="Street address, lot number, or property identifier for the location of the proposed changes" aria-label="Help: Property address">(i)</span>
             </label>
-            <input id="property_address" name="property_address" type="text" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-clr-green focus:ring-1 focus:ring-clr-green" placeholder="Street, lot or address" />
+            <input id="property_address" name="property_address" type="text" required class="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-clr-green focus:ring-1 focus:ring-clr-green" placeholder="Street, lot or address" value={prefillAddress} />
           </div>
           <div>
             <label class="block text-sm font-semibold text-gray-700 mb-1">Email address</label>
@@ -237,7 +234,7 @@ const draftCount = allRequests.filter(r => r.status === 'pending').length;
             required
             class="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-clr-green focus:ring-1 focus:ring-clr-green"
             placeholder="Describe the modification or project in detail..."
-          />
+          >{prefillDescription}</textarea>
           <p class="mt-1 text-sm font-semibold text-amber-800">Failure to provide complete information will delay the approval process.</p>
         </div>
 
@@ -707,4 +704,5 @@ const draftCount = allRequests.filter(r => r.status === 'pending').length;
       setInterval(checkSessionTimeout, 60 * 1000);
     })();
   </script>
-</ProtectedPage>
+  </ProtectedPage>
+</PortalLayout>

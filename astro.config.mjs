@@ -3,7 +3,7 @@ import tailwind from '@astrojs/tailwind';
 import cloudflare from '@astrojs/cloudflare';
 
 // https://astro.build/config
-// Portal (SSR) + static public site: hybrid so existing pages stay static.
+// Static default; pages with prerender = false are server-rendered and get fresh DB data.
 export default defineConfig({
   integrations: [tailwind()],
   output: 'static',

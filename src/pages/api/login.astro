@@ -5,8 +5,10 @@
  */
 export const prerender = false;
 
-import { getWhitelistRole, isEmailWhitelisted, createSessionCookieValue, SESSION_COOKIE_NAME, checkAccountLockout, recordFailedLoginAttempt, clearFailedLoginAttempts } from '../../lib/auth';
+import { getWhitelistRole, createSessionCookieValue, SESSION_COOKIE_NAME, checkAccountLockout, recordFailedLoginAttempt, clearFailedLoginAttempts } from '../../lib/auth';
 import { getUserByEmail, upsertUser } from '../../lib/db';
+import { getOwnerByEmail } from '../../lib/directory-db';
+import { insertLoginHistory } from '../../lib/login-history-db';
 import { createLogger, maskEmail } from '../../lib/logging';
 import { getSecurityMonitor } from '../../lib/monitoring';
 
@@ -60,18 +62,25 @@ if (!kv || !db || !secret) {
     }
   }
 
-const allowed = await isEmailWhitelisted(kv, normalized);
+// Directory is the authoritative source for portal access. Exception: admins can log in without being in directory.
+const whitelistRole = await getWhitelistRole(kv, normalized);
+const isAdmin = whitelistRole === 'admin';
+const inDirectory = db ? (await getOwnerByEmail(db, normalized)) != null : false;
+const allowed = isAdmin || inDirectory;
 if (!allowed) {
-  // Record failed attempt even if not whitelisted (to prevent enumeration)
   if (rateLimitKv) {
     await recordFailedLoginAttempt(rateLimitKv, normalized, ipAddress);
   }
-  logger.warn('Login attempt with non-whitelisted email', { email: maskEmail(normalized) });
-  securityMonitor.trackFailedLogin(normalized, ipAddress, 'not_whitelisted');
+  logger.warn('Login attempt: not in directory and not admin', { email: maskEmail(normalized) });
+  securityMonitor.trackFailedLogin(normalized, ipAddress, 'not_authorized');
   return Astro.redirect('/portal/login?error=unauthorized');
 }
 
-const whitelistRole = await getWhitelistRole(kv, normalized);
+// Ensure directory members are on KV for role sync (board/arb/member). Admins already in KV.
+if (inDirectory && kv) {
+  const existing = await kv.get(normalized);
+  if (existing == null) await kv.put(normalized, '1'); // member
+}
 let user = await getUserByEmail(db, normalized);
 if (!user) {
   user = await upsertUser(db, normalized, name, whitelistRole);
@@ -95,6 +104,13 @@ const cookieValue = await createSessionCookieValue(
 
 // Log successful login (with masked PII)
 logger.info('Successful login', { email: maskEmail(normalized), role: user.role, ip: ipAddress });
+
+// Record login for "last logon" and profile history (one row per login)
+if (db) {
+  await insertLoginHistory(db, normalized, ipAddress, userAgent ?? null).catch((err) => {
+    logger.warn('Failed to record login history', { error: err instanceof Error ? err.message : String(err) });
+  });
+}
 
 const destination = new URL('/portal/dashboard', Astro.url.origin);
 const response = Astro.redirect(destination.toString());

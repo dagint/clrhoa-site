@@ -84,7 +84,7 @@ if (!request) {
   });
 }
 
-const allowedRoles = ['arb', 'board', 'admin'];
+const allowedRoles = ['arb', 'board', 'admin', 'arb_board'];
 const isOwner = request.owner_email.toLowerCase() === session.email.toLowerCase();
 const isArb = allowedRoles.includes(session.role);
 

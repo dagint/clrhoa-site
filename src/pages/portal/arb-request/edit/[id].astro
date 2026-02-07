@@ -1,9 +1,9 @@
 ---
 export const prerender = false;
 
-import '../../../../styles/tailwind.css';
+import PortalLayout from '../../../../layouts/PortalLayout.astro';
 import ProtectedPage from '../../../../components/ProtectedPage.astro';
-import PortalElevatedRoleBanner from '../../../../components/PortalElevatedRoleBanner.astro';
+import PortalNav from '../../../../components/PortalNav.astro';
 import { getSessionFromCookie, updateSessionActivity, SESSION_COOKIE_NAME } from '../../../../lib/auth';
 import { getArbRequest, listArbFilesByRequest, listArbRequestsByOwner } from '../../../../lib/arb-db';
 import type { ArbFile } from '../../../../lib/arb-db';
@@ -121,35 +121,10 @@ const applicationTypes = ['Exterior Paint', 'Landscape Installation', 'Swimming 
 const selectedTypes = req.application_type ? req.application_type.split(',').map((s: string) => s.trim()).filter(Boolean) : [];
 ---
 
-<ProtectedPage>
-  <div class="min-h-screen bg-gray-50 font-body">
-    <header class="bg-white border-b border-gray-200">
-      <div class="max-w-4xl mx-auto px-4 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h1 class="text-xl font-heading font-bold text-clr-green">Member Portal</h1>
-          <p class="text-sm text-gray-500">Crooked Lake Reserve HOA</p>
-        </div>
-        <nav class="flex items-center gap-4">
-          <a href="/portal/dashboard" class="text-gray-600 hover:text-clr-green">Dashboard</a>
-          <a href="/portal/my-requests" class="text-clr-green font-medium relative">
-            My requests
-            {draftCount > 0 && (
-              <span class="absolute -top-1 -right-1 bg-amber-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center" title={`${draftCount} draft${draftCount === 1 ? '' : 's'}`}>
-                {draftCount}
-              </span>
-            )}
-          </a>
-          <a href="/portal/arb-request" class="text-gray-600 hover:text-clr-green">New ARB request</a>
-          <a href="/portal/documents" class="text-gray-600 hover:text-clr-green">Documents</a>
-          {(session.role === 'arb' || session.role === 'board' || session.role === 'admin') && (
-            <a href="/portal/arb-dashboard" class="text-gray-600 hover:text-clr-green">ARB Dashboard</a>
-          )}
-          <a href="/api/logout" class="text-sm text-gray-500 hover:text-clr-orange">Sign out</a>
-        </nav>
-      </div>
-    </header>
-
-    <PortalElevatedRoleBanner role={session.role} />
+<PortalLayout title="Edit ARB Request | Member Portal | Crooked Lake Reserve HOA">
+  <ProtectedPage>
+  <div class="min-h-screen portal-theme-bg font-body">
+    <PortalNav currentPath="/portal/my-requests" draftCount={draftCount} role={session.role} />
 
     <main class="max-w-2xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
       <h2 class="text-2xl font-heading font-bold text-clr-green mb-2">Edit ARB request #{req.id}</h2>
@@ -173,18 +148,18 @@ const selectedTypes = req.application_type ? req.application_type.split(',').map
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label for="applicant_name" class="block text-sm font-semibold text-gray-700 mb-1">Applicant's name</label>
-            <input id="applicant_name" name="applicant_name" type="text" value={req.applicant_name ?? ''} class="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-clr-green focus:ring-1 focus:ring-clr-green" placeholder="Your full name" />
+            <label for="applicant_name" class="block text-sm font-semibold text-gray-700 mb-1">Applicant's name <span class="text-red-600" aria-label="required">*</span></label>
+            <input id="applicant_name" name="applicant_name" type="text" required value={req.applicant_name ?? ''} class="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-clr-green focus:ring-1 focus:ring-clr-green" placeholder="Your full name" />
           </div>
           <div>
-            <label for="phone" class="block text-sm font-semibold text-gray-700 mb-1">Phone number</label>
-            <input id="phone" name="phone" type="tel" value={req.phone ?? ''} class="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-clr-green focus:ring-1 focus:ring-clr-green" placeholder="(555) 555-5555" />
+            <label for="phone" class="block text-sm font-semibold text-gray-700 mb-1">Phone number <span class="text-red-600" aria-label="required">*</span></label>
+            <input id="phone" name="phone" type="tel" required value={req.phone ?? ''} class="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-clr-green focus:ring-1 focus:ring-clr-green" placeholder="(555) 555-5555" />
           </div>
         </div>
 
         <div>
-          <label for="property_address" class="block text-sm font-semibold text-gray-700 mb-1">Property address</label>
-          <input id="property_address" name="property_address" type="text" value={req.property_address ?? ''} class="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-clr-green focus:ring-1 focus:ring-clr-green" placeholder="Street, lot or address" />
+          <label for="property_address" class="block text-sm font-semibold text-gray-700 mb-1">Property address <span class="text-red-600" aria-label="required">*</span></label>
+          <input id="property_address" name="property_address" type="text" required value={req.property_address ?? ''} class="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-clr-green focus:ring-1 focus:ring-clr-green" placeholder="Street, lot or address" />
         </div>
 
         <div>
@@ -200,7 +175,7 @@ const selectedTypes = req.application_type ? req.application_type.split(',').map
         </div>
 
         <div>
-          <label for="description" class="block text-sm font-semibold text-gray-700 mb-2">Description of changes</label>
+          <label for="description" class="block text-sm font-semibold text-gray-700 mb-2">Description of changes <span class="text-red-600" aria-label="required">*</span></label>
           <textarea
             id="description"
             name="description"
@@ -506,4 +481,5 @@ const selectedTypes = req.application_type ? req.application_type.split(',').map
       setInterval(checkSessionTimeout, 60 * 1000);
     })();
   </script>
-</ProtectedPage>
+  </ProtectedPage>
+</PortalLayout>

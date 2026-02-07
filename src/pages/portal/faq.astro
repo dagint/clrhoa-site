@@ -1,0 +1,104 @@
+---
+export const prerender = false;
+
+import PortalLayout from '../../layouts/PortalLayout.astro';
+import ProtectedPage from '../../components/ProtectedPage.astro';
+import PortalNav from '../../components/PortalNav.astro';
+import GlobalSearch from '../../components/GlobalSearch.astro';
+import { getSessionFromCookie } from '../../lib/auth';
+import { listArbRequestsByOwner } from '../../lib/arb-db';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const cookieHeader = Astro.request.headers.get('cookie') ?? undefined;
+let session = await getSessionFromCookie(cookieHeader, env?.SESSION_SECRET);
+if (!session && env?.SESSION_SECRET) session = await getSessionFromCookie(cookieHeader, env.SESSION_SECRET);
+if (!session) return Astro.redirect('/portal/login');
+
+const db = env?.DB;
+const allRequests = db ? await listArbRequestsByOwner(db, session.email) : [];
+const draftCount = allRequests.filter((r) => r.status === 'pending').length;
+---
+
+<PortalLayout title="FAQ | Member Portal | Crooked Lake Reserve HOA">
+  <ProtectedPage>
+  <div class="min-h-screen bg-gray-50 portal-theme-bg font-body">
+    <GlobalSearch fixed={true} class="portal-theme-header" />
+    <div class="pt-14">
+      <PortalNav currentPath="/portal/faq" draftCount={draftCount} role={session.role} />
+
+      <main class="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+        <h1 class="text-2xl font-heading font-bold text-clr-green mb-2">Portal FAQ</h1>
+        <p class="text-gray-600 portal-theme-text-muted mb-8">
+          Common questions about using the member portal.
+        </p>
+
+        <div class="space-y-6">
+          <section class="bg-white rounded-2xl border border-gray-100 p-6 portal-theme-card">
+            <h2 class="text-lg font-heading font-bold text-clr-green mb-3">How do I change my password?</h2>
+            <p class="text-gray-700 portal-theme-text">
+              The portal uses your email to sign in; there is no separate password. Access is controlled by the board. If you need to sign in from a new device or have trouble logging in, contact the board.
+            </p>
+          </section>
+
+          <section class="bg-white rounded-2xl border border-gray-100 p-6 portal-theme-card">
+            <h2 class="text-lg font-heading font-bold text-clr-green mb-3">How do I update my contact information?</h2>
+            <p class="text-gray-700 portal-theme-text">
+              Go to <strong>My account</strong> (in the main menu). Under &quot;Directory listing,&quot; click <strong>Edit directory info</strong>, update your name, address, or phone numbers, then click Save. Your listing is what other members see in the Directory.
+            </p>
+          </section>
+
+          <section class="bg-white rounded-2xl border border-gray-100 p-6 portal-theme-card">
+            <h2 class="text-lg font-heading font-bold text-clr-green mb-3">How do I submit an ARB request?</h2>
+            <p class="text-gray-700 portal-theme-text">
+              Click <strong>More</strong> in the menu, then <strong>New ARB request</strong>. Fill in the form (your name, property address, type of work, and description) and attach photos or documents if needed. You can save a draft and finish later from <strong>My requests</strong>. When ready, submit for review. You can also use an item from the <strong>Pre-approval library</strong> as a template to pre-fill the description.
+            </p>
+          </section>
+
+          <section class="bg-white rounded-2xl border border-gray-100 p-6 portal-theme-card">
+            <h2 class="text-lg font-heading font-bold text-clr-green mb-3">Where do I see the status of my ARB request?</h2>
+            <p class="text-gray-700 portal-theme-text">
+              Go to <strong>More</strong> then <strong>My requests</strong>. Each request shows its status (e.g. pending, in review, approved, rejected). If the ARB asks for changes, you will see their notes and can edit and resubmit from the same page.
+            </p>
+          </section>
+
+          <section class="bg-white rounded-2xl border border-gray-100 p-6 portal-theme-card">
+            <h2 class="text-lg font-heading font-bold text-clr-green mb-3">How do I report a maintenance issue?</h2>
+            <p class="text-gray-700 portal-theme-text">
+              Click <strong>More</strong> then <strong>Maintenance</strong>. Describe the issue and add a photo if helpful. Submit the form. The board will see it and can assign a vendor and update the status; you can check back on the same page.
+            </p>
+          </section>
+
+          <section class="bg-white rounded-2xl border border-gray-100 p-6 portal-theme-card">
+            <h2 class="text-lg font-heading font-bold text-clr-green mb-3">How do I turn off or change email or SMS notifications?</h2>
+            <p class="text-gray-700 portal-theme-text">
+              Go to <strong>My account</strong>. In the <strong>Notifications</strong> section you can uncheck specific email types you do not want, turn SMS alerts on or off, and add or change the phone number for SMS. You can also enable or disable browser push notifications there. Click <strong>Save notifications</strong> when done.
+            </p>
+          </section>
+
+          <section class="bg-white rounded-2xl border border-gray-100 p-6 portal-theme-card">
+            <h2 class="text-lg font-heading font-bold text-clr-green mb-3">Why can I not see other members&apos; phone numbers or emails in the Directory?</h2>
+            <p class="text-gray-700 portal-theme-text">
+              To protect privacy, contact details are hidden until you click <strong>Reveal phone</strong> or <strong>Reveal email</strong>. <strong>Each time you reveal a number or email, that action is logged</strong>; the board can see who revealed which contacts. This helps keep the directory useful while limiting misuse.
+            </p>
+          </section>
+
+          <section class="bg-white rounded-2xl border border-gray-100 p-6 portal-theme-card">
+            <h2 class="text-lg font-heading font-bold text-clr-green mb-3">Where do I pay my assessments?</h2>
+            <p class="text-gray-700 portal-theme-text">
+              The portal does not process payments. Go to <strong>More</strong> then <strong>Assessments</strong> to view your balance and payment history. Pay by the method the board specifies (e.g. check sent to the HOA address). Contact the board for current payment options.
+            </p>
+          </section>
+
+          <section class="bg-white rounded-2xl border border-gray-100 p-6 portal-theme-card">
+            <h2 class="text-lg font-heading font-bold text-clr-green mb-3">I cannot find what I need. What should I do?</h2>
+            <p class="text-gray-700 portal-theme-text">
+              Use the <strong>search bar</strong> at the top to search ARB requests, meetings, vendors, the directory, and the pre-approval library. Read the <strong>Documentation</strong> (under Help) for a guide to each section. If you still need help, contact the board.
+            </p>
+          </section>
+        </div>
+      </main>
+    </div>
+  </div>
+  </ProtectedPage>
+</PortalLayout>

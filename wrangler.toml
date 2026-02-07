@@ -26,9 +26,26 @@ id = "e936ea7760c04b268c4472eb24575d46"
 binding = "SESSION"
 id = "f2a5e8346928438baa1ca38e40ab200a"
 
+# KV: rate limiting (API) and login lockout. Create: npx wrangler kv namespace create RATE_LIMIT
+# Then set binding = "KV" and id = the printed id (replace placeholder below).
+[[kv_namespaces]]
+binding = "KV"
+id = "REPLACE_WITH_RATE_LIMIT_KV_ID"
+
 # R2: portal files (redacted minutes, budgets)
 [[r2_buckets]]
 binding = "CLOURHOA_FILES"
 bucket_name = "clrhoa-files"
 
 # SESSION_SECRET: set via wrangler secret put SESSION_SECRET (and .dev.vars for local)
+
+# Phase 3.5: Notifications (MailChannels + Twilio). Change emails without code.
+# For production, set MAILCHANNELS_API_KEY and Twilio vars via: wrangler secret put MAILCHANNELS_API_KEY
+[vars]
+NOTIFY_BOARD_EMAIL = "your_personal@gmail.com"
+NOTIFY_ARB_EMAIL = "your_personal@gmail.com"
+NOTIFY_NOREPLY_EMAIL = "noreply@clrhoa.com"
+MAILCHANNELS_API_KEY = "your_key"
+TWILIO_ACCOUNT_SID = "your_sid"
+TWILIO_AUTH_TOKEN = "your_token"
+TWILIO_PHONE_NUMBER = "+15551234567"

@@ -1,5 +1,6 @@
 ---
 title: Declaration of Covenants & Restrictions
+slug: covenants
 category: Governing Documents
 description: Covenants & Restrictions (2005) including Addendums A through F. Governing document for Crooked Lake Reserve.
 fileUrl: /docs/CLR-Covenants-2024.pdf

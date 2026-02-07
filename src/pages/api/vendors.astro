@@ -1,0 +1,289 @@
+---
+/**
+ * /api/vendors — GET: list (any auth). POST/PUT/DELETE: board only.
+ * POST/PUT: FormData with files; upload to R2 under vendors/{id}/.
+ */
+export const prerender = false;
+
+import { getSessionFromCookie, verifyCsrfToken, verifyOrigin } from '../../lib/auth';
+import {
+  listVendors,
+  getVendorById,
+  insertVendor,
+  updateVendor,
+  deleteVendor,
+  type VendorFile,
+} from '../../lib/vendors-db';
+
+const REQUEST_TIMEOUT_MS = 30 * 1000;
+
+function generateId(): string {
+  const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
+  let id = '';
+  const bytes = new Uint8Array(21);
+  crypto.getRandomValues(bytes);
+  for (let i = 0; i < 21; i++) id += chars[bytes[i]! % chars.length];
+  return id;
+}
+
+function safeFileName(name: string): string {
+  return name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 100) || 'file';
+}
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const userAgent = Astro.request.headers.get('user-agent') ?? null;
+const ipAddress = Astro.request.headers.get('cf-connecting-ip') ?? 
+  Astro.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
+let session = await getSessionFromCookie(
+  Astro.request.headers.get('cookie') ?? undefined,
+  env?.SESSION_SECRET,
+  userAgent,
+  ipAddress
+);
+
+if (!session && env?.SESSION_SECRET) {
+  session = await getSessionFromCookie(
+    Astro.request.headers.get('cookie') ?? undefined,
+    env.SESSION_SECRET
+  );
+}
+
+if (!session) {
+  return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+    status: 401,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const isBoard = session.role === 'board' || session.role === 'admin' || session.role === 'arb_board';
+const origin = Astro.request.headers.get('origin');
+const referer = Astro.request.headers.get('referer');
+const expectedOrigin = Astro.url.origin;
+if (!verifyOrigin(origin, referer, expectedOrigin)) {
+  return new Response(JSON.stringify({ error: 'Invalid origin.' }), {
+    status: 403,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const db = env?.DB;
+const r2 = env?.CLOURHOA_FILES;
+if (!db) {
+  return new Response(JSON.stringify({ error: 'Server configuration error' }), {
+    status: 503,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+// GET: list vendors (any authenticated user)
+if (Astro.request.method === 'GET') {
+  const vendors = await listVendors(db);
+  return new Response(JSON.stringify({ vendors }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+// DELETE: board only, JSON body
+if (Astro.request.method === 'DELETE') {
+  if (!isBoard) {
+    return new Response(JSON.stringify({ error: 'Forbidden' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  let body: { id?: string; csrf_token?: string; csrfToken?: string };
+  try {
+    body = await Astro.request.json();
+  } catch {
+    return new Response(JSON.stringify({ error: 'Invalid JSON' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  if (!verifyCsrfToken(session, body.csrf_token ?? body.csrfToken)) {
+    return new Response(JSON.stringify({ error: 'Invalid security token. Please refresh the page.' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  const id = (body.id ?? '').trim();
+  if (!id) {
+    return new Response(JSON.stringify({ error: 'id is required.' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  const deleted = await deleteVendor(db, id);
+  if (!deleted) {
+    return new Response(JSON.stringify({ error: 'Vendor not found or could not be deleted.' }), {
+      status: 404,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  return new Response(JSON.stringify({ success: true }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+// POST or PUT: FormData (board only)
+if (Astro.request.method !== 'POST' && Astro.request.method !== 'PUT') {
+  return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+    status: 405,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+if (!isBoard) {
+  return new Response(JSON.stringify({ error: 'Forbidden' }), {
+    status: 403,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+let formData: FormData;
+try {
+  const formDataPromise = Astro.request.formData();
+  const timeoutPromise = new Promise<never>((_, rej) => setTimeout(() => rej(new Error('Request timeout')), REQUEST_TIMEOUT_MS));
+  formData = await Promise.race([formDataPromise, timeoutPromise]);
+} catch (e) {
+  return new Response(JSON.stringify({ error: 'Invalid form data or request timeout.' }), {
+    status: 400,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const csrfToken = (formData.get('csrf_token') as string) ?? (formData.get('csrfToken') as string);
+if (!verifyCsrfToken(session, csrfToken)) {
+  return new Response(JSON.stringify({ error: 'Invalid security token. Please refresh the page.' }), {
+    status: 403,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const action = (formData.get('action') as string)?.trim() || 'create';
+const name = (formData.get('name') as string)?.trim() ?? null;
+const category = (formData.get('category') as string)?.trim() ?? null;
+const phone = (formData.get('phone') as string)?.trim() ?? null;
+const email = (formData.get('email') as string)?.trim() ?? null;
+const website = (formData.get('website') as string)?.trim() ?? null;
+const notes = (formData.get('notes') as string)?.trim() ?? null;
+
+// Collect file inputs (file_0, file_1, ...)
+const fileIndices = new Set<number>();
+for (const key of formData.keys()) {
+  const m = /^file_(\d+)$/.exec(key);
+  if (m) fileIndices.add(parseInt(m[1]!, 10));
+}
+const sortedIndices = Array.from(fileIndices).sort((a, b) => a - b);
+const files: { name: string; file: File }[] = [];
+for (const i of sortedIndices) {
+  const file = formData.get('file_' + i);
+  if (file instanceof File && file.size > 0) {
+    files.push({ name: file.name || 'file', file });
+  }
+}
+
+// POST: create vendor
+if (Astro.request.method === 'POST' && action === 'create') {
+  if (!name?.trim()) {
+    return new Response(JSON.stringify({ error: 'Name is required.' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  const id = await insertVendor(db, {
+    name: name.trim(),
+    category: category ?? 'Other',
+    phone,
+    email,
+    website,
+    notes,
+    filesJson: '[]',
+  });
+
+  const uploadedFiles: VendorFile[] = [];
+  if (r2 && files.length > 0) {
+    for (const { name: fileName, file } of files) {
+      const partId = generateId().slice(0, 8);
+      const safe = safeFileName(fileName);
+      const key = `vendors/${id}/${partId}_${safe}`;
+      const buf = await file.arrayBuffer();
+      await r2.put(key, buf, { httpMetadata: { contentType: file.type || 'application/octet-stream' } });
+      uploadedFiles.push({ name: fileName, key });
+    }
+    await updateVendor(db, id, { filesJson: JSON.stringify(uploadedFiles) });
+  }
+
+  return new Response(JSON.stringify({ success: true, id }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+// PUT: update vendor
+if (Astro.request.method === 'PUT' && action === 'update') {
+  const id = (formData.get('id') as string)?.trim();
+  if (!id) {
+    return new Response(JSON.stringify({ error: 'id is required for update.' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  const existing = await getVendorById(db, id);
+  if (!existing) {
+    return new Response(JSON.stringify({ error: 'Vendor not found.' }), {
+      status: 404,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  let existingFiles: VendorFile[] = [];
+  try {
+    existingFiles = JSON.parse(existing.files || '[]') as VendorFile[];
+  } catch {
+    existingFiles = [];
+  }
+
+  const newUploads: VendorFile[] = [];
+  if (r2 && files.length > 0) {
+    for (const { name: fileName, file } of files) {
+      const partId = generateId().slice(0, 8);
+      const safe = safeFileName(fileName);
+      const key = `vendors/${id}/${partId}_${safe}`;
+      const buf = await file.arrayBuffer();
+      await r2.put(key, buf, { httpMetadata: { contentType: file.type || 'application/octet-stream' } });
+      newUploads.push({ name: fileName, key });
+    }
+  }
+
+  const allFiles = [...existingFiles, ...newUploads];
+  const updated = await updateVendor(db, id, {
+    name: (name ?? existing.name)?.trim() ?? null,
+    category: (category ?? existing.category)?.trim() ?? 'Other',
+    phone: phone !== undefined && phone !== null ? phone : existing.phone,
+    email: email !== undefined && email !== null ? email : existing.email,
+    website: website !== undefined && website !== null ? website : existing.website,
+    notes: notes !== undefined && notes !== null ? notes : existing.notes,
+    filesJson: JSON.stringify(allFiles),
+  });
+
+  if (!updated) {
+    return new Response(JSON.stringify({ error: 'Failed to update vendor.' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  return new Response(JSON.stringify({ success: true, id }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+return new Response(JSON.stringify({ error: 'Invalid action or method.' }), {
+  status: 400,
+  headers: { 'Content-Type': 'application/json' },
+});
+---

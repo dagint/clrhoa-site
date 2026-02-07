@@ -37,6 +37,68 @@ export async function isEmailWhitelisted(
   return value !== null && value !== undefined;
 }
 
+/** Elevated roles (ARB, Board, both, or Admin). */
+export const ELEVATED_ROLES = new Set<string>(['arb', 'board', 'arb_board', 'admin']);
+export const VALID_ROLES = new Set<string>(['member', 'arb', 'board', 'arb_board', 'admin']);
+
+export function isElevatedRole(role: string): boolean {
+  return ELEVATED_ROLES.has(role.toLowerCase());
+}
+
+/**
+ * Set an email's role on the login whitelist (KV). Value is "1" for member or JSON { role } for elevated.
+ * Use when adding/editing an owner in board directory with a role selection.
+ */
+export async function setLoginWhitelistRole(
+  kv: KVNamespace | undefined,
+  email: string,
+  role: string
+): Promise<void> {
+  if (!kv || !email?.trim()) return;
+  const key = email.trim().toLowerCase();
+  const r = role?.trim().toLowerCase() || 'member';
+  const value = r === 'member' ? '1' : JSON.stringify({ role: r });
+  await kv.put(key, value);
+}
+
+/**
+ * Add an email to the login whitelist (KV) as a member only if not already present.
+ * Used when adding a new owner to the directory so they can sign in without manual KV setup.
+ * Does not overwrite existing entries (e.g. admin/board/arb).
+ */
+export async function addToLoginWhitelistIfMissing(
+  kv: KVNamespace | undefined,
+  email: string
+): Promise<void> {
+  if (!kv || !email?.trim()) return;
+  const key = email.trim().toLowerCase();
+  const existing = await kv.get(key);
+  if (existing !== null && existing !== undefined) return; // already on whitelist; do not overwrite role
+  await kv.put(key, '1'); // member
+}
+
+/**
+ * Remove an email from the login whitelist (KV) when they are removed from the directory.
+ * Skips removal if the KV entry has role "admin" so admins can still log in without being in the directory.
+ */
+export async function removeFromLoginWhitelistUnlessAdmin(
+  kv: KVNamespace | undefined,
+  email: string
+): Promise<void> {
+  if (!kv || !email?.trim()) return;
+  const key = email.trim().toLowerCase();
+  const value = await kv.get(key);
+  if (value == null) return;
+  try {
+    const data = JSON.parse(value) as { role?: string };
+    const role = typeof data.role === 'string' ? data.role.toLowerCase() : 'member';
+    if (role === 'admin') return; // do not remove; admin is exception
+  } catch {
+    // plain "1" or other format: treat as member, allow removal
+  }
+  await kv.delete(key);
+}
+
 /**
  * Get optional role from KV for whitelist entry (e.g. "admin"). Default "member".
  */
@@ -54,6 +116,36 @@ export async function getWhitelistRole(
   } catch {
     return 'member';
   }
+}
+
+/** Role labels suitable for directory display (board, admin, arb, arb_board). */
+const DISPLAY_ROLES = new Set<string>(['board', 'admin', 'arb', 'arb_board']);
+
+/**
+ * Get roles for a list of emails from KV. Returns only board/admin/arb (not member).
+ * Use for directory display so members can see who holds HOA roles. Safe: no secrets exposed.
+ */
+export async function getRolesForEmails(
+  kv: KVNamespace | undefined,
+  emails: (string | null | undefined)[]
+): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  if (!kv) return out;
+  const unique = [...new Set(emails.filter((e): e is string => Boolean(e?.trim())).map((e) => e!.trim().toLowerCase()))];
+  await Promise.all(
+    unique.map(async (email) => {
+      const value = await kv.get(email);
+      if (value == null) return;
+      try {
+        const data = JSON.parse(value) as { role?: string };
+        const role = typeof data.role === 'string' ? data.role.toLowerCase() : 'member';
+        if (DISPLAY_ROLES.has(role)) out.set(email, role);
+      } catch {
+        // ignore
+      }
+    })
+  );
+  return out;
 }
 
 /**

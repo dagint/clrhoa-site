@@ -1,0 +1,130 @@
+---
+export const prerender = false;
+
+import BoardLayout from '../../layouts/BoardLayout.astro';
+import { getSessionFromCookie } from '../../lib/auth';
+import { listPublicDocuments } from '../../lib/public-documents-db';
+import { BOARD_ONLY_SLUGS, ARB_FORM_SLUG } from '../../lib/public-documents-db';
+import { listArbRequestsByOwner } from '../../lib/arb-db';
+import { sanitizeForScriptInjection } from '../../lib/sanitize';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const cookieHeader = Astro.request.headers.get('cookie') ?? undefined;
+const session = await getSessionFromCookie(cookieHeader, env?.SESSION_SECRET);
+
+if (!session) {
+  return Astro.redirect('/portal/login');
+}
+
+const isBoard = session.role === 'board' || session.role === 'admin' || session.role === 'arb_board';
+const isArb = session.role === 'arb' || isBoard;
+if (!isBoard && !isArb) {
+  return Astro.redirect('/portal/dashboard');
+}
+
+const db = env?.DB;
+const docs = db ? await listPublicDocuments(db) : [];
+const allRequests = db ? await listArbRequestsByOwner(db, session.email) : [];
+const draftCount = allRequests.filter((r) => r.status === 'pending').length;
+
+function canEdit(slug: string): boolean {
+  if (BOARD_ONLY_SLUGS.includes(slug as typeof BOARD_ONLY_SLUGS[number])) return isBoard;
+  if (slug === ARB_FORM_SLUG) return isArb;
+  return false;
+}
+
+function formatDate(s: string | null): string {
+  if (!s) return '-';
+  try {
+    return new Date(s).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+  } catch {
+    return s;
+  }
+}
+---
+
+<BoardLayout title="Public documents" subtitle="Update bylaws, covenants, proxy form, and ARB request form" draftCount={draftCount} role={session.role}>
+  <div class="mb-8 p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-900" role="alert">
+    <p class="font-semibold">These documents are publicly accessible.</p>
+    <p class="text-sm mt-1">Anyone can view and download them from the <a href="/documents" class="underline font-medium" target="_blank" rel="noopener noreferrer">Documents page <span class="text-amber-800/80">(opens in new tab)</span></a> (no login required). Only upload files you intend to make public.</p>
+  </div>
+
+      <div class="space-y-6">
+        {docs.map((doc) => {
+          const editable = canEdit(doc.slug);
+          const isArbForm = doc.slug === ARB_FORM_SLUG;
+          return (
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+              <div class="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <h2 class="text-lg font-heading font-semibold text-clr-green">{doc.title}</h2>
+                  <p class="text-sm text-gray-600 mt-1">{doc.description ?? ''}</p>
+                  {doc.file_key && (
+                    <p class="text-xs text-gray-500 mt-2">
+                      Last updated: {formatDate(doc.updated_at)} by {doc.updated_by_email ?? '-'}
+                    </p>
+                  )}
+                  {!doc.file_key && (
+                    <p class="text-xs text-gray-500 mt-2">Currently showing the default file from the site. Upload a file to replace it.</p>
+                  )}
+                </div>
+                {editable ? (
+                  <form class="public-doc-form flex flex-wrap items-end gap-2" data-slug={doc.slug}>
+                    <input type="hidden" name="csrf_token" value={session.csrfToken ?? ''} />
+                    <input type="hidden" name="slug" value={doc.slug} />
+                    <label class="block">
+                      <span class="sr-only">Replace {doc.title}</span>
+                      <input type="file" name="file" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" class="block w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border file:border-gray-300 file:bg-gray-50 file:text-gray-700 hover:file:bg-gray-100" required />
+                    </label>
+                    <button type="submit" class="px-4 py-2 bg-clr-green text-white rounded-lg font-medium hover:brightness-110 text-sm">Replace</button>
+                    <p class="w-full text-xs text-gray-500 mt-1">PDF or Word (.pdf, .docx, .doc). This will be publicly accessible.</p>
+                  </form>
+                ) : (
+                  <p class="text-sm text-gray-500">
+                    {isArbForm ? 'Only ARB or Board can update this form.' : 'Only Board can update this document.'}
+                  </p>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+  <p class="mt-8 text-sm text-gray-500">
+    <strong>Board</strong> can update Bylaws, Covenants, and Proxy form. <strong>ARB or Board</strong> can update the ARB request form. Updated files are shown on the public <a href="/documents" class="text-clr-green hover:underline" target="_blank" rel="noopener noreferrer">Documents page <span class="text-gray-400">(opens in new tab)</span></a>.
+  </p>
+</BoardLayout>
+
+<script define:vars={{ csrfToken: sanitizeForScriptInjection(session?.csrfToken ?? '') }}>
+  document.querySelectorAll('.public-doc-form').forEach((form) => {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const f = e.target;
+      const slug = f.dataset.slug;
+      const fileInput = f.querySelector('input[type="file"]');
+      const file = fileInput?.files?.[0];
+      if (!file || !slug) return;
+      const fd = new FormData();
+      fd.set('slug', slug);
+      fd.set('file', file);
+      fd.set('csrf_token', (f.querySelector('input[name="csrf_token"]')?.value) || csrfToken || '');
+      const btn = f.querySelector('button[type="submit"]');
+      if (btn) btn.disabled = true;
+      try {
+        const res = await fetch('/api/public-document-upload', { method: 'POST', body: fd, credentials: 'same-origin' });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          alert(data.message || 'Document updated.');
+          window.location.reload();
+        } else {
+          alert(data.error || 'Upload failed.');
+        }
+      } catch (err) {
+        alert('Network error. Try again.');
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    });
+  });
+</script>
