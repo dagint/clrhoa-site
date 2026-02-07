@@ -4,35 +4,13 @@ export const prerender = false;
 import PortalLayout from '../../layouts/PortalLayout.astro';
 import ProtectedPage from '../../components/ProtectedPage.astro';
 import PortalNav from '../../components/PortalNav.astro';
-import { getSessionFromCookie, updateSessionActivity } from '../../lib/auth';
+import { getPortalContext } from '../../lib/portal-context';
 import { listArbRequestsByOwner, listArbFilesByRequest } from '../../lib/arb-db';
 import type { ArbFile } from '../../lib/arb-db';
 import { sanitizeForDisplay } from '../../lib/sanitize';
 
-const runtime = Astro.locals.runtime;
-const env = runtime?.env;
-const userAgent = Astro.request.headers.get('user-agent') ?? null;
-const ipAddress = Astro.request.headers.get('cf-connecting-ip') ?? 
-                  Astro.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
-const cookieHeader = Astro.request.headers.get('cookie') ?? undefined;
-let session = await getSessionFromCookie(
-  cookieHeader,
-  env?.SESSION_SECRET,
-  userAgent,
-  ipAddress
-);
-
-// If session validation fails due to fingerprint mismatch, try without fingerprint check
-if (!session && env?.SESSION_SECRET) {
-  session = await getSessionFromCookie(
-    cookieHeader,
-    env.SESSION_SECRET
-  );
-}
-
-if (!session) {
-  return Astro.redirect('/portal/login');
-}
+const { env, session } = await getPortalContext(Astro, { fingerprint: true });
+if (!session) return Astro.redirect('/portal/login');
 
 const db = env?.DB;
 const requests = db ? await listArbRequestsByOwner(db, session.email) : [];

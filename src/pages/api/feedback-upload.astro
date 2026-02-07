@@ -5,27 +5,16 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie } from '../../lib/auth';
+import { requireSession, jsonResponse } from '../../lib/api-helpers';
 
-const runtime = Astro.locals.runtime;
-const env = runtime?.env;
-const r2 = env?.CLOURHOA_FILES;
+const auth = await requireSession(Astro);
+if (auth.response) return auth.response;
+const { session } = auth;
 
-function jsonResponse(data: object, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { 'Content-Type': 'application/json' },
-  });
-}
-
-const session = await getSessionFromCookie(
-  Astro.request.headers.get('cookie') ?? undefined,
-  env?.SESSION_SECRET
-);
-
-if (!session) return jsonResponse({ error: 'Unauthorized' }, 401);
 const isBoard = session.role === 'board' || session.role === 'admin' || session.role === 'arb_board';
 if (!isBoard) return jsonResponse({ error: 'Forbidden' }, 403);
+
+const r2 = Astro.locals.runtime?.env?.CLOURHOA_FILES;
 if (!r2) return jsonResponse({ error: 'Server configuration error' }, 503);
 
 if (Astro.request.method !== 'POST') {

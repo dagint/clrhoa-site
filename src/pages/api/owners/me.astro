@@ -6,7 +6,7 @@
 export const prerender = false;
 
 import { getSessionFromCookie, verifyCsrfToken, verifyOrigin } from '../../../lib/auth';
-import { getOwnerByEmail, upsertOwnerByEmail } from '../../../lib/directory-db';
+import { getOwnerByEmail, upsertOwnerByEmail, insertDirectoryLog } from '../../../lib/directory-db';
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
@@ -117,6 +117,8 @@ const phonesArr = rawPhones !== undefined ? rawPhones.slice(0, MAX_PHONES) : und
 const phonesJson = phonesArr !== undefined ? JSON.stringify(phonesArr) : undefined;
 
 const result = await upsertOwnerByEmail(db, email, { name, address, phones: phonesJson });
+
+await insertDirectoryLog(db, session.email, '(directory info updated)', null, null, session.role ?? null);
 
 return new Response(JSON.stringify({
   success: true,

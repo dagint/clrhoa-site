@@ -1,6 +1,6 @@
 # Backup & Recovery Procedures
 
-This document outlines backup and recovery procedures for the ARB portal.
+This document outlines backup and recovery procedures for the HOA portal. For **strategy, compliance, and implementation plan** (what to backup, Cloudflare R2 vs Google Drive, scheduling, FL HOA notes), see [BACKUP_STRATEGY_AND_COMPLIANCE.md](./BACKUP_STRATEGY_AND_COMPLIANCE.md).
 
 ## Database Backups (D1)
 
@@ -22,23 +22,17 @@ npm run db:backup
 
 Backups are saved to `backups/d1-backup-YYYYMMDD-HHMMSS.sql`.
 
-### Automated Backups
+### Automated Backups (Cloudflare + optional Google Drive)
 
-Cloudflare D1 supports scheduled backups via Workers cron triggers. To set up:
+Automated backups are implemented by a **separate Cloudflare Worker** with a cron trigger (see [BACKUP_STRATEGY_AND_COMPLIANCE.md](./BACKUP_STRATEGY_AND_COMPLIANCE.md)):
 
-1. Create a Worker with a cron trigger
-2. Use `wrangler d1 export` command in the Worker
-3. Store backups in R2 or another storage service
+1. **Cloudflare R2:** The Worker uses the D1 Export REST API (trigger export → poll → fetch SQL), then uploads the dump (gzipped) to R2 under a backup prefix (e.g. `backups/d1/`). KV whitelist can be dumped to a small JSON and stored in R2 as well. Workers cannot run `wrangler d1 export`; they must use the [D1 Export API](https://developers.cloudflare.com/api/resources/d1/subresources/database/methods/export/).
+2. **Google Workspace Drive (optional):** A Board or Admin configures backup in the portal (**Board → Backups**): connects Google Drive (OAuth), selects a folder, and sets a schedule (e.g. daily 2 AM, weekly Sunday). The same Worker then uploads the same backup set (D1 + whitelist, optionally R2 manifest) to that Drive folder. Keeps size minimal and uses your existing Google Workspace.
+3. **Retention:** Worker deletes backups older than `BACKUP_RETENTION_DAYS` (default 30). Drive retention is managed by the board in the chosen folder.
 
-**Example Worker (for future implementation):**
-```javascript
-export default {
-  async scheduled(event, env, ctx) {
-    // Export D1 database
-    // Upload to R2 backup bucket
-  }
-}
-```
+**Deploy the backup Worker:** From project root run `npm run backup:deploy`. Set secrets and vars in `workers/backup/wrangler.toml`: `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN` (secret), and for Google Drive: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `BACKUP_ENCRYPTION_KEY` (secrets).
+
+**Board/Admin: download full backup to your computer:** Go to **Board → Backups** and click **Download backup (ZIP)**. The ZIP contains the current D1 SQL dump and KV whitelist JSON. The main app needs `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` (and optionally `D1_DATABASE_ID`) in env for this to work.
 
 ### Restore from Backup
 
@@ -108,6 +102,12 @@ npx wrangler r2 object get clrhoa-files --key="arb/REQUEST_ID/originals/file.jpg
 2. **Check backups**: Restore from R2 backup if available
 3. **Re-upload**: If files are lost, request owners to re-upload
 
+### Restoring from R2 or Google Drive backups
+
+- **D1:** Download the `.sql.gz` from R2 (Dashboard or `wrangler r2 object get`) or from the Google Drive backup folder. Decompress, then run `npx wrangler d1 execute clrhoa_db --remote --file=path/to/backup.sql` (see Restore from Backup above). Restoring overwrites existing data; back up the current DB first if needed.
+- **KV whitelist:** If you have `whitelist-YYYY-MM-DD.json`, use a small script or Worker to re-put keys into the `CLOURHOA_USERS` KV namespace. Document the JSON shape in the backup Worker so restore is repeatable.
+- **R2 files:** If you only backed up a manifest, R2 originals are still in place. If you backed up full R2 to Drive, restore by uploading from Drive back to R2 (or a new bucket) and updating any key references if needed.
+
 ## Backup Retention Policy
 
 - **Daily backups**: Keep for 7 days
@@ -127,9 +127,9 @@ npx wrangler r2 object get clrhoa-files --key="arb/REQUEST_ID/originals/file.jpg
 
 ## Backup Storage Locations
 
-- **Local backups**: `backups/` directory (gitignored)
-- **Remote backups**: R2 bucket `clrhoa-backups` (recommended)
-- **Off-site backups**: Consider additional storage for disaster recovery
+- **Local backups**: `backups/` directory (gitignored) — from manual `npm run db:backup` / `backup-d1.sh`.
+- **Remote backups (Cloudflare)**: R2 prefix e.g. `backups/d1/` and `backups/kv/` in the main bucket, or a dedicated `clrhoa-backups` bucket. No extra cost beyond R2 storage.
+- **Off-site backups**: Google Workspace Drive folder chosen in the portal (Board → Backups). Uses existing Workspace; retention managed by the board.
 
 ## Monitoring
 

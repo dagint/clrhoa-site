@@ -2,25 +2,17 @@
 export const prerender = false;
 
 import BoardLayout from '../../layouts/BoardLayout.astro';
-import { getSessionFromCookie } from '../../lib/auth';
+import { getBoardContext } from '../../lib/board-context';
 import { listMemberDocuments } from '../../lib/member-documents-db';
 import { MEMBER_DOC_CATEGORIES, MEMBER_DOC_CATEGORY_LABELS } from '../../lib/member-documents-db';
 import { listArbRequestsByOwner } from '../../lib/arb-db';
 import { sanitizeForScriptInjection } from '../../lib/sanitize';
 
-const runtime = Astro.locals.runtime;
-const env = runtime?.env;
-const cookieHeader = Astro.request.headers.get('cookie') ?? undefined;
-const session = await getSessionFromCookie(cookieHeader, env?.SESSION_SECRET);
-
-if (!session) {
-  return Astro.redirect('/portal/login');
-}
-
+const ctx = await getBoardContext(Astro);
+if (ctx.redirect) return Astro.redirect(ctx.redirect);
+const { env, session } = ctx;
 const isBoard = session.role === 'board' || session.role === 'admin' || session.role === 'arb_board';
-if (!isBoard) {
-  return Astro.redirect('/portal/dashboard');
-}
+if (!isBoard) return Astro.redirect('/portal/dashboard');
 
 const db = env?.DB;
 const docs = db ? await listMemberDocuments(db) : [];
@@ -168,7 +160,11 @@ const docsByCategory = MEMBER_DOC_CATEGORIES.map((cat) => ({
         const id = this.getAttribute('data-id');
         const title = this.getAttribute('data-title') || 'this document';
         if (!id || !confirm('Delete "' + title + '"? This cannot be undone.')) return;
+        hideMessage();
         const token = csrfInput?.value || csrfToken || '';
+        const b = this;
+        b.disabled = true;
+        b.setAttribute('aria-busy', 'true');
         try {
           const res = await fetch('/api/member-document', {
             method: 'DELETE',
@@ -178,12 +174,16 @@ const docsByCategory = MEMBER_DOC_CATEGORIES.map((cat) => ({
           });
           const data = await res.json();
           if (res.ok && data.success) {
-            window.location.reload();
+            showMessage('Document deleted.', false);
+            setTimeout(function () { window.location.reload(); }, 1500);
           } else {
-            alert(data.error || 'Delete failed.');
+            showMessage(data.error || 'Delete failed.', true);
           }
         } catch (err) {
-          alert('Network error. Try again.');
+          showMessage('Network error. Try again.', true);
+        } finally {
+          b.disabled = false;
+          b.removeAttribute('aria-busy');
         }
       });
     });

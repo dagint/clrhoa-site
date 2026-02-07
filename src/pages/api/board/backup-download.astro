@@ -1,0 +1,127 @@
+---
+/**
+ * GET /api/board/backup-download — Board and Admin only. Returns a ZIP with D1 SQL dump + KV whitelist.
+ * Requires env: CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN, D1_DATABASE_ID (or use same as wrangler).
+ */
+export const prerender = false;
+
+import { getSessionFromCookie } from '../../../lib/auth';
+import { buildZip } from '../../../lib/zip-simple';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env as import('../../../env.d').Env & {
+  CLOUDFLARE_ACCOUNT_ID?: string;
+  CLOUDFLARE_API_TOKEN?: string;
+  D1_DATABASE_ID?: string;
+};
+
+const session = await getSessionFromCookie(
+  Astro.request.headers.get('cookie') ?? undefined,
+  env?.SESSION_SECRET
+);
+
+if (!session) {
+  return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+    status: 401,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const isBoardOrAdmin = session.role === 'board' || session.role === 'admin';
+if (!isBoardOrAdmin) {
+  return new Response(JSON.stringify({ error: 'Forbidden' }), {
+    status: 403,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const accountId = env?.CLOUDFLARE_ACCOUNT_ID;
+const apiToken = env?.CLOUDFLARE_API_TOKEN;
+const databaseId = env?.D1_DATABASE_ID ?? 'a214f9da-3577-4ee7-bc50-bc9b9754a79c';
+
+if (!accountId || !apiToken) {
+  return new Response(JSON.stringify({ error: 'Backup not configured (missing Cloudflare API credentials)' }), {
+    status: 503,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const CF_API = 'https://api.cloudflare.com/client/v4';
+const base = `${CF_API}/accounts/${accountId}/d1/database/${databaseId}/export`;
+const headers = {
+  Authorization: `Bearer ${apiToken}`,
+  'Content-Type': 'application/json',
+};
+
+// Start export
+let res = await fetch(base, {
+  method: 'POST',
+  headers,
+  body: JSON.stringify({ output_format: 'polling' }),
+});
+if (!res.ok) {
+  const t = await res.text();
+  return new Response(JSON.stringify({ error: `D1 export failed: ${t}` }), {
+    status: 502,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const start = (await res.json()) as { result?: { at_bookmark?: string }; success?: boolean };
+if (!start.success || !start.result?.at_bookmark) {
+  return new Response(JSON.stringify({ error: 'D1 export invalid response' }), {
+    status: 502,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+let bookmark = start.result.at_bookmark;
+
+// Poll until complete
+for (let i = 0; i < 60; i++) {
+  await new Promise((r) => setTimeout(r, 3000));
+  res = await fetch(base, { method: 'POST', headers, body: JSON.stringify({ current_bookmark: bookmark }) });
+  if (!res.ok) break;
+  const poll = (await res.json()) as { result?: { result?: { signed_url?: string }; status?: string; current_bookmark?: string }; success?: boolean };
+  if (!poll.success || !poll.result) break;
+  const r = poll.result;
+  if (r.result?.signed_url && r.status === 'complete') {
+    const sqlRes = await fetch(r.result.signed_url);
+    if (!sqlRes.ok) break;
+    const sql = await sqlRes.text();
+
+    // Dump KV whitelist
+    const kv = env?.CLOURHOA_USERS;
+    const whitelist: Record<string, string> = {};
+    if (kv) {
+      let cursor: string | undefined;
+      do {
+        const list = await kv.list({ limit: 1000, cursor });
+        for (const k of list.keys) {
+          const v = await kv.get(k.name);
+          if (v != null) whitelist[k.name] = v;
+        }
+        cursor = list.list_complete ? undefined : list.cursor;
+      } while (cursor);
+    }
+
+    const date = new Date().toISOString().slice(0, 10);
+    const zip = buildZip([
+      { name: `backup-${date}.sql`, data: sql },
+      { name: `whitelist-${date}.json`, data: JSON.stringify(whitelist, null, 2) },
+    ]);
+
+    return new Response(zip, {
+      headers: {
+        'Content-Type': 'application/zip',
+        'Content-Disposition': `attachment; filename="clrhoa-backup-${date}.zip"`,
+      },
+    });
+  }
+  if (r.current_bookmark) bookmark = r.current_bookmark;
+}
+
+return new Response(JSON.stringify({ error: 'D1 export timed out' }), {
+  status: 504,
+  headers: { 'Content-Type': 'application/json' },
+});
+---

@@ -9,6 +9,7 @@ export interface Meeting {
   datetime: string;
   location: string | null;
   agenda_r2_key: string | null;
+  post_to_public_news: number;
   created_by: string | null;
   created: string;
 }
@@ -43,13 +44,15 @@ export function createMeetingId(): string {
   return `mtg_${generateId(14)}`;
 }
 
+const MEETING_SELECT =
+  'id, title, description, datetime, location, agenda_r2_key, COALESCE(post_to_public_news, 0) as post_to_public_news, created_by, created';
+
 /** List upcoming meetings (datetime >= now), sorted by datetime. */
 export async function listUpcomingMeetings(db: D1Database): Promise<Meeting[]> {
   const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
   const result = await db
     .prepare(
-      `SELECT id, title, description, datetime, location, agenda_r2_key, created_by, created
-       FROM meetings WHERE datetime >= ? ORDER BY datetime ASC`
+      `SELECT ${MEETING_SELECT} FROM meetings WHERE datetime >= ? ORDER BY datetime ASC`
     )
     .bind(now)
     .all<Meeting>();
@@ -81,8 +84,7 @@ export async function listUpcomingWithCountsAndUser(
 export async function listAllMeetings(db: D1Database): Promise<Meeting[]> {
   const result = await db
     .prepare(
-      `SELECT id, title, description, datetime, location, agenda_r2_key, created_by, created
-       FROM meetings ORDER BY datetime DESC`
+      `SELECT ${MEETING_SELECT} FROM meetings ORDER BY datetime DESC`
     )
     .all<Meeting>();
   return result.results ?? [];
@@ -92,8 +94,27 @@ export async function listAllMeetings(db: D1Database): Promise<Meeting[]> {
 export async function getMeetingById(db: D1Database, id: string): Promise<Meeting | null> {
   return db
     .prepare(
-      `SELECT id, title, description, datetime, location, agenda_r2_key, created_by, created
-       FROM meetings WHERE id = ? LIMIT 1`
+      `SELECT ${MEETING_SELECT} FROM meetings WHERE id = ? LIMIT 1`
+    )
+    .bind(id)
+    .first<Meeting>();
+}
+
+/** List meetings that are posted to public news (for public News page). */
+export async function listMeetingsForPublicNews(db: D1Database): Promise<Meeting[]> {
+  const result = await db
+    .prepare(
+      `SELECT ${MEETING_SELECT} FROM meetings WHERE COALESCE(post_to_public_news, 0) = 1 ORDER BY datetime DESC`
+    )
+    .all<Meeting>();
+  return result.results ?? [];
+}
+
+/** Get a single meeting by id only if it is posted to public news (for public detail page). */
+export async function getPublicMeetingById(db: D1Database, id: string): Promise<Meeting | null> {
+  return db
+    .prepare(
+      `SELECT ${MEETING_SELECT} FROM meetings WHERE id = ? AND COALESCE(post_to_public_news, 0) = 1 LIMIT 1`
     )
     .bind(id)
     .first<Meeting>();
@@ -162,13 +183,15 @@ export async function insertMeeting(
     datetime: string;
     location: string | null;
     agenda_r2_key?: string | null;
+    post_to_public_news?: number;
     created_by: string;
   }
 ): Promise<void> {
+  const postToPublic = data.post_to_public_news ? 1 : 0;
   await db
     .prepare(
-      `INSERT INTO meetings (id, title, description, datetime, location, agenda_r2_key, created_by, created)
-       VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))`
+      `INSERT INTO meetings (id, title, description, datetime, location, agenda_r2_key, post_to_public_news, created_by, created)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
     )
     .bind(
       id,
@@ -177,6 +200,7 @@ export async function insertMeeting(
       data.datetime,
       data.location?.trim() || null,
       data.agenda_r2_key ?? null,
+      postToPublic,
       data.created_by
     )
     .run();
@@ -192,10 +216,13 @@ export async function updateMeeting(
     datetime?: string;
     location?: string | null;
     agenda_r2_key?: string | null;
+    post_to_public_news?: number;
   }
 ): Promise<boolean> {
   const meeting = await getMeetingById(db, id);
   if (!meeting) return false;
+  const postToPublic =
+    data.post_to_public_news !== undefined ? (data.post_to_public_news ? 1 : 0) : meeting.post_to_public_news;
   await db
     .prepare(
       `UPDATE meetings SET
@@ -203,7 +230,8 @@ export async function updateMeeting(
         description = ?,
         datetime = COALESCE(?, datetime),
         location = ?,
-        agenda_r2_key = ?
+        agenda_r2_key = ?,
+        post_to_public_news = ?
        WHERE id = ?`
     )
     .bind(
@@ -212,6 +240,7 @@ export async function updateMeeting(
       data.datetime ?? meeting.datetime,
       data.location !== undefined ? (data.location?.trim() || null) : meeting.location,
       data.agenda_r2_key !== undefined ? data.agenda_r2_key : meeting.agenda_r2_key,
+      postToPublic,
       id
     )
     .run();

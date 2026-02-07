@@ -2,25 +2,14 @@
 export const prerender = false;
 
 import BoardLayout from '../../layouts/BoardLayout.astro';
-import { getSessionFromCookie, getRolesForEmails } from '../../lib/auth';
+import { getBoardContext } from '../../lib/board-context';
+import { getRolesForEmails } from '../../lib/auth';
 import { listOwners } from '../../lib/directory-db';
 import { listArbRequestsByOwner } from '../../lib/arb-db';
 
-const runtime = Astro.locals.runtime;
-const env = runtime?.env;
-const cookieHeader = Astro.request.headers.get('cookie') ?? undefined;
-let session = await getSessionFromCookie(
-  cookieHeader,
-  env?.SESSION_SECRET
-);
-
-if (!session) {
-  return Astro.redirect('/portal/login');
-}
-
-if (session.role !== 'board' && session.role !== 'admin' && session.role !== 'arb' && session.role !== 'arb_board') {
-  return Astro.redirect('/portal/dashboard');
-}
+const ctx = await getBoardContext(Astro);
+if (ctx.redirect) return Astro.redirect(ctx.redirect);
+const { env, session } = ctx;
 
 const db = env?.DB;
 const owners = db ? await listOwners(db) : [];
@@ -34,6 +23,7 @@ function roleLabel(role: string): string {
 ---
 
 <BoardLayout title="Directory" subtitle="Manage homeowner directory" draftCount={draftCount} role={session.role}>
+  <div id="directory-message" class="hidden mb-4 p-4 rounded-xl border" role="status" aria-live="polite" aria-atomic="true"></div>
   <h2 class="text-xl font-heading font-bold text-clr-green mb-6">Add or edit owner</h2>
 
       <form id="owner-form" class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-8 space-y-4">
@@ -68,8 +58,16 @@ function roleLabel(role: string): string {
             This role has elevated access (ARB dashboard, Board tools, or full admin). Assign only to trusted people.
           </p>
         </div>
+        <div>
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" id="owner-is-primary" name="is_primary" class="rounded border-gray-300 text-clr-green focus:ring-clr-green" checked />
+            <span class="text-sm font-medium text-gray-700">Primary contact at this address</span>
+          </label>
+          <p class="mt-1 text-xs text-gray-500">One primary per property for dues/assessments. Uncheck if another person at this address is the primary.</p>
+        </div>
+        <div id="owner-form-message" class="hidden p-3 rounded-lg border" role="status" aria-live="polite"></div>
         <div class="flex gap-3">
-          <button type="submit" id="owner-submit" class="px-4 py-2 bg-clr-green text-white rounded-lg font-medium hover:brightness-110">Add owner</button>
+          <button type="submit" id="owner-submit" class="px-4 py-2 bg-clr-green text-white rounded-lg font-medium hover:brightness-110" aria-busy="false">Add owner</button>
           <button type="button" id="owner-cancel-edit" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 hidden">Cancel edit</button>
         </div>
       </form>
@@ -107,6 +105,7 @@ function roleLabel(role: string): string {
                 <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
                 <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-24">Role</th>
                 <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Address</th>
+                <th scope="col" class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase w-20">Primary</th>
                 <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
               </tr>
             </thead>
@@ -129,8 +128,15 @@ function roleLabel(role: string): string {
                     )}
                   </td>
                   <td class="px-4 py-3 text-gray-600">{owner.address ?? '-'}</td>
+                  <td class="px-4 py-3 text-center">
+                    {(owner.is_primary ?? 1) === 1 ? (
+                      <span class="inline-block px-2 py-0.5 text-xs font-medium rounded bg-clr-green/15 text-clr-green" title="Primary contact for this address (dues/assessments)">Primary</span>
+                    ) : (
+                      <span class="text-gray-400">—</span>
+                    )}
+                  </td>
                   <td class="px-4 py-3">
-                    <button type="button" class="edit-owner-btn text-sm text-clr-green hover:underline mr-2" data-id={owner.id} data-name={owner.name ?? ''} data-address={owner.address ?? ''} data-phone={owner.phone ?? ''} data-email={owner.email ?? ''} data-role={role ?? 'member'}>Edit</button>
+                    <button type="button" class="edit-owner-btn text-sm text-clr-green hover:underline mr-2" data-id={owner.id} data-name={owner.name ?? ''} data-address={owner.address ?? ''} data-phone={owner.phone ?? ''} data-email={owner.email ?? ''} data-role={role ?? 'member'} data-is-primary={(owner.is_primary ?? 1) === 1 ? '1' : '0'}>Edit</button>
                     <button type="button" class="delete-owner-btn text-sm text-red-600 hover:underline" data-id={owner.id}>Delete</button>
                   </td>
                 </tr>
@@ -154,6 +160,7 @@ function roleLabel(role: string): string {
       const emailInput = document.getElementById('owner-email');
       const roleSelect = document.getElementById('owner-role');
       const elevatedWarning = document.getElementById('elevated-role-warning');
+      const isPrimaryCheckbox = document.getElementById('owner-is-primary');
       const submitBtn = document.getElementById('owner-submit');
       const cancelBtn = document.getElementById('owner-cancel-edit');
       const csrfInput = document.getElementById('form-csrf');
@@ -176,6 +183,7 @@ function roleLabel(role: string): string {
         phoneInput.value = '';
         emailInput.value = '';
         if (roleSelect) { roleSelect.value = 'member'; formInitialRole = 'member'; }
+        if (isPrimaryCheckbox) isPrimaryCheckbox.checked = true;
         updateElevatedWarning();
         submitBtn.textContent = 'Add owner';
         cancelBtn.classList.add('hidden');
@@ -191,6 +199,7 @@ function roleLabel(role: string): string {
           const role = this.getAttribute('data-role') || 'member';
           formInitialRole = role;
           if (roleSelect) roleSelect.value = role;
+          if (isPrimaryCheckbox) isPrimaryCheckbox.checked = (this.getAttribute('data-is-primary') || '1') === '1';
           updateElevatedWarning();
           submitBtn.textContent = 'Update owner';
           cancelBtn.classList.remove('hidden');
@@ -226,6 +235,22 @@ function roleLabel(role: string): string {
         cb.addEventListener('change', updateDeleteSelectedState);
       });
 
+      const dirMsg = document.getElementById('directory-message');
+      const formMsg = document.getElementById('owner-form-message');
+      function showDirMsg(text, isError) {
+        if (!dirMsg) return;
+        dirMsg.textContent = text;
+        dirMsg.className = 'mb-4 p-4 rounded-xl border ' + (isError ? 'bg-red-50 border-red-200 text-red-800' : 'bg-green-50 border-green-200 text-green-800');
+        dirMsg.classList.remove('hidden');
+      }
+      function showFormMsg(text, isError) {
+        if (!formMsg) return;
+        formMsg.textContent = text;
+        formMsg.className = 'p-3 rounded-lg border ' + (isError ? 'bg-red-50 border-red-200 text-red-800' : 'bg-green-50 border-green-200 text-green-800');
+        formMsg.classList.remove('hidden');
+      }
+      function clearFormMsg() { if (formMsg) { formMsg.textContent = ''; formMsg.classList.add('hidden'); } }
+
       const deleteSelectedBtn = document.getElementById('delete-selected-btn');
       if (deleteSelectedBtn) {
         deleteSelectedBtn.addEventListener('click', async function () {
@@ -233,16 +258,26 @@ function roleLabel(role: string): string {
           if (ids.length === 0) return;
           if (!confirm(`Remove ${ids.length} owner(s) from the directory?`)) return;
           const token = (csrfInput && csrfInput.value) || csrfToken || '';
-          const res = await fetch('/api/owners', {
-            method: 'DELETE',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ids, csrf_token: token }),
-          });
-          const data = await res.json();
-          if (res.ok && data.success) {
-            window.location.reload();
-          } else {
-            alert(data.error || 'Delete failed');
+          deleteSelectedBtn.disabled = true;
+          deleteSelectedBtn.setAttribute('aria-busy', 'true');
+          try {
+            const res = await fetch('/api/owners', {
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ ids, csrf_token: token }),
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+              showDirMsg('Owner(s) removed.', false);
+              setTimeout(function () { window.location.reload(); }, 1500);
+            } else {
+              showDirMsg(data.error || 'Delete failed', true);
+            }
+          } catch (err) {
+            showDirMsg('Network error. Try again.', true);
+          } finally {
+            deleteSelectedBtn.disabled = false;
+            deleteSelectedBtn.removeAttribute('aria-busy');
           }
         });
       }
@@ -252,22 +287,31 @@ function roleLabel(role: string): string {
           const id = this.getAttribute('data-id');
           if (!id || !confirm('Remove this owner from the directory?')) return;
           const token = (csrfInput && csrfInput.value) || csrfToken || '';
-          const res = await fetch('/api/owners', {
-            method: 'DELETE',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ids: [id], csrf_token: token }),
-          });
-          const data = await res.json();
-          if (res.ok && data.success) {
-            window.location.reload();
-          } else {
-            alert(data.error || 'Delete failed');
+          const b = this; b.disabled = true; b.setAttribute('aria-busy', 'true');
+          try {
+            const res = await fetch('/api/owners', {
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ ids: [id], csrf_token: token }),
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+              showDirMsg('Owner removed.', false);
+              setTimeout(function () { window.location.reload(); }, 1500);
+            } else {
+              showDirMsg(data.error || 'Delete failed', true);
+            }
+          } catch (err) {
+            showDirMsg('Network error. Try again.', true);
+          } finally {
+            b.disabled = false; b.removeAttribute('aria-busy');
           }
         });
       });
 
       form?.addEventListener('submit', async function (e) {
         e.preventDefault();
+        clearFormMsg();
         const token = (csrfInput && csrfInput.value) || csrfToken || '';
         const id = idInput.value.trim();
         const selectedRole = (roleSelect && roleSelect.value) || 'member';
@@ -282,13 +326,15 @@ function roleLabel(role: string): string {
           phone: phoneInput.value.trim() || null,
           email: emailInput.value.trim() || null,
           role: selectedRole,
+          is_primary: isPrimaryCheckbox ? isPrimaryCheckbox.checked : true,
           csrf_token: token,
         };
         if (isNewAdd && !payload.email) {
-          alert('Email is required when adding a user.');
+          showFormMsg('Email is required when adding a user.', true);
           return;
         }
         submitBtn.disabled = true;
+        submitBtn.setAttribute('aria-busy', 'true');
         try {
           if (id) {
             const res = await fetch('/api/owners', {
@@ -298,9 +344,10 @@ function roleLabel(role: string): string {
             });
             const data = await res.json();
             if (res.ok && data.success) {
-              window.location.reload();
+              showFormMsg('Owner updated.', false);
+              setTimeout(function () { window.location.reload(); }, 1500);
             } else {
-              alert(data.error || 'Update failed');
+              showFormMsg(data.error || 'Update failed', true);
             }
           } else {
             const res = await fetch('/api/owners', {
@@ -310,13 +357,17 @@ function roleLabel(role: string): string {
             });
             const data = await res.json();
             if (res.ok && data.success) {
-              window.location.reload();
+              showFormMsg('Owner added.', false);
+              setTimeout(function () { window.location.reload(); }, 1500);
             } else {
-              alert(data.error || 'Add failed');
+              showFormMsg(data.error || 'Add failed', true);
             }
           }
+        } catch (err) {
+          showFormMsg('Network error. Try again.', true);
         } finally {
           submitBtn.disabled = false;
+          submitBtn.removeAttribute('aria-busy');
         }
       });
 

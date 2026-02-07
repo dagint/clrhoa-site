@@ -5,27 +5,16 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie } from '../../lib/auth';
+import { requireSession, requireDb, jsonResponse } from '../../lib/api-helpers';
 import { getMeetingById, setRsvp } from '../../lib/meetings-db';
 
-const runtime = Astro.locals.runtime;
-const env = runtime?.env;
-const db = env?.DB;
+const auth = await requireSession(Astro);
+if (auth.response) return auth.response;
+const { session } = auth;
 
-function jsonResponse(data: object, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { 'Content-Type': 'application/json' },
-  });
-}
-
-const session = await getSessionFromCookie(
-  Astro.request.headers.get('cookie') ?? undefined,
-  env?.SESSION_SECRET
-);
-
-if (!session) return jsonResponse({ error: 'Unauthorized' }, 401);
-if (!db) return jsonResponse({ error: 'Server configuration error' }, 503);
+const dbResult = requireDb(Astro.locals.runtime?.env);
+if (dbResult.response) return dbResult.response;
+const { db } = dbResult;
 
 if (Astro.request.method !== 'POST') {
   return new Response(null, { status: 405, headers: { Allow: 'POST' } });

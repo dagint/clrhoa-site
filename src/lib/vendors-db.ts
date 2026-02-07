@@ -22,6 +22,9 @@ export interface VendorFile {
   key: string;
 }
 
+const VENDOR_SELECT =
+  'id, name, category, phone, email, website, notes, files, created, COALESCE(show_on_public, 1) as show_on_public';
+
 export interface Vendor {
   id: string;
   name: string | null;
@@ -32,11 +35,22 @@ export interface Vendor {
   notes: string | null;
   files: string; // JSON array of { name, key }
   created: string | null;
+  show_on_public: number;
 }
 
 export async function listVendors(db: D1Database): Promise<Vendor[]> {
   const { results } = await db
-    .prepare('SELECT id, name, category, phone, email, website, notes, files, created FROM vendors ORDER BY category ASC, name ASC')
+    .prepare(`SELECT ${VENDOR_SELECT} FROM vendors ORDER BY category ASC, name ASC`)
+    .all<Vendor>();
+  return results ?? [];
+}
+
+/** Vendors visible on the public page and portal (same list; portal shows more detail). */
+export async function listPublicVendors(db: D1Database): Promise<Vendor[]> {
+  const { results } = await db
+    .prepare(
+      `SELECT ${VENDOR_SELECT} FROM vendors WHERE COALESCE(show_on_public, 1) = 1 ORDER BY category ASC, name ASC`
+    )
     .all<Vendor>();
   return results ?? [];
 }
@@ -54,7 +68,7 @@ export async function getRecentVendorsCount(db: D1Database, days: number): Promi
 
 export async function getVendorById(db: D1Database, id: string): Promise<Vendor | null> {
   return db
-    .prepare('SELECT id, name, category, phone, email, website, notes, files, created FROM vendors WHERE id = ?')
+    .prepare(`SELECT ${VENDOR_SELECT} FROM vendors WHERE id = ?`)
     .bind(id)
     .first<Vendor>();
 }
@@ -69,12 +83,14 @@ export async function insertVendor(
     website: string | null;
     notes: string | null;
     filesJson?: string;
+    show_on_public?: number;
   }
 ): Promise<string> {
   const id = generateId();
+  const showOnPublic = data.show_on_public !== undefined ? (data.show_on_public ? 1 : 0) : 1;
   await db
     .prepare(
-      `INSERT INTO vendors (id, name, category, phone, email, website, notes, files) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO vendors (id, name, category, phone, email, website, notes, files, show_on_public) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .bind(
       id,
@@ -84,7 +100,8 @@ export async function insertVendor(
       data.email?.trim()?.toLowerCase() ?? null,
       data.website?.trim() ?? null,
       data.notes?.trim() ?? null,
-      data.filesJson ?? '[]'
+      data.filesJson ?? '[]',
+      showOnPublic
     )
     .run();
   return id;
@@ -101,13 +118,16 @@ export async function updateVendor(
     website?: string | null;
     notes?: string | null;
     filesJson?: string;
+    show_on_public?: number;
   }
 ): Promise<boolean> {
   const existing = await getVendorById(db, id);
   if (!existing) return false;
+  const showOnPublic =
+    data.show_on_public !== undefined ? (data.show_on_public ? 1 : 0) : existing.show_on_public;
   const result = await db
     .prepare(
-      `UPDATE vendors SET name = ?, category = ?, phone = ?, email = ?, website = ?, notes = ?, files = ? WHERE id = ?`
+      `UPDATE vendors SET name = ?, category = ?, phone = ?, email = ?, website = ?, notes = ?, files = ?, show_on_public = ? WHERE id = ?`
     )
     .bind(
       data.name !== undefined ? (data.name?.trim() ?? null) : existing.name,
@@ -117,6 +137,7 @@ export async function updateVendor(
       data.website !== undefined ? (data.website?.trim() ?? null) : existing.website,
       data.notes !== undefined ? (data.notes?.trim() ?? null) : existing.notes,
       data.filesJson !== undefined ? data.filesJson : existing.files,
+      showOnPublic,
       id
     )
     .run();
@@ -126,4 +147,49 @@ export async function updateVendor(
 export async function deleteVendor(db: D1Database, id: string): Promise<boolean> {
   const result = await db.prepare('DELETE FROM vendors WHERE id = ?').bind(id).run();
   return (result.meta.changes ?? 0) > 0;
+}
+
+export interface VendorAuditLogRow {
+  id: number;
+  vendor_id: string;
+  vendor_name: string | null;
+  action: string;
+  done_by_email: string | null;
+  created: string | null;
+}
+
+export async function insertVendorAuditLog(
+  db: D1Database,
+  params: { vendor_id: string; vendor_name?: string | null; action: string; done_by_email?: string | null }
+): Promise<void> {
+  try {
+    await db
+      .prepare(
+        `INSERT INTO vendor_audit_log (vendor_id, vendor_name, action, done_by_email) VALUES (?, ?, ?, ?)`
+      )
+      .bind(
+        params.vendor_id,
+        params.vendor_name?.trim() ?? null,
+        params.action,
+        params.done_by_email?.trim()?.toLowerCase() ?? null
+      )
+      .run();
+  } catch {
+    /* table may not exist yet */
+  }
+}
+
+export async function listVendorAuditLog(db: D1Database, limit: number): Promise<VendorAuditLogRow[]> {
+  try {
+    const { results } = await db
+      .prepare(
+        `SELECT id, vendor_id, vendor_name, action, done_by_email, created
+         FROM vendor_audit_log ORDER BY created DESC LIMIT ?`
+      )
+      .bind(Math.max(1, Math.min(limit, 500)))
+      .all<VendorAuditLogRow>();
+    return results ?? [];
+  } catch {
+    return [];
+  }
 }

@@ -48,6 +48,20 @@ export async function getMemberDocument(db: D1Database, id: number): Promise<Mem
     .first<MemberDocumentRow>();
 }
 
+/** Get one by file_key (for access control: only serve keys that exist in the table). */
+export async function getMemberDocumentByFileKey(
+  db: D1Database,
+  fileKey: string
+): Promise<MemberDocumentRow | null> {
+  return db
+    .prepare(
+      `SELECT id, category, title, file_key, content_type, uploaded_at, uploaded_by_email
+       FROM member_documents WHERE file_key = ? LIMIT 1`
+    )
+    .bind(fileKey)
+    .first<MemberDocumentRow>();
+}
+
 /** Insert after upload. */
 export async function insertMemberDocument(
   db: D1Database,

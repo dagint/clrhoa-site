@@ -65,14 +65,18 @@ These run every migration in the correct order. Use them when bringing a new DB 
 |------|--------|--------|
 | 23 | `npm run db:phase5:local` | `npm run db:phase5` |
 | 24 | `npm run db:phase5-paid-through:local` | `npm run db:phase5-paid-through` |
+| 24b | `npm run db:phase5-special-assessments:local` | `npm run db:phase5-special-assessments` |
 
-### Phase 6 + login history
+### Phase 6 + login history + member documents
 
 | Step | Local | Remote |
 |------|--------|--------|
 | 25 | `npm run db:phase6:local` | `npm run db:phase6` |
 | 26 | `npm run db:login-history:local` | `npm run db:login-history` |
 | 27 | `npm run db:public-documents:local` | `npm run db:public-documents` |
+| 28 | `npm run db:member-documents:local` | `npm run db:member-documents` |
+| 29 | `npm run db:backup-config:local` | `npm run db:backup-config` |
+| 30 | `npm run db:assessment-recorded-by:local` | `npm run db:assessment-recorded-by` |
 
 ---
 

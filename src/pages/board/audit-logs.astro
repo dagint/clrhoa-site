@@ -2,30 +2,45 @@
 export const prerender = false;
 
 import BoardLayout from '../../layouts/BoardLayout.astro';
-import { getSessionFromCookie } from '../../lib/auth';
+import { getBoardContext } from '../../lib/board-context';
 import { listOwners, listDirectoryLogs } from '../../lib/directory-db';
 import { listArbAuditLog, listArbRequestsByOwner } from '../../lib/arb-db';
+import { listAssessmentPaymentsForAudit } from '../../lib/assessments-db';
+import { listSubmissions } from '../../lib/vendor-submissions-db';
+import { listMemberDocuments } from '../../lib/member-documents-db';
+import { listAllSpecialAssessments } from '../../lib/assessments-db';
+import { listPreapprovalItems } from '../../lib/preapproval-db';
+import { listAllFeedbackDocs } from '../../lib/feedback-db';
+import { listAllMeetings } from '../../lib/meetings-db';
+import { listVendorAuditLog } from '../../lib/vendors-db';
 
-const runtime = Astro.locals.runtime;
-const env = runtime?.env;
-const cookieHeader = Astro.request.headers.get('cookie') ?? undefined;
-const session = await getSessionFromCookie(cookieHeader, env?.SESSION_SECRET);
-
-if (!session) {
-  return Astro.redirect('/portal/login');
-}
-
-if (session.role !== 'board' && session.role !== 'admin' && session.role !== 'arb' && session.role !== 'arb_board') {
-  return Astro.redirect('/portal/dashboard');
-}
+const ctx = await getBoardContext(Astro);
+if (ctx.redirect) return Astro.redirect(ctx.redirect);
+const { env, session } = ctx;
 
 const db = env?.DB;
 const directoryLogs = db ? await listDirectoryLogs(db, 500) : [];
 const arbLogs = db ? await listArbAuditLog(db, 500) : [];
 const owners = db ? await listOwners(db) : [];
 const ownersWithCreator = owners.filter((o) => o.created_by_email?.trim());
+const ownersWithUpdater = owners.filter((o) => o.updated_by?.trim()).sort((a, b) => (b.updated_at ?? '').localeCompare(a.updated_at ?? ''));
 const allRequests = db ? await listArbRequestsByOwner(db, session.email) : [];
 const draftCount = allRequests.filter((r) => r.status === 'pending').length;
+
+const paymentAudit = db ? await listAssessmentPaymentsForAudit(db, 300) : [];
+const vendorApproved = db ? await listSubmissions(db, { status: 'approved' }) : [];
+const vendorRejected = db ? await listSubmissions(db, { status: 'rejected' }) : [];
+const vendorSubmissionsAudit = [...vendorApproved, ...vendorRejected]
+  .sort((a, b) => (b.reviewed_at ?? b.submitted_at ?? '').localeCompare(a.reviewed_at ?? a.submitted_at ?? ''))
+  .slice(0, 200);
+const memberDocsAudit = db ? await listMemberDocuments(db) : [];
+const specialAssessmentsAudit = db
+  ? (await listAllSpecialAssessments(db)).sort((a, b) => (b.created ?? '').localeCompare(a.created ?? '')).slice(0, 200)
+  : [];
+const preapprovalAudit = db ? await listPreapprovalItems(db) : [];
+const feedbackDocsAudit = db ? await listAllFeedbackDocs(db) : [];
+const meetingsAudit = db ? (await listAllMeetings(db)).slice(0, 200) : [];
+const vendorAuditLog = db ? await listVendorAuditLog(db, 300) : [];
 
 const BLANK = '-';
 
@@ -42,7 +57,7 @@ function formatDate(s: string | null): string {
 
 <BoardLayout title="Audit logs" subtitle="Transparency for elevated access (Board, ARB, Admin)" draftCount={draftCount} role={session.role} mainWide showRoleBanner={false}>
   <p class="text-gray-600 mb-8">
-        Full audit logs for transparency: who revealed contact info, who added directory members, and ARB status changes (approvals, sent back for requestor updates, etc.).
+        Full audit logs for transparency: directory (contact reveals, who added/updated owners), assessment payments recorded, vendor list changes and vendor submission approvals/rejections, member document uploads, special assessments, preapproval library, feedback docs, meetings, and ARB status changes.
   </p>
 
   <!-- Directory: contact reveal log -->
@@ -104,6 +119,318 @@ function formatDate(s: string | null): string {
                     <tr class="border-b border-gray-100 hover:bg-gray-50/50">
                       <td class="py-2 px-3">{o.name ?? BLANK} / {o.email ?? BLANK}</td>
                       <td class="py-2 px-3">{o.created_by_email ?? BLANK}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </section>
+
+      <!-- Who updated which owner -->
+      <section aria-labelledby="dir-updated-heading">
+        <h2 id="dir-updated-heading" class="text-lg font-heading font-semibold text-clr-green mb-3">Directory: who updated which owner</h2>
+        <p class="text-sm text-gray-600 mb-3">Last update by board (edit or CSV upload). Run the owners-updated-by migration to populate.</p>
+        <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          {ownersWithUpdater.length === 0 ? (
+            <p class="p-4 text-gray-500">No directory update records (updated_by) yet.</p>
+          ) : (
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead class="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">Updated at</th>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">Owner (name / email)</th>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">Updated by</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ownersWithUpdater.slice(0, 300).map((o) => (
+                    <tr class="border-b border-gray-100 hover:bg-gray-50/50">
+                      <td class="py-2 px-3 text-gray-600">{formatDate(o.updated_at)}</td>
+                      <td class="py-2 px-3">{o.name ?? BLANK} / {o.email ?? BLANK}</td>
+                      <td class="py-2 px-3">{o.updated_by ?? BLANK}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </section>
+
+      <!-- Assessment payments recorded -->
+      <section aria-labelledby="payments-audit-heading">
+        <h2 id="payments-audit-heading" class="text-lg font-heading font-semibold text-clr-green mb-3">Assessment payments recorded</h2>
+        <p class="text-sm text-gray-600 mb-3">Who recorded which payment (dues and special assessments). Only payments with a recorded-by value appear.</p>
+        <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          {paymentAudit.length === 0 ? (
+            <p class="p-4 text-gray-500">No payment records with recorded-by yet.</p>
+          ) : (
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead class="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">When</th>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">Owner (email)</th>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">Paid at</th>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">Amount</th>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">Recorded by</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paymentAudit.map((row) => (
+                    <tr class="border-b border-gray-100 hover:bg-gray-50/50">
+                      <td class="py-2 px-3 text-gray-600">{formatDate(row.created)}</td>
+                      <td class="py-2 px-3">{row.owner_email ?? BLANK}</td>
+                      <td class="py-2 px-3">{row.paid_at ?? BLANK}</td>
+                      <td class="py-2 px-3">{row.amount != null ? `$${Number(row.amount).toFixed(2)}` : BLANK}</td>
+                      <td class="py-2 px-3">{row.recorded_by ?? BLANK}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </section>
+
+      <!-- Vendor list: changes (create, update, delete) -->
+      <section aria-labelledby="vendor-changes-heading">
+        <h2 id="vendor-changes-heading" class="text-lg font-heading font-semibold text-clr-green mb-3">Vendor list: changes</h2>
+        <p class="text-sm text-gray-600 mb-3">Who created, updated, or deleted vendors (including vendors approved from member suggestions). Run the vendor-audit migration to enable.</p>
+        <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          {vendorAuditLog.length === 0 ? (
+            <p class="p-4 text-gray-500">No vendor change log yet.</p>
+          ) : (
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead class="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">When</th>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">Action</th>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">Vendor (name)</th>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">Vendor ID</th>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">By</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {vendorAuditLog.map((row) => (
+                    <tr class="border-b border-gray-100 hover:bg-gray-50/50">
+                      <td class="py-2 px-3 text-gray-600">{formatDate(row.created)}</td>
+                      <td class="py-2 px-3">{row.action}</td>
+                      <td class="py-2 px-3">{row.vendor_name ?? BLANK}</td>
+                      <td class="py-2 px-3 font-mono text-gray-600">{row.vendor_id ?? BLANK}</td>
+                      <td class="py-2 px-3">{row.done_by_email ?? BLANK}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </section>
+
+      <!-- Vendor submissions: approved/rejected -->
+      <section aria-labelledby="vendor-audit-heading">
+        <h2 id="vendor-audit-heading" class="text-lg font-heading font-semibold text-clr-green mb-3">Vendor submissions: approved or rejected</h2>
+        <p class="text-sm text-gray-600 mb-3">Who reviewed member-suggested vendors (approved or rejected) and when.</p>
+        <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          {vendorSubmissionsAudit.length === 0 ? (
+            <p class="p-4 text-gray-500">No vendor approvals or rejections yet.</p>
+          ) : (
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead class="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">Reviewed at</th>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">Vendor (name)</th>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">Status</th>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">Reviewed by</th>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">Submitted by</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {vendorSubmissionsAudit.map((row) => (
+                    <tr class="border-b border-gray-100 hover:bg-gray-50/50">
+                      <td class="py-2 px-3 text-gray-600">{formatDate(row.reviewed_at)}</td>
+                      <td class="py-2 px-3">{row.name ?? BLANK}</td>
+                      <td class="py-2 px-3">{row.status ?? BLANK}</td>
+                      <td class="py-2 px-3">{row.reviewed_by ?? BLANK}</td>
+                      <td class="py-2 px-3">{row.submitted_by ?? BLANK}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </section>
+
+      <!-- Member documents: uploads -->
+      <section aria-labelledby="member-docs-audit-heading">
+        <h2 id="member-docs-audit-heading" class="text-lg font-heading font-semibold text-clr-green mb-3">Member documents: uploads</h2>
+        <p class="text-sm text-gray-600 mb-3">Who uploaded which member-only document (minutes, budgets, other).</p>
+        <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          {memberDocsAudit.length === 0 ? (
+            <p class="p-4 text-gray-500">No member document uploads yet.</p>
+          ) : (
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead class="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">Category</th>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">Title</th>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">Uploaded at</th>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">Uploaded by</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {memberDocsAudit.map((row) => (
+                    <tr class="border-b border-gray-100 hover:bg-gray-50/50">
+                      <td class="py-2 px-3">{row.category ?? BLANK}</td>
+                      <td class="py-2 px-3">{row.title ?? BLANK}</td>
+                      <td class="py-2 px-3 text-gray-600">{formatDate(row.uploaded_at)}</td>
+                      <td class="py-2 px-3">{row.uploaded_by_email ?? BLANK}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </section>
+
+      <!-- Special assessments: who created -->
+      <section aria-labelledby="special-assessments-audit-heading">
+        <h2 id="special-assessments-audit-heading" class="text-lg font-heading font-semibold text-clr-green mb-3">Special assessments: who created</h2>
+        <p class="text-sm text-gray-600 mb-3">Who created which special assessment (owner, amount, due date).</p>
+        <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          {specialAssessmentsAudit.length === 0 ? (
+            <p class="p-4 text-gray-500">No special assessments yet.</p>
+          ) : (
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead class="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">Created</th>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">Owner</th>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">Description</th>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">Amount</th>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">Created by</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {specialAssessmentsAudit.map((row) => (
+                    <tr class="border-b border-gray-100 hover:bg-gray-50/50">
+                      <td class="py-2 px-3 text-gray-600">{formatDate(row.created)}</td>
+                      <td class="py-2 px-3">{row.owner_email ?? BLANK}</td>
+                      <td class="py-2 px-3 max-w-xs truncate" title={row.description ?? undefined}>{row.description ?? BLANK}</td>
+                      <td class="py-2 px-3">{row.amount != null ? `$${Number(row.amount).toFixed(2)}` : BLANK}</td>
+                      <td class="py-2 px-3">{row.created_by ?? BLANK}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </section>
+
+      <!-- Preapproval library: who created -->
+      <section aria-labelledby="preapproval-audit-heading">
+        <h2 id="preapproval-audit-heading" class="text-lg font-heading font-semibold text-clr-green mb-3">Preapproval library: who created</h2>
+        <p class="text-sm text-gray-600 mb-3">Who added which preapproval item (category, title).</p>
+        <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          {preapprovalAudit.length === 0 ? (
+            <p class="p-4 text-gray-500">No preapproval items yet.</p>
+          ) : (
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead class="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">Created</th>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">Category</th>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">Title</th>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">Created by</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {preapprovalAudit.map((row) => (
+                    <tr class="border-b border-gray-100 hover:bg-gray-50/50">
+                      <td class="py-2 px-3 text-gray-600">{formatDate(row.created)}</td>
+                      <td class="py-2 px-3">{row.category ?? BLANK}</td>
+                      <td class="py-2 px-3 max-w-xs truncate" title={row.title ?? undefined}>{row.title ?? BLANK}</td>
+                      <td class="py-2 px-3">{row.created_by ?? BLANK}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </section>
+
+      <!-- Feedback docs: who created -->
+      <section aria-labelledby="feedback-docs-audit-heading">
+        <h2 id="feedback-docs-audit-heading" class="text-lg font-heading font-semibold text-clr-green mb-3">Feedback docs: who created</h2>
+        <p class="text-sm text-gray-600 mb-3">Who created which feedback/ballot document (title, deadline).</p>
+        <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          {feedbackDocsAudit.length === 0 ? (
+            <p class="p-4 text-gray-500">No feedback docs yet.</p>
+          ) : (
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead class="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">Created</th>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">Title</th>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">Deadline</th>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">Created by</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {feedbackDocsAudit.map((row) => (
+                    <tr class="border-b border-gray-100 hover:bg-gray-50/50">
+                      <td class="py-2 px-3 text-gray-600">{formatDate(row.created)}</td>
+                      <td class="py-2 px-3 max-w-xs truncate" title={row.title ?? undefined}>{row.title ?? BLANK}</td>
+                      <td class="py-2 px-3">{row.deadline ?? BLANK}</td>
+                      <td class="py-2 px-3">{row.created_by ?? BLANK}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </section>
+
+      <!-- Meetings: who created -->
+      <section aria-labelledby="meetings-audit-heading">
+        <h2 id="meetings-audit-heading" class="text-lg font-heading font-semibold text-clr-green mb-3">Meetings: who created</h2>
+        <p class="text-sm text-gray-600 mb-3">Who created which meeting (title, date).</p>
+        <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          {meetingsAudit.length === 0 ? (
+            <p class="p-4 text-gray-500">No meetings yet.</p>
+          ) : (
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead class="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">Created</th>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">Title</th>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">Date & time</th>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">Created by</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {meetingsAudit.map((row) => (
+                    <tr class="border-b border-gray-100 hover:bg-gray-50/50">
+                      <td class="py-2 px-3 text-gray-600">{formatDate(row.created)}</td>
+                      <td class="py-2 px-3 max-w-xs truncate" title={row.title ?? undefined}>{row.title ?? BLANK}</td>
+                      <td class="py-2 px-3">{row.datetime ?? BLANK}</td>
+                      <td class="py-2 px-3">{row.created_by ?? BLANK}</td>
                     </tr>
                   ))}
                 </tbody>

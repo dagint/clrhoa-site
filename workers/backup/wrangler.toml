@@ -1,0 +1,38 @@
+# Backup Worker: cron-triggered D1 export + KV whitelist dump to R2, optional Google Drive (Phase 3).
+# Deploy from repo root: npx wrangler deploy workers/backup
+# Set secrets: npx wrangler secret put CLOUDFLARE_API_TOKEN --env backup (from workers/backup dir)
+# Or from root: npx wrangler secret put CLOUDFLARE_API_TOKEN --config workers/backup/wrangler.toml
+name = "clrhoa-backup"
+main = "src/index.ts"
+compatibility_date = "2025-02-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Run daily at 2:00 AM UTC
+[triggers]
+cron = ["0 2 * * *"]
+
+# Same D1 as main app (for Phase 3: read backup_config)
+[[d1_databases]]
+binding = "DB"
+database_name = "clrhoa_db"
+database_id = "a214f9da-3577-4ee7-bc50-bc9b9754a79c"
+
+[[kv_namespaces]]
+binding = "CLOURHOA_USERS"
+id = "e936ea7760c04b268c4472eb24575d46"
+
+[[r2_buckets]]
+binding = "BACKUP_R2"
+bucket_name = "clrhoa-files"
+
+[vars]
+# Cloudflare account ID (replace with your account id)
+CLOUDFLARE_ACCOUNT_ID = "REPLACE_WITH_ACCOUNT_ID"
+# D1 database UUID (same as main app wrangler.toml)
+D1_DATABASE_ID = "a214f9da-3577-4ee7-bc50-bc9b9754a79c"
+# Retention: keep daily backups this many days
+BACKUP_RETENTION_DAYS = "30"
+
+# Secrets (set via wrangler secret put):
+# CLOUDFLARE_API_TOKEN - API token with D1 Read + R2 Edit (and D1 Read for DB binding in Phase 3)
+# Phase 3: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, BACKUP_ENCRYPTION_KEY (for decrypting refresh_token)

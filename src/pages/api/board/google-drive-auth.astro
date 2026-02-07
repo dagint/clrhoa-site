@@ -1,0 +1,38 @@
+---
+/**
+ * GET /api/board/google-drive-auth — Board/Admin only. Redirects to Google OAuth for Drive.
+ * Requires env: GOOGLE_CLIENT_ID. Redirect URI must be registered in Google Cloud Console.
+ */
+export const prerender = false;
+
+import { getSessionFromCookie } from '../../../lib/auth';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env as import('../../../env.d').Env & { GOOGLE_CLIENT_ID?: string };
+const session = await getSessionFromCookie(
+  Astro.request.headers.get('cookie') ?? undefined,
+  env?.SESSION_SECRET
+);
+if (!session || (session.role !== 'board' && session.role !== 'admin')) {
+  return Astro.redirect('/portal/login');
+}
+const clientId = env?.GOOGLE_CLIENT_ID;
+if (!clientId) {
+  return new Response('Google Drive not configured (missing GOOGLE_CLIENT_ID)', { status: 503 });
+}
+const url = new URL(Astro.request.url);
+const origin = url.origin;
+const redirectUri = `${origin}/api/board/google-drive-callback`;
+const state = crypto.randomUUID();
+const scope = 'https://www.googleapis.com/auth/drive.file';
+const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${new URLSearchParams({
+  client_id: clientId,
+  redirect_uri: redirectUri,
+  response_type: 'code',
+  scope,
+  state,
+  access_type: 'offline',
+  prompt: 'consent',
+})}`;
+return Astro.redirect(authUrl);
+---

@@ -1,0 +1,79 @@
+---
+/**
+ * POST /api/assessments/record-payment — board records a dues payment (or full year).
+ * Body: owner_email, amount, paid_at (YYYY-MM-DD), balance_after, full_year? (boolean), csrf_token
+ */
+export const prerender = false;
+
+import { getSessionFromCookie, verifyCsrfToken, verifyOrigin } from '../../../lib/auth';
+import { getAssessmentByOwner, recordPayment } from '../../../lib/assessments-db';
+
+function json(data: object, status = 200) {
+  return new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
+}
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const session = await getSessionFromCookie(
+  Astro.request.headers.get('cookie') ?? undefined,
+  env?.SESSION_SECRET
+);
+if (!session) return json({ error: 'Unauthorized' }, 401);
+const isBoard = session.role === 'board' || session.role === 'admin' || session.role === 'arb_board';
+if (!isBoard) return json({ error: 'Forbidden' }, 403);
+
+const origin = Astro.request.headers.get('origin');
+const referer = Astro.request.headers.get('referer');
+if (!verifyOrigin(origin, referer, Astro.url.origin)) return json({ error: 'Invalid origin.' }, 403);
+
+const db = env?.DB;
+if (!db) return json({ error: 'Server configuration error' }, 503);
+
+if (Astro.request.method !== 'POST') {
+  return new Response(null, { status: 405, headers: { Allow: 'POST' } });
+}
+
+let body: Record<string, unknown>;
+try {
+  body = await Astro.request.json();
+} catch {
+  return json({ error: 'Invalid JSON' }, 400);
+}
+if (!verifyCsrfToken(session, (body.csrf_token ?? body.csrfToken) as string)) {
+  return json({ error: 'Invalid security token.' }, 403);
+}
+
+const owner_email = String(body.owner_email ?? '').trim();
+const amount = Number(body.amount);
+const paid_at = String(body.paid_at ?? '').trim();
+const balance_after_raw = body.balance_after;
+const full_year = body.full_year === true || body.full_year === 'true';
+
+if (!owner_email) return json({ error: 'owner_email is required' }, 400);
+if (Number.isNaN(amount) || amount < 0) return json({ error: 'amount must be a non-negative number' }, 400);
+if (!/^\d{4}-\d{2}-\d{2}$/.test(paid_at)) return json({ error: 'paid_at must be YYYY-MM-DD' }, 400);
+
+// If balance_after omitted, compute as current balance minus amount (spreadsheet-style)
+let balance_after: number;
+if (balance_after_raw !== undefined && balance_after_raw !== null && balance_after_raw !== '') {
+  balance_after = Number(balance_after_raw);
+  if (Number.isNaN(balance_after) || balance_after < 0) return json({ error: 'balance_after must be a non-negative number' }, 400);
+} else {
+  const current = await getAssessmentByOwner(db, owner_email);
+  balance_after = Math.max(0, (current?.balance ?? 0) - amount);
+}
+
+try {
+  const { paymentId } = await recordPayment(db, owner_email, {
+    amount,
+    paid_at,
+    balance_after,
+    fullYear: full_year,
+    recorded_by: session.email,
+  });
+  return json({ success: true, paymentId });
+} catch (e) {
+  console.error('[record-payment]', e);
+  return json({ error: 'Failed to record payment' }, 500);
+}
+---

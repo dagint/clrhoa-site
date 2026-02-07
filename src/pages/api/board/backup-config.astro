@@ -1,0 +1,111 @@
+---
+/**
+ * GET /api/board/backup-config — Board/Admin only. Returns backup settings (no secrets).
+ * POST /api/board/backup-config — Board/Admin only. Saves schedule, folder id, enabled.
+ */
+export const prerender = false;
+
+import { getSessionFromCookie } from '../../../lib/auth';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const session = await getSessionFromCookie(
+  Astro.request.headers.get('cookie') ?? undefined,
+  env?.SESSION_SECRET
+);
+
+if (!session) {
+  return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
+}
+const isBoardOrAdmin = session.role === 'board' || session.role === 'admin';
+if (!isBoardOrAdmin) {
+  return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403, headers: { 'Content-Type': 'application/json' } });
+}
+
+const db = env?.DB;
+if (!db) {
+  return new Response(JSON.stringify({ error: 'Server error' }), { status: 503, headers: { 'Content-Type': 'application/json' } });
+}
+
+if (Astro.request.method === 'GET') {
+  const row = await db.prepare(
+    `SELECT google_drive_enabled, google_drive_folder_id, schedule_type, schedule_hour_utc, schedule_day_of_week, include_r2_manifest, include_r2_files, updated_at FROM backup_config WHERE id = 1`
+  ).first<{
+    google_drive_enabled: number;
+    google_drive_folder_id: string | null;
+    schedule_type: string;
+    schedule_hour_utc: number;
+    schedule_day_of_week: number | null;
+    include_r2_manifest: number;
+    include_r2_files: number;
+    updated_at: string | null;
+  }>();
+  const config = row ? {
+    google_drive_enabled: Boolean(row.google_drive_enabled),
+    google_drive_folder_id: row.google_drive_folder_id ?? '',
+    schedule_type: row.schedule_type || 'daily',
+    schedule_hour_utc: row.schedule_hour_utc ?? 2,
+    schedule_day_of_week: row.schedule_day_of_week ?? 0,
+    include_r2_manifest: Boolean(row.include_r2_manifest),
+    include_r2_files: Boolean(row.include_r2_files),
+    updated_at: row.updated_at ?? null,
+  } : {
+    google_drive_enabled: false,
+    google_drive_folder_id: '',
+    schedule_type: 'daily',
+    schedule_hour_utc: 2,
+    schedule_day_of_week: 0,
+    include_r2_manifest: false,
+    include_r2_files: false,
+    updated_at: null,
+  };
+  return new Response(JSON.stringify(config), {
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+if (Astro.request.method === 'POST') {
+  let body: Record<string, unknown>;
+  try {
+    body = await Astro.request.json();
+  } catch {
+    return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+  }
+  const google_drive_enabled = Boolean(body.google_drive_enabled);
+  const google_drive_folder_id = typeof body.google_drive_folder_id === 'string' ? body.google_drive_folder_id.trim() : '';
+  const schedule_type = typeof body.schedule_type === 'string' && (body.schedule_type === 'daily' || body.schedule_type === 'weekly') ? body.schedule_type : 'daily';
+  const schedule_hour_utc = typeof body.schedule_hour_utc === 'number' ? Math.max(0, Math.min(23, body.schedule_hour_utc)) : 2;
+  const schedule_day_of_week = schedule_type === 'weekly' && typeof body.schedule_day_of_week === 'number' ? Math.max(0, Math.min(6, body.schedule_day_of_week)) : null;
+  const include_r2_manifest = Boolean(body.include_r2_manifest);
+  const include_r2_files = Boolean(body.include_r2_files);
+
+  await db.prepare(
+    `UPDATE backup_config SET
+      google_drive_enabled = ?,
+      google_drive_folder_id = ?,
+      schedule_type = ?,
+      schedule_hour_utc = ?,
+      schedule_day_of_week = ?,
+      include_r2_manifest = ?,
+      include_r2_files = ?,
+      updated_by = ?,
+      updated_at = datetime('now')
+    WHERE id = 1`
+  ).bind(
+    google_drive_enabled ? 1 : 0,
+    google_drive_folder_id || null,
+    schedule_type,
+    schedule_hour_utc,
+    schedule_day_of_week ?? null,
+    include_r2_manifest ? 1 : 0,
+    include_r2_files ? 1 : 0,
+    session.email
+  ).run();
+
+  return new Response(JSON.stringify({ ok: true }), {
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405, headers: { 'Content-Type': 'application/json' } });
+---

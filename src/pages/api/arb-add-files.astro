@@ -6,9 +6,10 @@
 export const prerender = false;
 
 import { getSessionFromCookie, verifyCsrfToken, verifyOrigin } from '../../lib/auth';
+import { requireArbRequestOwner } from '../../lib/access-control';
 import { checkRateLimit, getRateLimitConfig } from '../../lib/rate-limit';
 import { getSecurityMonitor } from '../../lib/monitoring';
-import { getArbRequest, listArbFilesByRequest, createArbFileId, insertArbFile } from '../../lib/arb-db';
+import { listArbFilesByRequest, createArbFileId, insertArbFile } from '../../lib/arb-db';
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
 const MAX_TOTAL_BYTES = 25 * 1024 * 1024;
@@ -144,10 +145,8 @@ if (!requestId) {
   return new Response(JSON.stringify({ error: 'request_id is required.' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
 }
 
-const req = await getArbRequest(db, requestId);
-if (!req || req.owner_email !== session.email.toLowerCase() || req.status !== 'pending') {
-  return new Response(JSON.stringify({ error: 'Request not found or not editable.' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
-}
+const ownerCheck = await requireArbRequestOwner(db, requestId, session, { requirePending: true });
+if ('response' in ownerCheck) return ownerCheck.response;
 
 const existingFiles = await listArbFilesByRequest(db, requestId);
 const existingTotal = existingFiles.reduce((sum, f) => sum + f.original_size, 0);

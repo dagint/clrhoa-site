@@ -19,12 +19,16 @@ const documentsByCategory = publishedDocuments.reduce((acc, doc) => {
 
 const categories = ['Governing Documents', 'Policies', 'Forms', 'Minutes', 'Other'] as const;
 
-// Board/ARB may have uploaded replacements; use those links when present
+// Board/ARB may have uploaded replacements; use those links when present (public page: only slug/file_key/content_type)
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
 const db = env?.DB;
 const publicOverrides = db ? await listPublicDocuments(db) : [];
-const overrideBySlug = Object.fromEntries(publicOverrides.filter((r) => r.file_key).map((r) => [r.slug, r]));
+const overrideBySlug = Object.fromEntries(
+  publicOverrides
+    .filter((r) => r.file_key)
+    .map((r) => [r.slug, { slug: r.slug, file_key: r.file_key, content_type: r.content_type }])
+);
 
 const keyRules = [
   { title: 'Quarterly assessments', detail: 'Due January, April, July, and October.' },

@@ -19,9 +19,12 @@ Complete documentation for the Crooked Lake Reserve HOA website.
 ### Security
 
 - **[Security Guide](SECURITY.md)** - Complete security documentation (start here)
-- **[Security Assessment](SECURITY_ASSESSMENT.md)** - Detailed security analysis
-- **[Security Summary](SECURITY_SUMMARY.md)** - Executive security summary
+- **[Security Assessment](SECURITY_ASSESSMENT.md)** - Detailed security analysis and posture
+- **[Security Summary](SECURITY_SUMMARY.md)** - Executive summary and score breakdown
+- **[Security Checklist](SECURITY_CHECKLIST.md)** - Quick verification checklist
+- **[Data & Access Control](DATA_ACCESS_CONTROL.md)** - Who can access what; audit logging
 - **[Security Headers](SECURITY_HEADERS.md)** - HTTP security headers configuration
+- **[Rate Limiting](RATE_LIMITING.md)** - API and login rate limits
 - **[Dependency Security](DEPENDENCY_SECURITY.md)** - Managing dependencies and vulnerabilities
 - **[Security Monitoring](SECURITY_MONITORING.md)** - Monitoring and incident response
 - **[Subresource Integrity](SRI.md)** - SRI hash generation and updates
@@ -36,6 +39,12 @@ Complete documentation for the Crooked Lake Reserve HOA website.
 
 - **[Performance Optimizations](OPTIMIZATIONS.md)** - Build and runtime optimizations
 
+### Architecture & code quality
+
+- **[Architecture Overview](ARCHITECTURE.md)** - Public vs portal vs board; auth flow; key libs and data stores
+- **[Code Quality](CODE_QUALITY.md)** - Shared helpers, testing, type safety, and recommendations
+- **[Data & Access Control](DATA_ACCESS_CONTROL.md)** - Who can access what; audit logging
+
 ## 📖 Documentation Structure
 
 ```
@@ -47,6 +56,9 @@ docs/
 ├── ENVIRONMENT_VARIABLES.md    # Environment variables
 ├── CONTACT_FORM_SETUP.md       # Contact form setup
 ├── ANALYTICS_SETUP.md          # Analytics setup
+├── ARCHITECTURE.md             # Public vs portal vs board; auth; key libs
+├── CODE_QUALITY.md             # Shared helpers, testing, type safety
+├── DATA_ACCESS_CONTROL.md      # Who can access what; audit logging
 ├── SECURITY.md                 # Security guide (index)
 ├── SECURITY_ASSESSMENT.md      # Security analysis
 ├── SECURITY_SUMMARY.md         # Security summary

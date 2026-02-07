@@ -4,18 +4,14 @@ export const prerender = false;
 import PortalLayout from '../../layouts/PortalLayout.astro';
 import ProtectedPage from '../../components/ProtectedPage.astro';
 import PortalNav from '../../components/PortalNav.astro';
-import { getSessionFromCookie } from '../../lib/auth';
-import { getOwnerByEmail, getPhonesArray } from '../../lib/directory-db';
+import { getPortalContext } from '../../lib/portal-context';
+import { getOwnerByEmail, getPhonesArray, listHouseholdMembersWithLogin } from '../../lib/directory-db';
 import { listArbRequestsByOwner } from '../../lib/arb-db';
 import { getUserByEmail, type NotificationPreferences } from '../../lib/db';
 import { listLoginHistoryByEmail } from '../../lib/login-history-db';
 import { NOTIFICATION_TYPES } from '../../lib/notifications';
 
-const runtime = Astro.locals.runtime;
-const env = runtime?.env;
-const cookieHeader = Astro.request.headers.get('cookie') ?? undefined;
-let session = await getSessionFromCookie(cookieHeader, env?.SESSION_SECRET);
-if (!session && env?.SESSION_SECRET) session = await getSessionFromCookie(cookieHeader, env.SESSION_SECRET);
+const { env, session } = await getPortalContext(Astro);
 if (!session) return Astro.redirect('/portal/login');
 
 const db = env?.DB;
@@ -52,6 +48,8 @@ const pushEnabled = notification_preferences['push_enabled'] === true;
 const loginHistory = db ? await listLoginHistoryByEmail(db, session.email, 30) : [];
 const lastLogon = loginHistory[0]?.logged_at ?? null;
 
+const householdMembersWithLogin = db ? await listHouseholdMembersWithLogin(db, session.email) : [];
+
 function formatLoginTime(iso: string | null): string {
   if (!iso) return '—';
   try {
@@ -70,8 +68,11 @@ function formatLoginTime(iso: string | null): string {
 
     <main class="max-w-2xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
       <h2 class="text-2xl font-heading font-bold text-clr-green mb-2">Profile</h2>
-      <p class="text-gray-600 mb-6">
+      <p class="text-gray-600 mb-2">
         Your directory listing and notification preferences. Directory info is shown to other members and prefills ARB requests.
+      </p>
+      <p class="text-gray-600 mb-6">
+        <a href="/portal/my-activity" class="text-clr-green font-medium hover:underline">My activity</a> — view a log of your own actions (directory reveals, ARB request updates).
       </p>
 
       {requiredParam && (
@@ -140,6 +141,33 @@ function formatLoginTime(iso: string | null): string {
             <span id="my-info-message" class="text-sm text-gray-500"></span>
           </div>
         </form>
+      </section>
+
+      <!-- Section: Household accounts (others at same address who can sign in) -->
+      <section aria-labelledby="profile-household-heading" class="mb-10">
+        <h3 id="profile-household-heading" class="text-lg font-heading font-semibold text-clr-green mb-3">Household accounts</h3>
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 portal-theme-card p-6">
+          <p class="text-sm text-gray-600 mb-4">
+            Other people at your property address who are in the directory and have portal sign-in. You can see who else can log in here; each person manages their own account from My account.
+          </p>
+          {householdMembersWithLogin.length === 0 ? (
+            <p class="text-sm text-gray-500">No other household members with portal access at your address. Only directory entries with the same property address who have a portal account appear here.</p>
+          ) : (
+            <ul class="space-y-3" role="list">
+              {householdMembersWithLogin.map((m) => (
+                <li class="flex items-center justify-between gap-3 py-2 border-b border-gray-100 last:border-b-0 last:pb-0">
+                  <div>
+                    <span class="font-medium text-gray-900">{m.name || 'No name'}</span>
+                    {m.is_primary === 1 && (
+                      <span class="ml-2 text-xs text-gray-500">Primary contact</span>
+                    )}
+                  </div>
+                  <span class="text-sm text-gray-600">{m.email}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </section>
 
       <!-- Section 2: Contact sharing with other members -->

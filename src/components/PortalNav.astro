@@ -1,14 +1,16 @@
 ---
 /**
  * Shared portal navigation. Cleaner menu: main links + More dropdown + Help dropdown.
- * Props: currentPath (e.g. '/portal/dashboard'), draftCount (number), role (string).
+ * Props: currentPath, draftCount, role; optional arbInReviewCount and vendorPendingCount for action badges in More menu.
  */
 interface Props {
   currentPath: string;
   draftCount?: number;
   role?: string;
+  arbInReviewCount?: number;
+  vendorPendingCount?: number;
 }
-const { currentPath, draftCount = 0, role = '' } = Astro.props;
+const { currentPath, draftCount = 0, role = '', arbInReviewCount = 0, vendorPendingCount = 0 } = Astro.props;
 
 function isCurrent(href: string) {
   if (href === '/portal/dashboard') return currentPath === '/portal/dashboard';
@@ -48,6 +50,7 @@ const isStaff = role === 'board' || role === 'admin' || role === 'arb' || role =
                 My requests
                 {draftCount > 0 && <span class="bg-amber-500 text-white text-xs font-bold rounded-full min-w-[1.25rem] h-5 flex items-center justify-center px-1">{draftCount}</span>}
               </a>
+              <a href="/portal/my-activity" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 portal-theme-text">My activity</a>
               <a href="/portal/arb-request" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 portal-theme-text">New ARB request</a>
               <a href="/portal/maintenance" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 portal-theme-text">Maintenance</a>
               <a href="/portal/meetings" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 portal-theme-text">Meetings</a>
@@ -58,8 +61,14 @@ const isStaff = role === 'board' || role === 'admin' || role === 'arb' || role =
               {isStaff && (
                 <>
                   <div class="border-t border-gray-100 my-1" />
-                  <a href="/portal/arb-dashboard" class="block px-4 py-2 text-sm text-clr-green font-medium hover:bg-gray-50">ARB Dashboard</a>
-                  <a href="/portal/board" class="block px-4 py-2 text-sm text-clr-green font-medium hover:bg-gray-50">Board</a>
+                  <a href="/portal/arb-dashboard" class="flex items-center justify-between gap-2 px-4 py-2 text-sm text-clr-green font-medium hover:bg-gray-50">
+                    ARB Dashboard
+                    {arbInReviewCount > 0 && <span class="bg-amber-500 text-white text-xs font-bold rounded-full min-w-[1.25rem] h-5 flex items-center justify-center px-1" aria-label={`${arbInReviewCount} in review`}>{arbInReviewCount}</span>}
+                  </a>
+                  <a href="/portal/board" class="flex items-center justify-between gap-2 px-4 py-2 text-sm text-clr-green font-medium hover:bg-gray-50">
+                    Board
+                    {vendorPendingCount > 0 && <span class="bg-amber-500 text-white text-xs font-bold rounded-full min-w-[1.25rem] h-5 flex items-center justify-center px-1" aria-label={`${vendorPendingCount} vendor submissions pending`}>{vendorPendingCount}</span>}
+                  </a>
                   <a href="/board/public-documents" class="block px-4 py-2 text-sm text-clr-green font-medium hover:bg-gray-50">Public documents</a>
                   <a href="/board/member-documents" class="block px-4 py-2 text-sm text-clr-green font-medium hover:bg-gray-50">Member documents</a>
                   <a href="/board/audit-logs" class="block px-4 py-2 text-sm text-clr-green font-medium hover:bg-gray-50">Audit logs</a>
@@ -146,5 +155,28 @@ const isStaff = role === 'board' || role === 'admin' || role === 'arb' || role =
     if (moreDetails) moreDetails.addEventListener('toggle', syncDetailsAria);
     if (helpDetails) helpDetails.addEventListener('toggle', syncDetailsAria);
     syncDetailsAria();
+
+    // Close dropdown when pointer leaves after a short delay (so it rolls up when focus moves away)
+    var closeDelayMs = 400;
+    function setupCloseOnLeave(container, detailsEl) {
+      if (!container || !detailsEl) return;
+      var closeTimer = null;
+      container.addEventListener('pointerleave', function () {
+        closeTimer = window.setTimeout(function () {
+          detailsEl.open = false;
+          closeTimer = null;
+        }, closeDelayMs);
+      });
+      container.addEventListener('pointerenter', function () {
+        if (closeTimer) {
+          window.clearTimeout(closeTimer);
+          closeTimer = null;
+        }
+      });
+    }
+    document.querySelectorAll('.portal-nav-dropdown').forEach(function (el) {
+      var detailsEl = el.querySelector('details');
+      if (detailsEl) setupCloseOnLeave(el, detailsEl);
+    });
   })();
 </script>

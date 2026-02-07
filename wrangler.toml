@@ -39,6 +39,10 @@ bucket_name = "clrhoa-files"
 
 # SESSION_SECRET: set via wrangler secret put SESSION_SECRET (and .dev.vars for local)
 
+# Backup: for Board "Download backup" and backup Worker. Set CLOUDFLARE_API_TOKEN via wrangler secret put.
+# Optional Google Drive: set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, BACKUP_ENCRYPTION_KEY via wrangler secret put.
+# CLOUDFLARE_ACCOUNT_ID = your Cloudflare account id (dashboard URL or API)
+
 # Phase 3.5: Notifications (MailChannels + Twilio). Change emails without code.
 # For production, set MAILCHANNELS_API_KEY and Twilio vars via: wrangler secret put MAILCHANNELS_API_KEY
 [vars]

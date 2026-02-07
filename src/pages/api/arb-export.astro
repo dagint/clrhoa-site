@@ -1,0 +1,154 @@
+---
+/**
+ * GET /api/arb-export — ARB/Board/Admin only. Export all ARB requests with optional filters.
+ * Query: from_date (YYYY-MM-DD), to_date (YYYY-MM-DD), status (pending|in_review|approved|rejected|cancelled), format (csv|html).
+ * CSV = report download; HTML = print-friendly report (open and use Print → Save as PDF).
+ */
+export const prerender = false;
+
+import { getSessionFromCookie } from '../../lib/auth';
+import { listAllArbRequestsFiltered } from '../../lib/arb-db';
+import { escapeHtml } from '../../lib/sanitize';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const session = await getSessionFromCookie(
+  Astro.request.headers.get('cookie') ?? undefined,
+  env?.SESSION_SECRET
+);
+
+if (!session) {
+  return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
+}
+const allowedRoles = ['arb', 'board', 'admin', 'arb_board'];
+if (!allowedRoles.includes(session.role)) {
+  return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403, headers: { 'Content-Type': 'application/json' } });
+}
+
+const db = env?.DB;
+if (!db) {
+  return new Response(JSON.stringify({ error: 'Server error' }), { status: 503, headers: { 'Content-Type': 'application/json' } });
+}
+
+const url = new URL(Astro.request.url);
+const fromDate = url.searchParams.get('from_date')?.trim() || undefined;
+const toDate = url.searchParams.get('to_date')?.trim() || undefined;
+const status = url.searchParams.get('status')?.trim() || undefined;
+const format = (url.searchParams.get('format') || 'csv').toLowerCase();
+const validFormat = format === 'html' ? 'html' : 'csv';
+
+const requests = await listAllArbRequestsFiltered(db, { fromDate: fromDate || null, toDate: toDate || null, status: status || null });
+
+function escapeCsv(val: string | null | undefined): string {
+  if (val == null) return '';
+  const s = String(val).trim();
+  if (s.includes('"') || s.includes(',') || s.includes('\n') || s.includes('\r')) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
+
+function formatDate(s: string | null | undefined): string {
+  if (!s) return '';
+  try {
+    const d = new Date(s);
+    return Number.isNaN(d.getTime()) ? s : d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+  } catch {
+    return String(s);
+  }
+}
+
+if (validFormat === 'csv') {
+  const headers = ['ID', 'Owner email', 'Applicant', 'Phone', 'Property address', 'Application type', 'Status', 'Created', 'Decision date', 'ARB e-sign'];
+  const rows = requests.map((r) => [
+    r.id,
+    r.owner_email,
+    r.applicant_name ?? '',
+    r.phone ?? '',
+    r.property_address ?? '',
+    r.application_type ?? '',
+    r.status,
+    r.created ?? '',
+    r.esign_timestamp ?? '',
+    r.arb_esign ?? '',
+  ]);
+  const csv = [headers.map(escapeCsv).join(','), ...rows.map((row) => row.map(escapeCsv).join(','))].join('\n');
+  const filename = `arb-requests-${fromDate || 'start'}-${toDate || 'end'}.csv`.replace(/\s/g, '-');
+  return new Response(csv, {
+    headers: {
+      'Content-Type': 'text/csv; charset=utf-8',
+      'Content-Disposition': `attachment; filename="${filename}"`,
+    },
+  });
+}
+
+// HTML report (print-friendly for Save as PDF)
+const filterDesc = [fromDate && `from ${fromDate}`, toDate && `to ${toDate}`, status && `status ${status}`].filter(Boolean).join(', ') || 'all dates';
+const title = `ARB Requests Report — ${filterDesc}`;
+const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${escapeHtml(title)}</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 900px; margin: 0 auto; padding: 1rem; color: #111; }
+    h1 { font-size: 1.5rem; margin-bottom: 0.5rem; }
+    .meta { color: #555; font-size: 0.875rem; margin-bottom: 1.5rem; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
+    th, td { border: 1px solid #ccc; padding: 0.35rem 0.5rem; text-align: left; vertical-align: top; }
+    th { background: #f5f5f5; font-weight: 600; }
+    tr:nth-child(even) { background: #fafafa; }
+    .status { font-weight: 600; }
+    .status.approved { color: #0d7d0d; }
+    .status.rejected { color: #b91c1c; }
+    .status.in_review { color: #b45309; }
+    .status.pending { color: #555; }
+    .description { max-width: 280px; overflow-wrap: break-word; }
+    @media print { body { padding: 0; } th, td { padding: 0.25rem; } }
+  </style>
+</head>
+<body>
+  <h1>ARB Requests Report</h1>
+  <p class="meta">Generated ${formatDate(new Date().toISOString())} · Filter: ${escapeHtml(filterDesc)} · ${requests.length} request(s)</p>
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Applicant</th>
+        <th>Property</th>
+        <th>Type</th>
+        <th>Status</th>
+        <th>Submitted</th>
+        <th>Decision date</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+${requests
+  .map(
+    (r) => `
+      <tr>
+        <td>${escapeHtml(r.id)}</td>
+        <td>${escapeHtml(r.applicant_name ?? r.owner_email)}</td>
+        <td>${escapeHtml(r.property_address ?? '—')}</td>
+        <td>${escapeHtml(r.application_type ?? '—')}</td>
+        <td><span class="status ${escapeHtml(r.status)}">${escapeHtml(r.status)}</span></td>
+        <td>${formatDate(r.created)}</td>
+        <td>${formatDate(r.esign_timestamp)}</td>
+        <td class="description">${escapeHtml((r.description ?? '').slice(0, 200))}${(r.description?.length ?? 0) > 200 ? '…' : ''}</td>
+      </tr>`
+  )
+  .join('')}
+    </tbody>
+  </table>
+  <p class="meta" style="margin-top: 1rem;">Use your browser’s Print function (e.g. Ctrl+P / Cmd+P) and choose “Save as PDF” to save this report as a PDF.</p>
+</body>
+</html>`;
+
+const htmlFilename = `arb-requests-${fromDate || 'start'}-${toDate || 'end'}.html`.replace(/\s/g, '-');
+return new Response(html, {
+  headers: {
+    'Content-Type': 'text/html; charset=utf-8',
+    'Content-Disposition': `inline; filename="${htmlFilename}"`,
+  },
+});
+---

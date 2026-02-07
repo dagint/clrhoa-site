@@ -77,9 +77,14 @@ run('db:phase35', 'schema-phase35-users-notifications.sql');
 run('db:phase35-notification-types', 'schema-phase35-notification-types.sql');
 run('db:phase5', 'schema-phase5.sql');
 run('db:phase5-paid-through', 'schema-phase5-paid-through.sql');
+run('db:phase5-special-assessments', 'schema-phase5-special-assessments.sql');
 run('db:phase6', 'schema-phase6-preapproval.sql');
 run('db:login-history', 'schema-login-history.sql');
 run('db:public-documents', 'schema-public-documents.sql');
+run('db:member-documents', 'schema-member-documents.sql');
+run('db:backup-config', 'schema-backup-config.sql');
+run('db:assessment-recorded-by', 'schema-assessment-payments-recorded-by.sql');
+run('db:owners-primary', 'schema-owners-primary.sql');
 
 console.log('\nAll local DB migrations completed. You can run npm run dev.');
 process.exit(0);

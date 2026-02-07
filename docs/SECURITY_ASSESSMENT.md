@@ -1,123 +1,113 @@
 # Security Assessment & Recommendations
 
-## Current Security Posture: **B+ (Good)**
+## Current Security Posture: **A (Strong)**
 
-### ✅ Strengths
+The site uses a **hybrid architecture**: a largely static public site plus a **server-rendered member portal and board area** (Astro on Cloudflare Pages with D1, KV, and R2). Security is enforced at the edge (middleware), in session auth, and in role-based access control.
 
-1. **Static Site Architecture**
-   - No server-side code execution
-   - Minimal attack surface
-   - No database or backend vulnerabilities
+---
 
-2. **Form Security**
-   - StaticForms with optional reCAPTCHA bot protection
-   - Honeypot field for spam prevention
-   - Client-side validation with proper error handling
-   - Form submissions handled by trusted third-party (StaticForms)
+## ✅ Current Strengths
 
-3. **Privacy Protection**
-   - No exposed email addresses
-   - Generic approach (no named board members)
-   - Privacy-friendly analytics (opt-in, GDPR compliant)
+### 1. Architecture & deployment
 
-4. **Environment Variables**
-   - Sensitive keys properly excluded from git (`.gitignore`)
-   - Public keys only exposed (reCAPTCHA site key when used is safe to expose)
+- **Public pages**: Mostly static or server-rendered with **limited, non-PII data** (see `docs/DATA_ACCESS_CONTROL.md`). No session or secrets on the public side; only `PUBLIC_*` env and safe DB helpers.
+- **Portal/board**: Server-rendered with **session-based auth** (signed cookies, HttpOnly, Secure, SameSite=Lax). KV whitelist for who can log in; D1 for data; R2 for files.
+- **Cloudflare**: HTTPS, DDoS mitigation, and global edge. Secrets (e.g. `SESSION_SECRET`) set via `wrangler secret put` and not in repo.
 
-5. **Dependencies**
-   - Modern, actively maintained packages
-   - Minimal dependency footprint
-   - TypeScript for type safety
+### 2. Authentication & session
 
-6. **HTTPS/SSL**
-   - Cloudflare Pages provides automatic HTTPS
-   - SSL/TLS encryption in transit
+- **Session cookie**: HMAC-SHA256 signed payload; expiry and optional **inactivity timeout** (30 min). Optional **fingerprint** (user-agent + IP) to reduce hijacking risk.
+- **Login**: Rate-limited and **account lockout** after repeated failures (KV). No passwords; Google OAuth or magic-link style flows; access controlled by KV whitelist.
+- **CSRF**: Mutating API routes check **origin/referer** and use **CSRF tokens** where appropriate (e.g. ARB actions, preferences, directory updates).
 
-### ⚠️ Areas for Improvement
+### 3. Authorization & access control
 
-1. **Missing Security Headers**
-   - No Content Security Policy (CSP)
-   - No security headers (X-Frame-Options, X-Content-Type-Options, etc.)
-   - No HSTS header
+- **Middleware**: `/portal/*` requires a valid session (and profile completeness where needed); `/board/*` requires session **and** elevated role (board, arb, admin, arb_board). Elevated API prefixes return 403 if the user is authenticated but not elevated.
+- **Resource ownership**: **`requireArbRequestAccess`** and **`requireArbRequestOwner`** in `src/lib/access-control.ts` centralize ARB request checks (owner or elevated for read; owner only for cancel/add/remove file). Used consistently across ARB APIs.
+- **File access**: ARB attachments require request owner or elevated; **member documents** are only served if the key exists in `member_documents` (no arbitrary R2 paths).
+- **Data access**: Documented in `docs/DATA_ACCESS_CONTROL.md` (who can see what, audit logging for directory, etc.).
 
-2. **No robots.txt**
-   - Search engines can crawl everything (may be intentional)
+### 4. HTTP security headers (middleware)
 
-3. **No security.txt**
-   - Missing security contact information for responsible disclosure
+- **Content-Security-Policy** (CSP): Restricts scripts, styles, frames, form-action; `frame-ancestors 'none'` (or `'self'` only for file-view iframe).
+- **Strict-Transport-Security** (HSTS): Enabled on HTTPS responses.
+- **X-Content-Type-Options**: nosniff.
+- **X-Frame-Options**: DENY (or SAMEORIGIN for file-view).
+- **Referrer-Policy**: strict-origin-when-cross-origin.
+- **Permissions-Policy**: geolocation, microphone, camera disabled.
+- **X-XSS-Protection**: 1; mode=block (legacy; CSP is primary).
 
-4. **Dependency Management**
-   - No automated dependency updates
-   - No security scanning for vulnerabilities
+### 5. Input & output safety
 
-5. **Input Sanitization**
-   - Client-side validation only (server-side handled by StaticForms)
-   - No additional sanitization for user-generated content display
+- **Sanitization**: `src/lib/sanitize.ts` (escapeHtml, sanitizeFileName, sanitizeEmail, sanitizeForScriptInjection, etc.). User-generated content is sanitized for display.
+- **Path traversal**: Rejected in file keys (e.g. `..` in path). Member-doc keys validated against DB before serve.
+- **SQL**: Parameterized queries via D1 prepared statements (no raw concatenation).
 
-6. **Rate Limiting**
-   - Form submissions rely on honeypot and optional reCAPTCHA
-   - No additional rate limiting at application level
+### 6. Rate limiting & abuse prevention
 
-## Security Recommendations
+- **API rate limits** (KV): Login, ARB upload/cancel/approve/notes, directory reveal, CSV upload, etc. Per-IP and per-endpoint; 429 when exceeded. See `docs/RATE_LIMITING.md`.
+- **Login lockout**: Failed attempts tracked in KV; temporary lockout after threshold.
+- **Contact form**: StaticForms with honeypot and optional reCAPTCHA (no app-side rate limit; third-party handles submission).
 
-### High Priority
+### 7. Security files & disclosure
 
-1. **Add Security Headers** ⭐
-   - Implement Content Security Policy (CSP)
-   - Add X-Frame-Options, X-Content-Type-Options, Referrer-Policy
-   - Configure HSTS for HTTPS enforcement
+- **robots.txt**: Served from `src/pages/robots.txt.ts` (configurable disallow/sitemap).
+- **security.txt**: At `/.well-known/security.txt` (Contact, Expires, Policy, Acknowledgments) for responsible disclosure.
+- **Dependabot**: Enabled (`.github/dependabot.yml`) for dependency alerts and update PRs.
 
-2. **Add robots.txt** ⭐
-   - Control search engine crawling
-   - Protect sensitive paths if any
+### 8. Privacy & compliance
 
-3. **Add security.txt** ⭐
-   - Provide security contact information
-   - Enable responsible disclosure
+- **PII**: Public pages do not expose member PII. Portal/board show only what’s needed for the role; directory access is logged.
+- **Analytics**: Opt-in, privacy-friendly (e.g. Cloudflare Web Analytics); no cookies without consent where applicable.
+- **Env**: Secrets live in runtime env (Cloudflare); only `PUBLIC_*` and `SITE` are used in client-facing code. `env.d.ts` documents Env and public vars.
 
-### Medium Priority
+---
 
-4. **Dependency Security**
-   - Set up automated dependency updates (Dependabot)
-   - Regular security audits (`npm audit`)
-   - Consider using `npm audit fix` regularly
+## ⚠️ Areas for Improvement
 
-5. **Content Security**
-   - Review and sanitize any user-generated content
-   - Ensure PDFs are safe (currently static, but good practice)
+### 1. Monitoring & incident response (medium)
 
-6. **Monitoring**
-   - Set up security monitoring/alerts
-   - Monitor for dependency vulnerabilities
+- **Security monitoring**: Document runbooks for “suspicious logins,” “spike in 4xx/5xx,” “dependency CVE.” See `SECURITY_MONITORING.md` and extend with concrete steps.
+- **Incident response**: Short plan (who to contact, how to revoke sessions, how to rotate secrets, how to restore from backup). Can live in `SECURITY_MONITORING.md` or a dedicated `INCIDENT_RESPONSE.md`.
 
-### Low Priority
+### 2. Dependency & audit cadence (low)
 
-7. **Subresource Integrity (SRI)**
-   - Add SRI hashes for external scripts (reCAPTCHA if used, Cloudflare beacon if desired)
+- **npm audit**: Run regularly (e.g. in CI or before release). Document in `DEPENDENCY_SECURITY.md` (“run `npm run audit` before each release”).
+- **Update policy**: Define when to apply Dependabot PRs (e.g. security within 48h; minors monthly).
 
-8. **Security Documentation**
-   - Document security practices
-   - Create incident response plan
+### 3. Optional hardening (low)
 
-## Risk Assessment
+- **Security policy page**: `security.txt` references `Policy: https://clrhoa.com/security-policy`. Ensure that URL exists and describes how security issues are handled.
+- **SRI**: External scripts (e.g. reCAPTCHA, Cloudflare beacon) already considered in CSP; SRI hashes (see `SRI.md`) add another layer if you want to lock script integrity further.
 
-| Risk Level | Issue | Impact | Likelihood | Mitigation Priority |
-|------------|-------|--------|------------|---------------------|
-| Low | Missing CSP | XSS protection | Low | High |
-| Low | Missing security headers | Various attacks | Low | High |
-| Low | No robots.txt | Information disclosure | Very Low | Medium |
-| Low | No security.txt | No responsible disclosure | Very Low | Medium |
-| Very Low | Dependency vulnerabilities | Code execution | Very Low | Medium |
+---
 
-## Compliance Considerations
+## Risk Overview
 
-- **GDPR**: ✅ Compliant (privacy-friendly analytics, no cookies without consent)
-- **CCPA**: ✅ Compliant (no personal data collection)
-- **Accessibility**: ✅ Good (WCAG considerations implemented)
+| Area              | Status   | Notes                                                    |
+|-------------------|----------|----------------------------------------------------------|
+| Auth/session      | Strong   | Signed cookies, optional fingerprint, lockout, rate limit |
+| Authorization     | Strong   | Middleware + access-control helpers; documented          |
+| Headers / CSP     | Strong   | Set in middleware; HSTS on HTTPS                         |
+| Input sanitization| Good     | Centralized sanitize lib; parameterized DB               |
+| Rate limiting     | Good     | Login, ARB, directory, CSV; see RATE_LIMITING.md          |
+| Public data       | Good     | No PII; limited public DB helpers                        |
+| Dependencies      | Good     | Dependabot; could add audit in CI                        |
+| Monitoring/IR     | Improve  | Document runbooks and incident steps                     |
 
-## Next Steps
+---
 
-1. Implement security headers (see `SECURITY_HEADERS.md`)
-2. Add robots.txt and security.txt files
-3. Set up dependency monitoring
-4. Review and test security improvements
+## Compliance & standards
+
+- **GDPR**: Privacy-friendly analytics; no unnecessary PII on public site; access and logging documented.
+- **Security.txt**: Present for coordinated disclosure (RFC 9116).
+
+---
+
+## Next steps
+
+1. **Document** incident response and security monitoring runbooks (e.g. in `SECURITY_MONITORING.md`).
+2. **Add** `npm run audit` to CI or release checklist; document in `DEPENDENCY_SECURITY.md`.
+3. **Confirm** `/security-policy` (and `/security-acknowledgments` if used) exist and match `security.txt`.
+
+For header details see `SECURITY_HEADERS.md`; for data and access rules see `DATA_ACCESS_CONTROL.md`; for rate limits see `RATE_LIMITING.md`.

@@ -6,31 +6,22 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie } from '../../lib/auth';
+import { requireSession, requireDb, jsonResponse } from '../../lib/api-helpers';
 import { createMaintenanceId, insertMaintenanceRequest, MAINTENANCE_CATEGORIES } from '../../lib/maintenance-db';
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
 const MAX_TOTAL_BYTES = 25 * 1024 * 1024;
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/heic'];
 
-function jsonResponse(data: object, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { 'Content-Type': 'application/json' },
-  });
-}
+const auth = await requireSession(Astro);
+if (auth.response) return auth.response;
+const { session } = auth;
 
-const runtime = Astro.locals.runtime;
-const env = runtime?.env;
-const session = await getSessionFromCookie(
-  Astro.request.headers.get('cookie') ?? undefined,
-  env?.SESSION_SECRET
-);
-
-if (!session) return jsonResponse({ error: 'Unauthorized' }, 401);
-const db = env?.DB;
-const r2 = env?.CLOURHOA_FILES;
-if (!db || !r2) return jsonResponse({ error: 'Server configuration error' }, 503);
+const dbResult = requireDb(Astro.locals.runtime?.env);
+if (dbResult.response) return dbResult.response;
+const { db } = dbResult;
+const r2 = Astro.locals.runtime?.env?.CLOURHOA_FILES;
+if (!r2) return jsonResponse({ error: 'Server configuration error' }, 503);
 
 if (Astro.request.method !== 'POST') {
   return new Response(null, { status: 405, headers: { Allow: 'POST' } });

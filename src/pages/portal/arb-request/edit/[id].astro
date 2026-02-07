@@ -4,38 +4,15 @@ export const prerender = false;
 import PortalLayout from '../../../../layouts/PortalLayout.astro';
 import ProtectedPage from '../../../../components/ProtectedPage.astro';
 import PortalNav from '../../../../components/PortalNav.astro';
-import { getSessionFromCookie, updateSessionActivity, SESSION_COOKIE_NAME } from '../../../../lib/auth';
+import { getPortalContext } from '../../../../lib/portal-context';
+import { SESSION_COOKIE_NAME } from '../../../../lib/auth';
 import { getArbRequest, listArbFilesByRequest, listArbRequestsByOwner } from '../../../../lib/arb-db';
 import type { ArbFile } from '../../../../lib/arb-db';
 
 const { id } = Astro.params;
-const runtime = Astro.locals.runtime;
-const env = runtime?.env;
-const userAgent = Astro.request.headers.get('user-agent') ?? null;
-const ipAddress = Astro.request.headers.get('cf-connecting-ip') ?? 
-                  Astro.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
-const cookieHeader = Astro.request.headers.get('cookie') ?? undefined;
-// First try with fingerprint verification
-let session = await getSessionFromCookie(
-  cookieHeader,
-  env?.SESSION_SECRET,
-  userAgent,
-  ipAddress
-);
-
-// If session validation fails due to fingerprint mismatch, try without fingerprint check
-// This handles cases where IP/userAgent changed but session is still valid
-if (!session && env?.SESSION_SECRET) {
-  session = await getSessionFromCookie(
-    cookieHeader,
-    env.SESSION_SECRET
-    // Don't pass userAgent/ipAddress - this allows legacy sessions or sessions with changed fingerprint
-  );
-}
-
-if (!session) {
-  return Astro.redirect('/portal/login');
-}
+const { env, session: sessionFromContext } = await getPortalContext(Astro, { fingerprint: true });
+if (!sessionFromContext) return Astro.redirect('/portal/login');
+let session = sessionFromContext;
 
 // Always ensure session has a CSRF token (update activity and refresh token if needed)
 // This handles old sessions that were created before CSRF tokens were added

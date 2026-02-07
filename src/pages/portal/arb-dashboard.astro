@@ -7,28 +7,19 @@ import PortalNav from '../../components/PortalNav.astro';
 import PortalElevatedRoleBanner from '../../components/PortalElevatedRoleBanner.astro';
 import BoardNav from '../../components/BoardNav.astro';
 import ArbDashboardCard from '../../components/ArbDashboardCard.astro';
-import { getSessionFromCookie, updateSessionActivity } from '../../lib/auth';
-import { listAllArbRequests, listArbFilesByRequest, listArbRequestsByOwner } from '../../lib/arb-db';
-import type { ArbFile } from '../../lib/arb-db';
+import ArbDashboardExportSection from '../../components/ArbDashboardExportSection.astro';
+import { getPortalContext } from '../../lib/portal-context';
+import { updateSessionActivity } from '../../lib/auth';
+import { getArbDashboardData, formatApproval } from '../../lib/arb-dashboard';
 import { sanitizeForScriptInjection } from '../../lib/sanitize';
 
-const runtime = Astro.locals.runtime;
-const env = runtime?.env;
-const session = await getSessionFromCookie(
-  Astro.request.headers.get('cookie') ?? undefined,
-  env?.SESSION_SECRET
-);
-
-if (!session) {
-  return Astro.redirect('/portal/login');
-}
+const { env, session } = await getPortalContext(Astro);
+if (!session) return Astro.redirect('/portal/login');
 
 const allowedRoles = ['arb', 'board', 'admin', 'arb_board'];
-if (!allowedRoles.includes(session.role)) {
-  return Astro.redirect('/portal/dashboard');
-}
+if (!allowedRoles.includes(session.role)) return Astro.redirect('/portal/dashboard');
 
-/** Suggested e-signature for approve/reject: logged-in user name (or email) + role. User can edit before submitting. */
+/** Suggested e-signature for approve/reject (editable before submit). */
 const roleLabel = session.role === 'arb' ? 'ARB Member' : session.role === 'board' ? 'Board' : session.role === 'arb_board' ? 'ARB + Board' : session.role === 'admin' ? 'Admin' : '';
 const suggestedArbEsign = sanitizeForScriptInjection(
   roleLabel
@@ -37,96 +28,28 @@ const suggestedArbEsign = sanitizeForScriptInjection(
 );
 
 const db = env?.DB;
-const allRequests = db ? await listAllArbRequests(db) : [];
-const filesByRequestId: Record<string, ArbFile[]> = {};
-if (db) {
-  for (const req of allRequests) {
-    filesByRequestId[req.id] = await listArbFilesByRequest(db, req.id);
-  }
-}
+const dashboardData = db
+  ? await getArbDashboardData(db, session.email, Astro.url.searchParams.get('page') ?? '1')
+  : null;
 
-// Get draft count for navigation badge (for owner's own requests)
-const ownerRequests = db ? await listArbRequestsByOwner(db, session.email) : [];
-const draftCount = ownerRequests.filter(r => r.status === 'pending').length;
-
-/** Decision date for grouping completed requests (approved/rejected). Uses esign_timestamp; fallback to created. */
-function getYearQuarter(dateStr: string | null): string {
-  const d = dateStr ? new Date(dateStr) : new Date();
-  const year = d.getFullYear();
-  const q = Math.floor(d.getMonth() / 3) + 1;
-  return `${year}-Q${q}`;
-}
-
-const ITEMS_PER_PAGE = 20;
-
-const inReview = allRequests.filter((r) => r.status === 'in_review');
-const pending = allRequests.filter((r) => r.status === 'pending');
-const completed = allRequests.filter((r) => r.status === 'approved' || r.status === 'rejected');
-const completedWithPeriod = completed.map((r) => ({ ...r, yearQuarter: getYearQuarter(r.esign_timestamp ?? r.created) }));
-
-// Pagination for completed requests
-const completedPage = Math.max(1, parseInt(Astro.url.searchParams.get('page') ?? '1', 10));
-const completedStart = (completedPage - 1) * ITEMS_PER_PAGE;
-const completedEnd = completedStart + ITEMS_PER_PAGE;
-const completedPaginated = completedWithPeriod.slice(completedStart, completedEnd);
-const totalCompletedPages = Math.ceil(completedWithPeriod.length / ITEMS_PER_PAGE);
-
-const periodSet = new Set(completedWithPeriod.map((r) => r.yearQuarter));
-const periodOptions: { value: string; label: string }[] = [
-  { value: 'all', label: 'All' },
-  ...Array.from(periodSet)
-    .sort()
-    .reverse()
-    .map((q) => ({ value: q, label: q.replace('-', ' ') })),
-];
-
-function getFileViewUrl(r2KeysJson: string): string | null {
-  try {
-    const o = JSON.parse(r2KeysJson) as { originals?: string[]; review?: string[]; archive?: string[] };
-    const key = o.originals?.[0] ?? o.review?.[0] ?? o.archive?.[0];
-    return key ? `/api/portal/file/${encodeURIComponent(key)}` : null;
-  } catch {
-    return null;
-  }
-}
-
-function getFileViewerUrl(r2KeysJson: string): string | null {
-  try {
-    const o = JSON.parse(r2KeysJson) as { originals?: string[]; review?: string[]; archive?: string[] };
-    const key = o.originals?.[0] ?? o.review?.[0] ?? o.archive?.[0];
-    return key ? `/api/portal/file-view?key=${encodeURIComponent(key)}` : null;
-  } catch {
-    return null;
-  }
-}
-
-const IMAGE_EXT = /\.(jpe?g|png|gif|webp|heic)$/i;
-function isImageFilename(filename: string): boolean {
-  return IMAGE_EXT.test(filename);
-}
-
-const APPLICATION_TYPES = ['Exterior Paint', 'Landscape Installation', 'Swimming Pool', 'Recreational Equipment', 'Fencing', 'Other'];
-function selectedTypes(applicationType: string | null): string[] {
-  return applicationType ? applicationType.split(',').map((s) => s.trim()).filter(Boolean) : [];
-}
-
-/** Parse arb_esign (format: "STATUS | Name | email | date") for display. */
-function formatApproval(arbEsign: string | null, esignTimestamp: string | null): { status: string; by: string; date: string } | null {
-  if (!arbEsign?.trim()) return null;
-  const parts = arbEsign.split('|').map((p) => p.trim());
-  const status = (parts[0] ?? '').toLowerCase();
-  if (status !== 'approved' && status !== 'rejected') return null;
-  const by = parts[1] ?? arbEsign;
-  const dateStr = esignTimestamp ?? parts[3];
-  const date = dateStr ? new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
-  return { status, by, date };
-}
+const allRequests = dashboardData?.allRequests ?? [];
+const filesByRequestId = dashboardData?.filesByRequestId ?? {};
+const draftCount = dashboardData?.draftCount ?? 0;
+const arbInReviewCount = dashboardData?.arbInReviewCount ?? 0;
+const vendorPendingCount = dashboardData?.vendorPendingCount ?? 0;
+const inReview = dashboardData?.inReview ?? [];
+const pending = dashboardData?.pending ?? [];
+const completedWithPeriod = dashboardData?.completedWithPeriod ?? [];
+const completedPage = dashboardData?.completedPage ?? 1;
+const completedPaginated = dashboardData?.completedPaginated ?? [];
+const totalCompletedPages = dashboardData?.totalCompletedPages ?? 0;
+const periodOptions = dashboardData?.periodOptions ?? [];
 ---
 
 <PortalLayout title="ARB Dashboard | Member Portal | Crooked Lake Reserve HOA">
   <ProtectedPage>
   <div class="min-h-screen portal-theme-bg font-body">
-    <PortalNav currentPath="/portal/arb-dashboard" draftCount={draftCount} role={session.role} />
+    <PortalNav currentPath="/portal/arb-dashboard" draftCount={draftCount} role={session.role} arbInReviewCount={arbInReviewCount} vendorPendingCount={vendorPendingCount} />
 
     <PortalElevatedRoleBanner role={session.role} />
 
@@ -147,6 +70,8 @@ function formatApproval(arbEsign: string | null, esignTimestamp: string | null):
           </a>
         </div>
       )}
+
+      <ArbDashboardExportSection />
 
       {allRequests.length === 0 ? (
         <>

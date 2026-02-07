@@ -3,10 +3,9 @@ export const prerender = false;
 
 import PortalLayout from '../../layouts/PortalLayout.astro';
 import ProtectedPage from '../../components/ProtectedPage.astro';
-import GlobalSearch from '../../components/GlobalSearch.astro';
 import PortalNav from '../../components/PortalNav.astro';
 import PWAInstallPrompt from '../../components/PWAInstallPrompt.astro';
-import { getSessionFromCookie } from '../../lib/auth';
+import { getPortalContext } from '../../lib/portal-context';
 import { getArbRequestCountsByStatus, listArbRequestsByOwner } from '../../lib/arb-db';
 import { listPendingSubmissions } from '../../lib/vendor-submissions-db';
 import { getRecentOwnersCount, listOwners } from '../../lib/directory-db';
@@ -15,32 +14,11 @@ import { listMaintenanceByOwner } from '../../lib/maintenance-db';
 import { listUpcomingWithCountsAndUser } from '../../lib/meetings-db';
 import { listActiveFeedbackDocs, getFeedbackResponse } from '../../lib/feedback-db';
 
-const runtime = Astro.locals.runtime;
-const env = runtime?.env;
-const userAgent = Astro.request.headers.get('user-agent') ?? null;
-const ipAddress = Astro.request.headers.get('cf-connecting-ip') ?? 
-                  Astro.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
-const cookieHeader = Astro.request.headers.get('cookie') ?? undefined;
-let session = await getSessionFromCookie(
-  cookieHeader,
-  env?.SESSION_SECRET,
-  userAgent,
-  ipAddress
-);
-
-// If session validation fails due to fingerprint mismatch, try without fingerprint check
-if (!session && env?.SESSION_SECRET) {
-  session = await getSessionFromCookie(
-    cookieHeader,
-    env.SESSION_SECRET
-  );
-}
-
-if (!session) {
-  return Astro.redirect('/portal/login');
-}
+const { env, session } = await getPortalContext(Astro, { fingerprint: true });
+if (!session) return Astro.redirect('/portal/login');
 
 const { email, role, name } = session;
+const firstName = name?.trim().split(/\s+/)[0] ?? null;
 const db = env?.DB;
 let arbCounts: { pending: number; in_review: number } = { pending: 0, in_review: 0 };
 let pendingVendorCount = 0;
@@ -92,16 +70,38 @@ const arbBadgeCount = (role === 'arb' || role === 'board' || role === 'admin' ||
 <PortalLayout title="Dashboard | Member Portal | Crooked Lake Reserve HOA">
   <ProtectedPage>
   <div class="min-h-screen bg-gray-50 portal-theme-bg font-body" id="portal-root">
-    <GlobalSearch fixed={true} class="portal-theme-header" />
-    <div class="pt-14">
-      <PortalNav currentPath="/portal/dashboard" draftCount={draftCount} role={role} />
+    <PortalNav currentPath="/portal/dashboard" draftCount={draftCount} role={role} arbInReviewCount={arbCounts.in_review} vendorPendingCount={pendingVendorCount} />
 
       <main class="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
         <div class="bg-white rounded-2xl shadow-sm border border-gray-100 portal-theme-card portal-card-accent p-6 sm:p-8">
-          <h2 class="text-2xl font-heading font-bold text-clr-green mb-1">Welcome back</h2>
+          <h2 class="text-2xl font-heading font-bold text-clr-green mb-1">Welcome back{firstName ? `, ${firstName}` : ''}</h2>
           <p class="text-gray-600 portal-theme-text-muted mb-6">
             {name ? `${name} (` : ''}{email}{name ? ')' : ''}
           </p>
+
+          {hasNewNotices && (
+            <div class="mb-6 p-4 rounded-xl bg-clr-green/10 border border-clr-green/20" role="region" aria-label="Recent updates">
+              <p class="text-sm font-semibold text-clr-green mb-2">Recent updates</p>
+              <ul class="text-sm text-gray-700 portal-theme-text space-y-1">
+                {recentVendorsCount > 0 && (
+                  <li>
+                    <a href="/portal/vendors" class="text-clr-green hover:underline font-medium">
+                      {recentVendorsCount} new vendor{recentVendorsCount === 1 ? '' : 's'} added
+                    </a>
+                    <span class="text-gray-500 portal-theme-text-muted"> in the last {RECENT_DAYS} days</span>
+                  </li>
+                )}
+                {recentOwnersCount > 0 && (
+                  <li>
+                    <a href="/portal/directory" class="text-clr-green hover:underline font-medium">
+                      {recentOwnersCount} new member{recentOwnersCount === 1 ? '' : 's'} in the directory
+                    </a>
+                    <span class="text-gray-500 portal-theme-text-muted"> in the last {RECENT_DAYS} days</span>
+                  </li>
+                )}
+              </ul>
+            </div>
+          )}
 
           <!-- 2x2 Quick actions grid -->
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8" role="navigation" aria-label="Quick actions">
@@ -165,48 +165,39 @@ const arbBadgeCount = (role === 'arb' || role === 'board' || role === 'admin' ||
           <p class="text-sm text-gray-600 mt-4">
             <a href="/arb-request-how-to" class="text-clr-orange hover:underline">How to submit an ARB request</a>
           </p>
-          {hasNewNotices && (
-            <div class="mt-4 p-4 rounded-xl bg-clr-green/10 border border-clr-green/20" role="region" aria-label="Recent updates">
-              <p class="text-sm font-semibold text-clr-green mb-2">Recent updates</p>
-              <ul class="text-sm text-gray-700 portal-theme-text space-y-1">
-                {recentVendorsCount > 0 && (
-                  <li>
-                    <a href="/portal/vendors" class="text-clr-green hover:underline font-medium">
-                      {recentVendorsCount} new vendor{recentVendorsCount === 1 ? '' : 's'} added
-                    </a>
-                    <span class="text-gray-500 portal-theme-text-muted"> in the last {RECENT_DAYS} days</span>
-                  </li>
-                )}
-                {recentOwnersCount > 0 && (
-                  <li>
-                    <a href="/portal/directory" class="text-clr-green hover:underline font-medium">
-                      {recentOwnersCount} new member{recentOwnersCount === 1 ? '' : 's'} in the directory
-                    </a>
-                    <span class="text-gray-500 portal-theme-text-muted"> in the last {RECENT_DAYS} days</span>
-                  </li>
-                )}
-              </ul>
-            </div>
-          )}
           {(role === 'arb' || role === 'board' || role === 'admin' || role === 'arb_board') && (
-            <div class="mt-4 flex flex-wrap items-center gap-4 gap-y-1">
-              {(role === 'arb' || role === 'admin' || role === 'arb_board') && (
-                <p>
-                  <a href="/portal/arb-dashboard" class="text-clr-green font-semibold hover:underline">ARB Dashboard &rarr;</a>
-                  <span class="text-gray-500 portal-theme-text-muted text-sm ml-1">({arbCounts.pending} pending, {arbCounts.in_review} in review)</span>
-                </p>
-              )}
-              {(role === 'board' || role === 'admin' || role === 'arb_board') && (
-                <p>
-                  <a href="/portal/board" class="text-clr-green font-semibold hover:underline">Board &rarr;</a>
-                  {pendingVendorCount > 0 && <span class="text-gray-500 portal-theme-text-muted text-sm ml-1">({pendingVendorCount} pending)</span>}
-                </p>
-              )}
-            </div>
+            <section class="mt-6 p-4 rounded-xl bg-gray-50 border border-gray-200" aria-labelledby="quick-actions-heading">
+              <h3 id="quick-actions-heading" class="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-3">Quick actions</h3>
+              <div class="flex flex-wrap gap-3">
+                {(role === 'board' || role === 'admin' || role === 'arb_board') && (
+                  <a href="/board/assessments" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-clr-green hover:brightness-110 text-white font-semibold text-sm shadow-sm">
+                    Record payment
+                  </a>
+                )}
+                {(role === 'arb' || role === 'admin' || role === 'arb_board') && (
+                  <a href="/portal/arb-dashboard" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 border-clr-green text-clr-green hover:bg-clr-green/10 font-semibold text-sm">
+                    ARB Dashboard
+                    {(arbCounts.pending > 0 || arbCounts.in_review > 0) && (
+                      <span class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 rounded-full bg-amber-500 text-white text-xs font-bold" aria-label={`${arbCounts.in_review} in review, ${arbCounts.pending} pending`}>{arbCounts.in_review + arbCounts.pending}</span>
+                    )}
+                  </a>
+                )}
+                {(role === 'board' || role === 'admin' || role === 'arb_board') && (
+                  <a href="/board/vendors" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 border-gray-300 text-gray-700 hover:bg-gray-100 font-semibold text-sm">
+                    Vendor submissions
+                    {pendingVendorCount > 0 && (
+                      <span class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 rounded-full bg-amber-500 text-white text-xs font-bold" aria-label={`${pendingVendorCount} pending`}>{pendingVendorCount}</span>
+                    )}
+                  </a>
+                )}
+                <a href="/portal/board" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-gray-300 text-gray-600 hover:bg-gray-100 font-medium text-sm">
+                  Board home
+                </a>
+              </div>
+            </section>
           )}
         </div>
       </main>
-    </div>
   </div>
   <PWAInstallPrompt />
   </ProtectedPage>

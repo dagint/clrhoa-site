@@ -2,23 +2,15 @@
 export const prerender = false;
 
 import BoardLayout from '../../layouts/BoardLayout.astro';
-import { getSessionFromCookie } from '../../lib/auth';
+import { getBoardContext } from '../../lib/board-context';
 import { listAllMeetings } from '../../lib/meetings-db';
 import { listArbRequestsByOwner } from '../../lib/arb-db';
 
-const runtime = Astro.locals.runtime;
-const env = runtime?.env;
-const cookieHeader = Astro.request.headers.get('cookie') ?? undefined;
-let session = await getSessionFromCookie(cookieHeader, env?.SESSION_SECRET);
-
-if (!session) {
-  return Astro.redirect('/portal/login');
-}
-
+const ctx = await getBoardContext(Astro);
+if (ctx.redirect) return Astro.redirect(ctx.redirect);
+const { env, session } = ctx;
 const isBoard = session.role === 'board' || session.role === 'admin' || session.role === 'arb_board';
-if (!isBoard) {
-  return Astro.redirect('/portal/dashboard');
-}
+if (!isBoard) return Astro.redirect('/portal/dashboard');
 
 const db = env?.DB;
 const meetings = db ? await listAllMeetings(db) : [];
@@ -79,6 +71,15 @@ function formatDateTime(dt: string): string {
             <input type="hidden" name="agenda_r2_key" id="form-agenda-key" value="" />
             <p class="text-xs text-gray-500 mt-1">Optional. Upload a PDF; it will be stored and linked for owners.</p>
           </div>
+          <div class="rounded-lg border border-amber-200 bg-amber-50/80 p-4">
+            <label class="flex items-start gap-3 cursor-pointer">
+              <input type="checkbox" name="post_to_public_news" id="form-post-to-public-news" value="1" class="mt-1 rounded border-gray-300 text-clr-green focus:ring-clr-green" />
+              <span class="text-sm">
+                <span class="font-medium text-gray-800">Post to public News</span>
+                <span class="block text-gray-600 mt-0.5">Selecting this option will make the meeting visible on the public website’s News page. Anyone can view the title, date, location, and description.</span>
+              </span>
+            </label>
+          </div>
           <div class="flex gap-2">
             <button type="submit" class="bg-clr-green hover:brightness-110 text-white px-4 py-2 rounded-lg font-medium text-sm">
               Save
@@ -118,6 +119,7 @@ function formatDateTime(dt: string): string {
                   data-id={m.id}
                   data-title={m.title ?? ''}
                   data-datetime={m.datetime}
+                  data-post-to-public={m.post_to_public_news ? '1' : '0'}
                   data-location={m.location ?? ''}
                   data-description={m.description ?? ''}
                   data-agenda-key={m.agenda_r2_key ?? ''}
@@ -164,18 +166,21 @@ function formatDateTime(dt: string): string {
 
   document.querySelectorAll('.edit-meeting').forEach((btn) => {
     btn.addEventListener('click', () => {
-      const id = (btn as HTMLElement).dataset.id;
-      const title = (btn as HTMLElement).dataset.title;
-      const datetime = (btn as HTMLElement).dataset.datetime;
-      const location = (btn as HTMLElement).dataset.location ?? '';
-      const description = (btn as HTMLElement).dataset.description ?? '';
-      const agendaKey = (btn as HTMLElement).dataset.agendaKey ?? '';
+      const el = btn as HTMLElement;
+      const id = el.dataset.id;
+      const title = el.dataset.title;
+      const datetime = el.dataset.datetime;
+      const location = el.dataset.location ?? '';
+      const description = el.dataset.description ?? '';
+      const agendaKey = el.dataset.agendaKey ?? '';
+      const postToPublic = el.dataset.postToPublic === '1';
       formId.value = id ?? '';
       (document.getElementById('form-meeting-title') as HTMLInputElement).value = title ?? '';
       (document.getElementById('form-meeting-datetime') as HTMLInputElement).value = datetime?.slice(0, 16) ?? '';
       (document.getElementById('form-meeting-location') as HTMLInputElement).value = location;
       (document.getElementById('form-meeting-description') as HTMLTextAreaElement).value = description;
       formAgendaKey.value = agendaKey;
+      (document.getElementById('form-post-to-public-news') as HTMLInputElement).checked = postToPublic;
       agendaFileInput.value = '';
       formTitle!.textContent = 'Edit meeting';
       formPanel?.classList.remove('hidden');
@@ -227,7 +232,8 @@ function formatDateTime(dt: string): string {
       return;
     }
 
-    const body: Record<string, string> = { title, datetime, location, description, agenda_r2_key: agendaKey };
+    const postToPublic = (document.getElementById('form-post-to-public-news') as HTMLInputElement).checked;
+    const body: Record<string, string | boolean> = { title, datetime, location, description, agenda_r2_key: agendaKey, post_to_public_news: postToPublic };
     const url = '/api/meetings';
     const method = id ? 'PUT' : 'POST';
     if (id) body.id = id;
@@ -248,4 +254,3 @@ function formatDateTime(dt: string): string {
   });
 </script>
 </BoardLayout>
-

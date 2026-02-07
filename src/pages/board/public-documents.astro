@@ -2,26 +2,17 @@
 export const prerender = false;
 
 import BoardLayout from '../../layouts/BoardLayout.astro';
-import { getSessionFromCookie } from '../../lib/auth';
+import { getBoardContext } from '../../lib/board-context';
 import { listPublicDocuments } from '../../lib/public-documents-db';
 import { BOARD_ONLY_SLUGS, ARB_FORM_SLUG } from '../../lib/public-documents-db';
 import { listArbRequestsByOwner } from '../../lib/arb-db';
 import { sanitizeForScriptInjection } from '../../lib/sanitize';
 
-const runtime = Astro.locals.runtime;
-const env = runtime?.env;
-const cookieHeader = Astro.request.headers.get('cookie') ?? undefined;
-const session = await getSessionFromCookie(cookieHeader, env?.SESSION_SECRET);
-
-if (!session) {
-  return Astro.redirect('/portal/login');
-}
-
+const ctx = await getBoardContext(Astro);
+if (ctx.redirect) return Astro.redirect(ctx.redirect);
+const { env, session } = ctx;
 const isBoard = session.role === 'board' || session.role === 'admin' || session.role === 'arb_board';
 const isArb = session.role === 'arb' || isBoard;
-if (!isBoard && !isArb) {
-  return Astro.redirect('/portal/dashboard');
-}
 
 const db = env?.DB;
 const docs = db ? await listPublicDocuments(db) : [];
@@ -45,6 +36,7 @@ function formatDate(s: string | null): string {
 ---
 
 <BoardLayout title="Public documents" subtitle="Update bylaws, covenants, proxy form, and ARB request form" draftCount={draftCount} role={session.role}>
+  <div id="public-doc-message" class="hidden mb-4 p-4 rounded-xl border" role="status" aria-live="polite" aria-atomic="true"></div>
   <div class="mb-8 p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-900" role="alert">
     <p class="font-semibold">These documents are publicly accessible.</p>
     <p class="text-sm mt-1">Anyone can view and download them from the <a href="/documents" class="underline font-medium" target="_blank" rel="noopener noreferrer">Documents page <span class="text-amber-800/80">(opens in new tab)</span></a> (no login required). Only upload files you intend to make public.</p>
@@ -97,6 +89,13 @@ function formatDate(s: string | null): string {
 </BoardLayout>
 
 <script define:vars={{ csrfToken: sanitizeForScriptInjection(session?.csrfToken ?? '') }}>
+  const msgEl = document.getElementById('public-doc-message');
+  function showPublicDocMessage(text, isError) {
+    if (!msgEl) return;
+    msgEl.textContent = text;
+    msgEl.className = 'mb-4 p-4 rounded-xl border ' + (isError ? 'bg-red-50 border-red-200 text-red-800' : 'bg-green-50 border-green-200 text-green-800');
+    msgEl.classList.remove('hidden');
+  }
   document.querySelectorAll('.public-doc-form').forEach((form) => {
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -110,20 +109,21 @@ function formatDate(s: string | null): string {
       fd.set('file', file);
       fd.set('csrf_token', (f.querySelector('input[name="csrf_token"]')?.value) || csrfToken || '');
       const btn = f.querySelector('button[type="submit"]');
-      if (btn) btn.disabled = true;
+      if (msgEl) msgEl.classList.add('hidden');
+      if (btn) { btn.disabled = true; btn.setAttribute('aria-busy', 'true'); }
       try {
         const res = await fetch('/api/public-document-upload', { method: 'POST', body: fd, credentials: 'same-origin' });
         const data = await res.json();
         if (res.ok && data.success) {
-          alert(data.message || 'Document updated.');
-          window.location.reload();
+          showPublicDocMessage(data.message || 'Document updated.', false);
+          setTimeout(function () { window.location.reload(); }, 1500);
         } else {
-          alert(data.error || 'Upload failed.');
+          showPublicDocMessage(data.error || 'Upload failed.', true);
         }
       } catch (err) {
-        alert('Network error. Try again.');
+        showPublicDocMessage('Network error. Try again.', true);
       } finally {
-        if (btn) btn.disabled = false;
+        if (btn) { btn.disabled = false; btn.removeAttribute('aria-busy'); }
       }
     });
   });

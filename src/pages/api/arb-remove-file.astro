@@ -6,10 +6,11 @@
 export const prerender = false;
 
 import { getSessionFromCookie, verifyCsrfToken, verifyOrigin } from '../../lib/auth';
+import { requireArbRequestOwner } from '../../lib/access-control';
 import { createLogger } from '../../lib/logging';
 import { checkRateLimit, getRateLimitConfig } from '../../lib/rate-limit';
 import { getSecurityMonitor } from '../../lib/monitoring';
-import { getArbRequest, getArbFile, deleteArbFile } from '../../lib/arb-db';
+import { getArbFile, deleteArbFile } from '../../lib/arb-db';
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
@@ -64,10 +65,8 @@ if (!requestId || !fileId) {
   return new Response(JSON.stringify({ error: 'requestId and fileId are required.' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
 }
 
-const req = await getArbRequest(db, requestId);
-if (!req || req.owner_email !== session.email.toLowerCase() || req.status !== 'pending') {
-  return new Response(JSON.stringify({ error: 'Request not found or not editable.' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
-}
+const ownerCheck = await requireArbRequestOwner(db, requestId, session, { requirePending: true });
+if ('response' in ownerCheck) return ownerCheck.response;
 
 const file = await getArbFile(db, fileId, requestId);
 if (!file) {

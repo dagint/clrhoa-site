@@ -5,14 +5,10 @@ import PortalLayout from '../../layouts/PortalLayout.astro';
 import ProtectedPage from '../../components/ProtectedPage.astro';
 import PortalNav from '../../components/PortalNav.astro';
 import GlobalSearch from '../../components/GlobalSearch.astro';
-import { getSessionFromCookie } from '../../lib/auth';
+import { getPortalContext } from '../../lib/portal-context';
 import { listArbRequestsByOwner } from '../../lib/arb-db';
 
-const runtime = Astro.locals.runtime;
-const env = runtime?.env;
-const cookieHeader = Astro.request.headers.get('cookie') ?? undefined;
-let session = await getSessionFromCookie(cookieHeader, env?.SESSION_SECRET);
-if (!session && env?.SESSION_SECRET) session = await getSessionFromCookie(cookieHeader, env.SESSION_SECRET);
+const { env, session } = await getPortalContext(Astro);
 if (!session) return Astro.redirect('/portal/login');
 
 const db = env?.DB;

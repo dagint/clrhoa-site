@@ -37,6 +37,16 @@ If a major version update introduces breaking changes:
 3. Update code if needed
 4. Consider delaying if not critical
 
+## CI
+
+The **CI workflow** (`.github/workflows/ci.yml`) runs on every push and pull request to `main`:
+
+- **Tests** — `npm test -- --run`
+- **Audit** — `npm audit --audit-level=high` (fails the build if high or critical vulnerabilities exist)
+- **Build** — `npm run build`
+
+Fix or suppress high/critical issues before merging so the main branch stays clear.
+
 ## Manual Dependency Checks
 
 ### Check for Vulnerabilities

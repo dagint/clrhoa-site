@@ -28,6 +28,16 @@ export interface Owner {
   created_by_email?: string | null;
   /** 1 = share with other members (default), 0 = opt out (Board/ARB/Admin can still see; reveals are audited). */
   share_contact_with_members?: number | null;
+  /** 1 = primary contact for this property (one per address for dues/assessments). Default 1. */
+  is_primary?: number | null;
+  /** Set when board updates owner (audit). */
+  updated_by?: string | null;
+  updated_at?: string | null;
+}
+
+/** Normalize address for grouping (trim, lowercase). */
+export function normalizeAddress(addr: string | null | undefined): string {
+  return (addr ?? '').trim().toLowerCase() || '';
 }
 
 /** Parse phones JSON to array. Falls back to single phone if phones column missing. */
@@ -48,22 +58,110 @@ export function getPhonesArray(owner: Owner): string[] {
 export const LIST_OWNERS_MAX = 2000;
 
 const OWNERS_SELECT_FULL = 'SELECT id, name, address, phone, email, phones, created_by_email, share_contact_with_members FROM owners';
+const OWNERS_SELECT_FULL_WITH_PRIMARY = 'SELECT id, name, address, phone, email, phones, created_by_email, share_contact_with_members, COALESCE(is_primary, 1) as is_primary FROM owners';
+const OWNERS_SELECT_FULL_WITH_UPDATED = 'SELECT id, name, address, phone, email, phones, created_by_email, share_contact_with_members, COALESCE(is_primary, 1) as is_primary, updated_by, updated_at FROM owners';
 const OWNERS_SELECT = 'SELECT id, name, address, phone, email, phones FROM owners';
 
 export async function listOwners(db: D1Database): Promise<Owner[]> {
   try {
     const { results } = await db
-      .prepare(`${OWNERS_SELECT_FULL} ORDER BY name ASC LIMIT ?`)
+      .prepare(`${OWNERS_SELECT_FULL_WITH_UPDATED} ORDER BY name ASC LIMIT ?`)
       .bind(LIST_OWNERS_MAX)
       .all<Owner>();
     return results ?? [];
   } catch {
-    const { results } = await db
-      .prepare(`${OWNERS_SELECT} ORDER BY name ASC LIMIT ?`)
-      .bind(LIST_OWNERS_MAX)
-      .all<Owner>();
-    return results ?? [];
+    try {
+      const { results } = await db
+        .prepare(`${OWNERS_SELECT_FULL_WITH_PRIMARY} ORDER BY name ASC LIMIT ?`)
+        .bind(LIST_OWNERS_MAX)
+        .all<Owner>();
+      return (results ?? []).map((o) => ({ ...o, updated_by: null, updated_at: null }));
+    } catch {
+      const { results } = await db
+        .prepare(`${OWNERS_SELECT_FULL} ORDER BY name ASC LIMIT ?`)
+        .bind(LIST_OWNERS_MAX)
+        .all<Owner>();
+      return (results ?? []).map((o) => ({ ...o, updated_by: null, updated_at: null }));
+    }
   }
+}
+
+/**
+ * One primary owner per property (address) for dues/assessments. Groups by normalized address and returns
+ * the primary contact (is_primary = 1) or the first owner at that address. Use this for the board
+ * assessments spreadsheet so there is one row per address.
+ */
+export async function listPrimaryOwnersByAddress(db: D1Database): Promise<Owner[]> {
+  const owners = await listOwners(db);
+  const byAddress = new Map<string, Owner[]>();
+  for (const o of owners) {
+    const key = normalizeAddress(o.address);
+    if (!key) continue;
+    if (!byAddress.has(key)) byAddress.set(key, []);
+    byAddress.get(key)!.push(o);
+  }
+  const result: Owner[] = [];
+  for (const group of byAddress.values()) {
+    const primary = group.find((o) => (o.is_primary ?? 1) === 1) ?? group[0];
+    if (primary) result.push(primary);
+  }
+  return result.sort((a, b) => ((a.name ?? a.email ?? '').toLowerCase()).localeCompare((b.name ?? b.email ?? '').toLowerCase()));
+}
+
+/** Get the primary owner's email for an address (for looking up assessment by address). */
+export async function getPrimaryOwnerEmailForAddress(db: D1Database, address: string | null | undefined): Promise<string | null> {
+  const key = normalizeAddress(address);
+  if (!key) return null;
+  const owners = await listOwners(db);
+  const atAddress = owners.filter((o) => normalizeAddress(o.address) === key);
+  const primary = atAddress.find((o) => (o.is_primary ?? 1) === 1) ?? atAddress[0];
+  return primary?.email?.trim() ?? null;
+}
+
+export interface HouseholdMemberWithLogin {
+  name: string | null;
+  email: string;
+  is_primary: number;
+}
+
+/**
+ * List other owners at the same address as the given user who have portal login (user account).
+ * Used on My account to show "others in your household who can sign in". Excludes the current user.
+ */
+export async function listHouseholdMembersWithLogin(
+  db: D1Database,
+  currentUserEmail: string
+): Promise<HouseholdMemberWithLogin[]> {
+  const current = currentUserEmail.trim().toLowerCase();
+  const owner = await getOwnerByEmail(db, current);
+  if (!owner?.address?.trim()) return [];
+
+  const key = normalizeAddress(owner.address);
+  const owners = await listOwners(db);
+  const atAddress = owners.filter((o) => normalizeAddress(o.address) === key);
+  const otherEmails = atAddress
+    .map((o) => o.email?.trim()?.toLowerCase())
+    .filter((e): e is string => !!e && e !== current);
+  if (otherEmails.length === 0) return [];
+
+  const placeholders = otherEmails.map(() => '?').join(',');
+  const { results: userRows } = await db
+    .prepare(`SELECT email FROM users WHERE email IN (${placeholders})`)
+    .bind(...otherEmails)
+    .all<{ email: string }>();
+  const hasLogin = new Set((userRows ?? []).map((r) => r.email?.toLowerCase()).filter(Boolean));
+
+  return atAddress
+    .filter((o) => {
+      const e = o.email?.trim()?.toLowerCase();
+      return e && e !== current && hasLogin.has(e);
+    })
+    .map((o) => ({
+      name: o.name?.trim() ?? null,
+      email: o.email!.trim().toLowerCase(),
+      is_primary: (o.is_primary ?? 1) === 1 ? 1 : 0,
+    }))
+    .sort((a, b) => (a.name ?? a.email).localeCompare(b.name ?? b.email));
 }
 
 /** Count owners added in the last N days. Requires created_at column (run db:owners-created-at migration). Returns 0 if column missing. */
@@ -83,10 +181,14 @@ export async function getRecentOwnersCount(db: D1Database, days: number): Promis
 
 export async function getOwnerById(db: D1Database, id: string): Promise<Owner | null> {
   try {
-    const row = await db.prepare(`${OWNERS_SELECT_FULL} WHERE id = ?`).bind(id).first<Owner>();
-    return row;
+    const row = await db.prepare(`${OWNERS_SELECT_FULL_WITH_PRIMARY} WHERE id = ?`).bind(id).first<Owner>();
+    return row ?? null;
   } catch {
-    return db.prepare(`${OWNERS_SELECT} WHERE id = ?`).bind(id).first<Owner>();
+    try {
+      return await db.prepare(`${OWNERS_SELECT_FULL} WHERE id = ?`).bind(id).first<Owner>();
+    } catch {
+      return db.prepare(`${OWNERS_SELECT} WHERE id = ?`).bind(id).first<Owner>();
+    }
   }
 }
 
@@ -126,6 +228,38 @@ export interface DirectoryLogRow {
   target_phone: string | null;
   target_email: string | null;
   timestamp: string | null;
+}
+
+/** List directory reveal logs for a single viewer (their own actions). For portal "My activity" page. */
+export async function listDirectoryLogsByViewer(
+  db: D1Database,
+  viewerEmail: string,
+  limit: number
+): Promise<DirectoryLogRow[]> {
+  const viewer = viewerEmail.trim().toLowerCase();
+  try {
+    const { results } = await db
+      .prepare(
+        `SELECT id, viewer_email, viewer_role, target_name, target_phone, target_email, timestamp
+         FROM directory_logs WHERE viewer_email = ? ORDER BY timestamp DESC LIMIT ?`
+      )
+      .bind(viewer, Math.max(1, Math.min(limit, 500)))
+      .all<DirectoryLogRow>();
+    return results ?? [];
+  } catch {
+    try {
+      const { results } = await db
+        .prepare(
+          `SELECT id, viewer_email, target_name, target_phone, target_email, timestamp
+           FROM directory_logs WHERE viewer_email = ? ORDER BY timestamp DESC LIMIT ?`
+        )
+        .bind(viewer, Math.max(1, Math.min(limit, 500)))
+        .all<DirectoryLogRow & { viewer_role?: string | null }>();
+      return (results ?? []).map((r) => ({ ...r, viewer_role: null }));
+    } catch {
+      return [];
+    }
+  }
 }
 
 /** List directory reveal logs (audit). Requires directory_logs table with optional viewer_role column. */
@@ -286,7 +420,8 @@ export async function insertOwner(
 export async function updateOwner(
   db: D1Database,
   id: string,
-  data: { name?: string | null; address?: string | null; phone?: string | null; email?: string | null; phones?: string | null }
+  data: { name?: string | null; address?: string | null; phone?: string | null; email?: string | null; phones?: string | null; is_primary?: number | null },
+  updatedByEmail?: string | null
 ): Promise<boolean> {
   const existing = await getOwnerById(db, id);
   if (!existing) return false;
@@ -295,11 +430,32 @@ export async function updateOwner(
   const phone = data.phone !== undefined ? (data.phone?.trim() ?? null) : existing.phone;
   const email = data.email !== undefined ? (data.email?.trim()?.toLowerCase() ?? null) : existing.email;
   const phones = data.phones !== undefined ? data.phones : existing.phones;
-  const result = await db
-    .prepare(`UPDATE owners SET name = ?, address = ?, phone = ?, email = ?, phones = ? WHERE id = ?`)
-    .bind(name, address, phone, email, phones ?? null, id)
-    .run();
-  return (result.meta.changes ?? 0) > 0;
+  const isPrimary = data.is_primary !== undefined ? (data.is_primary ? 1 : 0) : (existing.is_primary ?? 1);
+  const updatedBy = updatedByEmail?.trim()?.toLowerCase() ?? null;
+  if (updatedBy) {
+    try {
+      const result = await db
+        .prepare(`UPDATE owners SET name = ?, address = ?, phone = ?, email = ?, phones = ?, is_primary = ?, updated_by = ?, updated_at = datetime('now') WHERE id = ?`)
+        .bind(name, address, phone, email, phones ?? null, isPrimary, updatedBy, id)
+        .run();
+      if ((result.meta.changes ?? 0) > 0) return true;
+    } catch {
+      /* updated_by column may not exist */
+    }
+  }
+  try {
+    const result = await db
+      .prepare(`UPDATE owners SET name = ?, address = ?, phone = ?, email = ?, phones = ?, is_primary = ? WHERE id = ?`)
+      .bind(name, address, phone, email, phones ?? null, isPrimary, id)
+      .run();
+    return (result.meta.changes ?? 0) > 0;
+  } catch {
+    const result = await db
+      .prepare(`UPDATE owners SET name = ?, address = ?, phone = ?, email = ?, phones = ? WHERE id = ?`)
+      .bind(name, address, phone, email, phones ?? null, id)
+      .run();
+    return (result.meta.changes ?? 0) > 0;
+  }
 }
 
 export async function deleteOwner(db: D1Database, id: string): Promise<boolean> {

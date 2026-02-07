@@ -246,6 +246,15 @@ npm audit fix
    - Monitor for recurrence
    - Update procedures if needed
 
+### Portal/API-specific actions
+
+For incidents involving the member portal or board (e.g. suspected session compromise or abuse):
+
+- **Revoke all sessions**: Rotate `SESSION_SECRET` in Cloudflare (wrangler secret put SESSION_SECRET). All existing session cookies become invalid; users must log in again.
+- **Lock an account**: Remove or change the user’s KV entry in `CLOURHOA_USERS` (or use your process for disabling access) so they cannot log in until restored.
+- **Restore data**: Use D1 backups and R2 as needed; see `BACKUP_AND_RECOVERY.md` and `BACKUP_SETUP.md`.
+- **Review access**: Check `directory_logs` and ARB audit logs (board audit views) for unusual activity by the affected identity or IP.
+
 ## Monitoring Tools
 
 ### Free Tools

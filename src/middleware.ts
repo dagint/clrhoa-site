@@ -1,16 +1,67 @@
 /**
- * Astro Middleware: portal auth + security headers.
- * - /portal/* (except /portal/login): require session cookie or redirect to login.
- * - Profile completeness: redirect to /portal/profile?required=1 before any response is sent (avoids ResponseSentError from component redirect).
+ * Astro Middleware: portal auth, board/elevated access, and security headers.
+ * - /portal/* (except /portal/login): require session cookie or redirect to login; profile completeness redirect to /portal/profile?required=1.
+ * - /board/*: require session (else redirect to login) and elevated role (else redirect to /portal/dashboard).
+ * - Elevated API path prefixes: if session exists but role is not elevated, return 403 before the handler.
  * - Security headers on all responses.
  */
 
 import type { MiddlewareHandler } from 'astro';
-import { getSessionFromCookie, SESSION_COOKIE_NAME } from './lib/auth';
+import { getSessionFromCookie, SESSION_COOKIE_NAME, isElevatedRole } from './lib/auth';
 import { getOwnerByEmail, getPhonesArray } from './lib/directory-db';
+
+/** API path prefixes that require an elevated role (board, arb, admin, arb_board). Middleware returns 403 if session exists but role is not elevated. */
+const ELEVATED_API_PREFIXES = [
+  '/api/board',
+  '/api/owners',
+  '/api/meetings',
+  '/api/maintenance-update',
+  '/api/public-document-upload',
+  '/api/member-document',
+  '/api/arb-approve',
+  '/api/arb-notes',
+  '/api/arb-deadline',
+  '/api/arb-export',
+];
 
 export const onRequest: MiddlewareHandler = async (context, next) => {
   const pathname = context.url.pathname;
+  // During static prerender, request.headers is not available; skip auth and pass through to avoid warnings
+  const hasHeaders = typeof context.request?.headers?.get === 'function';
+  if (!hasHeaders) {
+    return await next();
+  }
+  const env = context.locals.runtime?.env;
+  const cookieHeader = context.request.headers.get('cookie') ?? undefined;
+
+  // Board admin: require session and elevated role
+  if (pathname.startsWith('/board')) {
+    if (!context.cookies.has(SESSION_COOKIE_NAME)) {
+      return context.redirect('/portal/login');
+    }
+    if (env?.SESSION_SECRET) {
+      const session = await getSessionFromCookie(cookieHeader, env.SESSION_SECRET);
+      if (!session) {
+        return context.redirect('/portal/login');
+      }
+      if (!isElevatedRole(session.role)) {
+        return context.redirect('/portal/dashboard');
+      }
+    }
+  }
+
+  // Elevated APIs: 403 if session exists but role is not elevated
+  if (env?.SESSION_SECRET && ELEVATED_API_PREFIXES.some((p) => pathname.startsWith(p))) {
+    if (context.cookies.has(SESSION_COOKIE_NAME)) {
+      const session = await getSessionFromCookie(cookieHeader, env.SESSION_SECRET);
+      if (session && !isElevatedRole(session.role)) {
+        return new Response(JSON.stringify({ error: 'Forbidden', success: false }), {
+          status: 403,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+    }
+  }
 
   // Portal: require session cookie for all routes except login
   if (pathname.startsWith('/portal')) {
@@ -27,7 +78,7 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
       // Profile completeness: redirect before any response is sent (avoids "response already sent" when component would redirect)
       const isProfilePage = pathname === '/portal/profile' || pathname === '/portal/profile/';
       if (!isProfilePage) {
-        const env = (context.locals as { runtime?: { env?: { SESSION_SECRET?: string; DB?: D1Database } } })?.runtime?.env;
+        const env = context.locals.runtime?.env;
         if (env?.SESSION_SECRET && env?.DB) {
           const cookieHeader = context.request.headers.get('cookie') ?? undefined;
           const session = await getSessionFromCookie(cookieHeader, env.SESSION_SECRET);

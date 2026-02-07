@@ -1,0 +1,120 @@
+---
+export const prerender = false;
+
+import PortalLayout from '../../layouts/PortalLayout.astro';
+import ProtectedPage from '../../components/ProtectedPage.astro';
+import PortalNav from '../../components/PortalNav.astro';
+import { getPortalContext } from '../../lib/portal-context';
+import { listDirectoryLogsByViewer } from '../../lib/directory-db';
+import { listArbAuditLogForOwner, listArbRequestsByOwner } from '../../lib/arb-db';
+
+const { env, session } = await getPortalContext(Astro);
+if (!session) return Astro.redirect('/portal/login');
+
+const db = env?.DB;
+const dirLogs = db ? await listDirectoryLogsByViewer(db, session.email, 200) : [];
+const arbLogs = db ? await listArbAuditLogForOwner(db, session.email, 200) : [];
+const allRequests = db ? await listArbRequestsByOwner(db, session.email) : [];
+const draftCount = allRequests.filter((r) => r.status === 'pending').length;
+
+const BLANK = '—';
+
+function formatDate(s: string | null): string {
+  if (!s) return BLANK;
+  try {
+    const d = new Date(s);
+    return Number.isNaN(d.getTime()) ? s : d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+  } catch {
+    return s ?? BLANK;
+  }
+}
+
+/** Describe what was revealed for "my activity" without re-displaying contact details. */
+function revealType(row: { target_name: string | null; target_phone: string | null; target_email: string | null }): string {
+  if (row.target_name === '(full directory export)') return 'Full directory export';
+  if (row.target_name === '(directory info updated)') return 'Directory info updated';
+  if (row.target_email !== null && row.target_email !== undefined && String(row.target_email).trim() !== '') return 'Email';
+  return 'Phone';
+}
+---
+
+<PortalLayout title="My activity | Member Portal | Crooked Lake Reserve HOA">
+  <ProtectedPage>
+  <div class="min-h-screen portal-theme-bg font-body">
+    <PortalNav currentPath="/portal/my-activity" draftCount={draftCount} role={session.role} />
+
+    <main class="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+      <h1 class="text-2xl font-heading font-bold text-clr-green mb-2">My activity</h1>
+      <p class="text-gray-600 mb-8">
+        A log of your own actions on the portal: when you revealed directory contact info and when your ARB requests were updated. Only you can see this page; the board has a separate full audit log for transparency.
+      </p>
+
+      <section class="mb-10" aria-labelledby="dir-activity-heading">
+        <h2 id="dir-activity-heading" class="text-lg font-heading font-semibold text-clr-green mb-3">Directory: contact I revealed</h2>
+        <p class="text-sm text-gray-600 mb-3">When you clicked &quot;Reveal phone&quot; or &quot;Reveal email&quot; in the directory, when you updated your directory info (profile), or when you exported the full directory (board only).</p>
+        {dirLogs.length === 0 ? (
+          <p class="p-4 bg-gray-50 rounded-xl text-gray-500 text-sm">No directory actions yet.</p>
+        ) : (
+          <div class="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+            <table class="w-full text-sm">
+              <thead class="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th class="text-left py-2 px-3 font-medium text-gray-700">When</th>
+                  <th class="text-left py-2 px-3 font-medium text-gray-700">Target</th>
+                  <th class="text-left py-2 px-3 font-medium text-gray-700">Revealed</th>
+                </tr>
+              </thead>
+              <tbody>
+                {dirLogs.map((row) => (
+                  <tr class="border-b border-gray-100 last:border-0">
+                    <td class="py-2 px-3 text-gray-600">{formatDate(row.timestamp)}</td>
+                    <td class="py-2 px-3">{row.target_name === '(directory info updated)' ? 'My profile' : (row.target_name ?? BLANK)}</td>
+                    <td class="py-2 px-3">{revealType(row)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      <section aria-labelledby="arb-activity-heading">
+        <h2 id="arb-activity-heading" class="text-lg font-heading font-semibold text-clr-green mb-3">ARB: activity on my requests</h2>
+        <p class="text-sm text-gray-600 mb-3">Status changes on your ARB requests (submitted, sent back for revisions, approved, rejected, or cancelled by you).</p>
+        {arbLogs.length === 0 ? (
+          <p class="p-4 bg-gray-50 rounded-xl text-gray-500 text-sm">No ARB activity yet.</p>
+        ) : (
+          <div class="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+            <table class="w-full text-sm">
+              <thead class="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th class="text-left py-2 px-3 font-medium text-gray-700">When</th>
+                  <th class="text-left py-2 px-3 font-medium text-gray-700">Request</th>
+                  <th class="text-left py-2 px-3 font-medium text-gray-700">Action</th>
+                  <th class="text-left py-2 px-3 font-medium text-gray-700">Status</th>
+                  <th class="text-left py-2 px-3 font-medium text-gray-700">By</th>
+                  <th class="text-left py-2 px-3 font-medium text-gray-700">Notes</th>
+                </tr>
+              </thead>
+              <tbody>
+                {arbLogs.map((row) => (
+                  <tr class="border-b border-gray-100 last:border-0">
+                    <td class="py-2 px-3 text-gray-600">{formatDate(row.created)}</td>
+                    <td class="py-2 px-3">
+                      <a href="/portal/my-requests" class="font-mono text-clr-green hover:underline">{row.request_id}</a>
+                    </td>
+                    <td class="py-2 px-3">{row.action}</td>
+                    <td class="py-2 px-3">{row.old_status ?? BLANK} → {row.new_status ?? BLANK}</td>
+                    <td class="py-2 px-3">{row.changed_by_email ?? BLANK}{row.changed_by_role ? ` (${row.changed_by_role})` : ''}</td>
+                    <td class="py-2 px-3 text-gray-600 max-w-xs truncate" title={row.notes ?? undefined}>{row.notes ?? BLANK}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+    </main>
+  </div>
+  </ProtectedPage>
+</PortalLayout>

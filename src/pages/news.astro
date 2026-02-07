@@ -1,15 +1,45 @@
 ---
+export const prerender = false;
+
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { getCollection } from 'astro:content';
+import { listMeetingsForPublicNews } from '../lib/meetings-db';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const db = env?.DB;
 
 const allNews = await getCollection('news');
 const publishedNews = allNews
   .filter((item) => item.data.published)
-  .sort((a, b) => b.data.date.getTime() - a.data.date.getTime())
   .map((item) => ({
     ...item,
     slug: item.data.slug || item.id.split('/').pop()?.replace('.md', '') || item.id,
   }));
+
+const publicMeetings = db ? await listMeetingsForPublicNews(db) : [];
+
+type NewsListItem =
+  | { kind: 'article'; slug: string; title: string; date: Date; summary: string; tags?: string[] }
+  | { kind: 'meeting'; id: string; title: string; date: Date; summary: string };
+const items: NewsListItem[] = [
+  ...publishedNews.map((item) => ({
+    kind: 'article' as const,
+    slug: item.slug,
+    title: item.data.title,
+    date: item.data.date,
+    summary: item.data.summary,
+    tags: item.data.tags,
+  })),
+  ...publicMeetings.map((m) => ({
+    kind: 'meeting' as const,
+    id: m.id,
+    title: m.title ?? 'Meeting',
+    date: new Date(m.datetime),
+    summary: m.description?.trim() || (m.location ? `Location: ${m.location}` : 'Board meeting.'),
+  })),
+];
+items.sort((a, b) => b.date.getTime() - a.date.getTime());
 
 // Quarterly dues due dates: Jan 1, Apr 1, Jul 1, Oct 1
 const QUARTER_DUE_DATES = [
@@ -19,7 +49,6 @@ const QUARTER_DUE_DATES = [
   { month: 9, day: 1, quarter: 'Q4', name: 'October' },
 ];
 
-// Get the "next" quarter due date (for rendering the reminder card)
 function getNextDueDate(): { dueDate: Date; quarter: string; label: string; year: number } | null {
   const now = new Date();
   const year = now.getFullYear();
@@ -38,7 +67,7 @@ const nextDue = getNextDueDate();
     <div class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 max-w-2xl mx-auto">
       <h1 class="text-4xl font-heading font-bold text-clr-green mb-6">News & Announcements</h1>
 
-      {(publishedNews.length === 0 && !nextDue) ? (
+      {(items.length === 0 && !nextDue) ? (
         <p class="text-clr-gray font-body">No news items available at this time.</p>
       ) : (
         <div class="space-y-6">
@@ -68,38 +97,53 @@ const nextDue = getNextDueDate();
               </a>
             </article>
           )}
-          {publishedNews.map((item) => (
+          {items.map((item) => (
             <article class="border-b border-gray-100 pb-6 last:border-b-0">
               <div class="flex items-start justify-between gap-4 mb-2 flex-wrap">
                 <h2 class="text-2xl font-heading font-semibold text-clr-green">
-                  <a href={`/news/${item.slug}`} class="hover:underline transition-colors">
-                    {item.data.title}
-                  </a>
+                  {item.kind === 'article' ? (
+                    <a href={`/news/${item.slug}`} class="hover:underline transition-colors">
+                      {item.title}
+                    </a>
+                  ) : (
+                    <a href={`/news/meeting/${item.id}`} class="hover:underline transition-colors">
+                      {item.title}
+                    </a>
+                  )}
                 </h2>
                 <time class="text-sm text-clr-gray whitespace-nowrap font-body">
-                  {item.data.date.toLocaleDateString('en-US', {
+                  {item.date.toLocaleDateString('en-US', {
                     year: 'numeric',
                     month: 'long',
                     day: 'numeric',
                   })}
                 </time>
               </div>
-              <p class="text-gray-700 mb-3 font-body">{item.data.summary}</p>
-              {item.data.tags && item.data.tags.length > 0 && (
+              <p class="text-gray-700 mb-3 font-body">{item.summary}</p>
+              {item.kind === 'article' && item.tags && item.tags.length > 0 && (
                 <div class="flex flex-wrap gap-2 mb-3">
-                  {item.data.tags.map((tag) => (
+                  {item.tags.map((tag) => (
                     <span class="px-2 py-1 bg-clr-beige/50 text-clr-gray text-xs rounded font-body">
                       {tag}
                     </span>
                   ))}
                 </div>
               )}
-              <a
-                href={`/news/${item.slug}`}
-                class="text-clr-orange font-semibold hover:underline inline-block font-body"
-              >
-                Read more →
-              </a>
+              {item.kind === 'article' ? (
+                <a
+                  href={`/news/${item.slug}`}
+                  class="text-clr-orange font-semibold hover:underline inline-block font-body"
+                >
+                  Read more →
+                </a>
+              ) : (
+                <a
+                  href={`/news/meeting/${item.id}`}
+                  class="text-clr-orange font-semibold hover:underline inline-block font-body"
+                >
+                  Read more →
+                </a>
+              )}
             </article>
           ))}
         </div>

@@ -220,7 +220,7 @@ for (let i = startRow; i < lines.length; i++) {
     if (email) {
       const existing = await getOwnerByEmail(db, email);
       if (existing) {
-        const ok = await updateOwner(db, existing.id, { name, address, phone, email });
+        const ok = await updateOwner(db, existing.id, { name, address, phone, email }, session.email);
         if (ok) updated += 1;
       } else {
         await insertOwner(db, { name, address, phone, email });

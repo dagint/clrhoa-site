@@ -2,23 +2,15 @@
 export const prerender = false;
 
 import BoardLayout from '../../layouts/BoardLayout.astro';
-import { getSessionFromCookie } from '../../lib/auth';
+import { getBoardContext } from '../../lib/board-context';
 import { listAllMaintenance, parsePhotosJson } from '../../lib/maintenance-db';
 import { listArbRequestsByOwner } from '../../lib/arb-db';
 
-const runtime = Astro.locals.runtime;
-const env = runtime?.env;
-const cookieHeader = Astro.request.headers.get('cookie') ?? undefined;
-let session = await getSessionFromCookie(cookieHeader, env?.SESSION_SECRET);
-
-if (!session) {
-  return Astro.redirect('/portal/login');
-}
-
+const ctx = await getBoardContext(Astro);
+if (ctx.redirect) return Astro.redirect(ctx.redirect);
+const { env, session } = ctx;
 const isBoard = session.role === 'board' || session.role === 'admin' || session.role === 'arb_board';
-if (!isBoard) {
-  return Astro.redirect('/portal/dashboard');
-}
+if (!isBoard) return Astro.redirect('/portal/dashboard');
 
 const db = env?.DB;
 const statusFilter = (Astro.url.searchParams.get('status') as 'reported' | 'in_progress' | 'completed') || undefined;

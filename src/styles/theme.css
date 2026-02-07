@@ -1,6 +1,7 @@
 /**
  * Portal theme: members-only identity + dark mode.
  * Light mode uses a subtle green tint so the portal feels distinct from the public site.
+ * Dark mode uses a green-tinted palette that matches the brand and passes contrast (WCAG AA).
  * Toggle persists in localStorage (key: clrhoa_theme).
  */
 
@@ -17,17 +18,22 @@
   --portal-input-border: #e5e7eb;
 }
 
+/* Dark mode: green-tinted palette aligned with brand (deep green, warm accents), improved contrast */
+html.dark,
 .dark {
-  --portal-bg: #0f172a;
-  --portal-header-bg: #1e293b;
-  --portal-header-border: #334155;
-  --portal-accent: #34d399;
-  --portal-card-bg: #1e293b;
-  --portal-card-border: #334155;
-  --portal-text: #f1f5f9;
-  --portal-text-muted: #94a3b8;
-  --portal-input-bg: #334155;
-  --portal-input-border: #475569;
+  --portal-bg: #0d1411;
+  --portal-header-bg: #151e19;
+  --portal-header-border: #2a3630;
+  --portal-accent: #5cb88a;
+  --portal-accent-dim: #3d8a65;
+  --portal-card-bg: #151e19;
+  --portal-card-border: #2a3630;
+  --portal-text: #e8efe9;
+  --portal-text-muted: #a8b5ae;
+  --portal-input-bg: #1a2520;
+  --portal-input-border: #2d3d35;
+  --portal-hover-bg: #1e2924;
+  --portal-orange: #e4a574;
 }
 
 /* Apply theme to portal (light and dark) */
@@ -70,4 +76,68 @@ html.dark .portal-theme-input {
 /* Main content cards: subtle left accent so portal feels polished and distinct */
 .portal-card-accent {
   border-left: 4px solid var(--portal-accent);
+}
+
+/* Dark mode: override Tailwind brand/gray classes so portal content stays readable */
+html.dark .text-clr-green {
+  color: var(--portal-accent);
+}
+html.dark .hover\:text-clr-green:hover {
+  color: var(--portal-accent);
+}
+html.dark .bg-clr-green {
+  background-color: var(--portal-accent-dim);
+}
+html.dark .bg-clr-green:hover {
+  filter: brightness(1.1);
+}
+html.dark .text-clr-orange {
+  color: var(--portal-orange);
+}
+html.dark .border-clr-green,
+html.dark .focus\:ring-clr-green:focus,
+html.dark .focus\:border-clr-green:focus {
+  border-color: var(--portal-accent);
+  --tw-ring-color: var(--portal-accent);
+}
+html.dark .text-gray-500,
+html.dark .text-gray-600,
+html.dark .text-gray-700 {
+  color: var(--portal-text-muted);
+}
+html.dark .text-gray-900 {
+  color: var(--portal-text);
+}
+html.dark .bg-white {
+  background-color: var(--portal-card-bg);
+}
+html.dark .border-gray-100,
+html.dark .border-gray-200 {
+  border-color: var(--portal-card-border);
+}
+html.dark .hover\:bg-gray-50:hover,
+html.dark .hover\:bg-gray-100:hover {
+  background-color: var(--portal-hover-bg);
+}
+html.dark .bg-gray-50 {
+  background-color: var(--portal-hover-bg);
+}
+html.dark .bg-clr-beige\/10,
+html.dark .bg-clr-beige\/20,
+html.dark .bg-clr-beige\/30 {
+  background-color: rgba(26, 37, 32, 0.6);
+}
+html.dark .bg-clr-green\/10 {
+  background-color: rgba(93, 184, 138, 0.15);
+}
+html.dark .border-clr-green\/20,
+html.dark .border-clr-green\/30 {
+  border-color: rgba(93, 184, 138, 0.3);
+}
+/* File input and buttons in dark mode */
+html.dark .file\:bg-clr-green {
+  background-color: var(--portal-accent-dim);
+}
+html.dark .file\:text-white {
+  color: #fff;
 }

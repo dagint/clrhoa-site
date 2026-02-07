@@ -1,0 +1,163 @@
+---
+export const prerender = false;
+
+import BoardLayout from '../../layouts/BoardLayout.astro';
+import { getBoardContext } from '../../lib/board-context';
+import { listArbRequestsByOwner } from '../../lib/arb-db';
+
+const ctx = await getBoardContext(Astro);
+if (ctx.redirect) return Astro.redirect(ctx.redirect);
+const { env, session } = ctx;
+if (session.role !== 'board' && session.role !== 'admin') return Astro.redirect('/portal/dashboard');
+
+const allRequests = env?.DB ? await listArbRequestsByOwner(env.DB, session.email) : [];
+const draftCount = allRequests.filter((r) => r.status === 'pending').length;
+
+const url = Astro.url;
+const connected = url.searchParams.get('connected') === '1';
+const errorParam = url.searchParams.get('error') ?? '';
+---
+
+<BoardLayout title="Backups" subtitle="Download full backup or configure automated backups to Google Drive" draftCount={draftCount} role={session.role}>
+  <p class="text-gray-600 mb-6">
+    Database (D1) and login whitelist (KV) backups. Automated backups run daily to Cloudflare R2; you can also send a copy to a Google Workspace Drive folder.
+  </p>
+
+  {connected && (
+    <div class="mb-6 p-4 rounded-xl bg-green-50 border border-green-200 text-green-800 text-sm" role="alert">
+      Google Drive connected. Enter a folder ID below and save to enable backup to Drive.
+    </div>
+  )}
+  {errorParam && (
+    <div class="mb-6 p-4 rounded-xl bg-red-50 border border-red-200 text-red-800 text-sm" role="alert">
+      {errorParam === 'config' && 'Backup or Google Drive not configured (missing env).'}
+      {errorParam === 'no_code' && 'OAuth callback missing code.'}
+      {errorParam === 'no_refresh_token' && 'Google did not return a refresh token; try again with prompt=consent.'}
+      {errorParam === 'token_exchange_failed' && 'Could not exchange OAuth code for token.'}
+      {errorParam === 'db' && 'Database error.'}
+      {!['config', 'no_code', 'no_refresh_token', 'token_exchange_failed', 'db'].includes(errorParam) && `Error: ${errorParam}`}
+    </div>
+  )}
+
+  <section class="mb-8" aria-labelledby="download-backup-heading">
+    <h2 id="download-backup-heading" class="text-lg font-heading font-semibold text-clr-green mb-3">Download full backup</h2>
+    <p class="text-sm text-gray-600 mb-3">
+      Get a ZIP with the current database (SQL) and whitelist (JSON) to save on your computer.
+    </p>
+    <a
+      href="/api/board/backup-download"
+      class="inline-flex items-center gap-2 bg-clr-green hover:brightness-110 text-white px-5 py-2.5 rounded-xl font-semibold text-sm"
+      download
+    >
+      Download backup (ZIP)
+    </a>
+  </section>
+
+  <section class="mb-8" aria-labelledby="automated-heading">
+    <h2 id="automated-heading" class="text-lg font-heading font-semibold text-clr-green mb-3">Automated backups (Cloudflare R2)</h2>
+    <p class="text-sm text-gray-600 mb-2">
+      The backup Worker runs daily at 2:00 AM UTC. It exports D1 and the whitelist and stores them in R2 under <code class="bg-gray-100 px-1 rounded">backups/d1/</code> and <code class="bg-gray-100 px-1 rounded">backups/kv/</code>. Retention is applied (default 30 days). Deploy the Worker with <code class="bg-gray-100 px-1 rounded">npm run backup:deploy</code> and set <code class="bg-gray-100 px-1 rounded">CLOUDFLARE_API_TOKEN</code> and <code class="bg-gray-100 px-1 rounded">CLOUDFLARE_ACCOUNT_ID</code>.
+    </p>
+  </section>
+
+  <section class="mb-8" aria-labelledby="google-drive-heading">
+    <h2 id="google-drive-heading" class="text-lg font-heading font-semibold text-clr-green mb-3">Google Drive backup</h2>
+    <p class="text-sm text-gray-600 mb-4">
+      Optionally upload the same backup set to a Google Workspace Drive folder. Connect your Google account, then set the folder ID (from the folder URL in Drive) and schedule.
+    </p>
+
+    <form id="backup-config-form" class="space-y-4 max-w-xl">
+      <div class="flex items-center gap-2">
+        <input type="checkbox" id="google_drive_enabled" name="google_drive_enabled" class="rounded border-gray-300" />
+        <label for="google_drive_enabled" class="text-sm font-medium text-gray-700">Enable Google Drive backup</label>
+      </div>
+      <div>
+        <label for="google_drive_folder_id" class="block text-sm font-medium text-gray-700 mb-1">Google Drive folder ID</label>
+        <input type="text" id="google_drive_folder_id" name="google_drive_folder_id" placeholder="e.g. from https://drive.google.com/drive/folders/FOLDER_ID" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+      </div>
+      <div class="flex flex-wrap gap-4">
+        <div>
+          <label for="schedule_type" class="block text-sm font-medium text-gray-700 mb-1">Schedule</label>
+          <select id="schedule_type" name="schedule_type" class="rounded-lg border border-gray-300 px-3 py-2 text-sm">
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+          </select>
+        </div>
+        <div>
+          <label for="schedule_hour_utc" class="block text-sm font-medium text-gray-700 mb-1">Hour (UTC)</label>
+          <input type="number" id="schedule_hour_utc" name="schedule_hour_utc" min="0" max="23" value="2" class="w-20 rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+        </div>
+        <div id="schedule_day_wrap" class="hidden">
+          <label for="schedule_day_of_week" class="block text-sm font-medium text-gray-700 mb-1">Day (0=Sun, 6=Sat)</label>
+          <input type="number" id="schedule_day_of_week" name="schedule_day_of_week" min="0" max="6" value="0" class="w-20 rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+        </div>
+      </div>
+      <div class="flex items-center gap-4">
+        <a href="/api/board/google-drive-auth" class="text-sm text-clr-orange hover:underline font-medium">Connect Google Drive</a>
+        <button type="submit" class="bg-clr-green hover:brightness-110 text-white px-5 py-2.5 rounded-xl font-semibold text-sm">
+          Save settings
+        </button>
+      </div>
+    </form>
+  </section>
+
+  <script define:vars={{}}>
+    (function () {
+      const form = document.getElementById('backup-config-form');
+      const scheduleType = document.getElementById('schedule_type');
+      const dayWrap = document.getElementById('schedule_day_wrap');
+
+      scheduleType?.addEventListener('change', function () {
+        if (dayWrap) dayWrap.classList.toggle('hidden', scheduleType.value !== 'weekly');
+      });
+
+      async function load() {
+        try {
+          const r = await fetch('/api/board/backup-config');
+          const c = await r.json();
+          const enabled = document.getElementById('google_drive_enabled');
+          const folderId = document.getElementById('google_drive_folder_id');
+          const hour = document.getElementById('schedule_hour_utc');
+          const day = document.getElementById('schedule_day_of_week');
+          if (enabled) enabled.checked = c.google_drive_enabled;
+          if (folderId) folderId.value = c.google_drive_folder_id || '';
+          if (hour) hour.value = c.schedule_hour_utc ?? 2;
+          if (day) day.value = c.schedule_day_of_week ?? 0;
+          if (scheduleType) scheduleType.value = c.schedule_type || 'daily';
+          if (dayWrap) dayWrap.classList.toggle('hidden', scheduleType?.value !== 'weekly');
+        } catch (_) {}
+      }
+      load();
+
+      form?.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        const enabled = document.getElementById('google_drive_enabled');
+        const folderId = document.getElementById('google_drive_folder_id');
+        const hour = document.getElementById('schedule_hour_utc');
+        const day = document.getElementById('schedule_day_of_week');
+        const payload = {
+          google_drive_enabled: enabled?.checked ?? false,
+          google_drive_folder_id: (folderId as HTMLInputElement)?.value ?? '',
+          schedule_type: (scheduleType as HTMLSelectElement)?.value ?? 'daily',
+          schedule_hour_utc: parseInt((hour as HTMLInputElement)?.value ?? '2', 10),
+          schedule_day_of_week: parseInt((day as HTMLInputElement)?.value ?? '0', 10),
+          include_r2_manifest: false,
+          include_r2_files: false,
+        };
+        const r = await fetch('/api/board/backup-config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (r.ok) {
+          const btn = form.querySelector('button[type="submit"]');
+          if (btn) {
+            const orig = btn.textContent;
+            btn.textContent = 'Saved';
+            setTimeout(() => { btn.textContent = orig; }, 2000);
+          }
+        }
+      });
+    })();
+  </script>
+</BoardLayout>

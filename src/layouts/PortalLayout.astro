@@ -2,8 +2,10 @@
 /**
  * Layout for portal (member) pages. Ensures UTF-8 charset and consistent document structure
  * so special characters (e.g. ellipsis …) and formatting render correctly.
+ * Includes global search bar and top spacing so all portal pages share the same chrome.
  */
 import '../styles/tailwind.css';
+import GlobalSearch from '../components/GlobalSearch.astro';
 
 interface Props {
   title?: string;
@@ -24,6 +26,9 @@ const { title = 'Member Portal | Crooked Lake Reserve HOA' } = Astro.props;
     <meta name="robots" content="noindex, nofollow" />
   </head>
   <body class="min-h-screen bg-gray-50 text-gray-900 font-body">
-    <slot />
+    <GlobalSearch fixed={true} class="portal-theme-header" />
+    <div class="pt-14">
+      <slot />
+    </div>
   </body>
 </html>

@@ -16,7 +16,7 @@ import {
   updateSubmissionStatus,
   type VendorSubmission,
 } from '../../lib/vendor-submissions-db';
-import { insertVendor, updateVendor, type VendorFile } from '../../lib/vendors-db';
+import { insertVendor, updateVendor, insertVendorAuditLog, type VendorFile } from '../../lib/vendors-db';
 
 const REQUEST_TIMEOUT_MS = 30 * 1000;
 
@@ -162,7 +162,7 @@ if (Astro.request.method === 'PUT') {
     });
   }
 
-  // Approve: create vendor and copy submission files to vendor R2 path
+  // Approve: create vendor and copy submission files to vendor R2 path (visible on public & portal)
   const vendorId = await insertVendor(db, {
     name: submission.name ?? '',
     category: submission.category ?? 'Other',
@@ -171,6 +171,7 @@ if (Astro.request.method === 'PUT') {
     website: submission.website ?? null,
     notes: submission.notes,
     filesJson: '[]',
+    show_on_public: 1,
   });
 
   const submissionFiles = parseSubmissionFiles(submission.files);
@@ -192,6 +193,8 @@ if (Astro.request.method === 'PUT') {
       await updateVendor(db, vendorId, { filesJson: JSON.stringify(vendorFiles) });
     }
   }
+
+  await insertVendorAuditLog(db, { vendor_id: vendorId, vendor_name: submission.name ?? null, action: 'created', done_by_email: session.email });
 
   const updated = await updateSubmissionStatus(db, id, 'approved', session.email, reviewNotes, vendorId);
   if (!updated) {

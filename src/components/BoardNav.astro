@@ -12,6 +12,7 @@ const { currentPath } = Astro.props;
 const links: { href: string; label: string }[] = [
   { href: '/portal/board', label: 'Board' },
   { href: '/board/directory', label: 'Directory' },
+  { href: '/board/assessments', label: 'Assessments' },
   { href: '/board/vendors', label: 'Vendors' },
   { href: '/board/meetings', label: 'Meetings' },
   { href: '/board/maintenance', label: 'Maintenance' },
@@ -20,6 +21,7 @@ const links: { href: string; label: string }[] = [
   { href: '/board/public-documents', label: 'Public documents' },
   { href: '/board/member-documents', label: 'Member documents' },
   { href: '/board/audit-logs', label: 'Audit logs' },
+  { href: '/board/backups', label: 'Backups' },
 ];
 
 function isCurrent(href: string): boolean {

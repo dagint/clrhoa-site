@@ -177,6 +177,50 @@ export async function listAllArbRequests(db: D1Database): Promise<ArbRequest[]> 
   })) as ArbRequest[];
 }
 
+export interface ArbExportFilters {
+  /** Inclusive start date (YYYY-MM-DD). Filters by created date. */
+  fromDate?: string | null;
+  /** Inclusive end date (YYYY-MM-DD). Filters by created date. */
+  toDate?: string | null;
+  /** Filter by status (pending, in_review, approved, rejected, cancelled). */
+  status?: string | null;
+}
+
+/** List all ARB requests with optional date/status filters for export/reports. */
+export async function listAllArbRequestsFiltered(
+  db: D1Database,
+  filters?: ArbExportFilters
+): Promise<ArbRequest[]> {
+  const conditions: string[] = ['(deleted_at IS NULL OR deleted_at = "")'];
+  const bind: (string | number)[] = [];
+  if (filters?.fromDate?.trim()) {
+    conditions.push('date(created) >= date(?)');
+    bind.push(filters.fromDate.trim());
+  }
+  if (filters?.toDate?.trim()) {
+    conditions.push('date(created) <= date(?)');
+    bind.push(filters.toDate.trim());
+  }
+  if (filters?.status?.trim()) {
+    conditions.push('status = ?');
+    bind.push(filters.status.trim().toLowerCase());
+  }
+  const where = conditions.join(' AND ');
+  const { results } = await db
+    .prepare(
+      `SELECT id, owner_email, applicant_name, phone, property_address, application_type, description, status, esign_timestamp, arb_esign, created, updated_at, copied_from_id, revision_notes, arb_internal_notes, owner_notes, review_deadline, deleted_at FROM arb_requests WHERE ${where} ORDER BY created DESC`
+    )
+    .bind(...bind)
+    .all<ArbRequest & { arb_internal_notes?: string | null; owner_notes?: string | null; review_deadline?: string | null; deleted_at?: string | null }>();
+  return (results ?? []).map(row => ({
+    ...row,
+    arb_internal_notes: row.arb_internal_notes ?? null,
+    owner_notes: row.owner_notes ?? null,
+    review_deadline: row.review_deadline ?? null,
+    deleted_at: row.deleted_at ?? null,
+  })) as ArbRequest[];
+}
+
 /** Count of ARB requests by status (for dashboard badges). */
 export async function getArbRequestCountsByStatus(db: D1Database): Promise<{ pending: number; in_review: number; approved: number; rejected: number; cancelled: number }> {
   const { results } = await db
@@ -368,6 +412,26 @@ export async function listArbAuditLog(
        FROM arb_audit_log ORDER BY created DESC LIMIT ?`
     )
     .bind(Math.max(1, Math.min(limit, 2000)))
+    .all<ArbAuditLogRow>();
+  return results ?? [];
+}
+
+/** List ARB audit log entries for requests owned by the given email (activity on my requests). For portal "My activity" page. */
+export async function listArbAuditLogForOwner(
+  db: D1Database,
+  ownerEmail: string,
+  limit: number = 200
+): Promise<ArbAuditLogRow[]> {
+  const owner = ownerEmail.trim().toLowerCase();
+  const { results } = await db
+    .prepare(
+      `SELECT a.id, a.request_id, a.action, a.old_status, a.new_status, a.changed_by_email, a.changed_by_role, a.notes, a.created
+       FROM arb_audit_log a
+       INNER JOIN arb_requests r ON r.id = a.request_id AND (r.deleted_at IS NULL OR r.deleted_at = '')
+       WHERE r.owner_email = ?
+       ORDER BY a.created DESC LIMIT ?`
+    )
+    .bind(owner, Math.max(1, Math.min(limit, 500)))
     .all<ArbAuditLogRow>();
   return results ?? [];
 }

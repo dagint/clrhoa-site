@@ -2,18 +2,13 @@
 export const prerender = false;
 
 import BoardLayout from '../../layouts/BoardLayout.astro';
-import { getSessionFromCookie } from '../../lib/auth';
+import { getBoardContext } from '../../lib/board-context';
 import { listPreapprovalItems, listPreapprovalCategories, parsePhotos } from '../../lib/preapproval-db';
 import { listArbRequestsByOwner } from '../../lib/arb-db';
 
-const runtime = Astro.locals.runtime;
-const env = runtime?.env;
-const cookieHeader = Astro.request.headers.get('cookie') ?? undefined;
-let session = await getSessionFromCookie(cookieHeader, env?.SESSION_SECRET);
-if (!session) return Astro.redirect('/portal/login');
-
-const isReviewer = session.role === 'board' || session.role === 'admin' || session.role === 'arb' || session.role === 'arb_board';
-if (!isReviewer) return Astro.redirect('/portal/dashboard');
+const ctx = await getBoardContext(Astro);
+if (ctx.redirect) return Astro.redirect(ctx.redirect);
+const { env, session } = ctx;
 
 const db = env?.DB;
 const items = db ? await listPreapprovalItems(db) : [];

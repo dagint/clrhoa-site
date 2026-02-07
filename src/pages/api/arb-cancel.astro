@@ -7,10 +7,11 @@
 export const prerender = false;
 
 import { getSessionFromCookie, verifyCsrfToken, verifyOrigin } from '../../lib/auth';
+import { requireArbRequestOwner } from '../../lib/access-control';
 import { createLogger, maskRequestId } from '../../lib/logging';
 import { checkRateLimit, getRateLimitConfig } from '../../lib/rate-limit';
 import { getSecurityMonitor } from '../../lib/monitoring';
-import { getArbRequest, listArbFilesByRequest, deleteAllArbFilesByRequest, cancelArbRequest } from '../../lib/arb-db';
+import { listArbFilesByRequest, deleteAllArbFilesByRequest, cancelArbRequest } from '../../lib/arb-db';
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
@@ -78,13 +79,9 @@ if (!requestId) {
   return new Response(JSON.stringify({ error: 'requestId is required.' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
 }
 
-const req = await getArbRequest(db, requestId);
-if (!req || req.owner_email !== session.email.toLowerCase()) {
-  return new Response(JSON.stringify({ error: 'Request not found or you do not own it.' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
-}
-if (req.status !== 'pending') {
-  return new Response(JSON.stringify({ error: 'Only pending requests can be cancelled. This request is already ' + req.status + '.' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
-}
+const ownerCheck = await requireArbRequestOwner(db, requestId, session, { requirePending: true });
+if ('response' in ownerCheck) return ownerCheck.response;
+const req = ownerCheck.request;
 
 // IMPORTANT: Update status FIRST, then delete files
 // This prevents data loss if the status update fails - files remain attached to a cancelled request

@@ -126,7 +126,7 @@ if (Astro.request.method === 'PUT') {
       headers: { 'Content-Type': 'application/json' },
     });
   }
-  let body: { id?: string; name?: string; address?: string; phone?: string; email?: string; role?: string; csrf_token?: string; csrfToken?: string };
+  let body: { id?: string; name?: string; address?: string; phone?: string; email?: string; role?: string; is_primary?: boolean; csrf_token?: string; csrfToken?: string };
   try {
     body = await Astro.request.json();
   } catch {
@@ -157,7 +157,8 @@ if (Astro.request.method === 'PUT') {
     address: body.address,
     phone: body.phone,
     email: body.email,
-  });
+    is_primary: body.is_primary,
+  }, session.email);
   if (!updated) {
     return new Response(JSON.stringify({ error: 'Owner not found or update failed.' }), {
       status: 404,

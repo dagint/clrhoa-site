@@ -7,7 +7,7 @@ This document summarizes how the site enforces **elevated access** and mitigates
 ## Elevated access (members cannot access elevated APIs/pages)
 
 - **Definition of elevated:** ARB, Board, ARB+Board, Admin. See `ELEVATED_ROLES` and `isElevatedRole()` in `src/lib/auth.ts`.
-- **Middleware** (`src/middleware.ts`): Only enforces **portal** auth (session cookie and profile completeness for `/portal/*`). It does **not** gate `/board/*` or elevated APIs; those rely on per-request checks.
+- **Middleware** (`src/middleware.ts`): Enforces **portal** auth (session cookie and profile completeness for `/portal/*`). For **`/board/*`**: no session → redirect to login; session but non-elevated role → redirect to `/portal/dashboard`. For **elevated API path prefixes** (e.g. `/api/owners`, `/api/meetings`, `/api/arb-approve`, etc.), if the user has a session but is not elevated, middleware returns **403** before the handler runs. Per-request checks on each board page and API remain in place.
 - **Enforcement is per-request:**
   - **Board pages** (`src/pages/board/*`): Each page checks `session.role` (e.g. `isBoard` or `allowedRoles.includes(session.role)`) and redirects to `/portal/dashboard` if the user is not allowed.
   - **Elevated APIs:** Each elevated endpoint checks session and role before performing the action and returns `401`/`403` otherwise.
@@ -34,7 +34,7 @@ This document summarizes how the site enforces **elevated access** and mitigates
 1. **Never trust the client:** Role is read from the **server-side session** (cookie verified with `SESSION_SECRET`), not from request body or query.
 2. **Every elevated route must check role:** When adding a new board/ARB-only page or API, add a session + role check at the top and return 403 or redirect.
 3. **IDOR:** For actions keyed by ID (e.g. request id, owner id), ensure the user is either the **owner** of that resource or has an **elevated role** before allowing the action. See e.g. `arb-download-zip` (owner or allowed roles) and `arb-approve` (elevated only, request exists).
-4. **Optional hardening:** Add middleware that redirects non-elevated users away from `/board/*` and optionally returns 403 for known elevated API path prefixes, so that a single place enforces “no member on board routes” in addition to per-request checks.
+4. **Optional hardening (implemented):** Middleware redirects non-elevated users from `/board/*` to `/portal/dashboard` and returns 403 for requests to elevated API path prefixes when the user has a session but is not elevated. See `ELEVATED_API_PREFIXES` in `src/middleware.ts`.
 
 ---
 
@@ -69,6 +69,18 @@ This document summarizes how the site enforces **elevated access** and mitigates
   - Keys under the allowed prefix (e.g. `arb/`) so arbitrary bucket paths cannot be requested.
   - Authorization: the requesting user must be the **owner** of the ARB request that the key belongs to, or have an **elevated role** (see `src/pages/api/portal/file/[...key].astro`). This prevents IDOR (e.g. a member guessing another member’s attachment key).
 - **`/api/portal/file-view`:** Only allows keys under `arb/` and is used for same-origin iframe preview; file content is still served via the file endpoint above with the same auth.
+
+---
+
+## Data at rest (Cloudflare)
+
+All application data stored on Cloudflare is encrypted at rest; no configuration is required.
+
+- **D1 (database):** All data and metadata are encrypted using **AES-256 (GCM)**. Encryption keys are managed by Cloudflare. See [D1 Data security](https://developers.cloudflare.com/d1/reference/data-security/).
+- **R2 (files):** All objects and metadata are encrypted using **AES-256 (GCM)**. See [R2 Data security](https://developers.cloudflare.com/r2/reference/data-security/).
+- **KV (sessions, whitelist, rate limit):** All values are encrypted using **AES-256 (GCM)**. See [KV Data security](https://developers.cloudflare.com/kv/reference/data-security/).
+
+Data in transit to and from these services is protected by TLS (HTTPS).
 
 ---
 
