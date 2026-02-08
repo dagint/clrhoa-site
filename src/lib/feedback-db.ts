@@ -2,6 +2,8 @@
  * D1 helpers for Phase 5: Document feedback / sign-off.
  */
 
+import { listEmailsAtSameAddress } from './directory-db.js';
+
 export interface FeedbackDoc {
   id: string;
   title: string | null;
@@ -81,6 +83,24 @@ export async function getFeedbackResponse(
     )
     .bind(docId, email)
     .first<FeedbackResponse>();
+}
+
+/** True if any member of the household (same address) has responded to this doc. */
+export async function householdHasResponded(
+  db: D1Database,
+  docId: string,
+  userEmail: string
+): Promise<boolean> {
+  const emails = await listEmailsAtSameAddress(db, userEmail);
+  if (emails.length === 0) return false;
+  const placeholders = emails.map(() => '?').join(',');
+  const row = await db
+    .prepare(
+      `SELECT 1 FROM feedback_responses WHERE doc_id = ? AND owner_email IN (${placeholders}) LIMIT 1`
+    )
+    .bind(docId, ...emails)
+    .first<{ '1'?: number }>();
+  return row != null;
 }
 
 /** Upsert owner response (acknowledged, approved, comments). */

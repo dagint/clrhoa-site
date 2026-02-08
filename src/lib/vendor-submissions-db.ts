@@ -2,7 +2,12 @@
  * D1 helpers for vendor submissions (suggest-a-vendor workflow).
  */
 
+import { listEmailsAtSameAddress } from './directory-db.js';
+
 const ID_LEN = 21;
+
+const VENDOR_SUBMISSIONS_SELECT = `SELECT id, name, category, phone, email, website, notes, files, status, submitted_by, submitted_at, reviewed_by, reviewed_at, review_notes, created_vendor_id
+  FROM vendor_submissions`;
 
 function generateId(): string {
   const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
@@ -50,21 +55,39 @@ export async function listPendingSubmissions(db: D1Database): Promise<VendorSubm
 export async function listSubmissions(db: D1Database, options?: { status?: string }): Promise<VendorSubmission[]> {
   if (options?.status) {
     const { results } = await db
-      .prepare(
-        `SELECT id, name, category, phone, email, website, notes, files, status, submitted_by, submitted_at, reviewed_by, reviewed_at, review_notes, created_vendor_id
-         FROM vendor_submissions WHERE status = ? ORDER BY submitted_at DESC`
-      )
+      .prepare(`${VENDOR_SUBMISSIONS_SELECT} WHERE status = ? ORDER BY submitted_at DESC`)
       .bind(options.status)
       .all<VendorSubmission>();
     return results ?? [];
   }
   const { results } = await db
-    .prepare(
-      `SELECT id, name, category, phone, email, website, notes, files, status, submitted_by, submitted_at, reviewed_by, reviewed_at, review_notes, created_vendor_id
-       FROM vendor_submissions ORDER BY submitted_at DESC`
-    )
+    .prepare(`${VENDOR_SUBMISSIONS_SELECT} ORDER BY submitted_at DESC`)
     .all<VendorSubmission>();
   return results ?? [];
+}
+
+/** List submissions where submitted_by is any of the given emails (e.g. household). */
+export async function listSubmissionsBySubmitterEmails(
+  db: D1Database,
+  submitterEmails: string[]
+): Promise<VendorSubmission[]> {
+  const emails = submitterEmails.map((e) => e.trim().toLowerCase()).filter(Boolean);
+  if (emails.length === 0) return [];
+  const placeholders = emails.map(() => '?').join(',');
+  const { results } = await db
+    .prepare(`${VENDOR_SUBMISSIONS_SELECT} WHERE submitted_by IN (${placeholders}) ORDER BY submitted_at DESC`)
+    .bind(...emails)
+    .all<VendorSubmission>();
+  return results ?? [];
+}
+
+/** List vendor submissions from the household of the given user (same property address). */
+export async function listVendorSubmissionsByHousehold(
+  db: D1Database,
+  userEmail: string
+): Promise<VendorSubmission[]> {
+  const emails = await listEmailsAtSameAddress(db, userEmail);
+  return listSubmissionsBySubmitterEmails(db, emails);
 }
 
 export async function getSubmissionById(db: D1Database, id: string): Promise<VendorSubmission | null> {

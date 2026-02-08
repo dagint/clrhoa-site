@@ -4,18 +4,18 @@ export const prerender = false;
 import BoardLayout from '../../layouts/BoardLayout.astro';
 import { getBoardContext } from '../../lib/board-context';
 import { listAllMaintenance, parsePhotosJson } from '../../lib/maintenance-db';
-import { listArbRequestsByOwner } from '../../lib/arb-db';
+import { listArbRequestsByHousehold } from '../../lib/arb-db';
 
 const ctx = await getBoardContext(Astro);
 if (ctx.redirect) return Astro.redirect(ctx.redirect);
-const { env, session } = ctx;
-const isBoard = session.role === 'board' || session.role === 'admin' || session.role === 'arb_board';
+const { env, session, effectiveRole } = ctx;
+const isBoard = effectiveRole === 'board' || effectiveRole === 'admin' || effectiveRole === 'arb_board';
 if (!isBoard) return Astro.redirect('/portal/dashboard');
 
 const db = env?.DB;
 const statusFilter = (Astro.url.searchParams.get('status') as 'reported' | 'in_progress' | 'completed') || undefined;
 const allRequests = db ? await listAllMaintenance(db, statusFilter) : [];
-const allArbRequests = db ? await listArbRequestsByOwner(db, session.email) : [];
+const allArbRequests = db ? await listArbRequestsByHousehold(db, session.email) : [];
 const draftCount = allArbRequests.filter((r) => r.status === 'pending').length;
 
 function formatDate(s: string): string {
@@ -31,7 +31,7 @@ function categoryLabel(cat: string): string {
 }
 ---
 
-<BoardLayout title="Maintenance" subtitle="Manage maintenance requests" draftCount={draftCount} role={session.role}>
+<BoardLayout title="Maintenance" subtitle="Manage maintenance requests" draftCount={draftCount} role={effectiveRole} session={session} elevatedUntil={session.elevated_until}>
   <h2 class="text-xl font-heading font-bold text-clr-green mb-4">Maintenance requests</h2>
       <div class="flex flex-wrap gap-2 mb-6">
         <a

@@ -5,8 +5,9 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie } from '../../lib/auth';
+import { getSessionFromCookie, getEffectiveRole } from '../../lib/auth';
 import { getArbRequest, listArbFilesByRequest } from '../../lib/arb-db';
+import { listEmailsAtSameAddress } from '../../lib/directory-db.js';
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
@@ -47,10 +48,12 @@ if (!request) {
   });
 }
 
-// Check permissions: owner or ARB/Board/Admin
+// Check permissions: owner, household member, or ARB/Board/Admin
 const allowedRoles = ['arb', 'board', 'admin', 'arb_board'];
-const isOwner = request.owner_email.toLowerCase() === session.email.toLowerCase();
-const isAuthorized = isOwner || allowedRoles.includes(session.role);
+const householdEmails = await listEmailsAtSameAddress(db, request.owner_email);
+const isOwnerOrHousehold = householdEmails.includes(session.email.trim().toLowerCase());
+const effectiveRole = getEffectiveRole(session);
+const isAuthorized = isOwnerOrHousehold || allowedRoles.includes(effectiveRole);
 
 if (!isAuthorized) {
   return new Response(JSON.stringify({ error: 'Forbidden' }), {

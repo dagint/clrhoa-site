@@ -5,7 +5,7 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie, verifyCsrfToken, verifyOrigin } from '../../lib/auth';
+import { getSessionFromCookie, verifyCsrfToken, verifyOrigin, getEffectiveRole } from '../../lib/auth';
 import {
   listVendors,
   getVendorById,
@@ -57,7 +57,8 @@ if (!session) {
   });
 }
 
-const isBoard = session.role === 'board' || session.role === 'admin' || session.role === 'arb_board';
+const effectiveRole = getEffectiveRole(session);
+const isBoard = effectiveRole === 'board' || effectiveRole === 'admin' || effectiveRole === 'arb_board';
 const origin = Astro.request.headers.get('origin');
 const referer = Astro.request.headers.get('referer');
 const expectedOrigin = Astro.url.origin;

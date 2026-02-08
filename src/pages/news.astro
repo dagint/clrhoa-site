@@ -4,6 +4,8 @@ export const prerender = false;
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { getCollection } from 'astro:content';
 import { listMeetingsForPublicNews } from '../lib/meetings-db';
+import { listPublicNewsItems } from '../lib/news-items-db';
+import { listPublicVendors } from '../lib/vendors-db';
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
@@ -18,10 +20,13 @@ const publishedNews = allNews
   }));
 
 const publicMeetings = db ? await listMeetingsForPublicNews(db) : [];
+const boardNewsItems = db ? await listPublicNewsItems(db) : [];
+const vendorCount = db ? (await listPublicVendors(db)).length : 0;
 
 type NewsListItem =
   | { kind: 'article'; slug: string; title: string; date: Date; summary: string; tags?: string[] }
-  | { kind: 'meeting'; id: string; title: string; date: Date; summary: string };
+  | { kind: 'meeting'; id: string; title: string; date: Date; summary: string }
+  | { kind: 'board'; id: string; title: string; date: Date; summary: string };
 const items: NewsListItem[] = [
   ...publishedNews.map((item) => ({
     kind: 'article' as const,
@@ -37,6 +42,13 @@ const items: NewsListItem[] = [
     title: m.title ?? 'Meeting',
     date: new Date(m.datetime),
     summary: m.description?.trim() || (m.location ? `Location: ${m.location}` : 'Board meeting.'),
+  })),
+  ...boardNewsItems.map((n) => ({
+    kind: 'board' as const,
+    id: n.id,
+    title: n.title,
+    date: new Date(n.created_at),
+    summary: n.body.slice(0, 200) + (n.body.length > 200 ? '…' : ''),
   })),
 ];
 items.sort((a, b) => b.date.getTime() - a.date.getTime());
@@ -67,6 +79,14 @@ const nextDue = getNextDueDate();
     <div class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 max-w-2xl mx-auto">
       <h1 class="text-4xl font-heading font-bold text-clr-green mb-6">News & Announcements</h1>
 
+      {vendorCount > 0 && (
+        <div class="mb-6 rounded-xl border border-gray-200 bg-clr-beige/20 p-4">
+          <p class="text-gray-700 font-body text-sm">
+            <a href="/resources/vendors" class="text-clr-orange font-semibold hover:underline">Vendor list</a> — Board-recommended service providers (name and website only). Contact form available for vendors without a website.
+          </p>
+        </div>
+      )}
+
       {(items.length === 0 && !nextDue) ? (
         <p class="text-clr-gray font-body">No news items available at this time.</p>
       ) : (
@@ -87,7 +107,7 @@ const nextDue = getNextDueDate();
                 </span>
               </div>
               <p class="text-gray-700 mb-3 font-body">
-                Quarterly HOA dues are due by the 1st of the month. Payment options, mailing address, and drop-off information are on the Dues page.
+                Quarterly HOA dues are due on the 1st of each quarter month (Jan 1, Apr 1, Jul 1, Oct 1). Payment options, mailing address, and drop-off information are on the Dues page.
               </p>
               <a
                 href="/dues"
@@ -105,8 +125,12 @@ const nextDue = getNextDueDate();
                     <a href={`/news/${item.slug}`} class="hover:underline transition-colors">
                       {item.title}
                     </a>
-                  ) : (
+                  ) : item.kind === 'meeting' ? (
                     <a href={`/news/meeting/${item.id}`} class="hover:underline transition-colors">
+                      {item.title}
+                    </a>
+                  ) : (
+                    <a href={`/news/item/${item.id}`} class="hover:underline transition-colors">
                       {item.title}
                     </a>
                   )}
@@ -136,9 +160,16 @@ const nextDue = getNextDueDate();
                 >
                   Read more →
                 </a>
-              ) : (
+              ) : item.kind === 'meeting' ? (
                 <a
                   href={`/news/meeting/${item.id}`}
+                  class="text-clr-orange font-semibold hover:underline inline-block font-body"
+                >
+                  Read more →
+                </a>
+              ) : (
+                <a
+                  href={`/news/item/${item.id}`}
                   class="text-clr-orange font-semibold hover:underline inline-block font-body"
                 >
                   Read more →

@@ -18,6 +18,7 @@ import {
   updateArbRequestByOwner,
   listArbFilesByRequest,
 } from '../../lib/arb-db';
+import { listEmailsAtSameAddress } from '../../lib/directory-db.js';
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
 const MAX_TOTAL_BYTES = 25 * 1024 * 1024;
@@ -167,25 +168,25 @@ if (!description) {
   );
 }
 
-// Check if updating existing draft
+// Check if updating existing draft (owner or household member)
 if (requestId) {
   const existingReq = await getArbRequest(db, requestId);
-  if (existingReq && existingReq.owner_email === session.email.toLowerCase() && existingReq.status === 'pending') {
+  const householdEmails = existingReq ? await listEmailsAtSameAddress(db, existingReq.owner_email) : [];
+  const canUpdateDraft =
+    existingReq &&
+    existingReq.status === 'pending' &&
+    householdEmails.includes(session.email.trim().toLowerCase());
+  if (canUpdateDraft) {
     isUpdate = true;
-    // Update existing draft
+    // Update existing draft (use request owner_email so WHERE clause matches)
     try {
-      const updated = await updateArbRequestByOwner(
-        db,
-        requestId,
-        session.email,
+      const updated = await updateArbRequestByOwner(db, requestId, existingReq.owner_email, {
+        applicantName,
+        phone,
+        propertyAddress,
+        applicationType,
         description,
-        {
-          applicantName,
-          phone,
-          propertyAddress,
-          applicationType,
-        }
-      );
+      });
       if (updated) {
         // Get updated timestamp
         const updatedReq = await getArbRequest(db, requestId);

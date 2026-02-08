@@ -3,24 +3,28 @@ export const prerender = false;
 
 import BoardLayout from '../../layouts/BoardLayout.astro';
 import { getBoardContext } from '../../lib/board-context';
+import { canRecordPayments } from '../../lib/auth';
 import { listPrimaryOwnersByAddress } from '../../lib/directory-db';
-import { listArbRequestsByOwner } from '../../lib/arb-db';
+import { listArbRequestsByHousehold } from '../../lib/arb-db';
 import {
   getAssessmentByOwner,
   listAllAssessments,
   listAllSpecialAssessments,
+  getCurrentQuarterEnd,
+  isMissingForQuarter,
 } from '../../lib/assessments-db';
 import { escapeHtml } from '../../lib/sanitize';
 
 const ctx = await getBoardContext(Astro);
 if (ctx.redirect) return Astro.redirect(ctx.redirect);
-const { env, session } = ctx;
-const isBoard = session.role === 'board' || session.role === 'admin' || session.role === 'arb_board';
+const { env, session, effectiveRole } = ctx;
+const isBoard = effectiveRole === 'board' || effectiveRole === 'admin' || effectiveRole === 'arb_board';
 if (!isBoard) return Astro.redirect('/portal/dashboard');
+const canRecord = canRecordPayments(effectiveRole);
 
 const db = env?.DB;
 const owners = db ? await listPrimaryOwnersByAddress(db) : [];
-const allRequests = db ? await listArbRequestsByOwner(db, session.email) : [];
+const allRequests = db ? await listArbRequestsByHousehold(db, session.email) : [];
 const draftCount = allRequests.filter((r) => r.status === 'pending').length;
 
 const allAssessments = db ? await listAllAssessments(db) : [];
@@ -38,11 +42,19 @@ for (const s of allSpecials) {
 
 const today = new Date().toISOString().slice(0, 10);
 const currentYear = new Date().getFullYear();
+const currentQuarterEnd = getCurrentQuarterEnd();
 
 const sortedOwners = [...owners].filter((o) => o.email?.trim()).sort((a, b) => {
   const na = (a.name ?? a.email ?? '').toLowerCase();
   const nb = (b.name ?? b.email ?? '').toLowerCase();
   return na.localeCompare(nb);
+});
+
+/** Households missing payment for the current quarter only (paid_through < current quarter end). */
+const missingThisQuarter = sortedOwners.filter((o) => {
+  const email = (o.email ?? '').trim().toLowerCase();
+  const assessment = assessmentByEmail.get(email) ?? null;
+  return isMissingForQuarter(assessment?.paid_through ?? null, currentQuarterEnd);
 });
 
 function formatDate(s: string | null): string {
@@ -59,11 +71,29 @@ function formatCurrency(n: number): string {
 }
 ---
 
-<BoardLayout title="Assessments" subtitle="One row per property — record payments quickly" draftCount={draftCount} role={session.role}>
+<BoardLayout title="Dues" subtitle="Record payments, add special assessments, set quarterly amounts" draftCount={draftCount} role={effectiveRole} session={session} elevatedUntil={session.elevated_until}>
   <div id="csrf-holder" class="hidden" data-csrf={escapeHtml(session.csrfToken ?? '')} aria-hidden="true"></div>
   <div id="assessments-message" class="hidden mb-4 p-4 rounded-xl border" role="status" aria-live="polite" aria-atomic="true"></div>
 
-  <p class="text-sm text-gray-600 mb-4">One row per <strong>property (address)</strong>. Multiple people may be at one address; the primary contact is used for dues. Enter amount and date, then click Record. Use &quot;Full yr&quot; for annual payments (sets paid through Dec 31).</p>
+  {!canRecord && (effectiveRole === 'arb_board' || effectiveRole === 'admin') && (
+    <div class="mb-4 p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-sm" role="status">
+      <strong>View only.</strong> To record payments or add special assessments, use <strong>Act as Board</strong> in the yellow banner at the top of the page.
+    </div>
+  )}
+  <p class="text-sm text-gray-600 mb-4">One row per <strong>property (address)</strong>. Multiple people may be at one address; the primary contact is used for dues. Quarterly dues are due on the 1st of each quarter month (Jan 1, Apr 1, Jul 1, Oct 1). Record payments below; use &quot;Add special assessment&quot; for one-off charges. The quarterly dues amount can be changed by the board (e.g. in settings or when needed).</p>
+
+  <div class="flex flex-wrap items-center gap-4 mb-4">
+    <span class="text-sm font-medium text-gray-700">Show:</span>
+    <label class="flex items-center gap-2 cursor-pointer">
+      <input type="radio" name="assessments-filter" value="missing" checked class="assessments-filter-missing rounded border-gray-300 text-clr-green focus:ring-clr-green" aria-label="Missing this quarter only" />
+      <span class="text-sm text-gray-700">Missing this quarter only</span>
+    </label>
+    <label class="flex items-center gap-2 cursor-pointer">
+      <input type="radio" name="assessments-filter" value="all" class="assessments-filter-all rounded border-gray-300 text-clr-green focus:ring-clr-green" aria-label="Show all" />
+      <span class="text-sm text-gray-700">Show all</span>
+    </label>
+    <span class="text-xs text-gray-500" id="assessments-filter-count">({missingThisQuarter.length} of {sortedOwners.length} households)</span>
+  </div>
 
   <div class="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
     <table class="w-full text-sm min-w-[800px]" id="assessments-table">
@@ -74,7 +104,7 @@ function formatCurrency(n: number): string {
           <th class="text-right py-2 px-3 font-semibold text-gray-700 w-24">Balance</th>
           <th class="text-left py-2 px-3 font-semibold text-gray-700 w-28">Paid through</th>
           <th class="text-right py-2 px-3 font-semibold text-gray-700 w-20">Specials</th>
-          <th class="text-left py-2 px-3 font-semibold text-gray-700">Record payment</th>
+          {canRecord && <th class="text-left py-2 px-3 font-semibold text-gray-700">Record payment</th>}
         </tr>
       </thead>
       <tbody>
@@ -84,24 +114,51 @@ function formatCurrency(n: number): string {
           const specials = specialsByEmail.get(email);
           const unpaidSpecial = specials?.unpaid ?? 0;
           const balance = assessment?.balance ?? 0;
+          const missingForCurrentQuarter = isMissingForQuarter(assessment?.paid_through ?? null, currentQuarterEnd);
           return (
-            <tr class="border-b border-gray-100 hover:bg-gray-50/50" data-email={email}>
+            <tr
+              class="border-b border-gray-100 hover:bg-gray-50/50"
+              data-email={email}
+              data-missing-this-quarter={missingForCurrentQuarter ? 'true' : 'false'}
+            >
               <td class="py-2 px-3 font-medium text-gray-900">{o.name ?? '—'}</td>
               <td class="py-2 px-3 text-gray-600">{email || '—'}</td>
               <td class="py-2 px-3 text-right font-mono">{formatCurrency(balance)}</td>
               <td class="py-2 px-3 text-gray-600">{formatDate(assessment?.paid_through ?? null)}</td>
               <td class="py-2 px-3 text-right font-mono">{unpaidSpecial > 0 ? formatCurrency(unpaidSpecial) : '—'}</td>
-              <td class="py-2 px-3">
-                <div class="flex flex-wrap items-center gap-1.5">
-                  <input type="number" step="0.01" min="0" placeholder="Amt" class="record-amount w-16 rounded border border-gray-200 px-2 py-1 text-right" aria-label="Payment amount" />
-                  <input type="date" class="record-date w-32 rounded border border-gray-200 px-2 py-1" value={today} aria-label="Payment date" data-today={today} />
-                  <label class="flex items-center gap-0.5 whitespace-nowrap">
-                    <input type="checkbox" class="record-fullyear rounded border-gray-300 text-clr-green focus:ring-clr-green" aria-label="Full year" />
-                    <span class="text-xs text-gray-600">Full yr</span>
-                  </label>
-                  <button type="button" class="record-btn px-2 py-1 rounded bg-clr-green text-white text-xs font-medium hover:brightness-110 whitespace-nowrap" data-email={email} data-balance={balance}>Record</button>
-                </div>
-              </td>
+              {canRecord && (
+                <td class="py-2 px-3">
+                  <div class="flex flex-wrap items-center gap-1.5">
+                    <input type="number" step="0.01" min="0" placeholder="Amt" class="record-amount w-16 rounded border border-gray-200 px-2 py-1 text-right" aria-label="Payment amount" />
+                    <input type="date" class="record-date w-32 rounded border border-gray-200 px-2 py-1" value={today} aria-label="Payment date" data-today={today} />
+                    <label class="flex items-center gap-0.5 whitespace-nowrap">
+                      <span class="text-xs text-gray-600 sr-only">How received</span>
+                      <select class="record-method rounded border border-gray-200 px-1 py-1 text-xs min-w-0" aria-label="How received">
+                        <option value="electronic_transfer">E-transfer</option>
+                        <option value="check">Check</option>
+                        <option value="cash">Cash</option>
+                      </select>
+                    </label>
+                    <span class="record-check-wrap hidden">
+                      <input type="text" class="record-check-number w-20 rounded border border-gray-200 px-2 py-1 text-xs" placeholder="Check #" aria-label="Check number" maxlength="24" />
+                    </span>
+                    <label class="flex items-center gap-0.5 whitespace-nowrap" title="Apply payment to this many quarters (current + future)">
+                      <span class="text-xs text-gray-600">Qty:</span>
+                      <select class="record-quarters w-12 rounded border border-gray-200 px-1 py-1 text-xs" aria-label="Quarters to apply">
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                        <option value="3">3</option>
+                        <option value="4">4</option>
+                      </select>
+                    </label>
+                    <label class="flex items-center gap-0.5 whitespace-nowrap">
+                      <input type="checkbox" class="record-fullyear rounded border-gray-300 text-clr-green focus:ring-clr-green" aria-label="Full year (4 quarters)" />
+                      <span class="text-xs text-gray-600">Full yr</span>
+                    </label>
+                    <button type="button" class="record-btn px-2 py-1 rounded bg-clr-green text-white text-xs font-medium hover:brightness-110 whitespace-nowrap" data-email={email} data-balance={balance}>Record</button>
+                  </div>
+                </td>
+              )}
             </tr>
           );
         })}
@@ -114,8 +171,10 @@ function formatCurrency(n: number): string {
   )}
 
   <section class="mt-10">
+    {canRecord && (
+    <>
     <h2 class="text-lg font-heading font-semibold text-clr-green mb-3">Add special assessment</h2>
-    <p class="text-sm text-gray-600 mb-3">One-off bill for a single owner. They will see it on Portal → Assessments until paid.</p>
+    <p class="text-sm text-gray-600 mb-3">One-off bill for a single owner. They will see it on Portal → Dues until paid.</p>
     <form id="add-special-form" class="flex flex-wrap items-end gap-3 mb-6">
       <input type="hidden" name="csrf_token" id="add-special-csrf" value={session.csrfToken ?? ''} />
       <div>
@@ -141,6 +200,8 @@ function formatCurrency(n: number): string {
       </div>
       <button type="submit" id="add-special-btn" class="px-4 py-2 bg-clr-green text-white rounded-lg font-medium hover:brightness-110" aria-busy="false">Add</button>
     </form>
+    </>
+    )}
 
     {allSpecials.length > 0 && (
       <div class="overflow-x-auto rounded-xl border border-gray-200 bg-white">
@@ -164,9 +225,10 @@ function formatCurrency(n: number): string {
                 <td class="py-2 px-3">{formatDate(s.due_date)}</td>
                 <td class="py-2 px-3">{s.paid_at ? `Paid ${formatDate(s.paid_at)}` : 'Unpaid'}</td>
                 <td class="py-2 px-3">
-                  {!s.paid_at && (
+                  {!s.paid_at && canRecord && (
                     <button type="button" class="mark-special-paid text-clr-green hover:underline text-xs" data-id={s.id} data-owner={s.owner_email}>Mark paid</button>
                   )}
+                  {!s.paid_at && !canRecord && <span class="text-gray-400">—</span>}
                 </td>
               </tr>
             ))}
@@ -177,11 +239,13 @@ function formatCurrency(n: number): string {
   </section>
 </BoardLayout>
 
-<script define:vars={{ today: today, currentYear: currentYear, csrfToken: session?.csrfToken ?? '' }}>
+<script define:vars={{ today: today, currentYear: currentYear, csrfToken: session?.csrfToken ?? '', missingCount: missingThisQuarter.length, totalCount: sortedOwners.length }}>
   (function () {
     const msgEl = document.getElementById('assessments-message');
     const csrfHolder = document.getElementById('csrf-holder');
     const getCsrf = () => (csrfHolder?.getAttribute('data-csrf') ?? csrfToken ?? '').trim();
+    const table = document.getElementById('assessments-table');
+    const countEl = document.getElementById('assessments-filter-count');
 
     function showMsg(text, isError) {
       if (!msgEl) return;
@@ -190,7 +254,37 @@ function formatCurrency(n: number): string {
       msgEl.classList.remove('hidden');
     }
 
-    document.getElementById('assessments-table')?.addEventListener('click', async (e) => {
+    function applyFilter(showOnlyMissing) {
+      if (!table) return;
+      const rows = table.querySelectorAll('tbody tr[data-missing-this-quarter]');
+      rows.forEach((tr) => {
+        const missing = tr.getAttribute('data-missing-this-quarter') === 'true';
+        (tr as HTMLElement).style.display = showOnlyMissing && !missing ? 'none' : '';
+      });
+      if (countEl) countEl.textContent = showOnlyMissing ? `(${missingCount} of ${totalCount} households)` : `(all ${totalCount} households)`;
+    }
+
+    document.querySelectorAll('input[name="assessments-filter"]').forEach((radio) => {
+      radio.addEventListener('change', function () {
+        applyFilter((this as HTMLInputElement).value === 'missing');
+      });
+    });
+    applyFilter(true);
+
+    function toggleCheckNumber(row) {
+      const wrap = row?.querySelector('.record-check-wrap');
+      const methodSelect = row?.querySelector('.record-method');
+      if (!wrap || !methodSelect) return;
+      const isCheck = (methodSelect as HTMLSelectElement).value === 'check';
+      wrap.classList.toggle('hidden', !isCheck);
+    }
+    table?.querySelectorAll('tbody tr').forEach((tr) => {
+      const methodSelect = tr.querySelector('.record-method');
+      methodSelect?.addEventListener('change', () => toggleCheckNumber(tr));
+      toggleCheckNumber(tr);
+    });
+
+    table?.addEventListener('click', async (e) => {
       const btn = e.target?.closest('.record-btn');
       if (!btn) return;
       const email = btn.getAttribute('data-email');
@@ -198,6 +292,9 @@ function formatCurrency(n: number): string {
       const amountInput = row?.querySelector('.record-amount');
       const dateInput = row?.querySelector('.record-date');
       const fullYearCb = row?.querySelector('.record-fullyear');
+      const quartersSelect = row?.querySelector('.record-quarters');
+      const methodSelect = row?.querySelector('.record-method');
+      const checkInput = row?.querySelector('.record-check-number');
       if (!email || !amountInput || !dateInput) return;
       const amount = parseFloat(amountInput.value);
       const paid_at = dateInput.value;
@@ -209,6 +306,11 @@ function formatCurrency(n: number): string {
         showMsg('Select a payment date.', true);
         return;
       }
+      const payment_method = (methodSelect as HTMLSelectElement)?.value ?? 'electronic_transfer';
+      const check_number = payment_method === 'check' && checkInput ? (checkInput as HTMLInputElement).value?.trim() || null : null;
+      const quarters_to_apply = (fullYearCb && (fullYearCb as HTMLInputElement).checked)
+        ? 4
+        : Math.min(4, Math.max(1, parseInt((quartersSelect as HTMLSelectElement)?.value ?? '1', 10) || 1));
       btn.disabled = true;
       btn.setAttribute('aria-busy', 'true');
       try {
@@ -219,7 +321,9 @@ function formatCurrency(n: number): string {
             owner_email: email,
             amount,
             paid_at,
-            full_year: !!(fullYearCb && fullYearCb.checked),
+            quarters_to_apply,
+            payment_method,
+            check_number,
             csrf_token: getCsrf(),
           }),
         });

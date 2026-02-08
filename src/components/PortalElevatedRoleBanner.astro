@@ -1,20 +1,199 @@
 ---
+import type { SessionPayload } from '../lib/auth';
+
 interface Props {
   role: string;
+  /** When provided and role is admin, show assume-role controls (Board/ARB). */
+  session?: SessionPayload | null;
 }
 
-const { role } = Astro.props;
+const { role, session } = Astro.props;
 
 const isElevated = role === 'arb' || role === 'board' || role === 'admin' || role === 'arb_board';
 if (!isElevated) {
   return null;
 }
 
+const sessionRole = session?.role?.toLowerCase();
+const isAdmin = sessionRole === 'admin';
+const isArbBoard = sessionRole === 'arb_board';
+const canAssumeRole = isAdmin || isArbBoard;
+const assumedRole = session?.assumed_role ?? null;
+const assumedUntil = session?.assumed_until;
+
 const label = role === 'admin' ? 'Administrator' : role === 'arb_board' ? 'ARB + Board' : role === 'arb' ? 'ARB Member' : 'Board Member';
 ---
 
-<div class="bg-amber-50 border-b border-amber-200 px-4 py-2 no-print" role="status" aria-live="polite">
-  <p class="text-sm text-amber-900 text-center font-medium max-w-4xl mx-auto">
-    You are signed in with elevated access: <strong>{label}</strong>. Your actions in the portal may affect other members. Use responsibly.
-  </p>
+<div class="bg-amber-50 border-b border-amber-200 px-4 py-2 no-print" role="status" aria-live="polite" data-is-admin={isAdmin} data-session-role={sessionRole ?? ''}>
+  <div class="text-sm text-amber-900 text-center font-medium max-w-4xl mx-auto">
+    {!canAssumeRole ? (
+      <p>You are signed in with elevated access: <strong>{label}</strong>. Your actions in the portal may affect other members. Use responsibly.</p>
+    ) : (
+      <>
+        <div id="assume-role-status">
+          {assumedRole ? (
+            <>
+              <p class="mb-1">Acting as <strong>{assumedRole === 'board' ? 'Board' : 'ARB'}</strong>{isAdmin ? ' for technical assistance' : ''}. All actions are logged. Drop or wait for timeout (2 hr) before switching to the other role.</p>
+              {assumedUntil != null && (
+                <p id="assume-role-countdown" class="text-xs text-amber-800 mb-2" data-assumed-until={assumedUntil} aria-live="polite">Role expires in <span class="assume-role-countdown-text">—</span></p>
+              )}
+            </>
+          ) : isAdmin ? (
+            <p class="mb-2">You are signed in as <strong>Administrator</strong>. You have view-only access to Dues and ARB requests. To provide technical assistance, you may assume a role below (one at a time; all actions are logged).</p>
+          ) : (
+            <p class="mb-2">You are <strong>ARB + Board</strong>. Choose which role you are acting in (one at a time). Drop or wait for timeout (2 hr) before switching to the other role.</p>
+          )}
+        </div>
+        <p id="assume-role-error" class="mt-1 text-red-700 text-xs font-medium hidden" role="alert"></p>
+        <form id="assume-role-form" class="flex flex-wrap items-center justify-center gap-2 mt-1" data-csrf={session?.csrfToken ?? ''}>
+          <input type="hidden" name="csrf_token" id="assume-role-csrf" value={session?.csrfToken ?? ''} />
+          {assumedRole ? (
+            <button type="button" class="assume-role-btn px-3 py-1.5 rounded-lg border border-amber-700 bg-amber-100 text-amber-900 text-xs font-semibold hover:bg-amber-200" data-role="none">{isAdmin ? 'Return to Admin (view only)' : 'Drop role'}</button>
+          ) : (
+            <>
+              <button type="button" class="assume-role-btn px-3 py-1.5 rounded-lg border border-clr-green bg-clr-green/20 text-clr-green text-xs font-semibold hover:bg-clr-green/30" data-role="board">Act as Board</button>
+              <button type="button" class="assume-role-btn px-3 py-1.5 rounded-lg border border-clr-green bg-clr-green/20 text-clr-green text-xs font-semibold hover:bg-clr-green/30" data-role="arb">Act as ARB</button>
+            </>
+          )}
+        </form>
+        <p class="mt-1 text-xs text-amber-700"><a href="/portal/assume-role-help" class="underline hover:no-underline">How does this work?</a></p>
+      </>
+    )}
+  </div>
 </div>
+
+{canAssumeRole && (
+  <script>
+    (function () {
+      const form = document.getElementById('assume-role-form');
+      const statusEl = document.getElementById('assume-role-status');
+      const errorEl = document.getElementById('assume-role-error');
+      const banner = document.querySelector('[data-session-role]');
+      const getCsrf = () => { const el = document.getElementById('assume-role-csrf') as HTMLInputElement | null; return el?.value ?? form?.getAttribute('data-csrf') ?? ''; };
+      const isAdmin = banner?.getAttribute('data-is-admin') === 'true';
+
+      function formatCountdown(untilMs: number): string {
+        const now = Date.now();
+        const rem = untilMs - now;
+        if (rem <= 0) return 'Expired';
+        const mins = Math.floor(rem / 60000);
+        if (mins < 60) return `~${mins}m`;
+        const h = Math.floor(mins / 60);
+        const m = mins % 60;
+        return m ? `~${h}h ${m}m` : `~${h}h`;
+      }
+
+      function updateCountdown() {
+        const countdownEl = document.getElementById('assume-role-countdown');
+        if (!countdownEl) return;
+        const until = countdownEl.getAttribute('data-assumed-until');
+        if (!until) return;
+        const untilMs = parseInt(until, 10);
+        if (Number.isNaN(untilMs)) return;
+        const text = countdownEl.querySelector('.assume-role-countdown-text');
+        if (text) text.textContent = formatCountdown(untilMs);
+      }
+
+      function startCountdownTicker() {
+        updateCountdown();
+        const interval = setInterval(updateCountdown, 60000);
+        return () => clearInterval(interval);
+      }
+
+      const countdownEl = document.getElementById('assume-role-countdown');
+      if (countdownEl?.getAttribute('data-assumed-until')) {
+        startCountdownTicker();
+      }
+
+      function showError(msg: string) {
+        if (errorEl) {
+          errorEl.textContent = msg;
+          errorEl.classList.remove('hidden');
+        }
+      }
+      function clearError() {
+        if (errorEl) {
+          errorEl.textContent = '';
+          errorEl.classList.add('hidden');
+        }
+      }
+
+      function renderStatus(assumedRole: string | null, assumedUntil: number | null) {
+        if (!statusEl) return;
+        const roleLabel = assumedRole === 'board' ? 'Board' : assumedRole === 'arb' ? 'ARB' : null;
+        let html = '';
+        if (roleLabel) {
+          html += `<p class="mb-1">Acting as <strong>${roleLabel}</strong>${isAdmin ? ' for technical assistance' : ''}. All actions are logged. Drop or wait for timeout (2 hr) before switching to the other role.</p>`;
+          if (assumedUntil != null) {
+            html += `<p id="assume-role-countdown" class="text-xs text-amber-800 mb-2" data-assumed-until="${assumedUntil}" aria-live="polite">Role expires in <span class="assume-role-countdown-text">${formatCountdown(assumedUntil)}</span></p>`;
+          }
+        } else {
+          html += isAdmin
+            ? '<p class="mb-2">You are signed in as <strong>Administrator</strong>. You have view-only access to Dues and ARB requests. To provide technical assistance, you may assume a role below (one at a time; all actions are logged).</p>'
+            : '<p class="mb-2">You are <strong>ARB + Board</strong>. Choose which role you are acting in (one at a time). Drop or wait for timeout (2 hr) before switching to the other role.</p>';
+        }
+        statusEl.innerHTML = html;
+        if (assumedUntil != null) startCountdownTicker();
+      }
+
+      function renderFormButtons(assumedRole: string | null) {
+        if (!form) return;
+        const dropLabel = isAdmin ? 'Return to Admin (view only)' : 'Drop role';
+        const csrf = getCsrf();
+        form.innerHTML = `
+          <input type="hidden" name="csrf_token" id="assume-role-csrf" value="${csrf}" />
+          ${assumedRole
+            ? `<button type="button" class="assume-role-btn px-3 py-1.5 rounded-lg border border-amber-700 bg-amber-100 text-amber-900 text-xs font-semibold hover:bg-amber-200" data-role="none">${dropLabel}</button>`
+            : `<button type="button" class="assume-role-btn px-3 py-1.5 rounded-lg border border-clr-green bg-clr-green/20 text-clr-green text-xs font-semibold hover:bg-clr-green/30" data-role="board">Act as Board</button>
+               <button type="button" class="assume-role-btn px-3 py-1.5 rounded-lg border border-clr-green bg-clr-green/20 text-clr-green text-xs font-semibold hover:bg-clr-green/30" data-role="arb">Act as ARB</button>`
+          }
+        `;
+        bindAssumeRoleButtons();
+      }
+
+      function bindAssumeRoleButtons() {
+        form?.querySelectorAll('.assume-role-btn').forEach((btn) => {
+          btn.addEventListener('click', async function () {
+            const role = (this as HTMLElement).getAttribute('data-role') || 'none';
+            const token = getCsrf();
+            clearError();
+            (this as HTMLButtonElement).disabled = true;
+            try {
+              const res = await fetch('/api/admin/assume-role', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ role, csrf_token: token }),
+              });
+              const data = await res.json();
+              if (res.ok && data.success) {
+                const newRole = data.assumed_role ?? null;
+                const newUntil = data.assumed_until ?? null;
+                renderStatus(newRole, newUntil);
+                renderFormButtons(newRole);
+                if (newRole && !data.assumed_until) {
+                  const countdownEl = document.getElementById('assume-role-countdown');
+                  if (countdownEl) countdownEl.remove();
+                }
+                if (newRole && statusEl && !document.getElementById('assume-role-refresh-hint')) {
+                  const p = document.createElement('p');
+                  p.id = 'assume-role-refresh-hint';
+                  p.className = 'text-xs text-amber-700 mt-1';
+                  p.textContent = 'If Record payment or ARB approve options don\'t appear, refresh the page.';
+                  statusEl.appendChild(p);
+                }
+              } else {
+                (this as HTMLButtonElement).disabled = false;
+                showError(data.error || 'Couldn\'t switch role. Please try again or refresh the page.');
+              }
+            } catch (e) {
+              (this as HTMLButtonElement).disabled = false;
+              showError('Couldn\'t switch role. Please try again or refresh the page.');
+            }
+          });
+        });
+      }
+
+      bindAssumeRoleButtons();
+    })();
+  </script>
+)}

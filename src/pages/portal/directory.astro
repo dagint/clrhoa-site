@@ -7,22 +7,22 @@ import PortalNav from '../../components/PortalNav.astro';
 import { getPortalContext } from '../../lib/portal-context';
 import { getRolesForEmails, isElevatedRole } from '../../lib/auth';
 import { listOwners } from '../../lib/directory-db';
-import { listArbRequestsByOwner } from '../../lib/arb-db';
+import { listArbRequestsByHousehold } from '../../lib/arb-db';
 
-const { env, session } = await getPortalContext(Astro, { fingerprint: true });
+const { env, session, effectiveRole } = await getPortalContext(Astro, { fingerprint: true });
 if (!session) return Astro.redirect('/portal/login');
 
 const db = env?.DB;
 const owners = db ? await listOwners(db) : [];
 const ownerRoles = await getRolesForEmails(env?.CLOURHOA_USERS, owners.map((o) => o.email));
-const allRequests = db ? await listArbRequestsByOwner(db, session.email) : [];
+const allRequests = db ? await listArbRequestsByHousehold(db, session.email) : [];
 const draftCount = allRequests.filter((r) => r.status === 'pending').length;
 
 /** Display label for HOA role in directory (board, admin, arb only). */
 function roleLabel(role: string): string {
   return role === 'arb' ? 'ARB' : role === 'board' ? 'Board' : role === 'arb_board' ? 'ARB + Board' : role === 'admin' ? 'Admin' : role;
 }
-const viewerElevated = isElevatedRole(session.role);
+const viewerElevated = isElevatedRole(effectiveRole);
 function canRevealContact(owner: { share_contact_with_members?: number | null }): boolean {
   return owner.share_contact_with_members !== 0 || viewerElevated;
 }
@@ -31,7 +31,7 @@ function canRevealContact(owner: { share_contact_with_members?: number | null })
 <PortalLayout title="Directory | Member Portal | Crooked Lake Reserve HOA">
   <ProtectedPage>
   <div class="min-h-screen portal-theme-bg font-body">
-    <PortalNav currentPath="/portal/directory" draftCount={draftCount} role={session.role} />
+    <PortalNav currentPath="/portal/directory" draftCount={draftCount} role={effectiveRole} staffRole={session?.role ?? ''} />
 
     <main class="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
       <h2 class="text-2xl font-heading font-bold text-clr-green mb-2">Homeowner Directory</h2>
@@ -43,11 +43,11 @@ function canRevealContact(owner: { share_contact_with_members?: number | null })
       </p>
 
       <div class="mb-4">
-        <label for="dir-search" class="sr-only">Search by name, address, or email</label>
+        <label for="dir-search" class="sr-only">Search by name, address, lot number, or email</label>
         <input
           id="dir-search"
           type="search"
-          placeholder="Search by name, address, or email..."
+          placeholder="Search by name, address, lot #, or email..."
           class="w-full max-w-md px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-clr-green focus:border-clr-green"
           aria-label="Search directory"
         />
@@ -65,6 +65,7 @@ function canRevealContact(owner: { share_contact_with_members?: number | null })
                 <tr>
                   <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
                   <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-24">Role</th>
+                  <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-16">Lot #</th>
                   <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Address</th>
                   <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
                   <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
@@ -74,7 +75,7 @@ function canRevealContact(owner: { share_contact_with_members?: number | null })
                 {owners.map((owner) => {
                   const role = owner.email ? ownerRoles.get(owner.email.trim().toLowerCase()) : null;
                   return (
-                  <tr class="dir-row" data-name={(owner.name ?? '').toLowerCase()} data-address={(owner.address ?? '').toLowerCase()} data-email={(owner.email ?? '').toLowerCase()}>
+                  <tr class="dir-row" data-name={(owner.name ?? '').toLowerCase()} data-address={(owner.address ?? '').toLowerCase()} data-email={(owner.email ?? '').toLowerCase()} data-lot={(owner.lot_number ?? '').toLowerCase()}>
                     <td class="px-4 py-3 text-gray-900">{owner.name ?? '-'}</td>
                     <td class="px-4 py-3">
                       {role ? (
@@ -85,6 +86,7 @@ function canRevealContact(owner: { share_contact_with_members?: number | null })
                         <span class="text-gray-400">-</span>
                       )}
                     </td>
+                    <td class="px-4 py-3 text-gray-600">{owner.lot_number ?? '-'}</td>
                     <td class="px-4 py-3 text-gray-600">{owner.address ?? '-'}</td>
                     <td class="px-4 py-3">
                       {canRevealContact(owner) ? (
@@ -146,7 +148,8 @@ function canRevealContact(owner: { share_contact_with_members?: number | null })
             const name = (row.getAttribute('data-name') || '');
             const address = (row.getAttribute('data-address') || '');
             const email = (row.getAttribute('data-email') || '');
-            const show = !q || name.includes(q) || address.includes(q) || email.includes(q);
+            const lot = (row.getAttribute('data-lot') || '');
+            const show = !q || name.includes(q) || address.includes(q) || email.includes(q) || lot.includes(q);
             row.style.display = show ? '' : 'none';
           });
         });

@@ -16,7 +16,8 @@ How the site controls who can see and change what data. Use this to keep the pub
 | News / meetings (post_to_public_news) | ✅ Title, datetime, description, location | — | Full CRUD |
 | Vendors (show_on_public) | ✅ Name, category, website | — | Full + phone/email/notes |
 | Public documents (bylaws, etc.) | ✅ Slug, title, link (no updated_by) | — | Upload/replace |
-| ARB requests | — | Own only (`listArbRequestsByOwner`) | All + approve/reject |
+| ARB requests | — | Household (`listArbRequestsByHousehold` — same address) | All + approve/reject |
+| Maintenance requests | — | Household (`listMaintenanceByHousehold` — same address) | All + update status/vendor |
 | Directory (owners) | — | Limited (see Directory & logging) | Export + full |
 | Assessments / payments | — | Own (or primary at address) | All + record payment |
 | Member documents (minutes, budgets) | — | All (shared library) | Upload, delete |
@@ -24,8 +25,8 @@ How the site controls who can see and change what data. Use this to keep the pub
 
 ## Centralized helpers
 
-- **`requireArbRequestAccess(db, requestId, session)`** — Returns the ARB request if the user is the **owner or elevated**; otherwise 403/404. Use for viewing/downloading request or attachments.
-- **`requireArbRequestOwner(db, requestId, session, { requirePending?: true })`** — Returns the request only if the user is the **owner** (and optionally status is `pending`). Use for cancel, add file, remove file.
+- **`requireArbRequestAccess(db, requestId, session)`** — Returns the ARB request if the user is the **owner, a household member (same address), or elevated**; otherwise 403/404. Use for viewing/downloading request or attachments.
+- **`requireArbRequestOwner(db, requestId, session, { requirePending?: true })`** — Returns the request only if the user is the **owner or a household member** (and optionally status is `pending`). Use for cancel, add file, remove file.
 - **Member document file serve** — `/api/portal/file/member-docs/...` only serves keys that exist in `member_documents` (`getMemberDocumentByFileKey`). Prevents serving arbitrary R2 paths.
 
 ## What we log (audit)

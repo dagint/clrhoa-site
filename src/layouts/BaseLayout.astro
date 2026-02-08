@@ -1,6 +1,8 @@
 ---
 import '../styles/tailwind.css';
 import Analytics from '../components/Analytics.astro';
+import FeedbackWidget from '../components/FeedbackWidget.astro';
+import UsageBeacon from '../components/UsageBeacon.astro';
 
 interface Props {
   title: string;
@@ -611,6 +613,7 @@ const resourcesByCategory = {
               <li><a href="/resources/faq" class="hover:text-clr-beige transition-colors">FAQ</a></li>
               <li><a href="/contact" class="hover:text-clr-beige transition-colors">Contact Us</a></li>
               <li><a href="/about" class="hover:text-clr-beige transition-colors">About</a></li>
+              <li><a href="/dashboard" class="hover:text-clr-beige transition-colors">Usage</a></li>
             </ul>
           </div>
         </div>
@@ -685,5 +688,7 @@ const resourcesByCategory = {
         </div>
       </div>
     </footer>
+    <FeedbackWidget />
+    <UsageBeacon />
   </body>
 </html>

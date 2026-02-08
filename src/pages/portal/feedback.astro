@@ -5,22 +5,22 @@ import PortalLayout from '../../layouts/PortalLayout.astro';
 import ProtectedPage from '../../components/ProtectedPage.astro';
 import PortalNav from '../../components/PortalNav.astro';
 import { getPortalContext } from '../../lib/portal-context';
-import { listArbRequestsByOwner } from '../../lib/arb-db';
-import { listActiveFeedbackDocs } from '../../lib/feedback-db';
-import { getFeedbackResponse } from '../../lib/feedback-db';
+import { listArbRequestsByHousehold } from '../../lib/arb-db';
+import { listActiveFeedbackDocs, getFeedbackResponse, householdHasResponded } from '../../lib/feedback-db';
 
-const { env, session } = await getPortalContext(Astro, { fingerprint: true });
+const { env, session, effectiveRole } = await getPortalContext(Astro, { fingerprint: true });
 if (!session) return Astro.redirect('/portal/login');
 
 const db = env?.DB;
 const draftCount = db
-  ? (await listArbRequestsByOwner(db, session.email)).filter((r) => r.status === 'pending').length
+  ? (await listArbRequestsByHousehold(db, session.email)).filter((r) => r.status === 'pending').length
   : 0;
 const docs = db ? await listActiveFeedbackDocs(db) : [];
 const docsWithMyResponse = db
   ? await Promise.all(
       docs.map(async (d) => {
         const myResponse = await getFeedbackResponse(db, d.id, session!.email);
+        const household_has_responded = await householdHasResponded(db, d.id, session!.email);
         return {
           ...d,
           my_response: myResponse
@@ -31,6 +31,7 @@ const docsWithMyResponse = db
                 responded: myResponse.responded,
               }
             : null,
+          household_has_responded,
         };
       })
     )
@@ -49,7 +50,7 @@ function formatDate(s: string | null): string {
 <PortalLayout title="Feedback | Member Portal | Crooked Lake Reserve HOA">
   <ProtectedPage>
   <div class="min-h-screen portal-theme-bg font-body">
-    <PortalNav currentPath="/portal/feedback" draftCount={draftCount} role={session.role} />
+    <PortalNav currentPath="/portal/feedback" draftCount={draftCount} role={effectiveRole} staffRole={session?.role ?? ''} />
 
     <main class="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
       <h2 class="text-2xl font-heading font-bold text-clr-green mb-2">Document feedback</h2>
@@ -83,6 +84,9 @@ function formatDate(s: string | null): string {
                 </p>
               )}
               <div class="feedback-response border-t border-gray-100 pt-4 mt-4">
+                {d.household_has_responded && (
+                  <p class="text-sm text-gray-600 mb-2">Someone at your address has responded to this document.</p>
+                )}
                 {d.my_response ? (
                   <p class="text-sm text-green-700 font-medium">Thank you, your vote recorded.</p>
                 ) : (

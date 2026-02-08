@@ -9,7 +9,7 @@ interface Props {
 }
 const { placeholder = 'Search ARB, meetings, vendors, directory, feedback, library...', class: className = '', fixed = true } = Astro.props;
 ---
-<div class:list={['portal-search-wrap', fixed && 'fixed top-0 left-0 right-0 z-40 bg-white border-b border-gray-200 shadow-sm', className]} role="search">
+<div class:list={['portal-search-wrap', 'no-print', fixed && 'fixed top-0 left-0 right-0 z-40 bg-white border-b border-gray-200 shadow-sm', className]} role="search">
   <form
     id="global-search-form"
     class="max-w-4xl mx-auto px-4 py-2 flex gap-2"

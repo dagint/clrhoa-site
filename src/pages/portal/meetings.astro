@@ -5,17 +5,26 @@ import PortalLayout from '../../layouts/PortalLayout.astro';
 import ProtectedPage from '../../components/ProtectedPage.astro';
 import PortalNav from '../../components/PortalNav.astro';
 import { getPortalContext } from '../../lib/portal-context';
-import { listArbRequestsByOwner } from '../../lib/arb-db';
-import { listUpcomingWithCountsAndUser } from '../../lib/meetings-db';
+import { listArbRequestsByHousehold } from '../../lib/arb-db';
+import { listUpcomingWithCountsAndUser, getHouseholdRsvps } from '../../lib/meetings-db';
+import type { MeetingWithCounts } from '../../lib/meetings-db';
 
-const { env, session } = await getPortalContext(Astro, { fingerprint: true });
+const { env, session, effectiveRole } = await getPortalContext(Astro, { fingerprint: true });
 if (!session) return Astro.redirect('/portal/login');
 
 const db = env?.DB;
 const draftCount = db
-  ? (await listArbRequestsByOwner(db, session.email)).filter((r) => r.status === 'pending').length
+  ? (await listArbRequestsByHousehold(db, session.email)).filter((r) => r.status === 'pending').length
   : 0;
-const meetings = db ? await listUpcomingWithCountsAndUser(db, session.email) : [];
+const meetingsRaw = db ? await listUpcomingWithCountsAndUser(db, session.email) : [];
+const meetings: (MeetingWithCounts & { household_rsvps: { owner_email: string; response: string }[] })[] = db
+  ? await Promise.all(
+      meetingsRaw.map(async (m) => ({
+        ...m,
+        household_rsvps: await getHouseholdRsvps(db, m.id, session!.email),
+      }))
+    )
+  : [];
 
 function formatDateTime(dt: string): string {
   try {
@@ -51,7 +60,7 @@ function googleCalendarUrl(m: { title: string | null; datetime: string; descript
 <PortalLayout title="Meetings | Member Portal | Crooked Lake Reserve HOA">
   <ProtectedPage>
   <div class="min-h-screen portal-theme-bg font-body">
-    <PortalNav currentPath="/portal/meetings" draftCount={draftCount} role={session.role} />
+    <PortalNav currentPath="/portal/meetings" draftCount={draftCount} role={effectiveRole} staffRole={session?.role ?? ''} />
 
     <main class="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
       <h2 class="text-2xl font-heading font-bold text-clr-green mb-2">Meetings</h2>
@@ -113,6 +122,11 @@ function googleCalendarUrl(m: { title: string | null; datetime: string; descript
                   {m.user_response ? `You responded: ${m.user_response}` : '-'}
                 </span>
               </div>
+              {m.household_rsvps.length > 0 && (
+                <p class="text-sm text-gray-600 mb-2">
+                  Household: {m.household_rsvps.map((r) => (r.owner_email === session.email ? `You: ${r.response}` : `${r.owner_email}: ${r.response}`)).join(', ')}
+                </p>
+              )}
               <p class="text-sm text-gray-500 mb-2">
                 Counts: Yes {m.yes_count} | No {m.no_count} | Maybe {m.maybe_count}
               </p>

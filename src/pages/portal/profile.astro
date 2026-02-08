@@ -6,19 +6,19 @@ import ProtectedPage from '../../components/ProtectedPage.astro';
 import PortalNav from '../../components/PortalNav.astro';
 import { getPortalContext } from '../../lib/portal-context';
 import { getOwnerByEmail, getPhonesArray, listHouseholdMembersWithLogin } from '../../lib/directory-db';
-import { listArbRequestsByOwner } from '../../lib/arb-db';
+import { listArbRequestsByHousehold } from '../../lib/arb-db';
 import { getUserByEmail, type NotificationPreferences } from '../../lib/db';
 import { listLoginHistoryByEmail } from '../../lib/login-history-db';
 import { NOTIFICATION_TYPES } from '../../lib/notifications';
 
-const { env, session } = await getPortalContext(Astro);
+const { env, session, effectiveRole } = await getPortalContext(Astro);
 if (!session) return Astro.redirect('/portal/login');
 
 const db = env?.DB;
 const owner = db ? await getOwnerByEmail(db, session.email) : null;
 const phonesInitial = owner ? getPhonesArray(owner) : [];
 if (phonesInitial.length === 0) phonesInitial.push('');
-const allRequests = db ? await listArbRequestsByOwner(db, session.email) : [];
+const allRequests = db ? await listArbRequestsByHousehold(db, session.email) : [];
 const draftCount = allRequests.filter((r) => r.status === 'pending').length;
 
 let smsPhone = '';
@@ -40,7 +40,9 @@ if (db) {
 const hasName = !!(owner?.name?.trim());
 const hasAddress = !!(owner?.address?.trim());
 const hasPhones = phonesInitial.some((p) => !!(p && String(p).trim()));
-const profileComplete = hasName && hasAddress && hasPhones;
+// Admin accounts (e.g. service providers) are not required to have an address
+const profileComplete =
+  effectiveRole === 'admin' ? hasName && hasPhones : hasName && hasAddress && hasPhones;
 const requiredParam = Astro.url.searchParams.get('required') === '1';
 const startInEditMode = !profileComplete || requiredParam;
 const pushEnabled = notification_preferences['push_enabled'] === true;
@@ -64,7 +66,7 @@ function formatLoginTime(iso: string | null): string {
 <PortalLayout title="Profile | Member Portal | Crooked Lake Reserve HOA">
   <ProtectedPage>
   <div class="min-h-screen portal-theme-bg font-body">
-    <PortalNav currentPath="/portal/profile" draftCount={draftCount} role={session.role} />
+    <PortalNav currentPath="/portal/profile" draftCount={draftCount} role={effectiveRole} staffRole={session?.role ?? ''} />
 
     <main class="max-w-2xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
       <h2 class="text-2xl font-heading font-bold text-clr-green mb-2">Profile</h2>
@@ -77,7 +79,10 @@ function formatLoginTime(iso: string | null): string {
 
       {requiredParam && (
         <div class="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg text-amber-900" role="alert">
-          <strong>Profile required.</strong> Please complete your name, address, and at least one phone number to continue using the portal.
+          <strong>Profile required.</strong>
+          {effectiveRole === 'admin'
+            ? ' Please complete your name and at least one phone number.'
+            : ' Please complete your name, address, and at least one phone number.'}
         </div>
       )}
 
@@ -93,6 +98,10 @@ function formatLoginTime(iso: string | null): string {
             <div>
               <dt class="text-sm font-medium text-gray-500">Property address</dt>
               <dd id="profile-view-address" class="mt-0.5 text-gray-900">{owner?.address?.trim() || 'Not set'}</dd>
+            </div>
+            <div>
+              <dt class="text-sm font-medium text-gray-500">Lot number</dt>
+              <dd id="profile-view-lot" class="mt-0.5 text-gray-900">{owner?.lot_number?.trim() || 'Not set'}</dd>
             </div>
             <div>
               <dt class="text-sm font-medium text-gray-500">Phone numbers</dt>
@@ -119,6 +128,11 @@ function formatLoginTime(iso: string | null): string {
             <label for="my-info-address" class="block text-sm font-medium text-gray-700">Property address</label>
             <input type="text" id="my-info-address" name="address" class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2" value={owner?.address ?? ''} placeholder="Street, lot or address" />
             <p class="mt-1 text-xs text-gray-500">Used in the directory and to prefill the ARB request form.</p>
+          </div>
+          <div>
+            <label for="my-info-lot-number" class="block text-sm font-medium text-gray-700">Lot number</label>
+            <input type="text" id="my-info-lot-number" name="lot_number" inputmode="numeric" min="1" max="25" class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2" value={owner?.lot_number ?? ''} placeholder="1–25" />
+            <p class="mt-1 text-xs text-gray-500">Optional. Use 1–25 if you know your lot number.</p>
           </div>
           <div>
             <div class="flex items-center justify-between">
@@ -238,7 +252,17 @@ function formatLoginTime(iso: string | null): string {
               ))}
             </ul>
           </div>
-          <div>
+          <div class="rounded-lg border border-amber-200 bg-amber-50 p-4 mb-4">
+            <p class="text-sm font-medium text-amber-900 mb-1">SMS notifications (not yet available)</p>
+            <p class="text-sm text-amber-800 mb-3">Sending text alerts would <strong>cost the HOA money</strong> (carrier fees per message). No SMS messages are sent until the board enables this feature.</p>
+            <p class="text-sm text-amber-800 mb-3">If you want SMS alerts when they become available, click below. The board will see how many members want SMS.</p>
+            <div class="flex flex-wrap items-center gap-2">
+              <button type="button" id="btn-request-sms" class="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg font-medium text-sm">Request SMS (costs HOA money)</button>
+              <span id="sms-request-message" class="text-sm text-amber-800 hidden"></span>
+            </div>
+          </div>
+          <div class="opacity-75" aria-describedby="sms-locked-note">
+            <p id="sms-locked-note" class="text-xs text-gray-500 mb-2">Your preferences below will apply when SMS is enabled. No messages are sent until then.</p>
             <p class="text-sm font-medium text-gray-700 mb-1">SMS alerts (opt-in)</p>
             <label class="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" id="sms_optin" name="sms_optin" class="rounded border-gray-300 text-clr-green focus:ring-clr-green" checked={sms_optin} />
@@ -246,14 +270,14 @@ function formatLoginTime(iso: string | null): string {
             </label>
             <p class="text-sm text-gray-500 mt-1">Text alerts for important HOA updates. Standard messaging rates may apply.</p>
           </div>
-          <div>
+          <div class="opacity-75 mt-2">
             <label for="phone" class="block text-sm font-medium text-gray-700 mb-1">Phone number for SMS</label>
             <input type="tel" id="phone" name="phone" value={smsPhone} placeholder="+1 555 123 4567" class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2" />
-            <p class="text-xs text-gray-500 mt-1">Used for SMS alerts. If this number is not already in your directory listing above, it will be added when you save.</p>
+            <p class="text-xs text-gray-500 mt-1">Used for SMS alerts when enabled. If this number is not already in your directory listing above, it will be added when you save.</p>
           </div>
-          <div class="flex flex-wrap gap-3">
+          <div class="flex flex-wrap gap-3 mt-4">
             <button type="submit" class="bg-clr-green hover:brightness-110 text-white px-6 py-2 rounded-xl font-semibold text-sm">Save notifications</button>
-            <button type="button" id="btn-test-sms" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-6 py-2 rounded-xl font-semibold text-sm">Send test SMS</button>
+            <button type="button" id="btn-test-sms" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-6 py-2 rounded-xl font-semibold text-sm" disabled title="SMS sending is disabled until the board enables it">Send test SMS</button>
           </div>
           <div class="pt-4 border-t border-gray-100">
             <p class="text-sm font-medium text-gray-700 mb-2">Browser push notifications</p>
@@ -293,9 +317,11 @@ function formatLoginTime(iso: string | null): string {
         if (profileView) profileView.classList.remove('hidden');
         if (form) form.classList.add('hidden');
       }
+      const viewLot = document.getElementById('profile-view-lot');
       function updateViewFromForm() {
         const name = document.getElementById('my-info-name')?.value?.trim() || 'Not set';
         const address = document.getElementById('my-info-address')?.value?.trim() || 'Not set';
+        const lot = document.getElementById('my-info-lot-number')?.value?.trim() || 'Not set';
         const phones = [];
         container?.querySelectorAll('.phone-input').forEach(function (input) {
           const v = input.value?.trim();
@@ -303,6 +329,7 @@ function formatLoginTime(iso: string | null): string {
         });
         if (viewName) viewName.textContent = name;
         if (viewAddress) viewAddress.textContent = address;
+        if (viewLot) viewLot.textContent = lot;
         if (viewPhones) viewPhones.textContent = phones.length ? phones.join(', ') : 'Not set';
       }
 
@@ -341,7 +368,8 @@ function formatLoginTime(iso: string | null): string {
           const v = input.value?.trim();
           if (v) phones.push(v);
         });
-        const payload = { name: document.getElementById('my-info-name')?.value?.trim() || null, address: document.getElementById('my-info-address')?.value?.trim() || null, phones: phones.length ? phones : [], csrf_token: token };
+        const lotNumber = document.getElementById('my-info-lot-number')?.value?.trim() || null;
+        const payload = { name: document.getElementById('my-info-name')?.value?.trim() || null, address: document.getElementById('my-info-address')?.value?.trim() || null, lot_number: lotNumber, phones: phones.length ? phones : [], csrf_token: token };
         submitBtn.disabled = true;
         try {
           const res = await fetch('/api/owners/me', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
@@ -393,6 +421,29 @@ function formatLoginTime(iso: string | null): string {
           showPrefMsg('Network error. Please try again.', true);
         }
       });
+      document.getElementById('btn-request-sms')?.addEventListener('click', async function () {
+        const btn = document.getElementById('btn-request-sms');
+        const msgEl = document.getElementById('sms-request-message');
+        if (!btn || !msgEl) return;
+        btn.disabled = true;
+        msgEl.classList.remove('hidden');
+        msgEl.textContent = 'Recording…';
+        try {
+          const res = await fetch('/api/sms-feature-request', { method: 'POST', credentials: 'same-origin' });
+          const data = await res.json().catch(function () { return {}; });
+          if (res.ok && data.success) {
+            msgEl.textContent = 'Request recorded. The board will see how many members want SMS.';
+          } else {
+            msgEl.textContent = data.error || 'Request failed. Try again.';
+            msgEl.classList.add('text-red-600');
+          }
+        } catch (err) {
+          msgEl.textContent = 'Network error. Try again.';
+          msgEl.classList.add('text-red-600');
+        }
+        btn.disabled = false;
+      });
+
       document.getElementById('btn-test-sms')?.addEventListener('click', async function () {
         const phone = (prefForm?.querySelector('#phone'))?.value?.trim();
         if (!phone) { showPrefMsg('Enter a phone number and save first, then try again.', true); return; }

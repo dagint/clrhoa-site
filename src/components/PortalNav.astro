@@ -1,16 +1,20 @@
 ---
 /**
  * Shared portal navigation. Cleaner menu: main links + More dropdown + Help dropdown.
- * Props: currentPath, draftCount, role; optional arbInReviewCount and vendorPendingCount for action badges in More menu.
+ * Props: currentPath, draftCount, role (effective); optional staffRole (whitelist) so we show Board/ARB links for staff who haven't elevated yet (marked restricted).
  */
 interface Props {
   currentPath: string;
   draftCount?: number;
   role?: string;
+  /** Whitelist role (session.role). When board/arb/admin/arb_board, show elevated-only links; when not elevated, link to request-elevated-access. */
+  staffRole?: string;
   arbInReviewCount?: number;
   vendorPendingCount?: number;
 }
-const { currentPath, draftCount = 0, role = '', arbInReviewCount = 0, vendorPendingCount = 0 } = Astro.props;
+const { currentPath, draftCount = 0, role = '', staffRole = '', arbInReviewCount = 0, vendorPendingCount = 0 } = Astro.props;
+/** Red bubble for Requests: non-final ARB requests (pending + in_review). */
+const nonFinalCount = draftCount + arbInReviewCount;
 
 function isCurrent(href: string) {
   if (href === '/portal/dashboard') return currentPath === '/portal/dashboard';
@@ -19,7 +23,11 @@ function isCurrent(href: string) {
 }
 const linkClass = (href: string) =>
   isCurrent(href) ? 'text-clr-green font-medium' : 'text-gray-600 hover:text-clr-green portal-theme-text-muted';
-const isStaff = role === 'board' || role === 'admin' || role === 'arb' || role === 'arb_board';
+/** Effective role is elevated (user has current elevated access). */
+const isElevated = role === 'board' || role === 'admin' || role === 'arb' || role === 'arb_board';
+/** User has a staff whitelist role (can request elevation). Show Board/ARB links; when not elevated, they go to request-elevated-access. */
+const isStaffFromWhitelist = staffRole === 'board' || staffRole === 'admin' || staffRole === 'arb' || staffRole === 'arb_board';
+const isStaff = isElevated;
 ---
 
 <header class="bg-white portal-theme-header portal-header-accent shadow-sm" role="banner">
@@ -46,32 +54,45 @@ const isStaff = role === 'board' || role === 'admin' || role === 'arb' || role =
               <svg class="w-4 h-4 transition group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
             </summary>
             <div id="nav-more-menu" class="absolute left-0 top-full mt-1 py-2 w-56 rounded-xl bg-white border border-gray-200 shadow-lg z-50 portal-theme-card" role="menu">
-              <a href="/portal/my-requests" class="flex items-center justify-between gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 portal-theme-text">
-                My requests
-                {draftCount > 0 && <span class="bg-amber-500 text-white text-xs font-bold rounded-full min-w-[1.25rem] h-5 flex items-center justify-center px-1">{draftCount}</span>}
+              <a href="/portal/requests" class="flex items-center justify-between gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 portal-theme-text">
+                Requests
+                {nonFinalCount > 0 && <span class="bg-red-500 text-white text-xs font-bold rounded-full min-w-[1.25rem] h-5 flex items-center justify-center px-1" aria-label={`${nonFinalCount} in progress`}>{nonFinalCount}</span>}
               </a>
+              <a href="/portal/my-requests" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 portal-theme-text">My requests (ARB)</a>
               <a href="/portal/my-activity" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 portal-theme-text">My activity</a>
               <a href="/portal/arb-request" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 portal-theme-text">New ARB request</a>
               <a href="/portal/maintenance" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 portal-theme-text">Maintenance</a>
               <a href="/portal/meetings" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 portal-theme-text">Meetings</a>
               <a href="/portal/vendors" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 portal-theme-text">Vendors</a>
               <a href="/portal/library" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 portal-theme-text">Pre-approval library</a>
-              <a href="/portal/assessments" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 portal-theme-text">Assessments</a>
+              <a href="/portal/assessments" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 portal-theme-text">Dues</a>
               <a href="/portal/feedback" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 portal-theme-text">Feedback</a>
-              {isStaff && (
+              {isStaffFromWhitelist && (
                 <>
                   <div class="border-t border-gray-100 my-1" />
-                  <a href="/portal/arb-dashboard" class="flex items-center justify-between gap-2 px-4 py-2 text-sm text-clr-green font-medium hover:bg-gray-50">
-                    ARB Dashboard
-                    {arbInReviewCount > 0 && <span class="bg-amber-500 text-white text-xs font-bold rounded-full min-w-[1.25rem] h-5 flex items-center justify-center px-1" aria-label={`${arbInReviewCount} in review`}>{arbInReviewCount}</span>}
+                  <p class="px-4 py-1.5 text-xs font-semibold text-amber-700 uppercase tracking-wide" id="nav-elevated-label">Board &amp; ARB (elevated access)</p>
+                  <a href={isElevated ? '/portal/arb-dashboard' : `/portal/request-elevated-access?return=${encodeURIComponent('/portal/arb-dashboard')}`} class="flex items-center justify-between gap-2 px-4 py-2 text-sm hover:bg-gray-50 {isElevated ? 'text-clr-green font-medium' : 'text-gray-600'}">
+                    <span>ARB Dashboard</span>
+                    {!isElevated && <span class="text-xs text-amber-600 font-medium" aria-hidden="true">Requires elevation</span>}
+                    {isElevated && arbInReviewCount > 0 && <span class="bg-amber-500 text-white text-xs font-bold rounded-full min-w-[1.25rem] h-5 flex items-center justify-center px-1" aria-label={`${arbInReviewCount} in review`}>{arbInReviewCount}</span>}
                   </a>
-                  <a href="/portal/board" class="flex items-center justify-between gap-2 px-4 py-2 text-sm text-clr-green font-medium hover:bg-gray-50">
-                    Board
-                    {vendorPendingCount > 0 && <span class="bg-amber-500 text-white text-xs font-bold rounded-full min-w-[1.25rem] h-5 flex items-center justify-center px-1" aria-label={`${vendorPendingCount} vendor submissions pending`}>{vendorPendingCount}</span>}
+                  <a href={isElevated ? '/portal/board' : `/portal/request-elevated-access?return=${encodeURIComponent('/portal/board')}`} class="flex items-center justify-between gap-2 px-4 py-2 text-sm hover:bg-gray-50 {isElevated ? 'text-clr-green font-medium' : 'text-gray-600'}">
+                    <span>Board</span>
+                    {!isElevated && <span class="text-xs text-amber-600 font-medium" aria-hidden="true">Requires elevation</span>}
+                    {isElevated && vendorPendingCount > 0 && <span class="bg-amber-500 text-white text-xs font-bold rounded-full min-w-[1.25rem] h-5 flex items-center justify-center px-1" aria-label={`${vendorPendingCount} vendor submissions pending`}>{vendorPendingCount}</span>}
                   </a>
-                  <a href="/board/public-documents" class="block px-4 py-2 text-sm text-clr-green font-medium hover:bg-gray-50">Public documents</a>
-                  <a href="/board/member-documents" class="block px-4 py-2 text-sm text-clr-green font-medium hover:bg-gray-50">Member documents</a>
-                  <a href="/board/audit-logs" class="block px-4 py-2 text-sm text-clr-green font-medium hover:bg-gray-50">Audit logs</a>
+                  <a href={isElevated ? '/board/public-documents' : `/portal/request-elevated-access?return=${encodeURIComponent('/board/public-documents')}`} class="flex items-center justify-between gap-2 px-4 py-2 text-sm hover:bg-gray-50 {isElevated ? 'text-clr-green font-medium' : 'text-gray-600'}">
+                    <span>Public documents</span>
+                    {!isElevated && <span class="text-xs text-amber-600 font-medium" aria-hidden="true">Requires elevation</span>}
+                  </a>
+                  <a href={isElevated ? '/board/member-documents' : `/portal/request-elevated-access?return=${encodeURIComponent('/board/member-documents')}`} class="flex items-center justify-between gap-2 px-4 py-2 text-sm hover:bg-gray-50 {isElevated ? 'text-clr-green font-medium' : 'text-gray-600'}">
+                    <span>Member documents</span>
+                    {!isElevated && <span class="text-xs text-amber-600 font-medium" aria-hidden="true">Requires elevation</span>}
+                  </a>
+                  <a href={isElevated ? '/board/audit-logs' : `/portal/request-elevated-access?return=${encodeURIComponent('/board/audit-logs')}`} class="flex items-center justify-between gap-2 px-4 py-2 text-sm hover:bg-gray-50 {isElevated ? 'text-clr-green font-medium' : 'text-gray-600'}">
+                    <span>Audit logs</span>
+                    {!isElevated && <span class="text-xs text-amber-600 font-medium" aria-hidden="true">Requires elevation</span>}
+                  </a>
                 </>
               )}
             </div>
@@ -85,6 +106,7 @@ const isStaff = role === 'board' || role === 'admin' || role === 'arb' || role =
               <svg class="w-4 h-4 transition group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
             </summary>
             <div id="nav-help-menu" class="absolute right-0 top-full mt-1 py-2 w-52 rounded-xl bg-white border border-gray-200 shadow-lg z-50 portal-theme-card" role="menu">
+              <a href="/portal/news" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 portal-theme-text">News &amp; announcements</a>
               <a href="/portal/docs" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 portal-theme-text">Documentation</a>
               <a href="/portal/faq" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 portal-theme-text">FAQ</a>
             </div>

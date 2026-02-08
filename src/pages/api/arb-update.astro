@@ -10,6 +10,7 @@ import { createLogger, maskRequestId } from '../../lib/logging';
 import { checkRateLimit, getRateLimitConfig } from '../../lib/rate-limit';
 import { getSecurityMonitor } from '../../lib/monitoring';
 import { updateArbRequestByOwner } from '../../lib/arb-db';
+import { requireArbRequestOwner } from '../../lib/access-control';
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
@@ -77,6 +78,10 @@ try {
     });
   }
 
+  const ownerCheck = await requireArbRequestOwner(db, requestId, session, { requirePending: true });
+  if ('response' in ownerCheck) return ownerCheck.response;
+  const { request } = ownerCheck;
+
   const description = (formData.get('description') as string)?.trim();
   if (!description) {
     return new Response(JSON.stringify({ error: 'Description is required.' }), {
@@ -113,7 +118,7 @@ try {
     : null;
   const ownerNotes = (formData.get('owner_notes') as string)?.trim() || null;
 
-  const updated = await updateArbRequestByOwner(db, requestId, session.email, {
+  const updated = await updateArbRequestByOwner(db, requestId, request.owner_email, {
     applicantName,
     phone,
     propertyAddress,
@@ -124,7 +129,7 @@ try {
 
   if (!updated) {
     return new Response(
-      JSON.stringify({ error: 'Request not found, already decided, or you are not the owner.' }),
+      JSON.stringify({ error: 'Request not found, already decided, or you do not have access to this request.' }),
       { status: 404, headers: { 'Content-Type': 'application/json' } }
     );
   }

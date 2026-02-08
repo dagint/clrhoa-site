@@ -1,25 +1,18 @@
-# PRIORITIZED TODO List (GitHub Projects Recommended)
+# Prioritized TODO
 
-## 1. Dark Mode Fixes ⭐⭐⭐⭐⭐
-**Cursor Prompt:** `Fix dark mode: maintenance dropdown text contrast 4.5:1. Global CSS vars --text-primary-dark. Audit dropdowns/buttons/cards. Tailwind config.`
+## Done
 
-## 2. Auth + MFA + Password Management + Admin Controls ⭐⭐⭐⭐
-**Cursor Prompt:** `Full auth: email/pass login/register. JWT 15min sliding. MFA TOTP toggle (encrypted KV). Roles user/elevated/admin. ADMINS ONLY assign admins. Password update/reset/forgot flows w/rate limiting. Lucia lib. Protect admin routes.`
+- **Request Tabs** — Tabbed requests on `/portal/requests`: All | Pending | In review | Approved | Rejected | Cancelled (ARB status). Red badge for non-final, detail + timeline, SSE live updates.
+- **PIM Elevation** — Request elevated access (2 hr TTL), drop anytime. Logged in `pim_elevation_log`. Board Audit has “PIM: elevated access requests” section. Read-only `/portal/elevation-audit` for elevated-whitelist users (no elevation required).
+- **Directory Lot Number** — `lot_number` in D1 (1–25). Profile, board directory, portal directory, CSV upload. Required for elevated role. Board directory shows lot# → address mapping.
+- **Feedback Collector** — `FeedbackWidget` (bottom-right thumbs + 140-char comment). `/api/site-feedback` (rate limit 3/day). D1 `site_feedback`. Admin `/admin/feedback` with filters and CSV export.
+- **SMS (Disabled + Request Tracking)** — Profile: “Request SMS (costs HOA money)” button; no sending. D1 `sms_feature_requests` by lot_number. Admin `/admin/sms-requests`: “X users want SMS”, report for planning.
+- **Usage Metrics Dashboard** — `/dashboard`: public daily/weekly views + unique sessions (Chart.js). Admin section: user_id → path → timestamp. `/api/usage/record` beacon, `/api/usage/stats`, `/api/usage/admin`. D1 `page_views`.
+- **Dark Mode Fixes** — theme.css: `--text-primary-dark` / `--text-muted-dark`; all `select`s in dark get 4.5:1 (color + bg); `text-gray-400` override; inputs/textareas; Tailwind `text-portal-primary-dark` / `portal-muted-dark`.
 
-## 3. Directory Lot Number Field ⭐⭐⭐⭐
-**Cursor Prompt:** `User directory: add lot_number field alongside address. Update forms/login/profile display. Store in D1 schema. Admin view shows lot#→address mapping. Validation: 1-4 digits. Required for elevated role.`
+---
 
-## 4. Request Tabs ⭐⭐⭐
-**Cursor Prompt:** `Tabbed requests like maintenance page: All|Pending|Processing|Complete|Failed. Red bubble count non-final. Detail view+timeline. SSE live updates. Match styling exactly. /requests`
+## Outstanding
 
-## 5. Feedback Collector ⭐⭐⭐
-**Cursor Prompt:** `Feedback widget every page: bottom-right→thumbs up/down+140char box. Collect URL/time/viewport/sessionID (noPII). Worker→D1. Admin /admin/feedback dashboard w/filters/CSV. Rate limit 3/day. Tailwind.`
-
-## 6. PIM Elevation ⭐⭐
-**Cursor Prompt:** `PIM: member→request elevated (2hr TTL admin approve). JIT session refresh. Audit D1. Banner expiry timer. User dashboard integration. Cloudflare D1.`
-
-## 7. SMS Feature (Disabled + Request Tracking) ⭐⭐
-**Cursor Prompt:** `SMS notifications: show locked UI to users "Request SMS (costs HOA money)". Track feature requests in D1 w/lot_number+timestamp. Admin report "X users want SMS". Disable actual sending. Note costs in UI.`
-
-## 8. Usage Metrics Dashboard ⭐
-**Cursor Prompt:** `Create a usage metrics dashboard for Cloudflare Pages/Astro: 1.Public: total views/users daily/weekly (anon) 2.Admin: user_id→pages→timestamps via session keys 3.Chart.js responsive 4.Cloudflare KV/D1 storage 5.Role access 6./dashboard page matching styling`
+### 1. Auth + MFA + Password Management ⭐⭐⭐⭐
+Full auth: email/pass login/register. JWT 15min sliding. MFA TOTP toggle (encrypted KV). Roles user/elevated/admin. Admins only assign admins. Password update/reset/forgot with rate limiting. Lucia. Protect admin routes.

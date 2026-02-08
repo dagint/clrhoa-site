@@ -4,20 +4,20 @@ export const prerender = false;
 import BoardLayout from '../../layouts/BoardLayout.astro';
 import { getBoardContext } from '../../lib/board-context';
 import { listPreapprovalItems, listPreapprovalCategories, parsePhotos } from '../../lib/preapproval-db';
-import { listArbRequestsByOwner } from '../../lib/arb-db';
+import { listArbRequestsByHousehold } from '../../lib/arb-db';
 
 const ctx = await getBoardContext(Astro);
 if (ctx.redirect) return Astro.redirect(ctx.redirect);
-const { env, session } = ctx;
+const { env, session, effectiveRole } = ctx;
 
 const db = env?.DB;
 const items = db ? await listPreapprovalItems(db) : [];
 const categories = db ? await listPreapprovalCategories(db) : [];
-const allRequests = db ? await listArbRequestsByOwner(db, session.email) : [];
+const allRequests = db ? await listArbRequestsByHousehold(db, session.email) : [];
 const draftCount = allRequests.filter((r) => r.status === 'pending').length;
 ---
 
-<BoardLayout title="Pre-approval library" subtitle="Add and manage architectural pre-approval items" draftCount={draftCount} role={session.role}>
+<BoardLayout title="Pre-approval library" subtitle="Add and manage architectural pre-approval items" draftCount={draftCount} role={effectiveRole} session={session} elevatedUntil={session.elevated_until}>
   <h2 class="text-xl font-heading font-bold text-clr-green mb-6">Add pre-approval item</h2>
       <form id="library-form" class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-8 space-y-4">
         <input type="hidden" name="id" id="form-id" value="" />

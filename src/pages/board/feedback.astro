@@ -5,19 +5,19 @@ import BoardLayout from '../../layouts/BoardLayout.astro';
 import { getBoardContext } from '../../lib/board-context';
 import { listAllFeedbackDocs, getFeedbackResponseCounts } from '../../lib/feedback-db';
 import { listOwners } from '../../lib/directory-db';
-import { listArbRequestsByOwner } from '../../lib/arb-db';
+import { listArbRequestsByHousehold } from '../../lib/arb-db';
 
 const ctx = await getBoardContext(Astro);
 if (ctx.redirect) return Astro.redirect(ctx.redirect);
-const { env, session } = ctx;
-const isBoard = session.role === 'board' || session.role === 'admin' || session.role === 'arb_board';
+const { env, session, effectiveRole } = ctx;
+const isBoard = effectiveRole === 'board' || effectiveRole === 'admin' || effectiveRole === 'arb_board';
 if (!isBoard) return Astro.redirect('/portal/dashboard');
 
 const db = env?.DB;
 const docs = db ? await listAllFeedbackDocs(db) : [];
 const owners = db ? await listOwners(db) : [];
 const totalOwners = owners.length;
-const allRequests = db ? await listArbRequestsByOwner(db, session.email) : [];
+const allRequests = db ? await listArbRequestsByHousehold(db, session.email) : [];
 const draftCount = allRequests.filter((r) => r.status === 'pending').length;
 const docsWithCounts = db
   ? await Promise.all(
@@ -38,7 +38,7 @@ function formatDate(s: string | null): string {
 }
 ---
 
-<BoardLayout title="Feedback" subtitle="Manage document feedback requests" draftCount={draftCount} role={session.role}>
+<BoardLayout title="Feedback" subtitle="Manage document feedback requests" draftCount={draftCount} role={effectiveRole} session={session} elevatedUntil={session.elevated_until}>
   <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
         <h2 class="text-xl font-heading font-bold text-clr-green">Feedback documents</h2>
         <button type="button" id="btn-new-feedback" class="inline-flex items-center gap-2 bg-clr-green hover:brightness-110 text-white px-4 py-2 rounded-xl font-semibold text-sm">

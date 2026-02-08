@@ -6,12 +6,14 @@
 export const prerender = false;
 
 import { requireSession, jsonResponse } from '../../lib/api-helpers';
+import { getEffectiveRole } from '../../lib/auth';
 
 const auth = await requireSession(Astro);
 if (auth.response) return auth.response;
 const { session } = auth;
 
-const isBoard = session.role === 'board' || session.role === 'admin' || session.role === 'arb_board';
+const effectiveRole = getEffectiveRole(session);
+const isBoard = effectiveRole === 'board' || effectiveRole === 'admin' || effectiveRole === 'arb_board';
 if (!isBoard) return jsonResponse({ error: 'Forbidden' }, 403);
 
 const r2 = Astro.locals.runtime?.env?.CLOURHOA_FILES;

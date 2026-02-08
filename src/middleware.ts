@@ -7,11 +7,25 @@
  */
 
 import type { MiddlewareHandler } from 'astro';
-import { getSessionFromCookie, SESSION_COOKIE_NAME, isElevatedRole } from './lib/auth';
+import { getSessionFromCookie, SESSION_COOKIE_NAME, isElevatedRole, getEffectiveRole } from './lib/auth';
 import { getOwnerByEmail, getPhonesArray } from './lib/directory-db';
+
+/** Admin accounts (e.g. service providers) are not required to have an address in the directory. */
+function isProfileComplete(
+  owner: Awaited<ReturnType<typeof getOwnerByEmail>>,
+  phones: string[],
+  effectiveRole: string
+): boolean {
+  const hasName = !!(owner?.name?.trim());
+  const hasAddress = !!(owner?.address?.trim());
+  const hasPhones = phones.length > 0 && phones.some((p) => !!p?.trim());
+  if (effectiveRole === 'admin') return hasName && hasPhones;
+  return hasName && hasAddress && hasPhones;
+}
 
 /** API path prefixes that require an elevated role (board, arb, admin, arb_board). Middleware returns 403 if session exists but role is not elevated. */
 const ELEVATED_API_PREFIXES = [
+  '/api/admin',
   '/api/board',
   '/api/owners',
   '/api/meetings',
@@ -34,7 +48,8 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
   const env = context.locals.runtime?.env;
   const cookieHeader = context.request.headers.get('cookie') ?? undefined;
 
-  // Board admin: require session and elevated role
+  // Board admin: require session and effective elevated role (PIM: JIT elevation).
+  // If not elevated, send to request-elevated-access landing so they can elevate and then return here.
   if (pathname.startsWith('/board')) {
     if (!context.cookies.has(SESSION_COOKIE_NAME)) {
       return context.redirect('/portal/login');
@@ -44,17 +59,40 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
       if (!session) {
         return context.redirect('/portal/login');
       }
-      if (!isElevatedRole(session.role)) {
-        return context.redirect('/portal/dashboard');
+      if (!isElevatedRole(getEffectiveRole(session))) {
+        const returnUrl = encodeURIComponent(pathname);
+        return context.redirect(`/portal/request-elevated-access?return=${returnUrl}`);
       }
     }
   }
 
-  // Elevated APIs: 403 if session exists but role is not elevated
-  if (env?.SESSION_SECRET && ELEVATED_API_PREFIXES.some((p) => pathname.startsWith(p))) {
+  // Admin (e.g. /admin/feedback): same as board — session + effective elevated role
+  if (pathname.startsWith('/admin')) {
+    if (!context.cookies.has(SESSION_COOKIE_NAME)) {
+      return context.redirect('/portal/login');
+    }
+    if (env?.SESSION_SECRET) {
+      const session = await getSessionFromCookie(cookieHeader, env.SESSION_SECRET);
+      if (!session) {
+        return context.redirect('/portal/login');
+      }
+      if (!isElevatedRole(getEffectiveRole(session))) {
+        const returnUrl = encodeURIComponent(pathname);
+        return context.redirect(`/portal/request-elevated-access?return=${returnUrl}`);
+      }
+    }
+  }
+
+  // Elevated APIs: 403 if session exists but effective role is not elevated
+  // Exceptions (allow any logged-in user; handler enforces owner vs elevated):
+  //   /api/owners/me — members update own directory info
+  //   /api/arb-notes — members add owner_notes to their request; ARB/Board set internal notes
+  const isOwnProfileApi = pathname === '/api/owners/me' || pathname.startsWith('/api/owners/me/');
+  const isMemberArbNotesApi = pathname === '/api/arb-notes' || pathname.startsWith('/api/arb-notes/');
+  if (env?.SESSION_SECRET && !isOwnProfileApi && !isMemberArbNotesApi && ELEVATED_API_PREFIXES.some((p) => pathname.startsWith(p))) {
     if (context.cookies.has(SESSION_COOKIE_NAME)) {
       const session = await getSessionFromCookie(cookieHeader, env.SESSION_SECRET);
-      if (session && !isElevatedRole(session.role)) {
+      if (session && !isElevatedRole(getEffectiveRole(session))) {
         return new Response(JSON.stringify({ error: 'Forbidden', success: false }), {
           status: 403,
           headers: { 'Content-Type': 'application/json' },
@@ -87,10 +125,9 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
           }
           const owner = await getOwnerByEmail(env.DB, session.email);
           const phones = owner ? getPhonesArray(owner) : [];
-          const hasName = !!(owner?.name?.trim());
-          const hasAddress = !!(owner?.address?.trim());
-          const hasPhones = phones.length > 0 && phones.some((p) => !!p?.trim());
-          if (!hasName || !hasAddress || !hasPhones) {
+          const effectiveRole = getEffectiveRole(session);
+          const profileComplete = isProfileComplete(owner, phones, effectiveRole);
+          if (!profileComplete) {
             return context.redirect('/portal/profile?required=1');
           }
         }
@@ -135,7 +172,7 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
     const frameAncestors = allowSameOriginFrame ? "'self'" : "'none'";
     const csp = [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com https://static.cloudflareinsights.com https://www.google.com https://www.gstatic.com https://cdnjs.cloudflare.com",
+      "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com https://static.cloudflareinsights.com https://www.google.com https://www.gstatic.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com data:",
       "img-src 'self' data: https: blob:",

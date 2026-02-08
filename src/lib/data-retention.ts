@@ -1,6 +1,11 @@
 /**
  * Data retention and deletion utilities.
- * Implements retention policies for ARB requests and audit logs.
+ * Implements retention policies for ARB requests, audit logs, and maintenance requests.
+ *
+ * Florida (FL) context: Fla. Stat. 720.303 requires official records (e.g. meeting minutes,
+ * insurance) to be retained for 7 years; work bids 1 year. Maintenance work orders / repair
+ * requests are not explicitly listed, so we use 1 year for completed maintenance to reduce
+ * storage while staying within a conservative, FL-aligned period.
  */
 
 export interface RetentionPolicy {
@@ -12,8 +17,8 @@ export interface RetentionPolicy {
  * Retention policies for different request statuses.
  */
 export const RETENTION_POLICIES: RetentionPolicy[] = [
-  { status: 'approved', retentionDays: 7 * 365 }, // 7 years (legal/audit)
-  { status: 'rejected', retentionDays: 7 * 365 }, // 7 years (legal/audit)
+  { status: 'approved', retentionDays: 7 * 365 }, // 7 years (FL official records / audit)
+  { status: 'rejected', retentionDays: 7 * 365 }, // 7 years (FL official records / audit)
   { status: 'cancelled', retentionDays: 365 }, // 1 year
   { status: 'pending', retentionDays: 365 }, // 1 year (should be submitted or cancelled)
   { status: 'in_review', retentionDays: 365 }, // 1 year (should be decided)
@@ -23,6 +28,27 @@ export const RETENTION_POLICIES: RetentionPolicy[] = [
  * Retention policy for audit logs.
  */
 export const AUDIT_LOG_RETENTION_DAYS = 7 * 365; // 7 years
+
+/**
+ * After this many days, completed maintenance **photos** are removed from R2 and the photos
+ * column is cleared. Metadata (row) is kept to avoid storage cost from images while preserving
+ * history (category, description, status, vendor_assigned, dates).
+ */
+export const MAINTENANCE_PHOTOS_RETENTION_DAYS = 365; // 1 year
+
+/**
+ * After this many days, completed maintenance **rows** are permanently deleted (optional).
+ * Use a long period or run rarely; metadata is small. Set to 0 to never delete rows (only purge photos).
+ */
+export const MAINTENANCE_METADATA_RETENTION_DAYS = 7 * 365; // 7 years (0 = never delete rows)
+
+/** @deprecated Use MAINTENANCE_PHOTOS_RETENTION_DAYS for photo purge; MAINTENANCE_METADATA_RETENTION_DAYS for row delete. */
+export const MAINTENANCE_COMPLETED_RETENTION_DAYS = MAINTENANCE_PHOTOS_RETENTION_DAYS;
+
+/** R2 bucket–like interface for deleting object keys (avoids hard dependency on Cloudflare types). */
+export interface R2BucketLike {
+  delete(key: string): Promise<void>;
+}
 
 /**
  * Soft delete a request (marks as deleted but keeps data).
@@ -143,4 +169,130 @@ export async function permanentlyDeleteOldRecords(
   }
 
   return { requests: requestsDeleted, auditLogs: auditLogsDeleted, errors };
+}
+
+function parsePhotoKeys(photos: string | null): string[] {
+  if (!photos) return [];
+  try {
+    const arr = JSON.parse(photos);
+    if (!Array.isArray(arr)) return [];
+    return arr.filter((k): k is string => typeof k === 'string' && k.length > 0);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Remove photos from R2 and clear the photos column for completed maintenance older than
+ * retention days. Keeps the row (metadata) so history remains without image storage cost.
+ * Call this regularly (e.g. weekly); pass r2 so R2 objects are deleted.
+ */
+export async function purgeOldCompletedMaintenancePhotos(
+  db: D1Database,
+  r2: R2BucketLike,
+  retentionDays: number = MAINTENANCE_PHOTOS_RETENTION_DAYS
+): Promise<{ rowsUpdated: number; r2Errors: number; errors: number }> {
+  const cutoffDate = new Date();
+  cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
+  const cutoff = cutoffDate.toISOString();
+
+  let rowsUpdated = 0;
+  let r2Errors = 0;
+  let errors = 0;
+
+  try {
+    const { results: rows } = await db
+      .prepare(
+        `SELECT id, photos FROM maintenance_requests WHERE status = 'completed' AND updated < ? AND photos IS NOT NULL AND photos != '' AND photos != '[]'`
+      )
+      .bind(cutoff)
+      .all<{ id: string; photos: string | null }>();
+
+    for (const row of rows ?? []) {
+      try {
+        const keys = parsePhotoKeys(row.photos);
+        for (const key of keys) {
+          try {
+            await r2.delete(key);
+          } catch (e) {
+            console.warn('[data-retention] R2 delete failed for maintenance photo:', key, e);
+            r2Errors += 1;
+          }
+        }
+        await db.prepare('UPDATE maintenance_requests SET photos = NULL WHERE id = ?').bind(row.id).run();
+        rowsUpdated += 1;
+      } catch (e) {
+        console.error('[data-retention] Failed to purge photos for maintenance request:', row.id, e);
+        errors += 1;
+      }
+    }
+  } catch (e) {
+    console.error('[data-retention] Failed to list completed maintenance for photo purge:', e);
+    errors += 1;
+  }
+
+  return { rowsUpdated, r2Errors, errors };
+}
+
+/**
+ * Permanently delete completed maintenance rows (and any remaining R2 photos) older than
+ * retention days. Use a long period (e.g. 7 years) or set retentionDays to 0 to skip row
+ * deletion. For cost control, run purgeOldCompletedMaintenancePhotos regularly instead;
+ * this is for eventually removing very old metadata.
+ */
+export async function deleteOldCompletedMaintenance(
+  db: D1Database,
+  options: {
+    retentionDays?: number;
+    /** When provided, photo keys are deleted from R2 before removing DB rows. */
+    r2?: R2BucketLike;
+  } = {}
+): Promise<{ deleted: number; r2Errors: number; errors: number }> {
+  const retentionDays = options.retentionDays ?? MAINTENANCE_METADATA_RETENTION_DAYS;
+  if (retentionDays <= 0) return { deleted: 0, r2Errors: 0, errors: 0 };
+
+  const r2 = options.r2;
+  const cutoffDate = new Date();
+  cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
+  const cutoff = cutoffDate.toISOString();
+
+  let deleted = 0;
+  let r2Errors = 0;
+  let errors = 0;
+
+  try {
+    const { results: rows } = await db
+      .prepare(
+        `SELECT id, photos FROM maintenance_requests WHERE status = 'completed' AND updated < ?`
+      )
+      .bind(cutoff)
+      .all<{ id: string; photos: string | null }>();
+
+    const list = rows ?? [];
+    for (const row of list) {
+      try {
+        const keys = parsePhotoKeys(row.photos);
+        if (r2) {
+          for (const key of keys) {
+            try {
+              await r2.delete(key);
+            } catch (e) {
+              console.warn('[data-retention] R2 delete failed for maintenance photo:', key, e);
+              r2Errors += 1;
+            }
+          }
+        }
+        const result = await db.prepare('DELETE FROM maintenance_requests WHERE id = ?').bind(row.id).run();
+        deleted += result.meta.changes ?? 0;
+      } catch (e) {
+        console.error('[data-retention] Failed to delete maintenance request:', row.id, e);
+        errors += 1;
+      }
+    }
+  } catch (e) {
+    console.error('[data-retention] Failed to list/delete old completed maintenance:', e);
+    errors += 1;
+  }
+
+  return { deleted, r2Errors, errors };
 }

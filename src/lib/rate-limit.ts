@@ -68,6 +68,7 @@ export const RATE_LIMITS = {
   '/api/arb-copy': { maxRequests: 10, windowSeconds: 60 }, // 10 copies per minute
   '/api/owners/upload-csv': { maxRequests: 10, windowSeconds: 60 * 60 }, // 10 uploads per hour per IP
   '/api/log-phone-view': { maxRequests: 60, windowSeconds: 60 }, // 60 reveals (phone or email) per minute per IP
+  '/api/site-feedback': { maxRequests: 3, windowSeconds: 86400 }, // 3 site feedback submissions per day per IP
 } as const;
 
 /**

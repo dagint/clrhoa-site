@@ -21,6 +21,8 @@ export interface Owner {
   id: string;
   name: string | null;
   address: string | null;
+  /** Lot number: 1–25. Required for elevated role. */
+  lot_number?: string | null;
   phone: string | null;
   email: string | null;
   phones: string | null; // JSON array of phone strings
@@ -33,6 +35,14 @@ export interface Owner {
   /** Set when board updates owner (audit). */
   updated_by?: string | null;
   updated_at?: string | null;
+}
+
+/** Validation: lot number must be 1–25. Required for elevated role. */
+export function validateLotNumber(lot: string | null | undefined): boolean {
+  if (lot == null || typeof lot !== 'string') return false;
+  const t = lot.trim();
+  const n = parseInt(t, 10);
+  return Number.isInteger(n) && n >= 1 && n <= 25;
 }
 
 /** Normalize address for grouping (trim, lowercase). */
@@ -58,8 +68,9 @@ export function getPhonesArray(owner: Owner): string[] {
 export const LIST_OWNERS_MAX = 2000;
 
 const OWNERS_SELECT_FULL = 'SELECT id, name, address, phone, email, phones, created_by_email, share_contact_with_members FROM owners';
-const OWNERS_SELECT_FULL_WITH_PRIMARY = 'SELECT id, name, address, phone, email, phones, created_by_email, share_contact_with_members, COALESCE(is_primary, 1) as is_primary FROM owners';
-const OWNERS_SELECT_FULL_WITH_UPDATED = 'SELECT id, name, address, phone, email, phones, created_by_email, share_contact_with_members, COALESCE(is_primary, 1) as is_primary, updated_by, updated_at FROM owners';
+const OWNERS_SELECT_FULL_LOT = 'SELECT id, name, address, phone, email, phones, created_by_email, share_contact_with_members, lot_number FROM owners';
+const OWNERS_SELECT_FULL_WITH_PRIMARY = 'SELECT id, name, address, phone, email, phones, created_by_email, share_contact_with_members, COALESCE(is_primary, 1) as is_primary, lot_number FROM owners';
+const OWNERS_SELECT_FULL_WITH_UPDATED = 'SELECT id, name, address, phone, email, phones, created_by_email, share_contact_with_members, COALESCE(is_primary, 1) as is_primary, updated_by, updated_at, lot_number FROM owners';
 const OWNERS_SELECT = 'SELECT id, name, address, phone, email, phones FROM owners';
 
 export async function listOwners(db: D1Database): Promise<Owner[]> {
@@ -116,6 +127,22 @@ export async function getPrimaryOwnerEmailForAddress(db: D1Database, address: st
   const atAddress = owners.filter((o) => normalizeAddress(o.address) === key);
   const primary = atAddress.find((o) => (o.is_primary ?? 1) === 1) ?? atAddress[0];
   return primary?.email?.trim() ?? null;
+}
+
+/**
+ * All owner emails at the same (normalized) address as the given email. Includes the given email.
+ * Used for household-scoped access (e.g. ARB requests: everyone at the address can see/interact).
+ */
+export async function listEmailsAtSameAddress(db: D1Database, email: string): Promise<string[]> {
+  const owner = await getOwnerByEmail(db, email);
+  if (!owner?.address?.trim()) return [email.trim().toLowerCase()];
+  const key = normalizeAddress(owner.address);
+  const owners = await listOwners(db);
+  const atAddress = owners.filter((o) => normalizeAddress(o.address) === key);
+  const emails = atAddress
+    .map((o) => o.email?.trim()?.toLowerCase())
+    .filter((e): e is string => !!e);
+  return [...new Set(emails)];
 }
 
 export interface HouseholdMemberWithLogin {
@@ -199,24 +226,36 @@ export async function getOwnersByIds(db: D1Database, ids: string[]): Promise<Own
   const placeholders = unique.map(() => '?').join(',');
   try {
     const { results } = await db
-      .prepare(`${OWNERS_SELECT_FULL} WHERE id IN (${placeholders})`)
+      .prepare(`${OWNERS_SELECT_FULL_LOT} WHERE id IN (${placeholders})`)
       .bind(...unique)
       .all<Owner>();
     return results ?? [];
   } catch {
-    const { results } = await db
-      .prepare(`${OWNERS_SELECT} WHERE id IN (${placeholders})`)
-      .bind(...unique)
-      .all<Owner>();
-    return results ?? [];
+    try {
+      const { results } = await db
+        .prepare(`${OWNERS_SELECT_FULL} WHERE id IN (${placeholders})`)
+        .bind(...unique)
+        .all<Owner>();
+      return results ?? [];
+    } catch {
+      const { results } = await db
+        .prepare(`${OWNERS_SELECT} WHERE id IN (${placeholders})`)
+        .bind(...unique)
+        .all<Owner>();
+      return results ?? [];
+    }
   }
 }
 
 export async function getOwnerByEmail(db: D1Database, email: string): Promise<Owner | null> {
   try {
-    return await db.prepare(`${OWNERS_SELECT_FULL} WHERE email = ?`).bind(email.trim().toLowerCase()).first<Owner>();
+    return await db.prepare(`${OWNERS_SELECT_FULL_LOT} WHERE email = ?`).bind(email.trim().toLowerCase()).first<Owner>();
   } catch {
-    return db.prepare(`${OWNERS_SELECT} WHERE email = ?`).bind(email.trim().toLowerCase()).first<Owner>();
+    try {
+      return await db.prepare(`${OWNERS_SELECT_FULL} WHERE email = ?`).bind(email.trim().toLowerCase()).first<Owner>();
+    } catch {
+      return db.prepare(`${OWNERS_SELECT} WHERE email = ?`).bind(email.trim().toLowerCase()).first<Owner>();
+    }
   }
 }
 
@@ -375,13 +414,32 @@ export async function insertDirectoryExportLog(
 
 export async function insertOwner(
   db: D1Database,
-  data: { name: string | null; address: string | null; phone: string | null; email: string | null; phones?: string | null },
+  data: { name: string | null; address: string | null; lot_number?: string | null; phone: string | null; email: string | null; phones?: string | null },
   createdByEmail?: string | null
 ): Promise<string> {
   const id = generateId();
   const creator = createdByEmail?.trim()?.toLowerCase() ?? null;
+  const lotNumber = data.lot_number?.trim() || null;
   if (creator) {
     try {
+      await db
+        .prepare(
+          `INSERT INTO owners (id, name, address, lot_number, phone, email, phones, created_by_email) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+        )
+        .bind(
+          id,
+          data.name?.trim() ?? null,
+          data.address?.trim() ?? null,
+          lotNumber,
+          data.phone?.trim() ?? null,
+          data.email?.trim()?.toLowerCase() ?? null,
+          data.phones ?? null,
+          creator
+        )
+        .run();
+      return id;
+    } catch {
+      /* lot_number column may not exist */
       await db
         .prepare(
           `INSERT INTO owners (id, name, address, phone, email, phones, created_by_email) VALUES (?, ?, ?, ?, ?, ?, ?)`
@@ -397,36 +455,53 @@ export async function insertOwner(
         )
         .run();
       return id;
-    } catch {
-      /* column may not exist */
     }
   }
-  await db
-    .prepare(
-      `INSERT INTO owners (id, name, address, phone, email, phones) VALUES (?, ?, ?, ?, ?, ?)`
-    )
-    .bind(
-      id,
-      data.name?.trim() ?? null,
-      data.address?.trim() ?? null,
-      data.phone?.trim() ?? null,
-      data.email?.trim()?.toLowerCase() ?? null,
-      data.phones ?? null
-    )
-    .run();
-  return id;
+  try {
+    await db
+      .prepare(
+        `INSERT INTO owners (id, name, address, lot_number, phone, email, phones) VALUES (?, ?, ?, ?, ?, ?, ?)`
+      )
+      .bind(
+        id,
+        data.name?.trim() ?? null,
+        data.address?.trim() ?? null,
+        lotNumber,
+        data.phone?.trim() ?? null,
+        data.email?.trim()?.toLowerCase() ?? null,
+        data.phones ?? null
+      )
+      .run();
+    return id;
+  } catch {
+    await db
+      .prepare(
+        `INSERT INTO owners (id, name, address, phone, email, phones) VALUES (?, ?, ?, ?, ?, ?)`
+      )
+      .bind(
+        id,
+        data.name?.trim() ?? null,
+        data.address?.trim() ?? null,
+        data.phone?.trim() ?? null,
+        data.email?.trim()?.toLowerCase() ?? null,
+        data.phones ?? null
+      )
+      .run();
+    return id;
+  }
 }
 
 export async function updateOwner(
   db: D1Database,
   id: string,
-  data: { name?: string | null; address?: string | null; phone?: string | null; email?: string | null; phones?: string | null; is_primary?: number | null },
+  data: { name?: string | null; address?: string | null; lot_number?: string | null; phone?: string | null; email?: string | null; phones?: string | null; is_primary?: number | null },
   updatedByEmail?: string | null
 ): Promise<boolean> {
   const existing = await getOwnerById(db, id);
   if (!existing) return false;
   const name = data.name !== undefined ? (data.name?.trim() ?? null) : existing.name;
   const address = data.address !== undefined ? (data.address?.trim() ?? null) : existing.address;
+  const lotNumber = data.lot_number !== undefined ? (data.lot_number?.trim() || null) : existing.lot_number ?? null;
   const phone = data.phone !== undefined ? (data.phone?.trim() ?? null) : existing.phone;
   const email = data.email !== undefined ? (data.email?.trim()?.toLowerCase() ?? null) : existing.email;
   const phones = data.phones !== undefined ? data.phones : existing.phones;
@@ -435,24 +510,32 @@ export async function updateOwner(
   if (updatedBy) {
     try {
       const result = await db
-        .prepare(`UPDATE owners SET name = ?, address = ?, phone = ?, email = ?, phones = ?, is_primary = ?, updated_by = ?, updated_at = datetime('now') WHERE id = ?`)
-        .bind(name, address, phone, email, phones ?? null, isPrimary, updatedBy, id)
+        .prepare(`UPDATE owners SET name = ?, address = ?, lot_number = ?, phone = ?, email = ?, phones = ?, is_primary = ?, updated_by = ?, updated_at = datetime('now') WHERE id = ?`)
+        .bind(name, address, lotNumber, phone, email, phones ?? null, isPrimary, updatedBy, id)
         .run();
       if ((result.meta.changes ?? 0) > 0) return true;
     } catch {
-      /* updated_by column may not exist */
+      try {
+        const result = await db
+          .prepare(`UPDATE owners SET name = ?, address = ?, phone = ?, email = ?, phones = ?, is_primary = ?, updated_by = ?, updated_at = datetime('now') WHERE id = ?`)
+          .bind(name, address, phone, email, phones ?? null, isPrimary, updatedBy, id)
+          .run();
+        if ((result.meta.changes ?? 0) > 0) return true;
+      } catch {
+        /* updated_by column may not exist */
+      }
     }
   }
   try {
     const result = await db
-      .prepare(`UPDATE owners SET name = ?, address = ?, phone = ?, email = ?, phones = ?, is_primary = ? WHERE id = ?`)
-      .bind(name, address, phone, email, phones ?? null, isPrimary, id)
+      .prepare(`UPDATE owners SET name = ?, address = ?, lot_number = ?, phone = ?, email = ?, phones = ?, is_primary = ? WHERE id = ?`)
+      .bind(name, address, lotNumber, phone, email, phones ?? null, isPrimary, id)
       .run();
     return (result.meta.changes ?? 0) > 0;
   } catch {
     const result = await db
-      .prepare(`UPDATE owners SET name = ?, address = ?, phone = ?, email = ?, phones = ? WHERE id = ?`)
-      .bind(name, address, phone, email, phones ?? null, id)
+      .prepare(`UPDATE owners SET name = ?, address = ?, phone = ?, email = ?, phones = ?, is_primary = ? WHERE id = ?`)
+      .bind(name, address, phone, email, phones ?? null, isPrimary, id)
       .run();
     return (result.meta.changes ?? 0) > 0;
   }
@@ -479,26 +562,26 @@ export async function deleteOwners(db: D1Database, ids: string[]): Promise<numbe
 export async function updateOwnerByEmail(
   db: D1Database,
   email: string,
-  data: { name?: string | null; address?: string | null; phones?: string | null; share_contact_with_members?: number | null }
+  data: { name?: string | null; address?: string | null; lot_number?: string | null; phones?: string | null; share_contact_with_members?: number | null }
 ): Promise<boolean> {
   const normalized = email.trim().toLowerCase();
   const existing = await getOwnerByEmail(db, normalized);
   if (!existing) return false;
   const name = data.name !== undefined ? (data.name?.trim() ?? null) : existing.name;
   const address = data.address !== undefined ? (data.address?.trim() ?? null) : existing.address;
+  const lotNumber = data.lot_number !== undefined ? (data.lot_number?.trim() || null) : existing.lot_number ?? null;
   const phones = data.phones !== undefined ? data.phones : existing.phones;
-  const phone = existing.phone;
   const shareContact = data.share_contact_with_members !== undefined ? data.share_contact_with_members : existing.share_contact_with_members;
   try {
     const result = await db
-      .prepare(`UPDATE owners SET name = ?, address = ?, phones = ?, share_contact_with_members = ? WHERE email = ?`)
-      .bind(name, address, phones ?? null, shareContact ?? 1, normalized)
+      .prepare(`UPDATE owners SET name = ?, address = ?, lot_number = ?, phones = ?, share_contact_with_members = ? WHERE email = ?`)
+      .bind(name, address, lotNumber, phones ?? null, shareContact ?? 1, normalized)
       .run();
     return (result.meta.changes ?? 0) > 0;
   } catch {
     const result = await db
-      .prepare(`UPDATE owners SET name = ?, address = ?, phones = ? WHERE email = ?`)
-      .bind(name, address, phones ?? null, normalized)
+      .prepare(`UPDATE owners SET name = ?, address = ?, phones = ?, share_contact_with_members = ? WHERE email = ?`)
+      .bind(name, address, phones ?? null, shareContact ?? 1, normalized)
       .run();
     return (result.meta.changes ?? 0) > 0;
   }
@@ -508,27 +591,43 @@ export async function updateOwnerByEmail(
 export async function upsertOwnerByEmail(
   db: D1Database,
   email: string,
-  data: { name?: string | null; address?: string | null; phones?: string | null }
+  data: { name?: string | null; address?: string | null; lot_number?: string | null; phones?: string | null }
 ): Promise<{ id: string; created: boolean }> {
   const normalized = email.trim().toLowerCase();
   const existing = await getOwnerByEmail(db, normalized);
   if (existing) {
     const name = data.name !== undefined ? (data.name?.trim() ?? null) : existing.name;
     const address = data.address !== undefined ? (data.address?.trim() ?? null) : existing.address;
+    const lotNumber = data.lot_number !== undefined ? (data.lot_number?.trim() || null) : existing.lot_number ?? null;
     const phones = data.phones !== undefined ? data.phones : existing.phones;
-    await db
-      .prepare(`UPDATE owners SET name = ?, address = ?, phones = ? WHERE email = ?`)
-      .bind(name, address, phones ?? null, normalized)
-      .run();
+    try {
+      await db
+        .prepare(`UPDATE owners SET name = ?, address = ?, lot_number = ?, phones = ? WHERE email = ?`)
+        .bind(name, address, lotNumber, phones ?? null, normalized)
+        .run();
+    } catch {
+      await db
+        .prepare(`UPDATE owners SET name = ?, address = ?, phones = ? WHERE email = ?`)
+        .bind(name, address, phones ?? null, normalized)
+        .run();
+    }
     return { id: existing.id, created: false };
   }
   const id = generateId();
   const name = data.name?.trim() ?? null;
   const address = data.address?.trim() ?? null;
+  const lotNumber = data.lot_number?.trim() || null;
   const phones = data.phones ?? null;
-  await db
-    .prepare(`INSERT INTO owners (id, name, address, phone, email, phones) VALUES (?, ?, ?, ?, ?, ?)`)
-    .bind(id, name, address, null, normalized, phones)
-    .run();
+  try {
+    await db
+      .prepare(`INSERT INTO owners (id, name, address, lot_number, phone, email, phones) VALUES (?, ?, ?, ?, ?, ?, ?)`)
+      .bind(id, name, address, lotNumber, null, normalized, phones)
+      .run();
+  } catch {
+    await db
+      .prepare(`INSERT INTO owners (id, name, address, phone, email, phones) VALUES (?, ?, ?, ?, ?, ?)`)
+      .bind(id, name, address, null, normalized, phones)
+      .run();
+  }
   return { id, created: true };
 }

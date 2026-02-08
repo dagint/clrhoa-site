@@ -2,6 +2,8 @@
  * D1 helpers for ARB requests and files (Phase 2).
  */
 
+import { listEmailsAtSameAddress } from './directory-db.js';
+
 export interface ArbRequest {
   id: string;
   owner_email: string;
@@ -160,6 +162,47 @@ export async function listArbRequestsByOwner(
     review_deadline: row.review_deadline ?? null,
     deleted_at: row.deleted_at ?? null,
   })) as ArbRequest[];
+}
+
+const ARB_REQUEST_SELECT =
+  'SELECT id, owner_email, applicant_name, phone, property_address, application_type, description, status, esign_timestamp, arb_esign, created, updated_at, copied_from_id, revision_notes, arb_internal_notes, owner_notes, review_deadline, deleted_at FROM arb_requests';
+const ARB_REQUEST_DELETED_COND = ' (deleted_at IS NULL OR deleted_at = "") ';
+type ArbRequestRow = ArbRequest & { arb_internal_notes?: string | null; owner_notes?: string | null; review_deadline?: string | null; deleted_at?: string | null };
+
+function mapArbRequestRow(row: ArbRequestRow): ArbRequest {
+  return {
+    ...row,
+    arb_internal_notes: row.arb_internal_notes ?? null,
+    owner_notes: row.owner_notes ?? null,
+    review_deadline: row.review_deadline ?? null,
+    deleted_at: row.deleted_at ?? null,
+  } as ArbRequest;
+}
+
+/** List ARB requests for any of the given owner emails (e.g. household). */
+export async function listArbRequestsByOwnerEmails(
+  db: D1Database,
+  ownerEmails: string[]
+): Promise<ArbRequest[]> {
+  const emails = ownerEmails.map((e) => e.trim().toLowerCase()).filter(Boolean);
+  if (emails.length === 0) return [];
+  const placeholders = emails.map(() => '?').join(',');
+  const { results } = await db
+    .prepare(
+      `${ARB_REQUEST_SELECT} WHERE owner_email IN (${placeholders}) AND ${ARB_REQUEST_DELETED_COND} ORDER BY created DESC`
+    )
+    .bind(...emails)
+    .all<ArbRequestRow>();
+  return (results ?? []).map(mapArbRequestRow);
+}
+
+/** List ARB requests for the household of the given user (same property address). */
+export async function listArbRequestsByHousehold(
+  db: D1Database,
+  userEmail: string
+): Promise<ArbRequest[]> {
+  const emails = await listEmailsAtSameAddress(db, userEmail);
+  return listArbRequestsByOwnerEmails(db, emails);
 }
 
 export async function listAllArbRequests(db: D1Database): Promise<ArbRequest[]> {
@@ -434,6 +477,37 @@ export async function listArbAuditLogForOwner(
     .bind(owner, Math.max(1, Math.min(limit, 500)))
     .all<ArbAuditLogRow>();
   return results ?? [];
+}
+
+/** List ARB audit log entries for a single request (oldest first, for timeline). */
+export async function listArbAuditLogForRequest(
+  db: D1Database,
+  requestId: string
+): Promise<ArbAuditLogRow[]> {
+  const { results } = await db
+    .prepare(
+      `SELECT id, request_id, action, old_status, new_status, changed_by_email, changed_by_role, notes, created
+       FROM arb_audit_log WHERE request_id = ? ORDER BY created ASC`
+    )
+    .bind(requestId)
+    .all<ArbAuditLogRow>();
+  return results ?? [];
+}
+
+/** Date when request was first submitted for review (in_review). Used for "days in review" display. */
+export async function getSubmittedForReviewAt(
+  db: D1Database,
+  requestId: string
+): Promise<string | null> {
+  const row = await db
+    .prepare(
+      `SELECT created FROM arb_audit_log
+       WHERE request_id = ? AND action = 'submit_for_review' AND new_status = 'in_review'
+       ORDER BY created ASC LIMIT 1`
+    )
+    .bind(requestId)
+    .first<{ created: string | null }>();
+  return row?.created ?? null;
 }
 
 export async function getArbFile(

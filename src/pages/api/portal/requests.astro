@@ -1,0 +1,73 @@
+---
+/**
+ * GET /api/portal/requests — Returns current user's ARB requests with audit timeline and "submitted for review" dates.
+ * Used by /portal/requests for tabbed list and SSE refetch.
+ */
+export const prerender = false;
+
+import { getSessionFromCookie, verifyOrigin } from '../../../lib/auth';
+import { listArbRequestsByHousehold, listArbAuditLogForRequest, getSubmittedForReviewAt } from '../../../lib/arb-db';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const session = await getSessionFromCookie(
+  Astro.request.headers.get('cookie') ?? undefined,
+  env?.SESSION_SECRET
+);
+
+if (!session) {
+  return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+    status: 401,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const origin = Astro.request.headers.get('origin');
+const referer = Astro.request.headers.get('referer');
+if (!verifyOrigin(origin, referer, Astro.url.origin)) {
+  return new Response(JSON.stringify({ error: 'Invalid origin' }), {
+    status: 403,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+if (Astro.request.method !== 'GET') {
+  return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+    status: 405,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const db = env?.DB;
+if (!db) {
+  return new Response(JSON.stringify({ error: 'Server configuration error' }), {
+    status: 503,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const email = session.email.trim().toLowerCase();
+const requests = await listArbRequestsByHousehold(db, email);
+const auditByRequestId: Record<string, { id: number; request_id: string; action: string; old_status: string | null; new_status: string | null; changed_by_email: string | null; changed_by_role: string | null; notes: string | null; created: string | null }[]> = {};
+const submittedForReviewAt: Record<string, string | null> = {};
+
+for (const req of requests) {
+  const [audit, submittedAt] = await Promise.all([
+    listArbAuditLogForRequest(db, req.id),
+    getSubmittedForReviewAt(db, req.id),
+  ]);
+  auditByRequestId[req.id] = audit;
+  submittedForReviewAt[req.id] = submittedAt;
+}
+
+return new Response(
+  JSON.stringify({ requests, auditByRequestId, submittedForReviewAt }),
+  {
+    status: 200,
+    headers: {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'no-store, max-age=0',
+    },
+  }
+);
+---

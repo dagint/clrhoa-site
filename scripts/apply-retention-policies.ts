@@ -1,11 +1,18 @@
 /**
  * Script to apply data retention policies.
  * Run via: npx tsx scripts/apply-retention-policies.ts [local|remote]
- * 
+ *
  * This script should be run periodically (e.g., weekly) via cron or scheduled Worker.
+ * When run as a Worker with env.DB and env.CLOURHOA_FILES, also call deleteOldCompletedMaintenance(db, { r2: env.CLOURHOA_FILES }).
  */
 
-import { applyRetentionPolicies, softDeleteOldAuditLogs, permanentlyDeleteOldRecords } from '../src/lib/data-retention';
+import {
+  applyRetentionPolicies,
+  softDeleteOldAuditLogs,
+  permanentlyDeleteOldRecords,
+  purgeOldCompletedMaintenancePhotos,
+  deleteOldCompletedMaintenance,
+} from '../src/lib/data-retention';
 
 const env = process.argv[2] || 'remote';
 
@@ -29,18 +36,27 @@ console.log('See docs/BACKUP_AND_RECOVERY.md for implementation details.');
 export default {
   async scheduled(event, env, ctx) {
     const db = env.DB;
-    
-    // Apply retention policies
+    const r2 = env.CLOURHOA_FILES;
+
+    // ARB: soft-delete by status/age
     const result = await applyRetentionPolicies(db);
-    console.log(`Soft deleted ${result.deleted} requests, ${result.errors} errors`);
-    
-    // Clean up old audit logs
+    console.log(`ARB: soft deleted ${result.deleted} requests, ${result.errors} errors`);
+
+    // Audit logs: soft-delete old entries
     const auditDeleted = await softDeleteOldAuditLogs(db);
-    console.log(`Soft deleted ${auditDeleted} old audit log entries`);
-    
-    // Permanently delete records older than grace period (optional, destructive)
+    console.log(`Audit: soft deleted ${auditDeleted} old entries`);
+
+    // Maintenance: purge photos (R2 + clear column) after 1 year to reduce cost; keep metadata
+    const purge = await purgeOldCompletedMaintenancePhotos(db, r2);
+    console.log(`Maintenance photos: purged ${purge.rowsUpdated} rows, R2 errors ${purge.r2Errors}, errors ${purge.errors}`);
+
+    // Optional: permanently delete completed maintenance rows after 7 years (metadata is small)
+    const maint = await deleteOldCompletedMaintenance(db, { r2 });
+    console.log(`Maintenance rows: deleted ${maint.deleted} old completed requests, R2 errors ${maint.r2Errors}, errors ${maint.errors}`);
+
+    // Optional, destructive: permanently delete soft-deleted ARB/audit records after grace period
     // const permanent = await permanentlyDeleteOldRecords(db);
-    // console.log(`Permanently deleted ${permanent.requests} requests, ${permanent.auditLogs} audit logs`);
+    // console.log(`Permanent: ${permanent.requests} requests, ${permanent.auditLogs} audit logs`);
   }
 }
 */

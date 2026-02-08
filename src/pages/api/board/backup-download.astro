@@ -5,7 +5,7 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie } from '../../../lib/auth';
+import { getSessionFromCookie, getEffectiveRole } from '../../../lib/auth';
 import { buildZip } from '../../../lib/zip-simple';
 
 const runtime = Astro.locals.runtime;
@@ -27,8 +27,9 @@ if (!session) {
   });
 }
 
-const isBoardOrAdmin = session.role === 'board' || session.role === 'admin';
-if (!isBoardOrAdmin) {
+const effectiveRole = getEffectiveRole(session);
+const canDownloadBackup = effectiveRole === 'board' || effectiveRole === 'admin' || effectiveRole === 'arb_board';
+if (!canDownloadBackup) {
   return new Response(JSON.stringify({ error: 'Forbidden' }), {
     status: 403,
     headers: { 'Content-Type': 'application/json' },

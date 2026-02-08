@@ -1,0 +1,60 @@
+---
+/**
+ * GET /api/portal/requests/sse — Server-Sent Events for live updates on /portal/requests.
+ * Sends a "ping" event every 20s so the client can refetch from GET /api/portal/requests.
+ */
+export const prerender = false;
+
+import { getSessionFromCookie } from '../../../../lib/auth';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const session = await getSessionFromCookie(
+  Astro.request.headers.get('cookie') ?? undefined,
+  env?.SESSION_SECRET
+);
+
+if (!session) {
+  return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+    status: 401,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+if (Astro.request.method !== 'GET') {
+  return new Response(null, { status: 405 });
+}
+
+const INTERVAL_MS = 20000;
+
+const stream = new ReadableStream({
+  start(controller) {
+    const encoder = new TextEncoder();
+    const send = () => {
+      try {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ t: Date.now() })}\n\n`));
+      } catch {
+        // client may have closed
+      }
+    };
+    send();
+    const id = setInterval(send, INTERVAL_MS);
+    // Close after 2 hours to avoid runaway connections
+    setTimeout(() => {
+      clearInterval(id);
+      try {
+        controller.close();
+      } catch {}
+    }, 2 * 60 * 60 * 1000);
+  },
+});
+
+return new Response(stream, {
+  headers: {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-store, no-cache, must-revalidate',
+    'Connection': 'keep-alive',
+    'X-Accel-Buffering': 'no',
+  },
+});
+---

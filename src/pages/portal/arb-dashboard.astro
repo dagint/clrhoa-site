@@ -9,18 +9,22 @@ import BoardNav from '../../components/BoardNav.astro';
 import ArbDashboardCard from '../../components/ArbDashboardCard.astro';
 import ArbDashboardExportSection from '../../components/ArbDashboardExportSection.astro';
 import { getPortalContext } from '../../lib/portal-context';
-import { updateSessionActivity } from '../../lib/auth';
+import { updateSessionActivity, canApproveArb } from '../../lib/auth';
 import { getArbDashboardData, formatApproval } from '../../lib/arb-dashboard';
 import { sanitizeForScriptInjection } from '../../lib/sanitize';
 
-const { env, session } = await getPortalContext(Astro);
+const { env, session, effectiveRole } = await getPortalContext(Astro);
 if (!session) return Astro.redirect('/portal/login');
 
 const allowedRoles = ['arb', 'board', 'admin', 'arb_board'];
-if (!allowedRoles.includes(session.role)) return Astro.redirect('/portal/dashboard');
+if (!allowedRoles.includes(effectiveRole)) {
+  const returnUrl = encodeURIComponent('/portal/arb-dashboard');
+  return Astro.redirect(`/portal/request-elevated-access?return=${returnUrl}`);
+}
 
+const canApprove = canApproveArb(effectiveRole);
 /** Suggested e-signature for approve/reject (editable before submit). */
-const roleLabel = session.role === 'arb' ? 'ARB Member' : session.role === 'board' ? 'Board' : session.role === 'arb_board' ? 'ARB + Board' : session.role === 'admin' ? 'Admin' : '';
+const roleLabel = effectiveRole === 'arb' ? 'ARB Member' : effectiveRole === 'board' ? 'Board' : effectiveRole === 'arb_board' ? 'ARB + Board' : effectiveRole === 'admin' ? 'Admin' : '';
 const suggestedArbEsign = sanitizeForScriptInjection(
   roleLabel
     ? (session.name?.trim() ? `${session.name.trim()}, ${roleLabel}` : `${session.email}, ${roleLabel}`)
@@ -49,14 +53,14 @@ const periodOptions = dashboardData?.periodOptions ?? [];
 <PortalLayout title="ARB Dashboard | Member Portal | Crooked Lake Reserve HOA">
   <ProtectedPage>
   <div class="min-h-screen portal-theme-bg font-body">
-    <PortalNav currentPath="/portal/arb-dashboard" draftCount={draftCount} role={session.role} arbInReviewCount={arbInReviewCount} vendorPendingCount={vendorPendingCount} />
+    <PortalNav currentPath="/portal/arb-dashboard" draftCount={draftCount} role={effectiveRole} staffRole={session.role ?? ''} arbInReviewCount={arbInReviewCount} vendorPendingCount={vendorPendingCount} />
 
-    <PortalElevatedRoleBanner role={session.role} />
+    <PortalElevatedRoleBanner role={effectiveRole} session={session} />
 
     <BoardNav currentPath="/portal/arb-dashboard" />
 
     <main class="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
-      {(session.role === 'arb' || session.role === 'arb_board') && (
+      {(effectiveRole === 'arb' || effectiveRole === 'arb_board') && (
         <div class="mb-8 p-4 rounded-xl bg-clr-green/10 border border-clr-green/30">
           <p class="text-sm text-gray-700 mb-2">
             <strong>Update the ARB request form</strong> (PDF/Word) that members use to submit requests. Changes appear on the public Documents page.
@@ -68,6 +72,12 @@ const periodOptions = dashboardData?.periodOptions ?? [];
             Update ARB request form
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
           </a>
+        </div>
+      )}
+
+      {!canApprove && (effectiveRole === 'arb_board' || effectiveRole === 'admin') && (
+        <div class="mb-6 p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-sm" role="status">
+          <strong>View only.</strong> To approve or reject requests, set deadlines, or add ARB notes, use <strong>Act as ARB</strong> in the yellow banner at the top of the page.
         </div>
       )}
 
@@ -110,6 +120,7 @@ const periodOptions = dashboardData?.periodOptions ?? [];
                       <p class="text-sm text-red-600 font-semibold mt-1">Warning: Some requests are past their review deadline</p>
                     )}
                   </div>
+                  {canApprove && (
                   <div class="flex flex-wrap items-center gap-2 no-print">
                     <label class="inline-flex items-center gap-2 text-sm">
                       <input type="checkbox" id="select-all-in-review" class="rounded border-gray-300 text-clr-green focus:ring-clr-green" />
@@ -132,6 +143,7 @@ const periodOptions = dashboardData?.periodOptions ?? [];
                       Reject selected
                     </button>
                   </div>
+                  )}
                 </div>
                 <ul class="space-y-4 mb-6 arb-request-list" id="in-review-list">
                   {inReview.map((req) => {
@@ -140,9 +152,9 @@ const periodOptions = dashboardData?.periodOptions ?? [];
                     return (
                       <li class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden searchable-card" data-search-text={`${req.id} ${req.owner_email} ${req.property_address ?? ''} ${req.applicant_name ?? ''} ${req.phone ?? ''}`.toLowerCase()}>
                         <div class="flex items-start gap-2 p-2 no-print">
-                          <input type="checkbox" class="request-checkbox mt-2 rounded border-gray-300 text-clr-green focus:ring-clr-green" value={req.id} data-status="in_review" />
+                          {canApprove && <input type="checkbox" class="request-checkbox mt-2 rounded border-gray-300 text-clr-green focus:ring-clr-green" value={req.id} data-status="in_review" />}
                           <div class="flex-1">
-                            <ArbDashboardCard request={req} files={files} approval={approval} />
+                            <ArbDashboardCard request={req} files={files} approval={approval} canApproveArb={canApprove} />
                           </div>
                         </div>
                       </li>
@@ -160,7 +172,7 @@ const periodOptions = dashboardData?.periodOptions ?? [];
                     const approval = formatApproval(req.arb_esign ?? null, req.esign_timestamp ?? null);
                     return (
                       <li class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden searchable-card" data-search-text={`${req.id} ${req.owner_email} ${req.property_address ?? ''} ${req.applicant_name ?? ''} ${req.phone ?? ''}`.toLowerCase()}>
-                        <ArbDashboardCard request={req} files={files} approval={approval} />
+                        <ArbDashboardCard request={req} files={files} approval={approval} canApproveArb={canApprove} />
                       </li>
                     );
                   })}
@@ -214,7 +226,7 @@ const periodOptions = dashboardData?.periodOptions ?? [];
                     const approval = formatApproval(req.arb_esign ?? null, req.esign_timestamp ?? null);
                     return (
                       <li class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden completed-card searchable-card" data-year-quarter={req.yearQuarter} data-search-text={`${req.id} ${req.owner_email} ${req.property_address ?? ''} ${req.applicant_name ?? ''} ${req.phone ?? ''}`.toLowerCase()}>
-                        <ArbDashboardCard request={req} files={files} approval={approval} />
+                        <ArbDashboardCard request={req} files={files} approval={approval} canApproveArb={canApprove} />
                       </li>
                     );
                   })}

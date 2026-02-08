@@ -1,6 +1,6 @@
 ---
 /**
- * POST /api/contact — public contact form. Sends email to NOTIFY_BOARD_EMAIL via MailChannels.
+ * POST /api/contact — public contact form. Sends email to NOTIFY_BOARD_EMAIL via configured provider (Resend or MailChannels).
  * Body: name, email, message, recipient (form or JSON). No auth required.
  */
 export const prerender = false;

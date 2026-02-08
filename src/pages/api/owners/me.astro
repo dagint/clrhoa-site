@@ -5,8 +5,8 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie, verifyCsrfToken, verifyOrigin } from '../../../lib/auth';
-import { getOwnerByEmail, upsertOwnerByEmail, insertDirectoryLog } from '../../../lib/directory-db';
+import { getSessionFromCookie, verifyCsrfToken, verifyOrigin, getEffectiveRole } from '../../../lib/auth';
+import { getOwnerByEmail, upsertOwnerByEmail, insertDirectoryLog, validateLotNumber } from '../../../lib/directory-db';
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
@@ -74,6 +74,7 @@ if (Astro.request.method === 'GET') {
       id: owner.id,
       name: owner.name,
       address: owner.address,
+      lot_number: owner.lot_number ?? null,
       phone: owner.phone,
       phones,
       email: owner.email,
@@ -92,7 +93,7 @@ if (Astro.request.method !== 'PUT') {
   });
 }
 
-let body: { name?: string; address?: string; phones?: string[]; csrf_token?: string; csrfToken?: string };
+let body: { name?: string; address?: string; lot_number?: string; phones?: string[]; csrf_token?: string; csrfToken?: string };
 try {
   body = await Astro.request.json();
 } catch {
@@ -111,14 +112,25 @@ if (!verifyCsrfToken(session, body.csrf_token ?? body.csrfToken)) {
 
 const name = typeof body.name === 'string' ? body.name.trim() || null : undefined;
 const address = typeof body.address === 'string' ? body.address.trim() || null : undefined;
+const lotNumber = typeof body.lot_number === 'string' ? (body.lot_number.trim() || null) : undefined;
 const rawPhones = Array.isArray(body.phones) ? body.phones.filter((p): p is string => typeof p === 'string').map((p) => p.trim()).filter(Boolean) : undefined;
 const MAX_PHONES = 5;
 const phonesArr = rawPhones !== undefined ? rawPhones.slice(0, MAX_PHONES) : undefined;
 const phonesJson = phonesArr !== undefined ? JSON.stringify(phonesArr) : undefined;
 
-const result = await upsertOwnerByEmail(db, email, { name, address, phones: phonesJson });
+// If lot number is provided, validate format (1–25). Empty/null is allowed (optional field).
+if (lotNumber !== undefined && lotNumber !== null && lotNumber !== '') {
+  if (!validateLotNumber(lotNumber)) {
+    return new Response(JSON.stringify({ error: 'Lot number must be 1–25 when provided.' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+}
 
-await insertDirectoryLog(db, session.email, '(directory info updated)', null, null, session.role ?? null);
+const result = await upsertOwnerByEmail(db, email, { name, address, lot_number: lotNumber, phones: phonesJson });
+
+await insertDirectoryLog(db, session.email, '(directory info updated)', null, null, getEffectiveRole(session) ?? null);
 
 return new Response(JSON.stringify({
   success: true,

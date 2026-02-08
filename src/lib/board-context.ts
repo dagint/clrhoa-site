@@ -4,7 +4,7 @@
  */
 
 import type { SessionPayload } from './auth';
-import { getSessionFromCookie, isElevatedRole } from './auth';
+import { getSessionFromCookie, isElevatedRole, getEffectiveRole } from './auth';
 
 /** Minimal Astro-like context for board pages. */
 export interface BoardContextAstro {
@@ -15,6 +15,7 @@ export interface BoardContextAstro {
 export interface BoardContextResult {
   env: BoardContextAstro['locals']['runtime'] extends { env: infer E } ? E : undefined;
   session: SessionPayload;
+  effectiveRole: string;
 }
 
 export type GetBoardContextResult =
@@ -39,9 +40,9 @@ export async function getBoardContext(astro: BoardContextAstro): Promise<GetBoar
     return { redirect: '/portal/login' };
   }
 
-  if (!isElevatedRole(session.role)) {
+  if (!isElevatedRole(getEffectiveRole(session))) {
     return { redirect: '/portal/dashboard' };
   }
 
-  return { env, session };
+  return { env, session, effectiveRole: getEffectiveRole(session) };
 }

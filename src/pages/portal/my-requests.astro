@@ -5,17 +5,18 @@ import PortalLayout from '../../layouts/PortalLayout.astro';
 import ProtectedPage from '../../components/ProtectedPage.astro';
 import PortalNav from '../../components/PortalNav.astro';
 import { getPortalContext } from '../../lib/portal-context';
-import { listArbRequestsByOwner, listArbFilesByRequest } from '../../lib/arb-db';
+import { listArbRequestsByHousehold, listArbFilesByRequest } from '../../lib/arb-db';
 import type { ArbFile } from '../../lib/arb-db';
 import { sanitizeForDisplay } from '../../lib/sanitize';
 
-const { env, session } = await getPortalContext(Astro, { fingerprint: true });
+const { env, session, effectiveRole } = await getPortalContext(Astro, { fingerprint: true });
 if (!session) return Astro.redirect('/portal/login');
 
 const db = env?.DB;
-const requests = db ? await listArbRequestsByOwner(db, session.email) : [];
+const requests = db ? await listArbRequestsByHousehold(db, session.email) : [];
 const filesByRequestId: Record<string, ArbFile[]> = {};
 const draftCount = requests.filter(r => r.status === 'pending').length;
+const arbInReviewCount = requests.filter(r => r.status === 'in_review').length;
 if (db) {
   for (const req of requests) {
     filesByRequestId[req.id] = await listArbFilesByRequest(db, req.id);
@@ -68,13 +69,13 @@ function formatApproval(arbEsign: string | null, esignTimestamp: string | null):
 <PortalLayout title="My ARB Requests | Member Portal | Crooked Lake Reserve HOA">
   <ProtectedPage>
   <div class="min-h-screen portal-theme-bg font-body">
-    <PortalNav currentPath="/portal/my-requests" draftCount={draftCount} role={session.role} />
+    <PortalNav currentPath="/portal/my-requests" draftCount={draftCount} arbInReviewCount={arbInReviewCount} role={effectiveRole} staffRole={session?.role ?? ''} />
 
     <main class="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
-      <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+      <div class="flex flex-wrap items-center justify-between gap-4 mb-6 no-print">
         <h2 class="text-2xl font-heading font-bold text-clr-green">My ARB requests</h2>
         {requests.filter(r => r.status === 'pending').length > 0 && (
-          <div class="flex flex-wrap items-center gap-2 no-print">
+          <div class="flex flex-wrap items-center gap-2">
             <label class="inline-flex items-center gap-2 text-sm">
               <input type="checkbox" id="select-all-pending" class="rounded border-gray-300 text-clr-green focus:ring-clr-green" />
               <span>Select all pending</span>
@@ -91,14 +92,18 @@ function formatApproval(arbEsign: string | null, esignTimestamp: string | null):
         )}
       </div>
 
-      <p class="text-gray-600 mb-6">
+      <p class="text-gray-600 mb-6 no-print">
         <a href="/portal/arb-request" class="text-clr-green font-semibold hover:underline">Submit a new ARB request</a>
         <span class="text-gray-500"> | </span>
         <a href="/arb-request-how-to" class="text-clr-orange hover:underline">How to submit (guide)</a>
       </p>
 
       {requests.length === 0 ? (
-        <p class="text-gray-500">You have not submitted any ARB requests yet.</p>
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center">
+          <p class="text-gray-600 mb-4">You haven’t submitted any ARB requests yet.</p>
+          <p class="text-sm text-gray-500 mb-4">When you’re planning exterior changes (paint, landscaping, fencing, etc.), submit a request so the board can review it.</p>
+          <a href="/portal/arb-request" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-clr-green hover:brightness-110 text-white font-semibold text-sm">Submit your first ARB request</a>
+        </div>
       ) : (
         <ul class="space-y-4" id="request-list">
           {requests.map((req) => {

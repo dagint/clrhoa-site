@@ -7,20 +7,20 @@ import PortalNav from '../../components/PortalNav.astro';
 import GlobalSearch from '../../components/GlobalSearch.astro';
 import SearchResults from '../../components/SearchResults.astro';
 import { getPortalContext } from '../../lib/portal-context';
-import { listArbRequestsByOwner } from '../../lib/arb-db';
+import { listArbRequestsByHousehold } from '../../lib/arb-db';
 import { runPortalSearch } from '../../lib/search';
 
-const { env, session } = await getPortalContext(Astro);
+const { env, session, effectiveRole } = await getPortalContext(Astro);
 if (!session) return Astro.redirect('/portal/login');
 
 const db = env?.DB;
 const url = new URL(Astro.request.url);
 const q = (url.searchParams.get('q') ?? '').trim();
 const result = q && db
-  ? await runPortalSearch(db, q, { email: session.email, role: session.role })
+  ? await runPortalSearch(db, q, { email: session.email, role: effectiveRole })
   : { arb: [], meetings: [], vendors: [], owners: [], feedback_docs: [], preapproval: [] };
 
-const allRequests = db ? await listArbRequestsByOwner(db, session.email) : [];
+const allRequests = db ? await listArbRequestsByHousehold(db, session.email) : [];
 const draftCount = allRequests.filter((r) => r.status === 'pending').length;
 ---
 
@@ -29,7 +29,7 @@ const draftCount = allRequests.filter((r) => r.status === 'pending').length;
   <div class="min-h-screen bg-gray-50 portal-theme-bg font-body">
     <GlobalSearch fixed={true} class="portal-theme-header" />
     <div class="pt-14">
-      <PortalNav currentPath="/portal/search" draftCount={draftCount} role={session.role} />
+      <PortalNav currentPath="/portal/search" draftCount={draftCount} role={effectiveRole} staffRole={session?.role ?? ''} />
 
       <main class="max-w-4xl mx-auto px-4 sm:px-6 py-8">
         <h2 class="text-2xl font-heading font-bold text-clr-green mb-4">Search</h2>

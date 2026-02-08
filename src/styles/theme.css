@@ -18,7 +18,7 @@
   --portal-input-border: #e5e7eb;
 }
 
-/* Dark mode: green-tinted palette aligned with brand (deep green, warm accents), improved contrast */
+/* Dark mode: green-tinted palette aligned with brand (deep green, warm accents), WCAG AA 4.5:1 contrast */
 html.dark,
 .dark {
   --portal-bg: #0d1411;
@@ -28,8 +28,11 @@ html.dark,
   --portal-accent-dim: #3d8a65;
   --portal-card-bg: #151e19;
   --portal-card-border: #2a3630;
-  --portal-text: #e8efe9;
-  --portal-text-muted: #a8b5ae;
+  /* Global dark text: primary ≥4.5:1 on card bg #151e19, muted ≥4.5:1 for secondary (use in CSS and Tailwind dark:) */
+  --text-primary-dark: #e8efe9;
+  --text-muted-dark: #b8c4bd;
+  --portal-text: var(--text-primary-dark);
+  --portal-text-muted: var(--text-muted-dark);
   --portal-input-bg: #1a2520;
   --portal-input-border: #2d3d35;
   --portal-hover-bg: #1e2924;
@@ -61,6 +64,22 @@ html.dark .portal-theme-input {
   background-color: var(--portal-input-bg);
   border-color: var(--portal-input-border);
   color: var(--portal-text);
+}
+/* Inputs and textareas without .portal-theme-input (e.g. in board/portal forms) */
+html.dark input[type="text"],
+html.dark input[type="email"],
+html.dark input[type="tel"],
+html.dark input[type="number"],
+html.dark input[type="date"],
+html.dark textarea {
+  background-color: var(--portal-input-bg);
+  border-color: var(--portal-input-border);
+  color: var(--text-primary-dark);
+}
+html.dark input::placeholder,
+html.dark textarea::placeholder {
+  color: var(--text-muted-dark);
+  opacity: 0.9;
 }
 
 /* Portal page wrapper: use with min-h-screen for consistent members-area background */
@@ -105,8 +124,20 @@ html.dark .text-gray-600,
 html.dark .text-gray-700 {
   color: var(--portal-text-muted);
 }
+html.dark .text-gray-400 {
+  color: var(--text-muted-dark);
+}
 html.dark .text-gray-900 {
   color: var(--portal-text);
+}
+
+/* Dropdowns and [role="menu"]: force primary text (4.5:1) over gray so link text is readable */
+html.dark [role="menu"] a,
+html.dark [role="menu"] .text-gray-700 {
+  color: var(--text-primary-dark);
+}
+html.dark [role="menu"] a:hover {
+  color: var(--portal-accent);
 }
 html.dark .bg-white {
   background-color: var(--portal-card-bg);
@@ -140,4 +171,34 @@ html.dark .file\:bg-clr-green {
 }
 html.dark .file\:text-white {
   color: #fff;
+}
+
+/* Select / dropdown: ensure 4.5:1 text in dark (maintenance, forms). Native <option> styling is limited in some browsers; closed select is guaranteed. */
+html.dark select,
+html.dark select.portal-theme-input,
+html.dark select.border-gray-200,
+html.dark select.border-gray-300 {
+  background-color: var(--portal-input-bg) !important;
+  border-color: var(--portal-input-border) !important;
+  color: var(--text-primary-dark) !important;
+}
+html.dark select option,
+html.dark select.portal-theme-input option,
+html.dark select.border-gray-200 option {
+  background-color: var(--portal-input-bg);
+  color: var(--text-primary-dark);
+}
+
+/* Status pills on cards (e.g. maintenance): dark-friendly, 4.5:1 contrast */
+html.dark .bg-gray-100.text-gray-700 {
+  background-color: var(--portal-hover-bg);
+  color: var(--text-primary-dark);
+}
+html.dark .bg-amber-100.text-amber-800 {
+  background-color: rgba(180, 83, 9, 0.35);
+  color: #fcd34d;
+}
+html.dark .bg-green-100.text-green-800 {
+  background-color: rgba(21, 128, 61, 0.35);
+  color: #86efac;
 }

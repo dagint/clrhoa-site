@@ -3,18 +3,19 @@ export const prerender = false;
 
 import BoardLayout from '../../layouts/BoardLayout.astro';
 import { getBoardContext } from '../../lib/board-context';
-import { getRolesForEmails } from '../../lib/auth';
+import { getRolesForEmails, isBoardOrArbOnly } from '../../lib/auth';
 import { listOwners } from '../../lib/directory-db';
-import { listArbRequestsByOwner } from '../../lib/arb-db';
+import { listArbRequestsByHousehold } from '../../lib/arb-db';
 
 const ctx = await getBoardContext(Astro);
 if (ctx.redirect) return Astro.redirect(ctx.redirect);
-const { env, session } = ctx;
+const { env, session, effectiveRole } = ctx;
+const canEditDirectory = isBoardOrArbOnly(effectiveRole) || effectiveRole === 'admin';
 
 const db = env?.DB;
 const owners = db ? await listOwners(db) : [];
 const ownerRoles = await getRolesForEmails(env?.CLOURHOA_USERS, owners.map((o) => o.email));
-const allRequests = db ? await listArbRequestsByOwner(db, session.email) : [];
+const allRequests = db ? await listArbRequestsByHousehold(db, session.email) : [];
 const draftCount = allRequests.filter((r) => r.status === 'pending').length;
 
 function roleLabel(role: string): string {
@@ -22,8 +23,10 @@ function roleLabel(role: string): string {
 }
 ---
 
-<BoardLayout title="Directory" subtitle="Manage homeowner directory" draftCount={draftCount} role={session.role}>
+<BoardLayout title="Directory" subtitle="Manage homeowner directory" draftCount={draftCount} role={effectiveRole} session={session} elevatedUntil={session.elevated_until}>
   <div id="directory-message" class="hidden mb-4 p-4 rounded-xl border" role="status" aria-live="polite" aria-atomic="true"></div>
+  {canEditDirectory && (
+  <>
   <h2 class="text-xl font-heading font-bold text-clr-green mb-6">Add or edit owner</h2>
 
       <form id="owner-form" class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-8 space-y-4">
@@ -36,6 +39,11 @@ function roleLabel(role: string): string {
         <div>
           <label for="owner-address" class="block text-sm font-medium text-gray-700">Address</label>
           <input type="text" id="owner-address" name="address" class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2" />
+        </div>
+        <div>
+          <label for="owner-lot-number" class="block text-sm font-medium text-gray-700">Lot number</label>
+          <input type="text" id="owner-lot-number" name="lot_number" inputmode="numeric" min="1" max="25" class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2" placeholder="1–25" />
+          <p class="mt-1 text-xs text-gray-500">1–25 only. Required for elevated roles (ARB, Board, Admin).</p>
         </div>
         <div>
           <label for="owner-phone" class="block text-sm font-medium text-gray-700">Phone</label>
@@ -73,7 +81,7 @@ function roleLabel(role: string): string {
       </form>
 
       <h3 class="text-lg font-heading font-semibold text-clr-green mb-3 mt-8">Upload directory (CSV)</h3>
-      <p class="text-sm text-gray-600 mb-2">Upload a CSV with columns: <strong>name</strong>, <strong>address</strong>, <strong>phone</strong>, <strong>email</strong>. First row may be a header. Rows with an existing email are updated; others are added.</p>
+      <p class="text-sm text-gray-600 mb-2">Upload a CSV with columns: <strong>name</strong>, <strong>address</strong>, <strong>lot_number</strong> (optional, 1–25), <strong>phone</strong>, <strong>email</strong>. First row may be a header. Rows with an existing email are updated; others are added.</p>
       <form id="csv-upload-form" class="flex flex-wrap items-end gap-3 mb-8">
         <input type="hidden" name="csrf_token" id="csv-csrf" value={session.csrfToken ?? ''} />
         <div>
@@ -83,30 +91,37 @@ function roleLabel(role: string): string {
         <button type="submit" id="csv-upload-btn" class="px-4 py-2 bg-clr-green text-white rounded-lg font-medium hover:brightness-110">Upload CSV</button>
       </form>
       <p id="csv-result" class="mb-6 text-sm hidden" role="status"></p>
+  </>
+  )}
 
       <h3 class="text-lg font-heading font-semibold text-clr-green mb-3">Current directory</h3>
       {owners.length === 0 ? (
         <p class="text-gray-500">No owners yet. Add one above or upload a CSV. Members will see them on the portal Directory page.</p>
       ) : (
         <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          {canEditDirectory && (
           <div class="px-4 py-2 bg-gray-50 border-b border-gray-200 flex flex-wrap items-center gap-3">
             <a href="/api/directory-export" class="px-3 py-1.5 text-sm bg-clr-green text-white rounded-lg font-medium hover:brightness-110" download>Export full directory (CSV)</a>
             <button type="button" id="delete-selected-btn" class="px-3 py-1.5 text-sm bg-red-100 text-red-700 rounded-lg font-medium hover:bg-red-200 disabled:opacity-50 disabled:pointer-events-none" disabled>Delete selected</button>
           </div>
+          )}
           <table class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50">
               <tr>
+                {canEditDirectory && (
                 <th scope="col" class="px-4 py-3 text-left w-10">
                   <label class="flex items-center gap-1 cursor-pointer">
                     <input type="checkbox" id="select-all-owners" class="rounded border-gray-300 text-clr-green focus:ring-clr-green" aria-label="Select all" />
                     <span class="text-xs font-medium text-gray-500 uppercase">Select</span>
                   </label>
                 </th>
+                )}
                 <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
                 <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-24">Role</th>
+                <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-16">Lot #</th>
                 <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Address</th>
                 <th scope="col" class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase w-20">Primary</th>
-                <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                {canEditDirectory && <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>}
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-100">
@@ -114,9 +129,11 @@ function roleLabel(role: string): string {
                 const role = owner.email ? ownerRoles.get(owner.email.trim().toLowerCase()) : null;
                 return (
                 <tr>
+                  {canEditDirectory && (
                   <td class="px-4 py-3">
                     <input type="checkbox" class="owner-row-checkbox rounded border-gray-300 text-clr-green focus:ring-clr-green" data-id={owner.id} aria-label="Select row" />
                   </td>
+                  )}
                   <td class="px-4 py-3 text-gray-900">{owner.name ?? '-'}</td>
                   <td class="px-4 py-3">
                     {role ? (
@@ -127,6 +144,7 @@ function roleLabel(role: string): string {
                       <span class="text-gray-400">-</span>
                     )}
                   </td>
+                  <td class="px-4 py-3 text-gray-600">{owner.lot_number ?? '-'}</td>
                   <td class="px-4 py-3 text-gray-600">{owner.address ?? '-'}</td>
                   <td class="px-4 py-3 text-center">
                     {(owner.is_primary ?? 1) === 1 ? (
@@ -135,10 +153,12 @@ function roleLabel(role: string): string {
                       <span class="text-gray-400">—</span>
                     )}
                   </td>
+                  {canEditDirectory && (
                   <td class="px-4 py-3">
-                    <button type="button" class="edit-owner-btn text-sm text-clr-green hover:underline mr-2" data-id={owner.id} data-name={owner.name ?? ''} data-address={owner.address ?? ''} data-phone={owner.phone ?? ''} data-email={owner.email ?? ''} data-role={role ?? 'member'} data-is-primary={(owner.is_primary ?? 1) === 1 ? '1' : '0'}>Edit</button>
+                    <button type="button" class="edit-owner-btn text-sm text-clr-green hover:underline mr-2" data-id={owner.id} data-name={owner.name ?? ''} data-address={owner.address ?? ''} data-lot-number={owner.lot_number ?? ''} data-phone={owner.phone ?? ''} data-email={owner.email ?? ''} data-role={role ?? 'member'} data-is-primary={(owner.is_primary ?? 1) === 1 ? '1' : '0'}>Edit</button>
                     <button type="button" class="delete-owner-btn text-sm text-red-600 hover:underline" data-id={owner.id}>Delete</button>
                   </td>
+                  )}
                 </tr>
                 );
               })}
@@ -146,6 +166,49 @@ function roleLabel(role: string): string {
           </table>
         </div>
       )}
+
+      {owners.some((o) => o.lot_number?.trim()) && (() => {
+        const seen = new Set<string>();
+        const pairs: { lot_number: string; address: string }[] = [];
+        for (const o of owners) {
+          const lot = o.lot_number?.trim();
+          if (!lot) continue;
+          const addr = (o.address ?? '').trim();
+          const key = `${lot}\t${addr}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          pairs.push({ lot_number: lot, address: addr || '—' });
+        }
+        pairs.sort((a, b) => {
+          const na = parseInt(a.lot_number, 10) || 0;
+          const nb = parseInt(b.lot_number, 10) || 0;
+          return na - nb;
+        });
+        return (
+        <section class="mt-10" aria-labelledby="lot-address-heading">
+          <h3 id="lot-address-heading" class="text-lg font-heading font-semibold text-clr-green mb-3">Lot # → Address</h3>
+          <p class="text-sm text-gray-600 mb-3">One row per lot number and address. Multiple owners at the same address share one lot.</p>
+          <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <table class="min-w-full divide-y divide-gray-200">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-20">Lot #</th>
+                  <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Address</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100">
+                {pairs.map((row) => (
+                    <tr>
+                      <td class="px-4 py-3 font-medium text-gray-900">{row.lot_number}</td>
+                      <td class="px-4 py-3 text-gray-600">{row.address}</td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+        );
+      })()}
 
   <script define:vars={{ csrfToken: session.csrfToken ?? '' }}>
     (function () {
@@ -156,6 +219,7 @@ function roleLabel(role: string): string {
       const idInput = document.getElementById('form-owner-id');
       const nameInput = document.getElementById('owner-name');
       const addressInput = document.getElementById('owner-address');
+      const lotNumberInput = document.getElementById('owner-lot-number');
       const phoneInput = document.getElementById('owner-phone');
       const emailInput = document.getElementById('owner-email');
       const roleSelect = document.getElementById('owner-role');
@@ -180,6 +244,7 @@ function roleLabel(role: string): string {
         idInput.value = '';
         nameInput.value = '';
         addressInput.value = '';
+        if (lotNumberInput) lotNumberInput.value = '';
         phoneInput.value = '';
         emailInput.value = '';
         if (roleSelect) { roleSelect.value = 'member'; formInitialRole = 'member'; }
@@ -189,11 +254,19 @@ function roleLabel(role: string): string {
         cancelBtn.classList.add('hidden');
       }
 
+      function validLotNumber(v) {
+        if (v == null) return false;
+        const t = String(v).trim();
+        const n = parseInt(t, 10);
+        return Number.isInteger(n) && n >= 1 && n <= 25;
+      }
+
       document.querySelectorAll('.edit-owner-btn').forEach((btn) => {
         btn.addEventListener('click', function () {
           idInput.value = this.getAttribute('data-id') ?? '';
           nameInput.value = this.getAttribute('data-name') ?? '';
           addressInput.value = this.getAttribute('data-address') ?? '';
+          if (lotNumberInput) lotNumberInput.value = this.getAttribute('data-lot-number') ?? '';
           phoneInput.value = this.getAttribute('data-phone') ?? '';
           emailInput.value = this.getAttribute('data-email') ?? '';
           const role = this.getAttribute('data-role') || 'member';
@@ -315,14 +388,20 @@ function roleLabel(role: string): string {
         const token = (csrfInput && csrfInput.value) || csrfToken || '';
         const id = idInput.value.trim();
         const selectedRole = (roleSelect && roleSelect.value) || 'member';
+        const lotNumber = lotNumberInput ? lotNumberInput.value.trim() || null : null;
         const isNewAdd = !id;
         const isChangingToElevated = isElevatedRole(selectedRole) && (isNewAdd || !isElevatedRole(formInitialRole));
         if (isChangingToElevated && !confirm('Assigning an elevated role gives this person access to ARB and/or Board tools. Are you sure you want to assign this role?')) {
           return;
         }
+        if (isElevatedRole(selectedRole) && !validLotNumber(lotNumber)) {
+          showFormMsg('Lot number is required for elevated roles. Use 1–25 only.', true);
+          return;
+        }
         const payload = {
           name: nameInput.value.trim() || null,
           address: addressInput.value.trim() || null,
+          lot_number: lotNumber,
           phone: phoneInput.value.trim() || null,
           email: emailInput.value.trim() || null,
           role: selectedRole,

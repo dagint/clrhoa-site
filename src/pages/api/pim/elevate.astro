@@ -1,0 +1,75 @@
+---
+/**
+ * POST /api/pim/elevate — Request JIT elevated access (2-hour window). No approval; audit logged.
+ * Requires session with elevated whitelist role (board, admin, arb, arb_board).
+ */
+export const prerender = false;
+
+import { getSessionFromCookie, isElevatedRole, createSessionWithElevation, PIM_ELEVATION_TTL_MS, SESSION_COOKIE_NAME } from '../../../lib/auth';
+import { insertPimElevationLog } from '../../../lib/pim-db';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const db = env?.DB;
+const secret = env?.SESSION_SECRET;
+
+if (Astro.request.method !== 'POST') {
+  return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+    status: 405,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+if (!secret) {
+  return new Response(JSON.stringify({ error: 'Unavailable' }), { status: 503, headers: { 'Content-Type': 'application/json' } });
+}
+
+const session = await getSessionFromCookie(
+  Astro.request.headers.get('cookie') ?? undefined,
+  secret
+);
+if (!session) {
+  return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
+}
+
+if (!isElevatedRole(session.role)) {
+  return new Response(JSON.stringify({ error: 'Your account does not have elevated access to request.' }), {
+    status: 403,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const expiresAt = Date.now() + PIM_ELEVATION_TTL_MS;
+const cookieValue = await createSessionWithElevation(
+  Astro.request.headers.get('cookie') ?? undefined,
+  secret,
+  expiresAt
+);
+if (!cookieValue) {
+  return new Response(JSON.stringify({ error: 'Session invalid' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+}
+
+if (db) {
+  const expiresAtIso = new Date(expiresAt).toISOString();
+  await insertPimElevationLog(db, {
+    email: session.email,
+    role: session.role,
+    action: 'elevate',
+    expires_at: expiresAtIso,
+  });
+}
+
+const isProd = import.meta.env.PROD;
+const cookieHeader = `${SESSION_COOKIE_NAME}=${cookieValue}; Path=/; Max-Age=${60 * 60 * 24 * 7}; SameSite=Lax${isProd ? '; Secure' : ''}; HttpOnly`;
+
+return new Response(
+  JSON.stringify({ success: true, elevated_until: expiresAt }),
+  {
+    status: 200,
+    headers: {
+      'Content-Type': 'application/json',
+      'Set-Cookie': cookieHeader,
+    },
+  }
+);
+---

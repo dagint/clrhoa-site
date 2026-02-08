@@ -1,0 +1,38 @@
+---
+/**
+ * POST /api/notifications/dismiss — Mark a dashboard notification as read.
+ * Body: { key: string }. Keys: action_feedback, action_maintenance, action_meetings, staff_outstanding.
+ */
+export const prerender = false;
+
+import { requireSession, requireDb, jsonResponse } from '../../../lib/api-helpers';
+import { setDismissed, isValidDismissalKey } from '../../../lib/notification-dismissals';
+
+const auth = await requireSession(Astro);
+if (auth.response) return auth.response;
+const { session } = auth;
+
+const dbResult = requireDb(Astro.locals.runtime?.env);
+if (dbResult.response) return dbResult.response;
+const { db } = dbResult;
+
+if (Astro.request.method !== 'POST') {
+  return new Response(null, { status: 405, headers: { Allow: 'POST' } });
+}
+
+let body: { key?: string };
+try {
+  const ct = Astro.request.headers.get('content-type') ?? '';
+  body = ct.includes('application/json') ? await Astro.request.json() : Object.fromEntries(await Astro.request.formData());
+} catch {
+  return jsonResponse({ error: 'Invalid body' }, 400);
+}
+
+const key = typeof body.key === 'string' ? body.key.trim() : '';
+if (!isValidDismissalKey(key)) {
+  return jsonResponse({ error: 'Invalid or missing key' }, 400);
+}
+
+await setDismissed(db, session.email, key);
+return jsonResponse({ success: true });
+---

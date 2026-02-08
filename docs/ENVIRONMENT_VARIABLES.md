@@ -2,6 +2,82 @@
 
 This site uses environment variables to store sensitive information and configuration that shouldn't be committed to the repository.
 
+---
+
+## Production deployment: one place (Cloudflare Pages)
+
+**You do not manage the site in two places.** The live site is a **single Cloudflare Pages project**. All env vars, secrets, and bindings for the site are configured in that project only:
+
+- **Workers & Pages → your project (e.g. clrhoa-site) → Settings**
+  - **Environment variables** — plain variables and **Encrypt** (secrets)
+  - **Bindings** — D1 database, KV namespaces, R2 bucket (same names as in `wrangler.toml`: `DB`, `CLOURHOA_USERS`, `SESSION`, `KV`, `CLOURHOA_FILES`)
+
+A **separate** place exists only if you use the **backup Worker** (Board → Backups, `npm run backup:deploy`). That Worker has its own project and its own secrets; the table below lists only what the **site** (Pages) needs.
+
+---
+
+## Site deployment: secrets and env vars (Pages)
+
+Configure these under **Workers & Pages → [your project] → Settings → Environment variables** (and **Bindings** for D1/KV/R2). Use **Encrypt** for any secret.
+
+### Required for portal login
+
+| Name | Type | Where / notes |
+|------|------|----------------|
+| `SESSION_SECRET` | **Secret** | **Required** for login. Long random string (32+ chars). Set as **Encrypted** in Pages. |
+
+Without `SESSION_SECRET`, session cookies cannot be signed and portal login will not work.
+
+### Required bindings (not env vars)
+
+These are **resource bindings** in Pages (Settings → Bindings), not key/value env vars. Create the resources in the Cloudflare dashboard (or via wrangler), then attach them to the Pages project with these binding names:
+
+| Binding name | Type | Purpose |
+|--------------|------|---------|
+| `DB` | D1 | Database (portal, directory, vendors, news, etc.) |
+| `CLOURHOA_USERS` | KV | Login allow list (who can log in) |
+| `SESSION` | KV | Session storage |
+| `KV` | KV | Rate limiting / login lockout (replace `REPLACE_WITH_RATE_LIMIT_KV_ID` in wrangler.toml with real namespace id) |
+| `CLOURHOA_FILES` | R2 | Portal files (e.g. member documents) |
+
+### Optional runtime vars (Pages env)
+
+**Email:** The app supports **Resend** and **MailChannels**. Set one of the two API keys (Resend is recommended for the free tier; see [EMAIL_PROVIDER_OPTIONS.md](./EMAIL_PROVIDER_OPTIONS.md)).
+
+| Name | Type | Purpose |
+|------|------|---------|
+| `NOTIFY_BOARD_EMAIL` | Plain or Secret | Board notification recipient |
+| `NOTIFY_ARB_EMAIL` | Plain or Secret | ARB notification recipient |
+| `NOTIFY_NOREPLY_EMAIL` | Plain | From address for emails (e.g. `noreply@clrhoa.com`) |
+| `RESEND_API_KEY` | **Secret** | Email via Resend (recommended; free tier). If set, used for all outgoing email. |
+| `MAILCHANNELS_API_KEY` | **Secret** | Email via MailChannels. Used only when `RESEND_API_KEY` is not set. |
+| `TWILIO_ACCOUNT_SID` | **Secret** | SMS (Twilio) |
+| `TWILIO_AUTH_TOKEN` | **Secret** | SMS (Twilio) |
+| `TWILIO_PHONE_NUMBER` | Plain | From number for SMS |
+
+### Optional backup / Google Drive (only if you use those features)
+
+| Name | Type | Purpose |
+|------|------|---------|
+| `CLOUDFLARE_ACCOUNT_ID` | Plain or Secret | Backup download from Board |
+| `CLOUDFLARE_API_TOKEN` | **Secret** | Backup download from Board |
+| `D1_DATABASE_ID` | Plain | Backup (if different from binding) |
+| `GOOGLE_CLIENT_ID` | **Secret** | Google Drive backup OAuth |
+| `GOOGLE_CLIENT_SECRET` | **Secret** | Google Drive backup OAuth |
+| `BACKUP_ENCRYPTION_KEY` | **Secret** | Encrypt backup payloads |
+
+These are used by the **Pages** app when an admin uses Board → Backups. The **scheduled backup Worker** (if you run `npm run backup:deploy`) is a **separate** Worker project and has its own secrets (e.g. `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`); you would set those in that Worker’s settings, not in the Pages project.
+
+### Build-time (public) variables
+
+These are read at **build** time and embedded into the client bundle. Set them in Pages → Environment variables for **Production** (and optionally Preview). They can be plain (non-secret) because they are exposed to the client.
+
+- All `PUBLIC_*` variables (contact info, addresses, meeting location, dues, analytics, etc.) — see **Complete Variable List** and **Required Variables** below.
+- `SITE` — site URL (e.g. `https://clrhoa.com`).
+- `SITE_LAST_MODIFIED` — optional, for sitemap.
+
+---
+
 ## Required Variables
 
 ### Form Configuration

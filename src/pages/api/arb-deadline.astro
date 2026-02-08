@@ -4,7 +4,7 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie, verifyCsrfToken, verifyOrigin } from '../../lib/auth';
+import { getSessionFromCookie, verifyCsrfToken, verifyOrigin, getEffectiveRole, canApproveArb } from '../../lib/auth';
 import { checkRateLimit, getRateLimitConfig } from '../../lib/rate-limit';
 import { getSecurityMonitor } from '../../lib/monitoring';
 import { getArbRequest } from '../../lib/arb-db';
@@ -23,9 +23,8 @@ if (!session) {
   });
 }
 
-const allowedRoles = ['arb', 'board', 'admin', 'arb_board'];
-if (!allowedRoles.includes(session.role)) {
-  return new Response(JSON.stringify({ error: 'Forbidden. ARB or Board role required.' }), {
+if (!canApproveArb(getEffectiveRole(session))) {
+  return new Response(JSON.stringify({ error: 'Forbidden. Only ARB or Board can set review deadlines. Admins may view only.' }), {
     status: 403,
     headers: { 'Content-Type': 'application/json' },
   });

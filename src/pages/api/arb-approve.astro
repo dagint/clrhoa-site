@@ -5,7 +5,8 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie, verifyCsrfToken, verifyOrigin } from '../../lib/auth';
+import { getSessionFromCookie, verifyCsrfToken, verifyOrigin, getEffectiveRole, canApproveArb, isAdminActingAs } from '../../lib/auth';
+import { insertAdminAssumedRoleAudit } from '../../lib/admin-assumed-role-db';
 import { checkRateLimit, getRateLimitConfig } from '../../lib/rate-limit';
 import { getSecurityMonitor } from '../../lib/monitoring';
 import { getArbRequest, updateArbRequestStatus, setArbRequestPendingForRevision } from '../../lib/arb-db';
@@ -37,9 +38,9 @@ if (!verifyOrigin(origin, referer, expectedOrigin)) {
   });
 }
 
-const allowedRoles = ['arb', 'board', 'admin', 'arb_board'];
-if (!allowedRoles.includes(session.role)) {
-  return new Response(JSON.stringify({ error: 'Forbidden. ARB or Board role required.' }), {
+const effectiveRole = getEffectiveRole(session);
+if (!canApproveArb(effectiveRole)) {
+  return new Response(JSON.stringify({ error: 'Forbidden. Only ARB or Board can approve or reject requests. Admins may view only.' }), {
     status: 403,
     headers: { 'Content-Type': 'application/json' },
   });
@@ -145,7 +146,7 @@ if (action === 'request_revision' || action === 'request revision') {
       { status: 400, headers: { 'Content-Type': 'application/json' } }
     );
   }
-  const updated = await setArbRequestPendingForRevision(db, requestId, revisionNotes, session.email, session.role);
+  const updated = await setArbRequestPendingForRevision(db, requestId, revisionNotes, session.email, effectiveRole);
   if (!updated) {
     return new Response(JSON.stringify({ error: 'Update failed.' }), {
       status: 500,
@@ -185,13 +186,29 @@ if (request.status !== 'in_review') {
 
 const status = action === 'approve' ? 'approved' : 'rejected';
 const esignRecord = `${status.toUpperCase()} | ${arbEsign} | ${session.email} | ${new Date().toISOString()}`;
-const updated = await updateArbRequestStatus(db, requestId, status, esignRecord, session.email, session.role);
+const updated = await updateArbRequestStatus(db, requestId, status, esignRecord, session.email, effectiveRole);
 
 if (!updated) {
   return new Response(JSON.stringify({ error: 'Update failed.' }), {
     status: 500,
     headers: { 'Content-Type': 'application/json' },
   });
+}
+
+if (isAdminActingAs(session) && session.assumed_role) {
+  try {
+    const actorRole = session.role?.toLowerCase() === 'arb_board' ? 'arb_board' : 'admin';
+    await insertAdminAssumedRoleAudit(db, {
+      admin_email: session.email,
+      actor_role: actorRole,
+      action: 'action',
+      role_assumed: session.assumed_role,
+      action_detail: `arb_approve request_id=${requestId} action=${action} status=${status}`,
+      ip_address: Astro.request.headers.get('cf-connecting-ip') ?? Astro.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null,
+    });
+  } catch (auditErr) {
+    console.error('[arb-approve] assume-role audit insert failed:', auditErr);
+  }
 }
 
 return new Response(

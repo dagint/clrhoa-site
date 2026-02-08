@@ -1,0 +1,141 @@
+---
+export const prerender = false;
+
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { getSessionFromCookie, isElevatedRole } from '../lib/auth';
+import { getDailyStats, getWeeklyStats, getAdminPageViews } from '../lib/usage-db';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const db = env?.DB;
+
+const daily = db ? await getDailyStats(db, 30) : [];
+const weekly = db ? await getWeeklyStats(db, 12) : [];
+
+let isAdmin = false;
+let adminEvents: { user_id: string | null; path: string; created_at: string }[] = [];
+if (env?.SESSION_SECRET && db) {
+  const session = await getSessionFromCookie(
+    Astro.request.headers.get('cookie') ?? undefined,
+    env.SESSION_SECRET
+  );
+  if (session && isElevatedRole(session.role)) {
+    isAdmin = true;
+    adminEvents = await getAdminPageViews(db, 500);
+  }
+}
+
+function formatDate(s: string | null): string {
+  if (!s) return '—';
+  try {
+    const d = new Date(s);
+    return Number.isNaN(d.getTime()) ? s : d.toLocaleString();
+  } catch {
+    return s ?? '—';
+  }
+}
+---
+
+<BaseLayout title="Usage dashboard" description="Site usage metrics: page views and unique visitors (anonymous aggregates).">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <h1 class="text-4xl font-heading font-bold text-clr-green mb-2">Usage dashboard</h1>
+    <p class="text-gray-600 mb-8">Anonymous totals: page views and unique visitors by day and week.</p>
+
+    <section class="mb-12">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+          <h2 class="text-lg font-heading font-semibold text-clr-green mb-4">Daily (last 30 days)</h2>
+          <div class="relative h-64 md:h-72">
+            <canvas id="chart-daily" aria-label="Daily page views and unique visitors"></canvas>
+          </div>
+        </div>
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+          <h2 class="text-lg font-heading font-semibold text-clr-green mb-4">Weekly (last 12 weeks)</h2>
+          <div class="relative h-64 md:h-72">
+            <canvas id="chart-weekly" aria-label="Weekly page views and unique visitors"></canvas>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    {isAdmin && adminEvents.length > 0 && (
+      <section class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden" aria-labelledby="admin-usage-heading">
+        <h2 id="admin-usage-heading" class="text-lg font-heading font-semibold text-clr-green p-6 pb-0">Admin: user → pages → timestamps</h2>
+        <p class="text-sm text-gray-500 px-6 pt-1 mb-4">Recent page views by user (or anonymous session).</p>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead class="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th class="text-left py-2 px-3 font-medium text-gray-700">User / session</th>
+                <th class="text-left py-2 px-3 font-medium text-gray-700">Path</th>
+                <th class="text-left py-2 px-3 font-medium text-gray-700">Time</th>
+              </tr>
+            </thead>
+            <tbody>
+              {adminEvents.map((row, i) => (
+                <tr class="border-b border-gray-100 hover:bg-gray-50/50">
+                  <td class="py-2 px-3 text-gray-700">{row.user_id ?? '(anonymous)'}</td>
+                  <td class="py-2 px-3 font-mono text-gray-600 max-w-xs truncate" title={row.path}>{row.path}</td>
+                  <td class="py-2 px-3 text-gray-600 whitespace-nowrap">{formatDate(row.created_at)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    )}
+
+    <script is:inline src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script define:vars={{ daily, weekly }}>
+      (function () {
+        const dailyData = typeof daily !== 'undefined' ? daily : [];
+        const weeklyData = typeof weekly !== 'undefined' ? weekly : [];
+        function initCharts() {
+          if (typeof Chart === 'undefined') return;
+          const green = 'rgb(30, 95, 56)';
+          const orange = 'rgb(194, 108, 43)';
+          const dailyLabels = dailyData.map((d) => d.date);
+          const dailyViews = dailyData.map((d) => d.views);
+          const dailySessions = dailyData.map((d) => d.uniqueSessions);
+          const weeklyLabels = weeklyData.map((w) => w.weekStart);
+          const weeklyViews = weeklyData.map((w) => w.views);
+          const weeklySessions = weeklyData.map((w) => w.uniqueSessions);
+          const chartOptions = { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' } } };
+          const dailyEl = document.getElementById('chart-daily');
+          if (dailyEl && dailyLabels.length) {
+            new Chart(dailyEl.getContext('2d'), {
+              type: 'bar',
+              data: {
+                labels: dailyLabels,
+                datasets: [
+                  { label: 'Page views', data: dailyViews, backgroundColor: green, order: 1 },
+                  { label: 'Unique visitors', data: dailySessions, backgroundColor: orange, order: 2 },
+                ],
+              },
+              options: { ...chartOptions, scales: { x: { ticks: { maxRotation: 45 } } } },
+            });
+          }
+          const weeklyEl = document.getElementById('chart-weekly');
+          if (weeklyEl && weeklyLabels.length) {
+            new Chart(weeklyEl.getContext('2d'), {
+              type: 'bar',
+              data: {
+                labels: weeklyLabels,
+                datasets: [
+                  { label: 'Page views', data: weeklyViews, backgroundColor: green, order: 1 },
+                  { label: 'Unique visitors', data: weeklySessions, backgroundColor: orange, order: 2 },
+                ],
+              },
+              options: { ...chartOptions, scales: { x: { ticks: { maxRotation: 45 } } } },
+            });
+          }
+        }
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', initCharts);
+        } else {
+          initCharts();
+        }
+      })();
+    </script>
+  </div>
+</BaseLayout>

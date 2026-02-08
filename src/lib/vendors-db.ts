@@ -45,12 +45,20 @@ export async function listVendors(db: D1Database): Promise<Vendor[]> {
   return results ?? [];
 }
 
-/** Vendors visible on the public page and portal (same list; portal shows more detail). */
+/** Vendors visible on the public Resources page (show_on_public = 1 only). */
 export async function listPublicVendors(db: D1Database): Promise<Vendor[]> {
   const { results } = await db
     .prepare(
       `SELECT ${VENDOR_SELECT} FROM vendors WHERE COALESCE(show_on_public, 1) = 1 ORDER BY category ASC, name ASC`
     )
+    .all<Vendor>();
+  return results ?? [];
+}
+
+/** All vendors visible in the member portal (both “public & portal” and “portal only”). */
+export async function listPortalVendors(db: D1Database): Promise<Vendor[]> {
+  const { results } = await db
+    .prepare(`SELECT ${VENDOR_SELECT} FROM vendors ORDER BY category ASC, name ASC`)
     .all<Vendor>();
   return results ?? [];
 }

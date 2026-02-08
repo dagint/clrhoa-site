@@ -5,7 +5,7 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie, verifyCsrfToken, verifyOrigin } from '../../../lib/auth';
+import { getSessionFromCookie, verifyCsrfToken, verifyOrigin, getEffectiveRole, canRecordPayments } from '../../../lib/auth';
 import { listSpecialAssessmentsByOwner, addSpecialAssessment, markSpecialAssessmentPaid } from '../../../lib/assessments-db';
 
 function json(data: object, status = 200) {
@@ -19,8 +19,8 @@ const session = await getSessionFromCookie(
   env?.SESSION_SECRET
 );
 if (!session) return json({ error: 'Unauthorized' }, 401);
-const isBoard = session.role === 'board' || session.role === 'admin' || session.role === 'arb_board';
-if (!isBoard) return json({ error: 'Forbidden' }, 403);
+const effectiveRole = getEffectiveRole(session);
+if (!canRecordPayments(effectiveRole)) return json({ error: 'Forbidden. Only Board or ARB+Board can manage special assessments.' }, 403);
 
 const origin = Astro.request.headers.get('origin');
 const referer = Astro.request.headers.get('referer');

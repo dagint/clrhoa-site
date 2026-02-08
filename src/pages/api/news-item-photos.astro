@@ -1,0 +1,113 @@
+---
+/**
+ * POST /api/news-item-photos — Board: add photos to a news item.
+ * FormData: news_item_id, csrf_token, file (or multiple files). Stored in R2 under news/{id}/.
+ */
+export const prerender = false;
+
+import { getSessionFromCookie, verifyCsrfToken, verifyOrigin, getEffectiveRole } from '../../lib/auth';
+import { getNewsItemById, appendNewsItemImages } from '../../lib/news-items-db';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const session = await getSessionFromCookie(
+  Astro.request.headers.get('cookie') ?? undefined,
+  env?.SESSION_SECRET
+);
+
+if (!session) {
+  return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+    status: 401,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const effectiveRole = getEffectiveRole(session);
+const isBoard = effectiveRole === 'board' || effectiveRole === 'admin' || effectiveRole === 'arb_board';
+if (!isBoard) {
+  return new Response(JSON.stringify({ error: 'Forbidden' }), {
+    status: 403,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+if (!verifyOrigin(Astro.request.headers.get('origin'), Astro.request.headers.get('referer'), Astro.url.origin)) {
+  return new Response(JSON.stringify({ error: 'Invalid origin' }), { status: 403, headers: { 'Content-Type': 'application/json' } });
+}
+
+if (Astro.request.method !== 'POST') {
+  return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+    status: 405,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+let form: FormData;
+try {
+  form = await Astro.request.formData();
+} catch {
+  return new Response(JSON.stringify({ error: 'Invalid form' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+}
+
+const csrf = form.get('csrf_token')?.toString();
+if (!verifyCsrfToken(session, csrf)) {
+  return new Response(JSON.stringify({ error: 'Invalid CSRF token' }), { status: 403, headers: { 'Content-Type': 'application/json' } });
+}
+
+const newsItemId = form.get('news_item_id')?.toString()?.trim();
+if (!newsItemId) {
+  return new Response(JSON.stringify({ error: 'news_item_id required' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+}
+
+const db = env?.DB;
+const r2 = env?.CLOURHOA_FILES;
+if (!db || !r2) {
+  return new Response(JSON.stringify({ error: 'Server configuration error' }), { status: 503, headers: { 'Content-Type': 'application/json' } });
+}
+
+const item = await getNewsItemById(db, newsItemId);
+if (!item) {
+  return new Response(JSON.stringify({ error: 'News item not found' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
+}
+
+const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/heic'];
+const MAX_FILE_BYTES = 5 * 1024 * 1024; // 5MB
+const MAX_FILES = 15;
+
+let files: File[] = form.getAll('file').filter((f): f is File => f instanceof File && f.size > 0) as File[];
+if (files.length === 0 && form.get('file') instanceof File) {
+  const one = form.get('file') as File;
+  if (one.size > 0) files = [one];
+}
+if (files.length === 0) {
+  return new Response(JSON.stringify({ error: 'No image file(s) provided' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+}
+if (files.length > MAX_FILES) {
+  return new Response(JSON.stringify({ error: `Maximum ${MAX_FILES} images per upload` }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+}
+
+const keys: string[] = [];
+for (const file of files) {
+  const ok = ALLOWED_TYPES.includes(file.type) || file.type.startsWith('image/');
+  if (!ok) {
+    return new Response(JSON.stringify({ error: 'Only image files (JPEG, PNG, GIF, WebP) are allowed' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+  }
+  if (file.size > MAX_FILE_BYTES) {
+    return new Response(JSON.stringify({ error: 'Each image must be 5MB or less' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+  }
+  const ext = file.name.includes('.') ? file.name.split('.').pop()?.toLowerCase() ?? 'jpg' : 'jpg';
+  const safeExt = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic'].includes(ext) ? ext : 'jpg';
+  const unique = crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const key = `news/${newsItemId}/${unique}.${safeExt}`;
+  const buf = await file.arrayBuffer();
+  await r2.put(key, buf, { httpMetadata: { contentType: file.type || `image/${safeExt}` } });
+  keys.push(key);
+}
+
+await appendNewsItemImages(db, newsItemId, keys);
+
+return new Response(
+  JSON.stringify({ success: true, keys, message: `${keys.length} photo(s) added.` }),
+  { status: 200, headers: { 'Content-Type': 'application/json' } }
+);
+---

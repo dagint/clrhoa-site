@@ -8,7 +8,7 @@
  */
 export const prerender = false;
 
-import { verifyCsrfToken, verifyOrigin } from '../../lib/auth';
+import { verifyCsrfToken, verifyOrigin, getEffectiveRole } from '../../lib/auth';
 import { requireSession, requireDb, jsonResponse } from '../../lib/api-helpers';
 import {
   listPreapprovalItems,
@@ -37,7 +37,8 @@ if (!verifyOrigin(origin, referer, Astro.url.origin)) {
   return jsonResponse({ error: 'Invalid origin.' }, 403);
 }
 
-const isReviewer = session.role === 'board' || session.role === 'admin' || session.role === 'arb' || session.role === 'arb_board';
+const effectiveRole = getEffectiveRole(session);
+const isReviewer = effectiveRole === 'board' || effectiveRole === 'admin' || effectiveRole === 'arb' || effectiveRole === 'arb_board';
 
 // GET: list (any authenticated)
 if (Astro.request.method === 'GET') {

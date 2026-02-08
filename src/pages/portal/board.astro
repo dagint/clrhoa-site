@@ -6,17 +6,20 @@ import ProtectedPage from '../../components/ProtectedPage.astro';
 import PortalNav from '../../components/PortalNav.astro';
 import BoardNav from '../../components/BoardNav.astro';
 import { getPortalContext } from '../../lib/portal-context';
-import { getArbRequestCountsByStatus, listArbRequestsByOwner } from '../../lib/arb-db';
+import { getArbRequestCountsByStatus, listArbRequestsByHousehold } from '../../lib/arb-db';
 import { listPendingSubmissions } from '../../lib/vendor-submissions-db';
 
-const { env, session } = await getPortalContext(Astro, { fingerprint: true });
+const { env, session, effectiveRole } = await getPortalContext(Astro, { fingerprint: true });
 if (!session) return Astro.redirect('/portal/login');
 
-const isBoardOrAdmin = session.role === 'board' || session.role === 'admin' || session.role === 'arb_board';
-if (!isBoardOrAdmin) return Astro.redirect('/portal/dashboard');
+const isBoardOrAdmin = effectiveRole === 'board' || effectiveRole === 'admin' || effectiveRole === 'arb_board';
+if (!isBoardOrAdmin) {
+  const returnUrl = encodeURIComponent('/portal/board');
+  return Astro.redirect(`/portal/request-elevated-access?return=${returnUrl}`);
+}
 
 const db = env?.DB;
-const allRequests = db ? await listArbRequestsByOwner(db, session.email) : [];
+const allRequests = db ? await listArbRequestsByHousehold(db, session.email) : [];
 const draftCount = allRequests.filter((r) => r.status === 'pending').length;
 const pendingVendorCount = db ? (await listPendingSubmissions(db)).length : 0;
 const arbCounts = db ? await getArbRequestCountsByStatus(db) : { in_review: 0, pending: 0, approved: 0, rejected: 0, cancelled: 0 };
@@ -25,7 +28,7 @@ const arbCounts = db ? await getArbRequestCountsByStatus(db) : { in_review: 0, p
 <PortalLayout title="Board | Member Portal | Crooked Lake Reserve HOA">
   <ProtectedPage>
   <div class="min-h-screen portal-theme-bg font-body">
-    <PortalNav currentPath="/portal/board" draftCount={draftCount} role={session.role} arbInReviewCount={arbCounts.in_review} vendorPendingCount={pendingVendorCount} />
+    <PortalNav currentPath="/portal/board" draftCount={draftCount} role={effectiveRole} staffRole={session.role ?? ''} arbInReviewCount={arbCounts.in_review} vendorPendingCount={pendingVendorCount} />
 
     <BoardNav currentPath="/portal/board" />
 

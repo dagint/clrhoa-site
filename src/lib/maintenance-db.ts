@@ -2,6 +2,8 @@
  * D1 helpers for maintenance requests (Phase 4).
  */
 
+import { listEmailsAtSameAddress } from './directory-db.js';
+
 export interface MaintenanceRequest {
   id: string;
   owner_email: string;
@@ -42,6 +44,30 @@ export async function listMaintenanceByOwner(db: D1Database, ownerEmail: string)
     .bind(ownerEmail.trim().toLowerCase())
     .all<MaintenanceRequest>();
   return result.results ?? [];
+}
+
+/** List maintenance requests for any of the given owner emails (e.g. household). */
+export async function listMaintenanceByOwnerEmails(
+  db: D1Database,
+  ownerEmails: string[]
+): Promise<MaintenanceRequest[]> {
+  const emails = ownerEmails.map((e) => e.trim().toLowerCase()).filter(Boolean);
+  if (emails.length === 0) return [];
+  const placeholders = emails.map(() => '?').join(',');
+  const result = await db
+    .prepare(
+      `SELECT id, owner_email, category, description, status, vendor_assigned, photos, created, updated
+       FROM maintenance_requests WHERE owner_email IN (${placeholders}) ORDER BY created DESC`
+    )
+    .bind(...emails)
+    .all<MaintenanceRequest>();
+  return result.results ?? [];
+}
+
+/** List maintenance requests for the household of the given user (same property address). */
+export async function listMaintenanceByHousehold(db: D1Database, userEmail: string): Promise<MaintenanceRequest[]> {
+  const emails = await listEmailsAtSameAddress(db, userEmail);
+  return listMaintenanceByOwnerEmails(db, emails);
 }
 
 /** List all for board, optional status filter. */

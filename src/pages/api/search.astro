@@ -5,6 +5,7 @@
 export const prerender = false;
 
 import { requireSession, requireDb, jsonResponse } from '../../lib/api-helpers';
+import { getEffectiveRole } from '../../lib/auth';
 import { runPortalSearch } from '../../lib/search';
 
 const auth = await requireSession(Astro);
@@ -17,6 +18,6 @@ const { db } = dbResult;
 
 const url = new URL(Astro.request.url);
 const q = (url.searchParams.get('q') ?? '').trim();
-const result = await runPortalSearch(db, q, { email: session.email, role: session.role });
+const result = await runPortalSearch(db, q, { email: session.email, role: getEffectiveRole(session) });
 return jsonResponse(result);
 ---

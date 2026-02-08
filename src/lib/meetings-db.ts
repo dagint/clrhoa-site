@@ -2,6 +2,8 @@
  * D1 helpers for meetings and RSVPs (Phase 4).
  */
 
+import { listEmailsAtSameAddress } from './directory-db.js';
+
 export interface Meeting {
   id: string;
   title: string | null;
@@ -152,6 +154,47 @@ export async function getUserRsvp(
     .bind(meetingId, email.trim().toLowerCase())
     .first<{ response: string }>();
   return row?.response ?? null;
+}
+
+/** True if any member of the household (same address) has RSVP'd for this meeting. */
+export async function householdHasRsvpd(
+  db: D1Database,
+  meetingId: string,
+  userEmail: string
+): Promise<boolean> {
+  const emails = await listEmailsAtSameAddress(db, userEmail);
+  if (emails.length === 0) return false;
+  const placeholders = emails.map(() => '?').join(',');
+  const row = await db
+    .prepare(
+      `SELECT 1 FROM meeting_rsvps WHERE meeting_id = ? AND owner_email IN (${placeholders}) LIMIT 1`
+    )
+    .bind(meetingId, ...emails)
+    .first<{ '1'?: number }>();
+  return row != null;
+}
+
+/** RSVPs from all household members for a meeting. */
+export interface HouseholdRsvp {
+  owner_email: string;
+  response: string;
+}
+
+export async function getHouseholdRsvps(
+  db: D1Database,
+  meetingId: string,
+  userEmail: string
+): Promise<HouseholdRsvp[]> {
+  const emails = await listEmailsAtSameAddress(db, userEmail);
+  if (emails.length === 0) return [];
+  const placeholders = emails.map(() => '?').join(',');
+  const { results } = await db
+    .prepare(
+      `SELECT owner_email, response FROM meeting_rsvps WHERE meeting_id = ? AND owner_email IN (${placeholders})`
+    )
+    .bind(meetingId, ...emails)
+    .all<HouseholdRsvp>();
+  return results ?? [];
 }
 
 /** Upsert RSVP. */

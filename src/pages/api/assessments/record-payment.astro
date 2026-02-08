@@ -1,12 +1,14 @@
 ---
 /**
- * POST /api/assessments/record-payment — board records a dues payment (or full year).
- * Body: owner_email, amount, paid_at (YYYY-MM-DD), balance_after, full_year? (boolean), csrf_token
+ * POST /api/assessments/record-payment — board records a dues payment.
+ * Body: owner_email, amount, paid_at (YYYY-MM-DD), balance_after?, full_year?, quarters_to_apply? (1–4),
+ *       payment_method? (electronic_transfer|check|cash), check_number? (when method=check), csrf_token
  */
 export const prerender = false;
 
-import { getSessionFromCookie, verifyCsrfToken, verifyOrigin } from '../../../lib/auth';
+import { getSessionFromCookie, verifyCsrfToken, verifyOrigin, getEffectiveRole, canRecordPayments, isAdminActingAs } from '../../../lib/auth';
 import { getAssessmentByOwner, recordPayment } from '../../../lib/assessments-db';
+import { insertAdminAssumedRoleAudit } from '../../../lib/admin-assumed-role-db';
 
 function json(data: object, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
@@ -19,8 +21,8 @@ const session = await getSessionFromCookie(
   env?.SESSION_SECRET
 );
 if (!session) return json({ error: 'Unauthorized' }, 401);
-const isBoard = session.role === 'board' || session.role === 'admin' || session.role === 'arb_board';
-if (!isBoard) return json({ error: 'Forbidden' }, 403);
+const effectiveRole = getEffectiveRole(session);
+if (!canRecordPayments(effectiveRole)) return json({ error: 'Forbidden. Only Board or ARB+Board can record payments.' }, 403);
 
 const origin = Astro.request.headers.get('origin');
 const referer = Astro.request.headers.get('referer');
@@ -48,6 +50,17 @@ const amount = Number(body.amount);
 const paid_at = String(body.paid_at ?? '').trim();
 const balance_after_raw = body.balance_after;
 const full_year = body.full_year === true || body.full_year === 'true';
+const quarters_to_apply_raw = body.quarters_to_apply;
+const quarters_to_apply =
+  typeof quarters_to_apply_raw === 'number' && quarters_to_apply_raw >= 1 && quarters_to_apply_raw <= 4
+    ? Math.floor(quarters_to_apply_raw)
+    : undefined;
+const payment_method_raw = body.payment_method;
+const payment_method =
+  typeof payment_method_raw === 'string' && ['electronic_transfer', 'check', 'cash'].includes(payment_method_raw.trim())
+    ? payment_method_raw.trim()
+    : null;
+const check_number = typeof body.check_number === 'string' ? body.check_number.trim() || null : null;
 
 if (!owner_email) return json({ error: 'owner_email is required' }, 400);
 if (Number.isNaN(amount) || amount < 0) return json({ error: 'amount must be a non-negative number' }, 400);
@@ -68,9 +81,26 @@ try {
     amount,
     paid_at,
     balance_after,
-    fullYear: full_year,
+    fullYear: quarters_to_apply == null ? full_year : false,
+    quarters_to_apply,
     recorded_by: session.email,
+    payment_method,
+    check_number,
   });
+  if (isAdminActingAs(session) && session.assumed_role && db) {
+    try {
+      const actorRole = session.role?.toLowerCase() === 'arb_board' ? 'arb_board' : 'admin';
+      await insertAdminAssumedRoleAudit(db, {
+        admin_email: session.email,
+        actor_role: actorRole,
+        action: 'action',
+        role_assumed: session.assumed_role,
+        action_detail: `record_payment owner=${owner_email} amount=${amount} paid_at=${paid_at} paymentId=${paymentId}`,
+      });
+    } catch (auditErr) {
+      console.error('[record-payment] assume-role audit insert failed:', auditErr);
+    }
+  }
   return json({ success: true, paymentId });
 } catch (e) {
   console.error('[record-payment]', e);

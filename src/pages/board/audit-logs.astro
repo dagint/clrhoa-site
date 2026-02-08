@@ -4,7 +4,7 @@ export const prerender = false;
 import BoardLayout from '../../layouts/BoardLayout.astro';
 import { getBoardContext } from '../../lib/board-context';
 import { listOwners, listDirectoryLogs } from '../../lib/directory-db';
-import { listArbAuditLog, listArbRequestsByOwner } from '../../lib/arb-db';
+import { listArbAuditLog, listArbRequestsByHousehold } from '../../lib/arb-db';
 import { listAssessmentPaymentsForAudit } from '../../lib/assessments-db';
 import { listSubmissions } from '../../lib/vendor-submissions-db';
 import { listMemberDocuments } from '../../lib/member-documents-db';
@@ -13,10 +13,12 @@ import { listPreapprovalItems } from '../../lib/preapproval-db';
 import { listAllFeedbackDocs } from '../../lib/feedback-db';
 import { listAllMeetings } from '../../lib/meetings-db';
 import { listVendorAuditLog } from '../../lib/vendors-db';
+import { listPimElevationLog } from '../../lib/pim-db';
+import { listAdminAssumedRoleAudit } from '../../lib/admin-assumed-role-db';
 
 const ctx = await getBoardContext(Astro);
 if (ctx.redirect) return Astro.redirect(ctx.redirect);
-const { env, session } = ctx;
+const { env, session, effectiveRole } = ctx;
 
 const db = env?.DB;
 const directoryLogs = db ? await listDirectoryLogs(db, 500) : [];
@@ -24,7 +26,7 @@ const arbLogs = db ? await listArbAuditLog(db, 500) : [];
 const owners = db ? await listOwners(db) : [];
 const ownersWithCreator = owners.filter((o) => o.created_by_email?.trim());
 const ownersWithUpdater = owners.filter((o) => o.updated_by?.trim()).sort((a, b) => (b.updated_at ?? '').localeCompare(a.updated_at ?? ''));
-const allRequests = db ? await listArbRequestsByOwner(db, session.email) : [];
+const allRequests = db ? await listArbRequestsByHousehold(db, session.email) : [];
 const draftCount = allRequests.filter((r) => r.status === 'pending').length;
 
 const paymentAudit = db ? await listAssessmentPaymentsForAudit(db, 300) : [];
@@ -41,6 +43,17 @@ const preapprovalAudit = db ? await listPreapprovalItems(db) : [];
 const feedbackDocsAudit = db ? await listAllFeedbackDocs(db) : [];
 const meetingsAudit = db ? (await listAllMeetings(db)).slice(0, 200) : [];
 const vendorAuditLog = db ? await listVendorAuditLog(db, 300) : [];
+const pimElevationLog = db ? await listPimElevationLog(db, 500) : [];
+// Admin assume-role audit: only visible to Board and Admin (not ARB or ARB+Board).
+const showAdminAssumeRoleAudit = effectiveRole === 'board' || effectiveRole === 'admin';
+let adminAssumedRoleLog: Awaited<ReturnType<typeof listAdminAssumedRoleAudit>> = [];
+if (db && showAdminAssumeRoleAudit) {
+  try {
+    adminAssumedRoleLog = await listAdminAssumedRoleAudit(db, 300);
+  } catch {
+    // Table may not exist yet (run schema-admin-assumed-role.sql)
+  }
+}
 
 const BLANK = '-';
 
@@ -55,10 +68,84 @@ function formatDate(s: string | null): string {
 }
 ---
 
-<BoardLayout title="Audit logs" subtitle="Transparency for elevated access (Board, ARB, Admin)" draftCount={draftCount} role={session.role} mainWide showRoleBanner={false}>
+<BoardLayout title="Audit logs" subtitle="Transparency for elevated access (Board, ARB, Admin)" draftCount={draftCount} role={effectiveRole} session={session} elevatedUntil={session.elevated_until} mainWide showRoleBanner={false}>
   <p class="text-gray-600 mb-8">
-        Full audit logs for transparency: directory (contact reveals, who added/updated owners), assessment payments recorded, vendor list changes and vendor submission approvals/rejections, member document uploads, special assessments, preapproval library, feedback docs, meetings, and ARB status changes.
+        Full audit logs for transparency: PIM elevated access requests, directory (contact reveals, who added/updated owners), assessment payments recorded, vendor list changes and vendor submission approvals/rejections, member document uploads, special assessments, preapproval library, feedback docs, meetings, and ARB status changes.
   </p>
+
+  <!-- Admin assume role: when admins assumed Board/ARB or cleared (Board and Admin only) -->
+  {showAdminAssumeRoleAudit && adminAssumedRoleLog.length > 0 && (
+  <section aria-labelledby="admin-assume-heading">
+    <h2 id="admin-assume-heading" class="text-lg font-heading font-semibold text-clr-green mb-3">Admin assume role (technical assistance)</h2>
+    <p class="text-sm text-gray-600 mb-3">When an administrator assumed Board or ARB role to provide technical assistance, and actions they performed while assumed. One role at a time; all actions are logged.</p>
+    <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50 border-b border-gray-200">
+            <tr>
+              <th class="text-left py-2 px-3 font-medium text-gray-700">When</th>
+              <th class="text-left py-2 px-3 font-medium text-gray-700">Email</th>
+              <th class="text-left py-2 px-3 font-medium text-gray-700">Actor</th>
+              <th class="text-left py-2 px-3 font-medium text-gray-700">Action</th>
+              <th class="text-left py-2 px-3 font-medium text-gray-700">Role assumed</th>
+              <th class="text-left py-2 px-3 font-medium text-gray-700">Detail</th>
+              <th class="text-left py-2 px-3 font-medium text-gray-700">IP</th>
+            </tr>
+          </thead>
+          <tbody>
+            {adminAssumedRoleLog.map((row) => (
+              <tr class="border-b border-gray-100 hover:bg-gray-50/50">
+                <td class="py-2 px-3 text-gray-600">{formatDate(row.created)}</td>
+                <td class="py-2 px-3">{row.admin_email ?? BLANK}</td>
+                <td class="py-2 px-3">{row.actor_role ?? '—'}</td>
+                <td class="py-2 px-3">{row.action === 'assume' ? 'Assume' : row.action === 'clear' ? 'Clear' : 'Action'}</td>
+                <td class="py-2 px-3">{row.role_assumed ?? '—'}</td>
+                <td class="py-2 px-3 text-gray-600 max-w-xs truncate" title={row.action_detail ?? ''}>{row.action_detail ?? '—'}</td>
+                <td class="py-2 px-3 text-gray-500 text-xs">{row.ip_address ?? '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+  )}
+
+  <!-- PIM: elevated access requests (who elevated when, who dropped) -->
+  <section aria-labelledby="pim-elevation-heading">
+    <h2 id="pim-elevation-heading" class="text-lg font-heading font-semibold text-clr-green mb-3">PIM: elevated access requests</h2>
+    <p class="text-sm text-gray-600 mb-3">When someone with an elevated role (Board, ARB, Admin) requested temporary elevated access or dropped it. All CRUD operations while elevated are covered by the other audit sections below.</p>
+    <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      {pimElevationLog.length === 0 ? (
+        <p class="p-4 text-gray-500">No PIM elevation entries yet.</p>
+      ) : (
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead class="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th class="text-left py-2 px-3 font-medium text-gray-700">When</th>
+                <th class="text-left py-2 px-3 font-medium text-gray-700">Email</th>
+                <th class="text-left py-2 px-3 font-medium text-gray-700">Role</th>
+                <th class="text-left py-2 px-3 font-medium text-gray-700">Action</th>
+                <th class="text-left py-2 px-3 font-medium text-gray-700">Expires at</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pimElevationLog.map((row) => (
+                <tr class="border-b border-gray-100 hover:bg-gray-50/50">
+                  <td class="py-2 px-3 text-gray-600">{formatDate(row.elevated_at)}</td>
+                  <td class="py-2 px-3">{row.email ?? BLANK}</td>
+                  <td class="py-2 px-3">{row.role ?? BLANK}</td>
+                  <td class="py-2 px-3">{row.action === 'elevate' ? 'Elevated' : 'Dropped'}</td>
+                  <td class="py-2 px-3 text-gray-600">{row.expires_at ? formatDate(row.expires_at) : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  </section>
 
   <!-- Directory: contact reveal log -->
       <section aria-labelledby="dir-reveal-heading">
@@ -176,6 +263,8 @@ function formatDate(s: string | null): string {
                     <th class="text-left py-2 px-3 font-medium text-gray-700">Owner (email)</th>
                     <th class="text-left py-2 px-3 font-medium text-gray-700">Paid at</th>
                     <th class="text-left py-2 px-3 font-medium text-gray-700">Amount</th>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">Method</th>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">Check #</th>
                     <th class="text-left py-2 px-3 font-medium text-gray-700">Recorded by</th>
                   </tr>
                 </thead>
@@ -186,6 +275,8 @@ function formatDate(s: string | null): string {
                       <td class="py-2 px-3">{row.owner_email ?? BLANK}</td>
                       <td class="py-2 px-3">{row.paid_at ?? BLANK}</td>
                       <td class="py-2 px-3">{row.amount != null ? `$${Number(row.amount).toFixed(2)}` : BLANK}</td>
+                      <td class="py-2 px-3">{row.payment_method === 'electronic_transfer' ? 'E-transfer' : row.payment_method === 'check' ? 'Check' : row.payment_method === 'cash' ? 'Cash' : row.payment_method ?? BLANK}</td>
+                      <td class="py-2 px-3">{row.check_number ?? BLANK}</td>
                       <td class="py-2 px-3">{row.recorded_by ?? BLANK}</td>
                     </tr>
                   ))}

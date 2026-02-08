@@ -1,7 +1,7 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 
-// StaticForms (optional) or Phase 3.5 /api/contact (MailChannels → NOTIFY_BOARD_EMAIL)
+// StaticForms (optional) or Phase 3.5 /api/contact (email via Resend or MailChannels → NOTIFY_BOARD_EMAIL)
 const staticformsApiKey = import.meta.env.PUBLIC_STATICFORMS_API_KEY ?? '';
 const formAction = staticformsApiKey ? 'https://api.staticforms.dev/submit' : '/api/contact';
 const thanksUrl = `${import.meta.env.SITE ?? 'https://clrhoa.com'}/contact/thanks`;
@@ -29,13 +29,13 @@ const prefillMessage = vendorParam
 
       <section class="mb-8">
         <p class="text-gray-700 mb-4 font-body">
-          Use the form below to contact the <strong>Board of Directors</strong> or the <strong>Architectural Review Board (ARB)</strong> directly. Choose who you want to reach and your message will be sent securely to that group.
+          Use the form below to contact the <strong>Board of Directors</strong> or the <strong>Architectural Review Board (ARB)</strong> directly. Choose who you want to reach and your message will be sent securely to that group. You can use this form to submit an ARB request the traditional way—select ARB as the recipient and describe your project; your message goes directly to the ARB. (If you need to send documents or photos, a member of the ARB will follow up with you.) Alternatively, you can submit ARB requests via the <a href="/portal/login" class="text-clr-orange hover:underline font-semibold">Member Portal</a> (More → New ARB request), where you can attach files and track status.
         </p>
         <p class="text-gray-700 mb-6 font-body">
-          This form does not accept file attachments. If your matter requires documents or photos, send your message here and a member of the Board or ARB will reach out to you to arrange sharing attachments.
+          This form does not accept file attachments. If your matter requires documents or photos, send your message here and a member of the Board or ARB will reach out to you to arrange sharing them.
         </p>
 
-        <!-- Contact form: StaticForms (if configured) or /api/contact (MailChannels → NOTIFY_BOARD_EMAIL) -->
+        <!-- Contact form: StaticForms (if configured) or /api/contact (email via Resend or MailChannels → NOTIFY_BOARD_EMAIL) -->
         <div class="bg-clr-beige/30 border border-gray-100 rounded-xl p-6 mb-8">
           <h2 class="text-xl font-heading font-semibold text-clr-green mb-4">Send a message</h2>
           <form id="contact-form" action={formAction} method="POST" class="space-y-4" novalidate data-redirect-to={thanksUrl}>
@@ -191,8 +191,7 @@ const prefillMessage = vendorParam
             <div>
               <h3 class="text-lg font-heading font-semibold text-clr-green mb-2">When are HOA dues due?</h3>
               <p class="text-gray-700 font-body">
-                Dues are typically due quarterly. Check the latest news and announcements
-                for specific due dates and payment instructions.
+                Payments are due on the <strong>1st of the month</strong> for each quarter: January 1, April 1, July 1, and October 1. Check the latest news and the <a href="/dues" class="text-clr-orange hover:underline font-semibold">Dues</a> page for payment instructions.
               </p>
             </div>
             <div>

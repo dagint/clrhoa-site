@@ -1,10 +1,11 @@
 /**
  * Portal page context: env + session (and optional fingerprint).
  * Use getPortalContext(Astro) so pages don't repeat runtime/cookie/session logic.
+ * effectiveRole is used for UI (PIM: member until user requests elevation).
  */
 
 import type { SessionPayload } from './auth';
-import { getSessionFromCookie } from './auth';
+import { getSessionFromCookie, getEffectiveRole } from './auth';
 
 /** Minimal Astro-like context for portal pages. */
 export interface PortalContextAstro {
@@ -15,6 +16,7 @@ export interface PortalContextAstro {
 export interface PortalContextResult {
   env: PortalContextAstro['locals']['runtime'] extends { env: infer E } ? E : undefined;
   session: SessionPayload | null;
+  effectiveRole: string;
   userAgent?: string | null;
   ipAddress?: string | null;
 }
@@ -53,6 +55,7 @@ export async function getPortalContext(
   return {
     env,
     session,
+    effectiveRole: session ? getEffectiveRole(session) : 'member',
     userAgent,
     ipAddress,
   };

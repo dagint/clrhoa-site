@@ -4,17 +4,17 @@ export const prerender = false;
 import BoardLayout from '../../layouts/BoardLayout.astro';
 import { getBoardContext } from '../../lib/board-context';
 import { listAllMeetings } from '../../lib/meetings-db';
-import { listArbRequestsByOwner } from '../../lib/arb-db';
+import { listArbRequestsByHousehold } from '../../lib/arb-db';
 
 const ctx = await getBoardContext(Astro);
 if (ctx.redirect) return Astro.redirect(ctx.redirect);
-const { env, session } = ctx;
-const isBoard = session.role === 'board' || session.role === 'admin' || session.role === 'arb_board';
+const { env, session, effectiveRole } = ctx;
+const isBoard = effectiveRole === 'board' || effectiveRole === 'admin' || effectiveRole === 'arb_board';
 if (!isBoard) return Astro.redirect('/portal/dashboard');
 
 const db = env?.DB;
 const meetings = db ? await listAllMeetings(db) : [];
-const allRequests = db ? await listArbRequestsByOwner(db, session.email) : [];
+const allRequests = db ? await listArbRequestsByHousehold(db, session.email) : [];
 const draftCount = allRequests.filter((r) => r.status === 'pending').length;
 
 function formatDateTime(dt: string): string {
@@ -33,7 +33,7 @@ function formatDateTime(dt: string): string {
 }
 ---
 
-<BoardLayout title="Meetings" subtitle="Manage meetings and agendas" draftCount={draftCount} role={session.role}>
+<BoardLayout title="Meetings" subtitle="Manage meetings and agendas" draftCount={draftCount} role={effectiveRole} session={session} elevatedUntil={session.elevated_until}>
   <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
         <h2 class="text-xl font-heading font-bold text-clr-green">Meetings</h2>
         <button

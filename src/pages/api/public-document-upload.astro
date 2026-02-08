@@ -6,7 +6,7 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie, verifyCsrfToken, verifyOrigin } from '../../lib/auth';
+import { getSessionFromCookie, verifyCsrfToken, verifyOrigin, getEffectiveRole } from '../../lib/auth';
 import {
   isManagedPublicDocSlug,
   BOARD_ONLY_SLUGS,
@@ -63,9 +63,10 @@ if (!slug || !isManagedPublicDocSlug(slug)) {
   });
 }
 
-const isBoard = session.role === 'board' || session.role === 'admin' || session.role === 'arb_board';
+const effectiveRole = getEffectiveRole(session);
+const isBoard = effectiveRole === 'board' || effectiveRole === 'admin' || effectiveRole === 'arb_board';
 const canEditBoardDocs = isBoard;
-const canEditArbForm = isBoard || session.role === 'arb';
+const canEditArbForm = isBoard || effectiveRole === 'arb';
 
 const allowedBoard = BOARD_ONLY_SLUGS.includes(slug as typeof BOARD_ONLY_SLUGS[number]);
 const isArbForm = slug === ARB_FORM_SLUG;
@@ -115,7 +116,7 @@ await r2.put(fileKey, buf, {
   httpMetadata: { contentType: file.type },
 });
 
-await setPublicDocumentFile(db, slug, fileKey, file.type, session.email, session.role);
+await setPublicDocumentFile(db, slug, fileKey, file.type, session.email, effectiveRole);
 
 return new Response(
   JSON.stringify({

@@ -6,7 +6,7 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie } from '../../lib/auth';
+import { getSessionFromCookie, getEffectiveRole } from '../../lib/auth';
 import { listAllArbRequestsFiltered } from '../../lib/arb-db';
 import { escapeHtml } from '../../lib/sanitize';
 
@@ -21,7 +21,7 @@ if (!session) {
   return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
 }
 const allowedRoles = ['arb', 'board', 'admin', 'arb_board'];
-if (!allowedRoles.includes(session.role)) {
+if (!allowedRoles.includes(getEffectiveRole(session))) {
   return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403, headers: { 'Content-Type': 'application/json' } });
 }
 

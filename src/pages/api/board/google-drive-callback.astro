@@ -4,7 +4,7 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie } from '../../../lib/auth';
+import { getSessionFromCookie, getEffectiveRole } from '../../../lib/auth';
 import { encryptRefreshToken } from '../../../lib/backup-encrypt';
 
 const runtime = Astro.locals.runtime;
@@ -17,7 +17,8 @@ const session = await getSessionFromCookie(
   Astro.request.headers.get('cookie') ?? undefined,
   env?.SESSION_SECRET
 );
-if (!session || (session.role !== 'board' && session.role !== 'admin')) {
+const effectiveRole = session ? getEffectiveRole(session) : 'member';
+if (!session || (effectiveRole !== 'board' && effectiveRole !== 'admin')) {
   return Astro.redirect('/portal/login');
 }
 

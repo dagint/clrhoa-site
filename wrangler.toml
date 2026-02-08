@@ -43,12 +43,15 @@ bucket_name = "clrhoa-files"
 # Optional Google Drive: set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, BACKUP_ENCRYPTION_KEY via wrangler secret put.
 # CLOUDFLARE_ACCOUNT_ID = your Cloudflare account id (dashboard URL or API)
 
-# Phase 3.5: Notifications (MailChannels + Twilio). Change emails without code.
-# For production, set MAILCHANNELS_API_KEY and Twilio vars via: wrangler secret put MAILCHANNELS_API_KEY
+# Phase 3.5: Notifications — email (Resend or MailChannels) + Twilio. Change emails without code.
+# Email: set RESEND_API_KEY (recommended, free tier) or MAILCHANNELS_API_KEY via wrangler secret put.
+# Twilio: set TWILIO_* vars for SMS. See docs/EMAIL_PROVIDER_OPTIONS.md and docs/PHASE35_NOTIFICATIONS_SETUP.md.
 [vars]
 NOTIFY_BOARD_EMAIL = "your_personal@gmail.com"
 NOTIFY_ARB_EMAIL = "your_personal@gmail.com"
 NOTIFY_NOREPLY_EMAIL = "noreply@clrhoa.com"
+# RESEND_API_KEY = "re_..."   # preferred; set via wrangler secret put
+# MAILCHANNELS_API_KEY = "your_key"   # used only when RESEND_API_KEY is not set
 MAILCHANNELS_API_KEY = "your_key"
 TWILIO_ACCOUNT_SID = "your_sid"
 TWILIO_AUTH_TOKEN = "your_token"

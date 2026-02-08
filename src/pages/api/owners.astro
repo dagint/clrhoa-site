@@ -5,8 +5,8 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie, verifyCsrfToken, verifyOrigin, setLoginWhitelistRole, removeFromLoginWhitelistUnlessAdmin, VALID_ROLES } from '../../lib/auth';
-import { listOwners, getOwnerById, insertOwner, updateOwner, deleteOwners, getOwnerByEmail, getOwnersByIds } from '../../lib/directory-db';
+import { getSessionFromCookie, verifyCsrfToken, verifyOrigin, setLoginWhitelistRole, removeFromLoginWhitelistUnlessAdmin, VALID_ROLES, isElevatedRole, getEffectiveRole, isBoardOrArbOnly } from '../../lib/auth';
+import { listOwners, getOwnerById, insertOwner, updateOwner, deleteOwners, getOwnerByEmail, getOwnersByIds, validateLotNumber } from '../../lib/directory-db';
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
@@ -34,8 +34,10 @@ if (!session) {
   });
 }
 
-const isBoard = session.role === 'board' || session.role === 'admin' || session.role === 'arb_board';
-const canManageDirectory = isBoard || session.role === 'arb';
+const effectiveRole = getEffectiveRole(session);
+/** List directory: any elevated role. Write: board, arb, arb_board, or admin (admins can manage directory). */
+const canManageDirectory = isElevatedRole(effectiveRole);
+const canWriteDirectory = isBoardOrArbOnly(effectiveRole) || effectiveRole === 'admin';
 const origin = Astro.request.headers.get('origin');
 const referer = Astro.request.headers.get('referer');
 const expectedOrigin = Astro.url.origin;
@@ -69,15 +71,15 @@ if (Astro.request.method === 'GET') {
   });
 }
 
-// POST: create owner (board only)
+// POST: create owner (board, arb, arb_board only; not admin)
 if (Astro.request.method === 'POST') {
-  if (!isBoard) {
+  if (!canWriteDirectory) {
     return new Response(JSON.stringify({ error: 'Forbidden' }), {
       status: 403,
       headers: { 'Content-Type': 'application/json' },
     });
   }
-  let body: { name?: string; address?: string; phone?: string; email?: string; role?: string; csrf_token?: string; csrfToken?: string };
+  let body: { name?: string; address?: string; phone?: string; email?: string; role?: string; lot_number?: string; csrf_token?: string; csrfToken?: string };
   try {
     body = await Astro.request.json();
   } catch {
@@ -101,11 +103,19 @@ if (Astro.request.method === 'POST') {
   }
   const role = (body.role ?? 'member').trim().toLowerCase();
   const roleToStore = VALID_ROLES.has(role) ? role : 'member';
+  const lotNumber = body.lot_number?.trim() || null;
+  if (isElevatedRole(roleToStore) && !validateLotNumber(lotNumber)) {
+    return new Response(JSON.stringify({ error: 'Lot number is required for elevated roles (ARB, Board, Admin). Use 1–25.' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
   const id = await insertOwner(
     db,
     {
       name: body.name ?? null,
       address: body.address ?? null,
+      lot_number: lotNumber,
       phone: body.phone ?? null,
       email: emailRaw,
     },
@@ -118,15 +128,15 @@ if (Astro.request.method === 'POST') {
   });
 }
 
-// PUT: update owner (board only)
+// PUT: update owner (board, arb, arb_board only; not admin)
 if (Astro.request.method === 'PUT') {
-  if (!isBoard) {
+  if (!canWriteDirectory) {
     return new Response(JSON.stringify({ error: 'Forbidden' }), {
       status: 403,
       headers: { 'Content-Type': 'application/json' },
     });
   }
-  let body: { id?: string; name?: string; address?: string; phone?: string; email?: string; role?: string; is_primary?: boolean; csrf_token?: string; csrfToken?: string };
+  let body: { id?: string; name?: string; address?: string; phone?: string; email?: string; role?: string; is_primary?: boolean; lot_number?: string; csrf_token?: string; csrfToken?: string };
   try {
     body = await Astro.request.json();
   } catch {
@@ -152,9 +162,20 @@ if (Astro.request.method === 'PUT') {
   const oldEmail = existing?.email?.trim().toLowerCase();
   const role = body.role !== undefined ? (String(body.role).trim().toLowerCase()) : undefined;
   const roleToStore = role !== undefined && VALID_ROLES.has(role) ? role : undefined;
+  const lotNumber = body.lot_number !== undefined ? (body.lot_number?.trim() || null) : undefined;
+  if (roleToStore !== undefined && isElevatedRole(roleToStore)) {
+    const effectiveLot = lotNumber !== undefined ? lotNumber : (existing?.lot_number ?? null);
+    if (!validateLotNumber(effectiveLot)) {
+      return new Response(JSON.stringify({ error: 'Lot number is required for elevated roles. Use 1–25.' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+  }
   const updated = await updateOwner(db, id, {
     name: body.name,
     address: body.address,
+    lot_number: lotNumber,
     phone: body.phone,
     email: body.email,
     is_primary: body.is_primary,
@@ -182,9 +203,9 @@ if (Astro.request.method === 'PUT') {
   });
 }
 
-// DELETE: delete one or more owners (board, admin, arb)
+// DELETE: delete one or more owners (board, arb, arb_board only; not admin)
 if (Astro.request.method === 'DELETE') {
-  if (!canManageDirectory) {
+  if (!canWriteDirectory) {
     return new Response(JSON.stringify({ error: 'Forbidden' }), {
       status: 403,
       headers: { 'Content-Type': 'application/json' },

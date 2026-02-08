@@ -1,0 +1,355 @@
+---
+export const prerender = false;
+
+import PortalLayout from '../../layouts/PortalLayout.astro';
+import ProtectedPage from '../../components/ProtectedPage.astro';
+import PortalNav from '../../components/PortalNav.astro';
+import { getPortalContext } from '../../lib/portal-context';
+import { listArbRequestsByHousehold, listArbAuditLogForRequest, getSubmittedForReviewAt } from '../../lib/arb-db';
+import type { ArbRequest, ArbAuditLogRow } from '../../lib/arb-db';
+import { sanitizeForDisplay } from '../../lib/sanitize';
+
+const { env, session, effectiveRole } = await getPortalContext(Astro, { fingerprint: true });
+if (!session) return Astro.redirect('/portal/login');
+
+const db = env?.DB;
+const requests = db ? await listArbRequestsByHousehold(db, session.email) : [];
+const auditByRequestId: Record<string, ArbAuditLogRow[]> = {};
+const submittedForReviewAt: Record<string, string | null> = {};
+
+if (db) {
+  for (const req of requests) {
+    const [audit, submittedAt] = await Promise.all([
+      listArbAuditLogForRequest(db, req.id),
+      getSubmittedForReviewAt(db, req.id),
+    ]);
+    auditByRequestId[req.id] = audit;
+    submittedForReviewAt[req.id] = submittedAt;
+  }
+}
+
+const draftCount = requests.filter((r) => r.status === 'pending').length;
+const inReviewCount = requests.filter((r) => r.status === 'in_review').length;
+const nonFinalCount = draftCount + inReviewCount;
+
+function formatDate(s: string | null | undefined): string {
+  if (!s) return '—';
+  try {
+    return new Date(s).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+  } catch {
+    return s;
+  }
+}
+
+function formatDateTime(s: string | null | undefined): string {
+  if (!s) return '—';
+  try {
+    return new Date(s).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
+  } catch {
+    return s;
+  }
+}
+
+function daysInReview(submittedAt: string | null | undefined): number | null {
+  if (!submittedAt) return null;
+  const start = new Date(submittedAt).getTime();
+  const now = Date.now();
+  return Math.floor((now - start) / (24 * 60 * 60 * 1000));
+}
+
+function timelineLabel(row: ArbAuditLogRow): string {
+  const action = (row.action ?? '').replace(/_/g, ' ');
+  const by = row.changed_by_email ?? row.changed_by_role ?? 'System';
+  const when = formatDateTime(row.created);
+  if (row.action === 'create') return `Created · ${when}`;
+  if (row.action === 'submit_for_review') return `Submitted for review · ${when}`;
+  if (row.action === 'request_revision') return `Revision requested by ARB · ${when}`;
+  if (row.action === 'cancel') return `Cancelled · ${when}`;
+  if (row.new_status === 'approved') return `Approved by ${by} · ${when}`;
+  if (row.new_status === 'rejected') return `Rejected · ${when}`;
+  return `${action} · ${when}`;
+}
+
+/** Tabs match ARB request status (single source of truth). */
+const TABS = [
+  { id: 'all', label: 'All' },
+  { id: 'pending', label: 'Pending' },
+  { id: 'in_review', label: 'In review' },
+  { id: 'approved', label: 'Approved' },
+  { id: 'rejected', label: 'Rejected' },
+  { id: 'cancelled', label: 'Cancelled' },
+] as const;
+
+function tabFilter(tabId: string, req: ArbRequest): boolean {
+  if (tabId === 'all') return true;
+  return req.status === tabId;
+}
+
+function statusBadgeClass(status: string): string {
+  switch (status) {
+    case 'pending':
+      return 'bg-amber-100 text-amber-800';
+    case 'in_review':
+      return 'bg-blue-100 text-blue-800';
+    case 'approved':
+      return 'bg-green-100 text-green-800';
+    case 'cancelled':
+      return 'bg-gray-100 text-gray-600';
+    default:
+      return 'bg-red-100 text-red-800';
+  }
+}
+
+function statusLabel(status: string): string {
+  if (status === 'pending') return 'Pending';
+  if (status === 'in_review') return 'In review';
+  if (status === 'approved') return 'Approved';
+  if (status === 'rejected') return 'Rejected';
+  if (status === 'cancelled') return 'Cancelled';
+  return status;
+}
+---
+
+<PortalLayout title="Requests | Member Portal | Crooked Lake Reserve HOA">
+  <ProtectedPage>
+  <div class="min-h-screen portal-theme-bg font-body">
+    <PortalNav currentPath="/portal/requests" draftCount={draftCount} arbInReviewCount={inReviewCount} role={effectiveRole} staffRole={session?.role ?? ''} />
+
+    <main class="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+      <h2 class="text-2xl font-heading font-bold text-clr-green mb-2">Requests</h2>
+      <p class="text-gray-600 portal-theme-text-muted mb-2">
+        View and track your ARB requests. Use tabs to filter by status. Live updates refresh automatically.
+      </p>
+      <p class="text-sm text-gray-500 portal-theme-text-muted mb-6">
+        ARB = Architectural Review Board. &quot;In review&quot; means the board is currently reviewing your request.
+      </p>
+
+      <div class="flex flex-wrap items-center gap-2 mb-4" role="tablist" aria-label="Filter by status">
+        {TABS.map((tab) => {
+          const count = tab.id === 'all' ? requests.length : requests.filter((r) => tabFilter(tab.id, r)).length;
+          return (
+            <a
+              href="#"
+              data-tab={tab.id}
+              class={`tab-link inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${tab.id === 'all' ? 'bg-clr-green text-white' : 'bg-white portal-theme-card border border-gray-200 text-gray-700 hover:bg-gray-50'}`}
+              role="tab"
+            >
+              {tab.label}
+              {count > 0 && (
+                <span
+                  class={`inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 rounded-full text-xs font-bold ${(tab.id === 'pending' || tab.id === 'in_review') && count > 0 ? 'bg-red-500 text-white' : 'bg-gray-200 text-gray-700'}`}
+                >
+                  {count}
+                </span>
+              )}
+            </a>
+          );
+        })}
+      </div>
+
+      <p class="text-sm text-gray-500 portal-theme-text-muted mb-4">
+        <a href="/portal/arb-request" class="text-clr-green font-semibold hover:underline">Submit a new ARB request</a>
+        <span class="mx-2">·</span>
+        <a href="/portal/my-requests" class="text-clr-green hover:underline">My requests (full view)</a>
+        <span class="mx-2">·</span>
+        <button type="button" id="requests-refresh-btn" class="text-clr-green hover:underline bg-transparent border-0 cursor-pointer p-0 font-inherit text-inherit">Refresh</button>
+        <span id="requests-last-updated" class="ml-2 text-gray-400 text-xs" aria-live="polite"></span>
+      </p>
+
+      <div id="requests-list-container">
+        {requests.length === 0 ? (
+          <div class="bg-white portal-theme-card rounded-2xl shadow-sm border border-gray-100 p-8 text-center">
+            <p class="text-gray-600 mb-4">You don’t have any ARB requests yet.</p>
+            <p class="text-sm text-gray-500 mb-4">Submit your first request when you’re planning exterior changes (paint, landscaping, fencing, etc.).</p>
+            <a href="/portal/arb-request" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-clr-green hover:brightness-110 text-white font-semibold text-sm">Submit your first ARB request</a>
+          </div>
+        ) : (
+          <ul id="requests-list" class="space-y-4">
+            {requests.map((req) => {
+              const audit = auditByRequestId[req.id] ?? [];
+              const submittedAt = submittedForReviewAt[req.id];
+              const days = daysInReview(submittedAt);
+              const tabClass = TABS.map((t) => (tabFilter(t.id, req) ? `tab-${t.id}` : '')).filter(Boolean).join(' ');
+              return (
+                <li
+                  class={`request-card bg-white portal-theme-card rounded-2xl shadow-sm border border-gray-100 overflow-hidden ${tabClass}`}
+                  data-status={req.status}
+                >
+                  <button
+                    type="button"
+                    class="request-summary w-full text-left p-4 sm:p-6 flex flex-wrap justify-between gap-2 items-start hover:bg-gray-50 transition-colors"
+                    data-request-id={req.id}
+                    aria-expanded="false"
+                  >
+                    <div class="flex-1 min-w-0">
+                      <div class="flex flex-wrap items-center justify-between gap-2 mb-1">
+                        <span class="font-mono text-sm text-gray-500">#{req.id}</span>
+                        <span class={`inline-flex px-2 py-1 rounded text-xs font-semibold shrink-0 ${statusBadgeClass(req.status)}`}>
+                          {statusLabel(req.status)}
+                        </span>
+                      </div>
+                      <p class="text-gray-700 line-clamp-2" set:html={sanitizeForDisplay(req.description)}></p>
+                      <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-xs text-gray-500 portal-theme-text-muted">
+                        <span>Submitted: {formatDateTime(req.created)}</span>
+                        {req.status === 'in_review' && submittedAt && (
+                          <span class="font-medium text-blue-700">
+                            In review since {formatDate(submittedAt)}
+                            {days != null && ` (${days} day${days !== 1 ? 's' : ''})`}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <span class="request-chevron text-gray-400 shrink-0 ml-2" aria-hidden="true">&#9660;</span>
+                  </button>
+                  <div class="request-details hidden border-t border-gray-100 bg-gray-50/50" data-request-id={req.id}>
+                    <div class="p-4 sm:p-6 space-y-4">
+                      <div class="rounded-xl border border-gray-200 bg-white p-4 sm:p-6 space-y-4 text-sm">
+                        <h3 class="text-lg font-heading font-bold text-clr-green border-b border-gray-100 pb-2">#{req.id}</h3>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div>
+                            <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Applicant</label>
+                            <p class="text-gray-800">{sanitizeForDisplay(req.applicant_name) || '—'}</p>
+                          </div>
+                          <div>
+                            <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Property</label>
+                            <p class="text-gray-800">{sanitizeForDisplay(req.property_address) || '—'}</p>
+                          </div>
+                        </div>
+                        <div>
+                          <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Application for</label>
+                          <p class="text-gray-800">{sanitizeForDisplay(req.application_type) || '—'}</p>
+                        </div>
+                        <div>
+                          <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Description</label>
+                          <div class="text-gray-800 whitespace-pre-wrap" set:html={sanitizeForDisplay(req.description)}></div>
+                        </div>
+                        {req.status === 'in_review' && submittedAt && (
+                          <div class="rounded-lg bg-blue-50 border border-blue-200 p-3">
+                            <p class="text-sm font-medium text-blue-900">
+                              Submitted for approval on {formatDateTime(submittedAt)}
+                              {days != null && (
+                                <span class="block mt-1 text-blue-700">In review for {days} day{days !== 1 ? 's' : ''}</span>
+                              )}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                      {audit.length > 0 && (
+                        <div class="rounded-xl border border-gray-200 bg-white p-4">
+                          <h4 class="text-sm font-heading font-semibold text-clr-green mb-3">Timeline</h4>
+                          <ul class="space-y-2" role="list">
+                            {audit.map((row) => (
+                              <li class="flex gap-3 text-sm">
+                                <span class="shrink-0 w-2 h-2 rounded-full bg-clr-green mt-1.5" aria-hidden="true"></span>
+                                <div>
+                                  <p class="text-gray-800">{timelineLabel(row)}</p>
+                                  {row.notes && (
+                                    <p class="text-gray-600 text-xs mt-0.5 whitespace-pre-wrap">{row.notes}</p>
+                                  )}
+                                </div>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      <div class="flex flex-wrap gap-3">
+                        <a href={`/portal/my-requests#${req.id}`} class="text-sm text-clr-green font-semibold hover:underline">Open full view</a>
+                        {req.status === 'pending' && (
+                          <a href={`/portal/arb-request/edit/${req.id}`} class="text-sm text-clr-green hover:underline">Edit</a>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+    </main>
+  </div>
+  </ProtectedPage>
+</PortalLayout>
+
+<script define:vars={{ requests: requests, auditByRequestId: auditByRequestId, submittedForReviewAt: submittedForReviewAt, TABS: TABS }}>
+  (function () {
+    if (typeof window === 'undefined') return;
+
+    const listEl = document.getElementById('requests-list');
+    const container = document.getElementById('requests-list-container');
+    if (!listEl) return;
+
+    let currentTab = 'all';
+
+    function getTabCounts() {
+      const counts = { all: requests.length, pending: 0, in_review: 0, approved: 0, rejected: 0, cancelled: 0 };
+      requests.forEach(function (r) {
+        if (r.status === 'pending') counts.pending++;
+        else if (r.status === 'in_review') counts.in_review++;
+        else if (r.status === 'approved') counts.approved++;
+        else if (r.status === 'rejected') counts.rejected++;
+        else if (r.status === 'cancelled') counts.cancelled++;
+      });
+      return counts;
+    }
+
+    function filterTab(id) {
+      currentTab = id;
+      listEl.querySelectorAll('.request-card').forEach(function (li) {
+        const status = li.getAttribute('data-status');
+        const show = id === 'all' ? true : status === id;
+        li.style.display = show ? '' : 'none';
+      });
+      document.querySelectorAll('.tab-link').forEach(function (a) {
+        const tabId = a.getAttribute('data-tab');
+        a.classList.toggle('bg-clr-green', tabId === id);
+        a.classList.toggle('text-white', tabId === id);
+        a.classList.toggle('bg-white', tabId !== id);
+        a.classList.toggle('text-gray-700', tabId !== id);
+      });
+    }
+
+    document.querySelectorAll('.tab-link').forEach(function (a) {
+      a.addEventListener('click', function (e) {
+        e.preventDefault();
+        const tabId = a.getAttribute('data-tab');
+        if (tabId) filterTab(tabId);
+      });
+    });
+
+    document.querySelectorAll('.request-summary').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const id = this.getAttribute('data-request-id');
+        const details = document.querySelector('.request-details[data-request-id="' + id + '"]');
+        const chevron = this.querySelector('.request-chevron');
+        if (!details) return;
+        const isExpanded = !details.classList.contains('hidden');
+        details.classList.toggle('hidden', isExpanded);
+        btn.setAttribute('aria-expanded', isExpanded ? 'false' : 'true');
+        if (chevron) chevron.style.transform = isExpanded ? '' : 'rotate(180deg)';
+      });
+    });
+
+    document.getElementById('requests-refresh-btn')?.addEventListener('click', function () {
+      window.location.reload();
+    });
+
+    function refetch() {
+      fetch('/api/portal/requests', { credentials: 'same-origin' })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (data) {
+          if (!data || !data.requests) return;
+          var el = document.getElementById('requests-last-updated');
+          if (el) el.textContent = 'Updated ' + new Date().toLocaleTimeString();
+          window.__requestsData = data;
+        })
+        .catch(function () {});
+    }
+
+    try {
+      var es = new EventSource('/api/portal/requests/sse', { withCredentials: true });
+      es.onmessage = function () { refetch(); };
+      es.onerror = function () { es.close(); };
+    } catch (e) {}
+  })();
+</script>

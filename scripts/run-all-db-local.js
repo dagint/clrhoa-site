@@ -84,7 +84,13 @@ run('db:public-documents', 'schema-public-documents.sql');
 run('db:member-documents', 'schema-member-documents.sql');
 run('db:backup-config', 'schema-backup-config.sql');
 run('db:assessment-recorded-by', 'schema-assessment-payments-recorded-by.sql');
+run('db:assessment-paid-through-after', 'schema-assessment-payments-paid-through-after.sql');
 run('db:owners-primary', 'schema-owners-primary.sql');
+run('db:owners-lot-number', 'schema-owners-lot-number.sql');
+run('db:news-items-placement', 'schema-news-items-placement-and-images.sql');
+run('db:pim-elevation', 'schema-pim-elevation.sql');
+run('db:notification-dismissals', 'schema-notification-dismissals.sql');
+run('db:assessment-payments-method-check', 'schema-assessment-payments-method-check.sql');
 
 console.log('\nAll local DB migrations completed. You can run npm run dev.');
 process.exit(0);

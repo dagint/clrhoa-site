@@ -77,6 +77,10 @@ These run every migration in the correct order. Use them when bringing a new DB 
 | 28 | `npm run db:member-documents:local` | `npm run db:member-documents` |
 | 29 | `npm run db:backup-config:local` | `npm run db:backup-config` |
 | 30 | `npm run db:assessment-recorded-by:local` | `npm run db:assessment-recorded-by` |
+| 31 | `npm run db:admin-assumed-role:local` | `npm run db:admin-assumed-role` |
+| 32 | `npm run db:admin-assumed-role-actor:local` | `npm run db:admin-assumed-role-actor` |
+
+Step 31 creates the `admin_assumed_role_audit` table (admins and arb_board assume Board or ARB, one at a time; all assume/clear and actions-while-assumed are logged). Step 32 adds the `actor_role` column (admin vs arb_board). If the table already existed without it, run step 32.
 
 ---
 

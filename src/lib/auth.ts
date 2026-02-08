@@ -16,6 +16,14 @@ export interface SessionPayload {
   sessionId?: string; // Unique session identifier
   fingerprint?: string; // Browser + IP fingerprint hash
   createdAt?: number; // Session creation timestamp
+  /** PIM: Unix ms when elevated access expires. When set and > now, effective role is session.role; else effective = 'member' for elevated whitelist roles. */
+  elevated_until?: number;
+  /** Admin and arb_board: temporarily act as Board or ARB (not both). When set, getEffectiveRole returns this. Logged and auditable. */
+  assumed_role?: 'board' | 'arb';
+  /** When assumed_role was set (Unix ms). Used for display and audit. */
+  assumed_at?: number;
+  /** When assumed role expires (Unix ms). After this, user falls back to admin or arb_board until they assume again or drop. */
+  assumed_until?: number;
 }
 
 export interface EnvWithAuth {
@@ -41,8 +49,59 @@ export async function isEmailWhitelisted(
 export const ELEVATED_ROLES = new Set<string>(['arb', 'board', 'arb_board', 'admin']);
 export const VALID_ROLES = new Set<string>(['member', 'arb', 'board', 'arb_board', 'admin']);
 
+/** PIM: 2-hour window for JIT elevated access. */
+export const PIM_ELEVATION_TTL_MS = 2 * 60 * 60 * 1000;
+
 export function isElevatedRole(role: string): boolean {
   return ELEVATED_ROLES.has(role.toLowerCase());
+}
+
+/**
+ * True only for effective role 'board'. arb_board must elevate to Board to record payments;
+ * admin must assume Board. Ensures one-role-at-a-time for arb_board.
+ */
+export function canRecordPayments(role: string): boolean {
+  const r = role?.toLowerCase();
+  return r === 'board';
+}
+
+/**
+ * True for effective role 'arb' or 'board'. arb_board must elevate to ARB (or Board) to approve;
+ * admin must assume ARB. Ensures one-role-at-a-time for arb_board.
+ */
+export function canApproveArb(role: string): boolean {
+  const r = role?.toLowerCase();
+  return r === 'arb' || r === 'board';
+}
+
+/**
+ * True for board, arb, or arb_board (not admin). Use for directory CRUD, directory export/CSV,
+ * and any other operation that should be restricted from admin while allowing browse access.
+ */
+export function isBoardOrArbOnly(role: string): boolean {
+  const r = role?.toLowerCase();
+  return r === 'board' || r === 'arb' || r === 'arb_board';
+}
+
+/**
+ * Effective role for access control (PIM/JIT). If user has an elevated whitelist role but
+ * elevated_until is missing or expired, they see member access until they request elevation.
+ * For admin and arb_board: if assumed_role is set and not expired, returns that role (board or arb)
+ * so they act in one capacity at a time; otherwise returns session role (admin or arb_board).
+ */
+export function getEffectiveRole(session: SessionPayload | null): string {
+  if (!session) return 'member';
+  const role = session.role?.toLowerCase() ?? 'member';
+  if (!ELEVATED_ROLES.has(role)) return session.role ?? 'member';
+  const until = session.elevated_until;
+  if (until == null || until < Date.now()) return 'member';
+  // Admin and arb_board: act as Board or ARB only when explicitly elevated; one at a time; timeout clears it.
+  if (role === 'admin' || role === 'arb_board') {
+    const assumed = session.assumed_role;
+    const assumedUntil = session.assumed_until;
+    if (assumed && (assumedUntil == null || assumedUntil > Date.now())) return assumed;
+  }
+  return session.role ?? 'member';
 }
 
 /**
@@ -294,14 +353,83 @@ export async function updateSessionActivity(
 ): Promise<string | null> {
   const session = await getSessionFromCookie(cookieHeader, secret, userAgent, ipAddress);
   if (!session) return null;
-  
+
   const updated: SessionPayload = {
     ...session,
     lastActivity: Math.floor(Date.now() / 1000),
     csrfToken: session.csrfToken || generateCsrfToken(),
   };
-  
+
   return signPayload(updated, secret!);
+}
+
+/**
+ * Re-issue session cookie with elevated_until set or cleared (PIM). Caller must set the cookie on response.
+ */
+export async function createSessionWithElevation(
+  cookieHeader: string | undefined,
+  secret: string | undefined,
+  elevated_until: number | null,
+  userAgent?: string | null,
+  ipAddress?: string | null
+): Promise<string | null> {
+  const session = await getSessionFromCookie(cookieHeader, secret, userAgent, ipAddress);
+  if (!session) return null;
+
+  const updated: SessionPayload = {
+    ...session,
+    lastActivity: Math.floor(Date.now() / 1000),
+    elevated_until: elevated_until ?? undefined,
+  };
+  if (elevated_until == null) delete (updated as Record<string, unknown>).elevated_until;
+
+  return signPayload(updated, secret!);
+}
+
+/** Allowed assumed roles (admin and arb_board use these; one at a time). */
+export const ASSUMED_ROLES = ['board', 'arb'] as const;
+export type AdminAssumedRole = (typeof ASSUMED_ROLES)[number];
+
+/** TTL for assumed role (2 hours). After this, user falls back to admin/arb_board until they assume again or drop. */
+export const ASSUMED_ROLE_TTL_MS = 2 * 60 * 60 * 1000;
+
+/**
+ * Re-issue session cookie with assumed_role set or cleared (admin or arb_board only). Caller must set the cookie on response and log the action.
+ * When setting a role, assumed_until is set so it auto-expires; user must drop or wait before assuming the other role.
+ */
+export async function createSessionWithAssumedRole(
+  cookieHeader: string | undefined,
+  secret: string | undefined,
+  assumed_role: AdminAssumedRole | null,
+  userAgent?: string | null,
+  ipAddress?: string | null
+): Promise<string | null> {
+  const session = await getSessionFromCookie(cookieHeader, secret, userAgent, ipAddress);
+  if (!session) return null;
+  const r = session.role?.toLowerCase();
+  if (r !== 'admin' && r !== 'arb_board') return null;
+
+  const now = Date.now();
+  const updated: SessionPayload = {
+    ...session,
+    lastActivity: Math.floor(now / 1000),
+    assumed_role: assumed_role ?? undefined,
+    assumed_at: assumed_role ? now : undefined,
+    assumed_until: assumed_role ? now + ASSUMED_ROLE_TTL_MS : undefined,
+  };
+  if (assumed_role == null) {
+    delete (updated as Record<string, unknown>).assumed_role;
+    delete (updated as Record<string, unknown>).assumed_at;
+    delete (updated as Record<string, unknown>).assumed_until;
+  }
+
+  return signPayload(updated, secret!);
+}
+
+/** True if the current effective role is due to admin or arb_board assuming Board or ARB (for audit logging). */
+export function isAdminActingAs(session: SessionPayload | null): boolean {
+  const r = session?.role?.toLowerCase();
+  return (r === 'admin' || r === 'arb_board') && Boolean(session.assumed_role);
 }
 
 /**

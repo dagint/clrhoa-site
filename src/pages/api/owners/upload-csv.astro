@@ -7,7 +7,7 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie, verifyCsrfToken, verifyOrigin, addToLoginWhitelistIfMissing } from '../../../lib/auth';
+import { getSessionFromCookie, verifyCsrfToken, verifyOrigin, addToLoginWhitelistIfMissing, getEffectiveRole, isElevatedRole } from '../../../lib/auth';
 import { getOwnerByEmail, insertOwner, updateOwner } from '../../../lib/directory-db';
 import { checkRateLimit, getRateLimitConfig } from '../../../lib/rate-limit';
 import { getSecurityMonitor } from '../../../lib/monitoring';
@@ -38,8 +38,8 @@ if (!session) {
   });
 }
 
-const canManageDirectory = session.role === 'board' || session.role === 'admin' || session.role === 'arb' || session.role === 'arb_board';
-if (!canManageDirectory) {
+const effectiveRole = getEffectiveRole(session);
+if (!isElevatedRole(effectiveRole)) {
   return new Response(JSON.stringify({ error: 'Forbidden' }), {
     status: 403,
     headers: { 'Content-Type': 'application/json' },
@@ -189,6 +189,7 @@ const nameCol = col('name') >= 0 ? col('name') : 0;
 const addressCol = col('address') >= 0 ? col('address') : 1;
 const phoneCol = col('phone') >= 0 ? col('phone') : 2;
 const emailCol = col('email') >= 0 ? col('email') : 3;
+const lotNumberCol = col('lot_number') >= 0 ? col('lot_number') : -1;
 
 // If first row looks like header (has "name" or "email" etc), skip it for data
 let startRow = 0;
@@ -214,21 +215,22 @@ for (let i = startRow; i < lines.length; i++) {
   const address = (row[addressCol] ?? '').trim() || null;
   const phone = (row[phoneCol] ?? '').trim() || null;
   const email = (row[emailCol] ?? '').trim()?.toLowerCase() || null;
+  const lotNumber = lotNumberCol >= 0 ? (row[lotNumberCol] ?? '').trim() || null : null;
   if (!name && !address && !email) continue;
 
   try {
     if (email) {
       const existing = await getOwnerByEmail(db, email);
       if (existing) {
-        const ok = await updateOwner(db, existing.id, { name, address, phone, email }, session.email);
+        const ok = await updateOwner(db, existing.id, { name, address, lot_number: lotNumber, phone, email }, session.email);
         if (ok) updated += 1;
       } else {
-        await insertOwner(db, { name, address, phone, email });
+        await insertOwner(db, { name, address, lot_number: lotNumber, phone, email });
         added += 1;
         await addToLoginWhitelistIfMissing(env?.CLOURHOA_USERS, email);
       }
     } else {
-      await insertOwner(db, { name, address, phone, email: null });
+      await insertOwner(db, { name, address, lot_number: lotNumber, phone, email: null });
       added += 1;
     }
   } catch (e) {

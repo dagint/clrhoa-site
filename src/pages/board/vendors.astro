@@ -5,18 +5,18 @@ import BoardLayout from '../../layouts/BoardLayout.astro';
 import { getBoardContext } from '../../lib/board-context';
 import { listVendors } from '../../lib/vendors-db';
 import { listPendingSubmissions } from '../../lib/vendor-submissions-db';
-import { listArbRequestsByOwner } from '../../lib/arb-db';
+import { listArbRequestsByHousehold } from '../../lib/arb-db';
 import { escapeHtml } from '../../lib/sanitize';
 
 const ctx = await getBoardContext(Astro);
 if (ctx.redirect) return Astro.redirect(ctx.redirect);
-const { env, session } = ctx;
-const isBoardOrAdmin = session.role === 'board' || session.role === 'admin' || session.role === 'arb_board';
+const { env, session, effectiveRole } = ctx;
+const isBoardOrAdmin = effectiveRole === 'board' || effectiveRole === 'admin' || effectiveRole === 'arb_board';
 
 const db = env?.DB;
 const vendorsList = db ? await listVendors(db) : [];
 const pendingSubmissions = db ? await listPendingSubmissions(db) : [];
-const allRequests = db ? await listArbRequestsByOwner(db, session.email) : [];
+const allRequests = db ? await listArbRequestsByHousehold(db, session.email) : [];
 const draftCount = allRequests.filter((r) => r.status === 'pending').length;
 
 function parseFiles(filesJson: string | null): { name: string; key: string }[] {
@@ -31,7 +31,7 @@ function parseFiles(filesJson: string | null): { name: string; key: string }[] {
 }
 ---
 
-<BoardLayout title="Vendors" subtitle="Manage recommended vendors" draftCount={draftCount} role={session.role}>
+<BoardLayout title="Vendors" subtitle="Manage recommended vendors" draftCount={draftCount} role={effectiveRole} session={session} elevatedUntil={session.elevated_until}>
   <div id="csrf-holder" class="hidden" data-csrf={escapeHtml(session.csrfToken ?? '')} aria-hidden="true"></div>
   <div id="vendors-message" class="hidden mb-4 p-4 rounded-xl border" role="status" aria-live="polite" aria-atomic="true"></div>
       {pendingSubmissions.length > 0 && (
@@ -113,15 +113,26 @@ function parseFiles(filesJson: string | null): { name: string; key: string }[] {
           <label for="vendor-notes" class="block text-sm font-medium text-gray-700">Notes</label>
           <textarea id="vendor-notes" name="notes" rows={3} class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2"></textarea>
         </div>
-        <div class="rounded-lg border border-gray-200 bg-gray-50/80 p-4">
-          <label class="flex items-start gap-3 cursor-pointer">
-            <input type="checkbox" name="show_on_public" id="vendor-show-on-public" value="1" checked class="mt-1 rounded border-gray-300 text-clr-green focus:ring-clr-green" />
-            <span class="text-sm">
-              <span class="font-medium text-gray-800">Show on public & portal</span>
-              <span class="block text-gray-600 mt-0.5">When checked, this vendor appears on the public Resources vendor page and in the member portal. Uncheck to hide from both.</span>
-            </span>
-          </label>
-        </div>
+        <fieldset class="rounded-lg border border-gray-200 bg-gray-50/80 p-4" aria-describedby="vendor-visibility-desc">
+          <legend class="text-sm font-medium text-gray-800">Visibility</legend>
+          <p id="vendor-visibility-desc" class="sr-only">Choose whether this vendor appears on the public site, in the portal, or both.</p>
+          <div class="mt-2 space-y-3">
+            <label class="flex items-start gap-3 cursor-pointer">
+              <input type="radio" name="show_on_public" id="vendor-show-public-portal" value="1" checked class="mt-0.5 rounded-full border-gray-300 text-clr-green focus:ring-clr-green" />
+              <span class="text-sm">
+                <span class="font-medium text-gray-800">Show on public & portal</span>
+                <span class="block text-gray-600 mt-0.5">This vendor appears on the public Resources vendor page and in the member portal.</span>
+              </span>
+            </label>
+            <label class="flex items-start gap-3 cursor-pointer">
+              <input type="radio" name="show_on_public" id="vendor-show-portal-only" value="0" class="mt-0.5 rounded-full border-gray-300 text-clr-green focus:ring-clr-green" />
+              <span class="text-sm">
+                <span class="font-medium text-gray-800">Portal only</span>
+                <span class="block text-gray-600 mt-0.5">This vendor appears only in the member portal (not on the public website).</span>
+              </span>
+            </label>
+          </div>
+        </fieldset>
         <div>
           <label class="block text-sm font-medium text-gray-700">Files (optional)</label>
           <input type="file" id="vendor-files" name="file_0" multiple class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:rounded file:border-0 file:bg-clr-green file:px-4 file:py-2 file:text-white file:font-medium hover:file:brightness-110" />
@@ -157,7 +168,7 @@ function parseFiles(filesJson: string | null): { name: string; key: string }[] {
                   )}
                 </div>
                 <div class="flex gap-2">
-                  <button type="button" class="edit-vendor-btn text-sm text-clr-green hover:underline" data-id={v.id} data-name={v.name ?? ''} data-category={v.category ?? ''} data-phone={v.phone ?? ''} data-email={v.email ?? ''} data-website={v.website ?? ''} data-notes={v.notes ?? ''} data-show-on-public={v.show_on_public ? '1' : '0'}>Edit</button>
+                  <button type="button" class="edit-vendor-btn text-sm text-clr-green hover:underline" data-id={v.id} data-name={v.name ?? ''} data-category={v.category ?? ''} data-phone={v.phone ?? ''} data-email={v.email ?? ''} data-website={v.website ?? ''} data-notes={v.notes ?? ''} data-show-on-public={String(v.show_on_public ? 1 : 0)}>Edit</button>
                   <button type="button" class="delete-vendor-btn text-sm text-red-600 hover:underline" data-id={v.id}>Delete</button>
                 </div>
               </li>
@@ -187,7 +198,8 @@ function parseFiles(filesJson: string | null): { name: string; key: string }[] {
       const submitBtn = document.getElementById('vendor-submit');
       const cancelBtn = document.getElementById('vendor-cancel-edit');
       const csrfInput = document.getElementById('form-csrf');
-      const showOnPublicCheckbox = document.getElementById('vendor-show-on-public');
+      const radioPublicPortal = document.getElementById('vendor-show-public-portal');
+      const radioPortalOnly = document.getElementById('vendor-show-portal-only');
 
       function setFormCreate() {
         actionInput.value = 'create';
@@ -198,7 +210,8 @@ function parseFiles(filesJson: string | null): { name: string; key: string }[] {
         emailInput.value = '';
         if (websiteInput) websiteInput.value = '';
         notesInput.value = '';
-        if (showOnPublicCheckbox) (showOnPublicCheckbox as HTMLInputElement).checked = true;
+        if (radioPublicPortal) (radioPublicPortal as HTMLInputElement).checked = true;
+        if (radioPortalOnly) (radioPortalOnly as HTMLInputElement).checked = false;
         if (fileInput) fileInput.value = '';
         submitBtn.textContent = 'Create vendor';
         cancelBtn.classList.add('hidden');
@@ -222,7 +235,8 @@ function parseFiles(filesJson: string | null): { name: string; key: string }[] {
           emailInput.value = email;
           if (websiteInput) websiteInput.value = website;
           notesInput.value = notes;
-          if (showOnPublicCheckbox) (showOnPublicCheckbox as HTMLInputElement).checked = showOnPublic;
+          if (radioPublicPortal) (radioPublicPortal as HTMLInputElement).checked = showOnPublic;
+          if (radioPortalOnly) (radioPortalOnly as HTMLInputElement).checked = !showOnPublic;
           submitBtn.textContent = 'Update vendor';
           cancelBtn.classList.remove('hidden');
         });

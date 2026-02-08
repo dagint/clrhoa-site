@@ -5,7 +5,7 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie } from '../../../lib/auth';
+import { getSessionFromCookie, getEffectiveRole } from '../../../lib/auth';
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env as import('../../../env.d').Env & { GOOGLE_CLIENT_ID?: string };
@@ -13,7 +13,8 @@ const session = await getSessionFromCookie(
   Astro.request.headers.get('cookie') ?? undefined,
   env?.SESSION_SECRET
 );
-if (!session || (session.role !== 'board' && session.role !== 'admin')) {
+const effectiveRole = session ? getEffectiveRole(session) : 'member';
+if (!session || (effectiveRole !== 'board' && effectiveRole !== 'admin')) {
   return Astro.redirect('/portal/login');
 }
 const clientId = env?.GOOGLE_CLIENT_ID;

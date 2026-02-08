@@ -6,9 +6,11 @@ interface Props {
   request: ArbRequest;
   files: ArbFile[];
   approval: { status: string; by: string; date: string } | null;
+  /** When false (e.g. admin), hide Approve/Reject/Request revision/Add notes/Set deadline. */
+  canApproveArb?: boolean;
 }
 
-const { request: req, files, approval } = Astro.props;
+const { request: req, files, approval, canApproveArb = true } = Astro.props;
 
 function getFileViewUrl(r2KeysJson: string): string | null {
   try {
@@ -228,6 +230,7 @@ function selectedTypes(applicationType: string | null): string[] {
             <p class="text-sm font-semibold text-red-900">Warning: Review deadline passed: {new Date(req.review_deadline).toLocaleDateString()}</p>
           </div>
         )}
+        {canApproveArb && (
         <div class="flex flex-wrap gap-2 pt-4 no-print" role="group" aria-label="Request actions">
           <button type="button" class="arb-action px-3 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2" data-request-id={req.id} data-action="approve" aria-label={`Approve request ${req.id}`}>Approve</button>
           <button type="button" class="arb-action px-3 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2" data-request-id={req.id} data-action="reject" aria-label={`Reject request ${req.id}`}>Reject</button>
@@ -235,11 +238,12 @@ function selectedTypes(applicationType: string | null): string[] {
           <button type="button" class="arb-add-notes px-3 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-clr-green focus:ring-offset-2" data-request-id={req.id} aria-label={`Add internal notes for request ${req.id}`}>Add notes</button>
           <button type="button" class="arb-set-deadline px-3 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-clr-green focus:ring-offset-2" data-request-id={req.id} aria-label={`Set review deadline for request ${req.id}`}>Set deadline</button>
         </div>
+        )}
         {req.arb_internal_notes && (
           <div class="mt-3 rounded-lg border border-blue-200 bg-blue-50 p-3 no-print">
             <p class="text-xs font-semibold text-blue-900 mb-1">ARB Internal Notes</p>
             <p class="text-sm text-blue-900 whitespace-pre-wrap arb-internal-notes-text" set:html={sanitizeForDisplay(req.arb_internal_notes)}></p>
-            <button type="button" class="arb-edit-notes mt-2 text-xs text-blue-700 hover:underline" data-request-id={req.id}>Edit notes</button>
+            {canApproveArb && <button type="button" class="arb-edit-notes mt-2 text-xs text-blue-700 hover:underline" data-request-id={req.id}>Edit notes</button>}
           </div>
         )}
       </>

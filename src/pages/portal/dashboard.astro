@@ -5,16 +5,18 @@ import PortalLayout from '../../layouts/PortalLayout.astro';
 import ProtectedPage from '../../components/ProtectedPage.astro';
 import PortalNav from '../../components/PortalNav.astro';
 import PWAInstallPrompt from '../../components/PWAInstallPrompt.astro';
+import PimElevationBanner from '../../components/PimElevationBanner.astro';
 import { getPortalContext } from '../../lib/portal-context';
-import { getArbRequestCountsByStatus, listArbRequestsByOwner } from '../../lib/arb-db';
+import { getArbRequestCountsByStatus, listArbRequestsByHousehold } from '../../lib/arb-db';
 import { listPendingSubmissions } from '../../lib/vendor-submissions-db';
 import { getRecentOwnersCount, listOwners } from '../../lib/directory-db';
 import { getRecentVendorsCount } from '../../lib/vendors-db';
-import { listMaintenanceByOwner } from '../../lib/maintenance-db';
-import { listUpcomingWithCountsAndUser } from '../../lib/meetings-db';
-import { listActiveFeedbackDocs, getFeedbackResponse } from '../../lib/feedback-db';
+import { listMaintenanceByHousehold } from '../../lib/maintenance-db';
+import { listUpcomingWithCountsAndUser, householdHasRsvpd } from '../../lib/meetings-db';
+import { listActiveFeedbackDocs, getFeedbackResponse, householdHasResponded } from '../../lib/feedback-db';
+import { getDismissedKeys } from '../../lib/notification-dismissals';
 
-const { env, session } = await getPortalContext(Astro, { fingerprint: true });
+const { env, session, effectiveRole } = await getPortalContext(Astro, { fingerprint: true });
 if (!session) return Astro.redirect('/portal/login');
 
 const { email, role, name } = session;
@@ -22,7 +24,11 @@ const firstName = name?.trim().split(/\s+/)[0] ?? null;
 const db = env?.DB;
 let arbCounts: { pending: number; in_review: number } = { pending: 0, in_review: 0 };
 let pendingVendorCount = 0;
-if (db && (role === 'arb' || role === 'board' || role === 'admin' || role === 'arb_board')) {
+const isStaffRole = effectiveRole === 'arb' || effectiveRole === 'board' || effectiveRole === 'admin' || effectiveRole === 'arb_board';
+const hasStaffWhitelistRole = role === 'arb' || role === 'board' || role === 'admin' || role === 'arb_board';
+const canRequestElevation = hasStaffWhitelistRole && !isStaffRole;
+// Load ARB and vendor counts for any staff (by whitelist) so we can show outstanding items even when not elevated
+if (db && hasStaffWhitelistRole) {
   const counts = await getArbRequestCountsByStatus(db);
   arbCounts = { pending: counts.pending, in_review: counts.in_review };
   const pendingSubmissions = await listPendingSubmissions(db);
@@ -30,7 +36,7 @@ if (db && (role === 'arb' || role === 'board' || role === 'admin' || role === 'a
 }
 
 // Get draft count for navigation badge
-const allRequests = db ? await listArbRequestsByOwner(db, email) : [];
+const allRequests = db ? await listArbRequestsByHousehold(db, email) : [];
 const draftCount = allRequests.filter(r => r.status === 'pending').length;
 
 // Quick action badge counts
@@ -38,17 +44,24 @@ let maintenanceOpenCount = 0;
 let meetingsRsvpCount = 0;
 let feedbackDueCount = 0;
 if (db) {
-  const maintenanceList = await listMaintenanceByOwner(db, email);
+  const maintenanceList = await listMaintenanceByHousehold(db, email);
   maintenanceOpenCount = maintenanceList.filter((m) => m.status !== 'completed').length;
   const upcomingMeetings = await listUpcomingWithCountsAndUser(db, email);
-  meetingsRsvpCount = upcomingMeetings.filter((m) => m.user_response == null).length;
+  meetingsRsvpCount = 0;
+  for (const m of upcomingMeetings) {
+    if (m.user_response != null) continue;
+    if (await householdHasRsvpd(db, m.id, email)) continue;
+    meetingsRsvpCount += 1;
+  }
   const activeFeedback = await listActiveFeedbackDocs(db);
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
   const tomorrowStr = tomorrow.toISOString().slice(0, 10);
   for (const doc of activeFeedback) {
     const resp = await getFeedbackResponse(db, doc.id, email);
-    if (!resp && (doc.deadline == null || doc.deadline <= tomorrowStr)) feedbackDueCount += 1;
+    if (resp) continue;
+    if (await householdHasResponded(db, doc.id, email)) continue;
+    if (doc.deadline == null || doc.deadline <= tomorrowStr) feedbackDueCount += 1;
   }
 }
 const directoryCount = db ? (await listOwners(db)).length : 0;
@@ -64,13 +77,23 @@ if (db) {
 const hasNewNotices = recentVendorsCount > 0 || recentOwnersCount > 0;
 
 // ARB badge for dashboard tile: my pending drafts (or for staff, board pending count)
-const arbBadgeCount = (role === 'arb' || role === 'board' || role === 'admin' || role === 'arb_board') ? arbCounts.pending : draftCount;
+const arbBadgeCount = isStaffRole ? arbCounts.pending : draftCount;
+const showPimBanner = isStaffRole && typeof session.elevated_until === 'number' && session.elevated_until > Date.now();
+
+// Dismissals: "Mark as read" hides a notice for 7 days
+const dismissedSet = db ? await getDismissedKeys(db, email) : new Set<string>();
+const showStaffOutstanding = hasStaffWhitelistRole && (arbCounts.in_review > 0 || arbCounts.pending > 0 || pendingVendorCount > 0) && !dismissedSet.has('staff_outstanding');
+const showActionFeedback = feedbackDueCount > 0 && !dismissedSet.has('action_feedback');
+const showActionMaintenance = maintenanceOpenCount > 0 && !dismissedSet.has('action_maintenance');
+const showActionMeetings = meetingsRsvpCount > 0 && !dismissedSet.has('action_meetings');
+const showActionNeededBanner = showActionFeedback || showActionMaintenance || showActionMeetings;
 ---
 
 <PortalLayout title="Dashboard | Member Portal | Crooked Lake Reserve HOA">
   <ProtectedPage>
   <div class="min-h-screen bg-gray-50 portal-theme-bg font-body" id="portal-root">
-    <PortalNav currentPath="/portal/dashboard" draftCount={draftCount} role={role} arbInReviewCount={arbCounts.in_review} vendorPendingCount={pendingVendorCount} />
+    {showPimBanner && <PimElevationBanner elevatedUntil={session.elevated_until!} role={effectiveRole} />}
+    <PortalNav currentPath="/portal/dashboard" draftCount={draftCount} role={effectiveRole} staffRole={session.role ?? ''} arbInReviewCount={arbCounts.in_review} vendorPendingCount={pendingVendorCount} />
 
       <main class="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
         <div class="bg-white rounded-2xl shadow-sm border border-gray-100 portal-theme-card portal-card-accent p-6 sm:p-8">
@@ -78,6 +101,90 @@ const arbBadgeCount = (role === 'arb' || role === 'board' || role === 'admin' ||
           <p class="text-gray-600 portal-theme-text-muted mb-6">
             {name ? `${name} (` : ''}{email}{name ? ')' : ''}
           </p>
+
+          {hasStaffWhitelistRole && (
+            <div class="mb-6 p-4 rounded-xl bg-amber-50 border border-amber-200" role="region" aria-label="Elevated access">
+              <p class="text-sm font-semibold text-amber-900 mb-2">Board / ARB / Admin access</p>
+              {canRequestElevation ? (
+                <>
+                  <p class="text-sm text-amber-800 mb-2">By default you see the same portal as all members. When you need to use board or ARB tools (directory, dues, meetings, ARB dashboard), click <strong>Request elevated access</strong>. You get 2 hours of access, then you’re back to normal. When you’re done, you can click <strong>Drop access</strong> anytime.</p>
+                  <div class="flex flex-wrap items-center gap-3 mt-3">
+                    <button type="button" id="pim-elevate-btn" class="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg font-medium text-sm">Request elevated access</button>
+                    <a href="/portal/request-elevated-access" class="text-sm text-amber-800 hover:text-amber-900 underline">Request elevated access (same)</a>
+                    <a href="/portal/elevation-audit" class="text-sm text-amber-800 hover:text-amber-900 underline">View elevation audit (read-only)</a>
+                  </div>
+                </>
+              ) : (
+                <p class="text-sm text-amber-800 mb-2">You have elevated access. When you’re done, click <strong>Drop access</strong> in the banner above to return to normal member view. <a href="/portal/elevation-audit" class="text-amber-900 underline hover:no-underline">View elevation audit (read-only)</a> to see when others requested or dropped access.</p>
+              )}
+            </div>
+          )}
+
+          {/* Outstanding items for Board/ARB — visible even when not elevated so they know what needs attention */}
+          {showStaffOutstanding && (
+            <div class="mb-6 p-4 rounded-xl bg-amber-50/80 border border-amber-200" role="region" aria-label="Outstanding Board and ARB items">
+              <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+                <p class="text-sm font-semibold text-amber-900">Outstanding items requiring your action</p>
+                <button type="button" class="notification-dismiss text-xs text-amber-700 hover:text-amber-900 underline" data-key="staff_outstanding" aria-label="Mark as read">Mark as read</button>
+              </div>
+              {!isStaffRole && <p class="text-sm text-amber-800 mb-3">The following need attention. You must request elevated access to act on them.</p>}
+              <ul class="list-none space-y-1.5 mb-3">
+                {(arbCounts.in_review > 0 || arbCounts.pending > 0) && (
+                  <li>
+                    <a href={isStaffRole ? '/portal/arb-dashboard' : '/portal/request-elevated-access?return=' + encodeURIComponent('/portal/arb-dashboard')} class="text-sm font-medium text-amber-900 hover:text-amber-700 underline">
+                      ARB: {arbCounts.in_review} in review, {arbCounts.pending} pending
+                    </a>
+                  </li>
+                )}
+                {pendingVendorCount > 0 && (
+                  <li>
+                    <a href={isStaffRole ? '/board/vendors' : '/portal/request-elevated-access?return=' + encodeURIComponent('/board/vendors')} class="text-sm font-medium text-amber-900 hover:text-amber-700 underline">
+                      Vendor submissions: {pendingVendorCount} pending
+                    </a>
+                  </li>
+                )}
+              </ul>
+              {!isStaffRole && (
+                <a href="/portal/request-elevated-access" class="inline-block bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg font-medium text-sm">Request elevated access to complete these</a>
+              )}
+            </div>
+          )}
+
+          {/* Action needed: for all members when they have feedback due, open maintenance, or meetings to RSVP */}
+          {showActionNeededBanner && (
+            <div class="mb-6 p-4 rounded-xl bg-clr-green/10 border border-clr-green/30" role="region" aria-label="Action needed">
+              <p class="text-sm font-semibold text-clr-green mb-2">Action needed</p>
+              <p class="text-sm text-gray-700 mb-3">You have outstanding items that need your attention. Use <strong>Mark as read</strong> to hide an item for 7 days.</p>
+              <ul class="list-none space-y-2 mb-0">
+                {showActionFeedback && (
+                  <li class="flex flex-wrap items-center gap-2">
+                    <a href="/portal/feedback" class="inline-flex items-center gap-2 text-sm font-medium text-clr-green hover:underline">
+                      Document feedback: {feedbackDueCount} due for your review
+                    </a>
+                    <button type="button" class="notification-dismiss text-xs text-gray-600 hover:text-clr-green underline" data-key="action_feedback" aria-label="Mark as read">Mark as read</button>
+                  </li>
+                )}
+                {showActionMaintenance && (
+                  <li class="flex flex-wrap items-center gap-2">
+                    <a href="/portal/maintenance" class="inline-flex items-center gap-2 text-sm font-medium text-clr-green hover:underline">
+                      Maintenance: {maintenanceOpenCount} open request{maintenanceOpenCount === 1 ? '' : 's'}
+                    </a>
+                    <button type="button" class="notification-dismiss text-xs text-gray-600 hover:text-clr-green underline" data-key="action_maintenance" aria-label="Mark as read">Mark as read</button>
+                  </li>
+                )}
+                {showActionMeetings && (
+                  <li class="flex flex-wrap items-center gap-2">
+                    <a href="/portal/meetings" class="inline-flex items-center gap-2 text-sm font-medium text-clr-green hover:underline">
+                      Meetings: RSVP for {meetingsRsvpCount} upcoming meeting{meetingsRsvpCount === 1 ? '' : 's'}
+                    </a>
+                    <button type="button" class="notification-dismiss text-xs text-gray-600 hover:text-clr-green underline" data-key="action_meetings" aria-label="Mark as read">Mark as read</button>
+                  </li>
+                )}
+              </ul>
+            </div>
+          )}
+
+          <p class="text-sm text-gray-600 mb-4">Choose an action below to get started.</p>
 
           {hasNewNotices && (
             <div class="mb-6 p-4 rounded-xl bg-clr-green/10 border border-clr-green/20" role="region" aria-label="Recent updates">
@@ -103,7 +210,8 @@ const arbBadgeCount = (role === 'arb' || role === 'board' || role === 'admin' ||
             </div>
           )}
 
-          <!-- 2x2 Quick actions grid -->
+          <!-- Quick actions: clear next steps for all members -->
+          <h3 class="text-base font-heading font-semibold text-gray-800 mb-3">Quick actions</h3>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8" role="navigation" aria-label="Quick actions">
             <a href="/portal/arb-request" class="flex flex-col items-center justify-center p-6 rounded-2xl bg-clr-green hover:brightness-110 text-white shadow-md transition-all min-h-[140px]">
               <span class="mb-2 w-10 h-10 flex items-center justify-center" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg></span>
@@ -160,21 +268,21 @@ const arbBadgeCount = (role === 'arb' || role === 'board' || role === 'admin' ||
           </div>
 
           <p class="text-sm text-gray-500 portal-theme-text-muted">
-            Your role: <strong class="text-clr-green">{role}</strong>
+            Your role: <strong class="text-clr-green">{effectiveRole}</strong>
           </p>
           <p class="text-sm text-gray-600 mt-4">
             <a href="/arb-request-how-to" class="text-clr-orange hover:underline">How to submit an ARB request</a>
           </p>
-          {(role === 'arb' || role === 'board' || role === 'admin' || role === 'arb_board') && (
+          {isStaffRole && (
             <section class="mt-6 p-4 rounded-xl bg-gray-50 border border-gray-200" aria-labelledby="quick-actions-heading">
               <h3 id="quick-actions-heading" class="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-3">Quick actions</h3>
               <div class="flex flex-wrap gap-3">
-                {(role === 'board' || role === 'admin' || role === 'arb_board') && (
+                {(effectiveRole === 'board' || effectiveRole === 'admin' || effectiveRole === 'arb_board') && (
                   <a href="/board/assessments" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-clr-green hover:brightness-110 text-white font-semibold text-sm shadow-sm">
                     Record payment
                   </a>
                 )}
-                {(role === 'arb' || role === 'admin' || role === 'arb_board') && (
+                {(effectiveRole === 'arb' || effectiveRole === 'admin' || effectiveRole === 'arb_board') && (
                   <a href="/portal/arb-dashboard" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 border-clr-green text-clr-green hover:bg-clr-green/10 font-semibold text-sm">
                     ARB Dashboard
                     {(arbCounts.pending > 0 || arbCounts.in_review > 0) && (
@@ -182,7 +290,7 @@ const arbBadgeCount = (role === 'arb' || role === 'board' || role === 'admin' ||
                     )}
                   </a>
                 )}
-                {(role === 'board' || role === 'admin' || role === 'arb_board') && (
+                {(effectiveRole === 'board' || effectiveRole === 'admin' || effectiveRole === 'arb_board') && (
                   <a href="/board/vendors" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 border-gray-300 text-gray-700 hover:bg-gray-100 font-semibold text-sm">
                     Vendor submissions
                     {pendingVendorCount > 0 && (
@@ -200,5 +308,37 @@ const arbBadgeCount = (role === 'arb' || role === 'board' || role === 'admin' ||
       </main>
   </div>
   <PWAInstallPrompt />
+  <script>
+    document.getElementById('pim-elevate-btn')?.addEventListener('click', function () {
+      const btn = this as HTMLButtonElement;
+      btn.disabled = true;
+      fetch('/api/pim/elevate', { method: 'POST', credentials: 'same-origin' })
+        .then(function (r) {
+          if (r.ok) window.location.reload();
+          else btn.disabled = false;
+        })
+        .catch(function () { btn.disabled = false; });
+    });
+
+    document.querySelectorAll('.notification-dismiss').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const key = (this as HTMLElement).getAttribute('data-key');
+        if (!key) return;
+        const el = this as HTMLButtonElement;
+        el.disabled = true;
+        fetch('/api/notifications/dismiss', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key }),
+        })
+          .then(function (r) {
+            if (r.ok) window.location.reload();
+            else el.disabled = false;
+          })
+          .catch(function () { el.disabled = false; });
+      });
+    });
+  </script>
   </ProtectedPage>
 </PortalLayout>

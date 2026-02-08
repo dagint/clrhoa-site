@@ -7,7 +7,7 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie, verifyCsrfToken, verifyOrigin } from '../../lib/auth';
+import { getSessionFromCookie, verifyCsrfToken, verifyOrigin, getEffectiveRole } from '../../lib/auth';
 import {
   listPendingSubmissions,
   listSubmissions,
@@ -69,7 +69,8 @@ if (!session) {
   });
 }
 
-const isReviewer = session.role === 'board' || session.role === 'admin' || session.role === 'arb' || session.role === 'arb_board';
+const effectiveRole = getEffectiveRole(session);
+const isReviewer = effectiveRole === 'board' || effectiveRole === 'admin' || effectiveRole === 'arb' || effectiveRole === 'arb_board';
 const origin = Astro.request.headers.get('origin');
 const referer = Astro.request.headers.get('referer');
 const expectedOrigin = Astro.url.origin;

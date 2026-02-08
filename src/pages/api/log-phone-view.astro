@@ -6,7 +6,7 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie, verifyCsrfToken, verifyOrigin, isElevatedRole } from '../../lib/auth';
+import { getSessionFromCookie, verifyCsrfToken, verifyOrigin, isElevatedRole, getEffectiveRole } from '../../lib/auth';
 import { getOwnerById, getPhonesArray, insertDirectoryLog } from '../../lib/directory-db';
 import { checkRateLimit, getRateLimitConfig } from '../../lib/rate-limit';
 import { getSecurityMonitor } from '../../lib/monitoring';
@@ -136,7 +136,7 @@ if (!owner) {
 }
 
 const optedOut = owner.share_contact_with_members === 0;
-const viewerElevated = isElevatedRole(session.role);
+const viewerElevated = isElevatedRole(getEffectiveRole(session));
 if (optedOut && !viewerElevated) {
   return new Response(
     JSON.stringify({
@@ -146,7 +146,7 @@ if (optedOut && !viewerElevated) {
   );
 }
 
-const viewerRole = session.role ?? 'member';
+const viewerRole = getEffectiveRole(session) ?? 'member';
 
 if (reveal === 'email') {
   const email = owner.email?.trim() ?? '';

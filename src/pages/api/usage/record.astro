@@ -1,0 +1,62 @@
+---
+/**
+ * POST /api/usage/record — Record a page view (path from body).
+ * Sets _usage_sid cookie if missing for anonymous session. Optionally attaches user_id from auth.
+ */
+export const prerender = false;
+
+import { getSessionFromCookie } from '../../../lib/auth';
+import { insertPageView } from '../../../lib/usage-db';
+
+const USAGE_SID_COOKIE = '_usage_sid';
+const USAGE_SID_MAX_AGE = 60 * 60 * 24 * 365; // 1 year
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const db = env?.DB;
+
+if (Astro.request.method !== 'POST') {
+  return new Response(null, { status: 405, headers: { Allow: 'POST' } });
+}
+
+if (!db) {
+  return new Response(null, { status: 503 });
+}
+
+let path = '/';
+try {
+  const body = await Astro.request.json().catch(() => ({}));
+  if (typeof body.path === 'string' && body.path.trim()) path = body.path.trim().slice(0, 2048);
+} catch {
+  /* use default path */
+}
+
+const cookies = Astro.cookies;
+let sessionId = cookies.get(USAGE_SID_COOKIE)?.value?.trim();
+if (!sessionId) {
+  sessionId = crypto.randomUUID?.() ?? `s${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`;
+  cookies.set(USAGE_SID_COOKIE, sessionId, {
+    path: '/',
+    maxAge: USAGE_SID_MAX_AGE,
+    sameSite: 'lax',
+    secure: import.meta.env.PROD,
+    httpOnly: true,
+  });
+}
+
+let userId: string | null = null;
+if (env?.SESSION_SECRET) {
+  const session = await getSessionFromCookie(
+    Astro.request.headers.get('cookie') ?? undefined,
+    env.SESSION_SECRET
+  );
+  if (session?.email) userId = session.email.trim();
+}
+
+await insertPageView(db, { path, session_id: sessionId, user_id: userId });
+
+return new Response(null, {
+  status: 204,
+  headers: {},
+});
+---

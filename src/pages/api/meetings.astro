@@ -9,6 +9,7 @@
 export const prerender = false;
 
 import { requireSession, requireDb, jsonResponse } from '../../lib/api-helpers';
+import { getEffectiveRole } from '../../lib/auth';
 import {
   listUpcomingMeetings,
   listAllMeetings,
@@ -27,7 +28,8 @@ const dbResult = requireDb(Astro.locals.runtime?.env);
 if (dbResult.response) return dbResult.response;
 const { db } = dbResult;
 
-const isBoard = session.role === 'board' || session.role === 'admin' || session.role === 'arb_board';
+const effectiveRole = getEffectiveRole(session);
+const isBoard = effectiveRole === 'board' || effectiveRole === 'admin' || effectiveRole === 'arb_board';
 
 if (Astro.request.method === 'GET') {
   const meetings = isBoard ? await listAllMeetings(db) : await listUpcomingMeetings(db);

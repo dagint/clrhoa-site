@@ -6,13 +6,13 @@ import ProtectedPage from '../../components/ProtectedPage.astro';
 import PortalNav from '../../components/PortalNav.astro';
 import GlobalSearch from '../../components/GlobalSearch.astro';
 import { getPortalContext } from '../../lib/portal-context';
-import { listArbRequestsByOwner } from '../../lib/arb-db';
+import { listArbRequestsByHousehold } from '../../lib/arb-db';
 
-const { env, session } = await getPortalContext(Astro);
+const { env, session, effectiveRole } = await getPortalContext(Astro);
 if (!session) return Astro.redirect('/portal/login');
 
 const db = env?.DB;
-const allRequests = db ? await listArbRequestsByOwner(db, session.email) : [];
+const allRequests = db ? await listArbRequestsByHousehold(db, session.email) : [];
 const draftCount = allRequests.filter((r) => r.status === 'pending').length;
 ---
 
@@ -21,12 +21,12 @@ const draftCount = allRequests.filter((r) => r.status === 'pending').length;
   <div class="min-h-screen bg-gray-50 portal-theme-bg font-body">
     <GlobalSearch fixed={true} class="portal-theme-header" />
     <div class="pt-14">
-      <PortalNav currentPath="/portal/docs" draftCount={draftCount} role={session.role} />
+      <PortalNav currentPath="/portal/docs" draftCount={draftCount} role={effectiveRole} staffRole={session?.role ?? ''} />
 
       <main class="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
         <h1 class="text-2xl font-heading font-bold text-clr-green mb-2">Portal documentation</h1>
         <p class="text-gray-600 portal-theme-text-muted mb-8">
-          A short guide to the member portal. Use the links above to jump to a section.
+          A short guide to the Member Portal. Use the links above to jump to a section.
         </p>
 
         <nav aria-label="Documentation sections" class="mb-10">
@@ -78,7 +78,7 @@ const draftCount = allRequests.filter((r) => r.status === 'pending').length;
               <li><strong>Maintenance</strong> – Report a maintenance issue (e.g. road, common area). The board can assign a vendor and update the status.</li>
               <li><strong>Vendors</strong> – See board-recommended vendors and suggest new ones. Suggested vendors are reviewed before they appear on the list.</li>
               <li><strong>Pre-approval library</strong> – Browse pre-approved designs. Use one as a template when submitting an ARB request to speed up your application.</li>
-              <li><strong>Assessments</strong> – View your balance and payment history. Payment is made by the method specified by the board (e.g. check); the portal does not process payments.</li>
+              <li><strong>Dues</strong> – View your balance, dues schedule, and payment history (including special assessments). Payment is made by the method specified by the board (e.g. check); the portal does not process payments.</li>
             </ul>
           </section>
 
@@ -94,8 +94,12 @@ const draftCount = allRequests.filter((r) => r.status === 'pending').length;
 
           <section id="help" class="bg-white rounded-2xl border border-gray-100 p-6 sm:p-8 portal-theme-card">
             <h2 class="text-xl font-heading font-bold text-clr-green mb-3">Help</h2>
-            <p class="text-gray-700 portal-theme-text">
+            <p class="text-gray-700 portal-theme-text mb-4">
               Use <strong>Documentation</strong> (this page) for an overview of each section. Use <strong>FAQ</strong> for answers to common questions about the portal. You can also search from the bar at the top to find ARB requests, meetings, vendors, directory entries, and library items.
+            </p>
+            <h3 class="text-lg font-heading font-semibold text-clr-green mb-2">Feedback (report issues or suggest features)</h3>
+            <p class="text-gray-700 portal-theme-text">
+              On every portal page you’ll see a <strong>feedback button</strong> (thumbs up/down) in the bottom-right corner. Please use it to <strong>report problems</strong> (something broken or confusing) or to <strong>ask for new features</strong> when the portal doesn’t meet your needs. You can add a short comment (e.g. what went wrong or what you’d like to see). Positive feedback is welcome too, but the board especially uses this to fix issues and plan improvements.
             </p>
           </section>
         </div>

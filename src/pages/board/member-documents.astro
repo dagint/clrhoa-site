@@ -5,18 +5,18 @@ import BoardLayout from '../../layouts/BoardLayout.astro';
 import { getBoardContext } from '../../lib/board-context';
 import { listMemberDocuments } from '../../lib/member-documents-db';
 import { MEMBER_DOC_CATEGORIES, MEMBER_DOC_CATEGORY_LABELS } from '../../lib/member-documents-db';
-import { listArbRequestsByOwner } from '../../lib/arb-db';
+import { listArbRequestsByHousehold } from '../../lib/arb-db';
 import { sanitizeForScriptInjection } from '../../lib/sanitize';
 
 const ctx = await getBoardContext(Astro);
 if (ctx.redirect) return Astro.redirect(ctx.redirect);
-const { env, session } = ctx;
-const isBoard = session.role === 'board' || session.role === 'admin' || session.role === 'arb_board';
+const { env, session, effectiveRole } = ctx;
+const isBoard = effectiveRole === 'board' || effectiveRole === 'admin' || effectiveRole === 'arb_board';
 if (!isBoard) return Astro.redirect('/portal/dashboard');
 
 const db = env?.DB;
 const docs = db ? await listMemberDocuments(db) : [];
-const allRequests = db ? await listArbRequestsByOwner(db, session.email) : [];
+const allRequests = db ? await listArbRequestsByHousehold(db, session.email) : [];
 const draftCount = allRequests.filter((r) => r.status === 'pending').length;
 
 function formatDate(s: string | null): string {
@@ -35,7 +35,7 @@ const docsByCategory = MEMBER_DOC_CATEGORIES.map((cat) => ({
 }));
 ---
 
-<BoardLayout title="Member documents" subtitle="Redacted minutes, budgets, and other member-only files" draftCount={draftCount} role={session.role}>
+<BoardLayout title="Member documents" subtitle="Redacted minutes, budgets, and other member-only files" draftCount={draftCount} role={effectiveRole} session={session} elevatedUntil={session.elevated_until}>
   <div class="mb-8 p-4 rounded-xl bg-blue-50 border border-blue-200 text-blue-900" role="alert">
     <p class="font-semibold">Members only.</p>
     <p class="text-sm mt-1">These files are visible only to logged-in members on the <a href="/portal/documents" class="underline font-medium" target="_blank" rel="noopener noreferrer">Documents page <span class="text-blue-700/80">(opens in new tab)</span></a>. Use for redacted minutes, budgets, and other member-only content.</p>

@@ -1,0 +1,51 @@
+---
+/**
+ * GET /api/usage/admin — Admin only: user_id → path → created_at (role access).
+ */
+export const prerender = false;
+
+import { getSessionFromCookie, isElevatedRole, getEffectiveRole } from '../../../lib/auth';
+import { getAdminPageViews } from '../../../lib/usage-db';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const db = env?.DB;
+
+if (Astro.request.method !== 'GET') {
+  return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+    status: 405,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const session = await getSessionFromCookie(
+  Astro.request.headers.get('cookie') ?? undefined,
+  env?.SESSION_SECRET
+);
+if (!session || !isElevatedRole(getEffectiveRole(session))) {
+  return new Response(JSON.stringify({ error: 'Forbidden' }), {
+    status: 403,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+if (!db) {
+  return new Response(JSON.stringify({ error: 'Unavailable' }), {
+    status: 503,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const u = new URL(Astro.request.url);
+const limit = Math.min(Math.max(parseInt(u.searchParams.get('limit') ?? '500', 10) || 500, 1), 5000);
+
+const events = await getAdminPageViews(db, limit);
+
+return new Response(
+  JSON.stringify({ events }),
+  {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  }
+);
+---

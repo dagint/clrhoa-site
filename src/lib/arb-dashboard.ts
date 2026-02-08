@@ -4,7 +4,7 @@
  */
 
 import type { ArbRequest, ArbFile } from './arb-db';
-import { listAllArbRequests, listArbFilesByRequest, listArbRequestsByOwner } from './arb-db';
+import { listAllArbRequests, listArbFilesByRequest, listArbRequestsByHousehold } from './arb-db';
 import { listPendingSubmissions } from './vendor-submissions-db';
 
 export type { ArbRequest, ArbFile };
@@ -106,7 +106,7 @@ export async function getArbDashboardData(
     filesByRequestId[req.id] = await listArbFilesByRequest(db, req.id);
   }
 
-  const ownerRequests = await listArbRequestsByOwner(db, sessionEmail);
+  const ownerRequests = await listArbRequestsByHousehold(db, sessionEmail);
   const draftCount = ownerRequests.filter((r) => r.status === 'pending').length;
   const arbInReviewCount = allRequests.filter((r) => r.status === 'in_review').length;
   const vendorPendingCount = (await listPendingSubmissions(db)).length;

@@ -6,7 +6,7 @@
 export const prerender = false;
 
 import { getSessionFromCookie, verifyCsrfToken, verifyOrigin } from '../../lib/auth';
-import { listArbRequestsByOwner, listArbFilesByRequest } from '../../lib/arb-db';
+import { listArbRequestsByHousehold, listArbFilesByRequest } from '../../lib/arb-db';
 import { getSecurityMonitor } from '../../lib/monitoring';
 import { createLogger } from '../../lib/logging';
 
@@ -61,7 +61,7 @@ if (!db) {
 
 try {
   // Get all user's requests
-  const requests = await listArbRequestsByOwner(db, session.email);
+  const requests = await listArbRequestsByHousehold(db, session.email);
   
   // Get files for each request
   const exportData = {

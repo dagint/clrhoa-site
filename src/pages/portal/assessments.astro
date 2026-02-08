@@ -6,15 +6,15 @@ import ProtectedPage from '../../components/ProtectedPage.astro';
 import PortalNav from '../../components/PortalNav.astro';
 import { getPortalContext } from '../../lib/portal-context';
 import { getOwnerByEmail, getPrimaryOwnerEmailForAddress } from '../../lib/directory-db';
-import { listArbRequestsByOwner } from '../../lib/arb-db';
+import { listArbRequestsByHousehold } from '../../lib/arb-db';
 import { getAssessmentByOwner, getPaymentHistory, listSpecialAssessmentsByOwner } from '../../lib/assessments-db';
 
-const { env, session } = await getPortalContext(Astro, { fingerprint: true });
+const { env, session, effectiveRole } = await getPortalContext(Astro, { fingerprint: true });
 if (!session) return Astro.redirect('/portal/login');
 
 const db = env?.DB;
 const draftCount = db
-  ? (await listArbRequestsByOwner(db, session.email)).filter((r) => r.status === 'pending').length
+  ? (await listArbRequestsByHousehold(db, session.email)).filter((r) => r.status === 'pending').length
   : 0;
 // Assessments are per property (address). Use primary owner at this address so everyone at the same address sees the same dues.
 const owner = db ? await getOwnerByEmail(db, session.email) : null;
@@ -35,13 +35,18 @@ const quarterlyAmountDisplay = quarterlyAmountRaw ? (Number(quarterlyAmountRaw) 
 const now = new Date();
 now.setHours(0, 0, 0, 0);
 
-// Quarterly schedule: Q1=Jan 1, Q2=Apr 1, Q3=Jul 1, Q4=Oct 1. Quarter end = last day of quarter for "paid through" comparison.
+// Quarterly schedule: Q1=Jan 1, Q2=Apr 1, Q3=Jul 1, Q4=Oct 1 (authority: 1st of each quarter). Quarter end = last day of quarter for "paid through" comparison.
 const QUARTERS = [
   { q: 'Q1', dueMonth: 0, dueDay: 1, endMonth: 2, endDay: 31 },
   { q: 'Q2', dueMonth: 3, dueDay: 1, endMonth: 5, endDay: 30 },
   { q: 'Q3', dueMonth: 6, dueDay: 1, endMonth: 8, endDay: 30 },
   { q: 'Q4', dueMonth: 9, dueDay: 1, endMonth: 11, endDay: 31 },
 ];
+
+/** Format YYYY-MM-DD from local date parts (avoid toISOString() which shifts to UTC and can show last day of prior month). */
+function toLocalDateString(year: number, month: number, day: number): string {
+  return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
 
 function getCurrentQuarterIndex(): number {
   const m = now.getMonth();
@@ -65,8 +70,8 @@ function buildQuarterSchedule(): { quarter: string; year: number; dueDate: strin
       const qu = QUARTERS[i]!;
       const dueDateObj = new Date(y, qu.dueMonth, qu.dueDay);
       const quarterEnd = new Date(y, qu.endMonth, qu.endDay);
-      const dueDate = dueDateObj.toISOString().slice(0, 10);
-      const quarterEndDate = quarterEnd.toISOString().slice(0, 10);
+      const dueDate = toLocalDateString(y, qu.dueMonth, qu.dueDay);
+      const quarterEndDate = toLocalDateString(y, qu.endMonth, qu.endDay);
       let status: 'Paid' | 'Due' | 'Overdue' | 'Upcoming';
       if (paidThrough && quarterEnd <= paidThrough) status = 'Paid';
       else if (dueDateObj < today) status = 'Overdue';
@@ -101,6 +106,15 @@ if (!isPaidThrough && assessment?.next_due) {
 function formatDate(s: string | null): string {
   if (!s) return '-';
   try {
+    // Parse YYYY-MM-DD as local date; otherwise "2026-01-01" is UTC midnight and shows as Dec 31 in US TZ
+    const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(s.trim());
+    if (match) {
+      const year = parseInt(match[1], 10);
+      const month = parseInt(match[2], 10) - 1;
+      const day = parseInt(match[3], 10);
+      const d = new Date(year, month, day);
+      if (!Number.isNaN(d.getTime())) return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+    }
     return new Date(s).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
   } catch {
     return s;
@@ -122,20 +136,25 @@ function daysRemaining(nextDue: string | null): number | null {
 }
 ---
 
-<PortalLayout title="Assessments | Member Portal | Crooked Lake Reserve HOA">
+<PortalLayout title="Dues | Member Portal | Crooked Lake Reserve HOA">
   <ProtectedPage>
   <div class="min-h-screen portal-theme-bg font-body">
-    <PortalNav currentPath="/portal/assessments" draftCount={draftCount} role={session.role} />
+    <PortalNav currentPath="/portal/assessments" draftCount={draftCount} role={effectiveRole} staffRole={session?.role ?? ''} />
 
     <main class="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
-      <h2 class="text-2xl font-heading font-bold text-clr-green mb-2">Assessment balance</h2>
-      <p class="text-gray-600 mb-6">
+      <h2 class="text-2xl font-heading font-bold text-clr-green mb-2">Dues & balance</h2>
+      <p class="text-gray-600 mb-2">
         View your balance, dues schedule, and payment history. No payment processing here; pay by the method specified by the board.
+      </p>
+      <p class="text-sm text-gray-500 mb-6">
+        Your balance may include quarterly dues and any <strong>special assessments</strong> the board has added. The board can change the dues amount per quarter; check the schedule below or contact the board for the current amount.
       </p>
 
       {!assessment ? (
-        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center text-gray-500 mb-8">
-          No assessment record found for your account. Contact the board if you believe this is an error.
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center mb-8">
+          <p class="text-gray-600 mb-2">No dues record found for your account.</p>
+          <p class="text-sm text-gray-500 mb-4">If you just joined, the board may need to add you to the roster. Otherwise, contact the board if you believe this is an error.</p>
+          <a href="/portal/faq" class="text-clr-green font-semibold hover:underline">See FAQ</a>
         </div>
       ) : (
         <div class={`rounded-2xl shadow-sm border p-6 mb-8 ${isOverdue || totalDueFromSpecials > 0 ? 'bg-red-50 border-red-200' : 'bg-white border-gray-100'}`}>
@@ -204,7 +223,7 @@ function daysRemaining(nextDue: string | null): number | null {
       <section class="mb-8" aria-labelledby="dues-schedule-heading">
         <h3 id="dues-schedule-heading" class="text-lg font-heading font-semibold text-clr-green mb-3">Dues schedule</h3>
         <p class="text-sm text-gray-600 mb-3">
-          Quarterly dues (due Jan 1, Apr 1, Jul 1, Oct 1). Shown from this quarter through next year. Special assessments, if any, would be communicated by the board.
+          Quarterly dues (due Jan 1, Apr 1, Jul 1, Oct 1). Shown from this quarter through next year. The board may add special assessments or change the amount per quarter; any special assessments appear in the balance above.
         </p>
         <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           <table class="w-full text-sm">
@@ -282,8 +301,9 @@ function daysRemaining(nextDue: string | null): number | null {
           <h3 class="text-lg font-heading font-semibold text-clr-green mb-3">Payment history (last 12 months)</h3>
           <p class="text-sm text-gray-600 mb-3">Payments you’ve made; these match the &quot;Paid&quot; quarters in the schedule above.</p>
           {paymentHistory.length === 0 ? (
-            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 text-center text-gray-500">
-              No payment history in the last 12 months.
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 text-center">
+              <p class="text-gray-600">No payments recorded in the last 12 months.</p>
+              <p class="text-sm text-gray-500 mt-1">Payments are added by the board when you pay. Contact the board if you’ve paid and don’t see it here.</p>
             </div>
           ) : (
             <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
@@ -293,8 +313,11 @@ function daysRemaining(nextDue: string | null): number | null {
                     <th class="text-left py-3 px-4 font-semibold text-gray-700">Payment date</th>
                     <th class="text-left py-3 px-4 font-semibold text-gray-700">Recorded</th>
                     <th class="text-left py-3 px-4 font-semibold text-gray-700">Recorded by</th>
+                    <th class="text-left py-3 px-4 font-semibold text-gray-700">Method</th>
+                    <th class="text-left py-3 px-4 font-semibold text-gray-700">Check #</th>
                     <th class="text-right py-3 px-4 font-semibold text-gray-700">Amount</th>
                     <th class="text-right py-3 px-4 font-semibold text-gray-700">Balance after</th>
+                    <th class="text-left py-3 px-4 font-semibold text-gray-700">Receipt</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -303,8 +326,13 @@ function daysRemaining(nextDue: string | null): number | null {
                       <td class="py-3 px-4">{formatDate(p.paid_at)}</td>
                       <td class="py-3 px-4">{formatDate(p.created)}</td>
                       <td class="py-3 px-4 text-gray-600">{p.recorded_by ?? '—'}</td>
+                      <td class="py-3 px-4">{p.payment_method === 'electronic_transfer' ? 'E-transfer' : p.payment_method === 'check' ? 'Check' : p.payment_method === 'cash' ? 'Cash' : p.payment_method ?? '—'}</td>
+                      <td class="py-3 px-4">{p.check_number ?? '—'}</td>
                       <td class="py-3 px-4 text-right">{formatCurrency(p.amount)}</td>
                       <td class="py-3 px-4 text-right">{formatCurrency(p.balance_after)}</td>
+                      <td class="py-3 px-4">
+                        <a href={`/portal/assessments/receipt/${p.id}`} target="_blank" rel="noopener noreferrer" class="text-clr-green hover:underline text-sm font-medium">Print receipt</a>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

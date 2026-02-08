@@ -3,14 +3,14 @@ export const prerender = false;
 
 import BoardLayout from '../../layouts/BoardLayout.astro';
 import { getBoardContext } from '../../lib/board-context';
-import { listArbRequestsByOwner } from '../../lib/arb-db';
+import { listArbRequestsByHousehold } from '../../lib/arb-db';
 
 const ctx = await getBoardContext(Astro);
 if (ctx.redirect) return Astro.redirect(ctx.redirect);
-const { env, session } = ctx;
-if (session.role !== 'board' && session.role !== 'admin') return Astro.redirect('/portal/dashboard');
+const { env, session, effectiveRole } = ctx;
+if (effectiveRole !== 'board' && effectiveRole !== 'admin') return Astro.redirect('/portal/dashboard');
 
-const allRequests = env?.DB ? await listArbRequestsByOwner(env.DB, session.email) : [];
+const allRequests = env?.DB ? await listArbRequestsByHousehold(env.DB, session.email) : [];
 const draftCount = allRequests.filter((r) => r.status === 'pending').length;
 
 const url = Astro.url;
@@ -18,7 +18,7 @@ const connected = url.searchParams.get('connected') === '1';
 const errorParam = url.searchParams.get('error') ?? '';
 ---
 
-<BoardLayout title="Backups" subtitle="Download full backup or configure automated backups to Google Drive" draftCount={draftCount} role={session.role}>
+<BoardLayout title="Backups" subtitle="Download full backup or configure automated backups to Google Drive" draftCount={draftCount} role={effectiveRole} session={session} elevatedUntil={session.elevated_until}>
   <p class="text-gray-600 mb-6">
     Database (D1) and login whitelist (KV) backups. Automated backups run daily to Cloudflare R2; you can also send a copy to a Google Workspace Drive folder.
   </p>

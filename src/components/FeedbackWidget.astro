@@ -1,0 +1,171 @@
+---
+/** Site feedback widget: bottom-right, thumbs up/down + 140-char box. No PII. */
+---
+
+<div id="feedback-widget" class="fixed bottom-4 right-4 z-50 flex flex-col items-end gap-2">
+  <div
+    id="feedback-panel"
+    class="hidden rounded-lg border border-gray-200 bg-white p-3 shadow-lg"
+    aria-label="Site feedback"
+  >
+    <p class="mb-2 text-sm font-medium text-gray-700">How was your experience?</p>
+    <div class="mb-2 flex gap-2">
+      <button
+        type="button"
+        id="feedback-thumbs-up"
+        class="rounded-md border border-gray-300 bg-white p-2 text-gray-600 transition hover:border-green-500 hover:bg-green-50 hover:text-green-700"
+        aria-label="Thumbs up"
+      >
+        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5" />
+        </svg>
+      </button>
+      <button
+        type="button"
+        id="feedback-thumbs-down"
+        class="rounded-md border border-gray-300 bg-white p-2 text-gray-600 transition hover:border-red-500 hover:bg-red-50 hover:text-red-700"
+        aria-label="Thumbs down"
+      >
+        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.736 3h4.018a2 2 0 01.485.06l3.76.94m-7 10v5a2 2 0 002 2h.096c.5 0 .905-.405.905-.904 0-.715.211-1.413.608-2.008L17 13V4m-7 10h2M5 4h2a2 2 0 012 2v6a2 2 0 01-2 2H5" />
+        </svg>
+      </button>
+    </div>
+    <textarea
+      id="feedback-comment"
+      class="mb-2 w-64 resize-none rounded-md border border-gray-300 px-2 py-1.5 text-sm placeholder-gray-400 focus:border-green-600 focus:outline-none focus:ring-1 focus:ring-green-600"
+      rows="2"
+      maxlength="140"
+      placeholder="Optional comment (140 chars max)"
+      aria-label="Optional feedback comment"
+    ></textarea>
+    <div class="flex justify-between text-xs text-gray-500">
+      <span id="feedback-char-count">0/140</span>
+      <button
+        type="button"
+        id="feedback-submit"
+        class="rounded bg-green-700 px-2 py-1 text-white hover:bg-green-800 disabled:opacity-50"
+      >
+        Send
+      </button>
+    </div>
+    <p id="feedback-message" class="mt-2 hidden text-sm" role="status"></p>
+  </div>
+  <button
+    type="button"
+    id="feedback-toggle"
+    class="rounded-full border border-gray-200 bg-white p-2 shadow-md transition hover:bg-gray-50"
+    aria-label="Open feedback"
+    title="Send feedback"
+  >
+    <svg class="h-5 w-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+    </svg>
+  </button>
+</div>
+
+<script>
+  (function () {
+    const FEEDBACK_KEY = 'site_feedback_session_id';
+    function getSessionId(): string {
+      try {
+        let id = sessionStorage.getItem(FEEDBACK_KEY);
+        if (!id) {
+          id = crypto.randomUUID?.() ?? Math.random().toString(36).slice(2) + Date.now().toString(36);
+          sessionStorage.setItem(FEEDBACK_KEY, id);
+        }
+        return id;
+      } catch {
+        return '';
+      }
+    }
+
+    const panel = document.getElementById('feedback-panel');
+    const toggle = document.getElementById('feedback-toggle');
+    const thumbsUp = document.getElementById('feedback-thumbs-up');
+    const thumbsDown = document.getElementById('feedback-thumbs-down');
+    const comment = document.getElementById('feedback-comment') as HTMLTextAreaElement | null;
+    const charCount = document.getElementById('feedback-char-count');
+    const submitBtn = document.getElementById('feedback-submit');
+    const messageEl = document.getElementById('feedback-message');
+
+    if (!panel || !toggle || !thumbsUp || !thumbsDown || !submitBtn || !messageEl) return;
+
+    let chosenThumbs: 1 | -1 | null = null;
+
+    function showMessage(text: string, isError: boolean) {
+      messageEl.textContent = text;
+      messageEl.classList.toggle('text-red-600', isError);
+      messageEl.classList.toggle('text-green-600', !isError);
+      messageEl.classList.remove('hidden');
+    }
+
+    function setCharCount() {
+      if (charCount && comment) charCount.textContent = `${comment.value.length}/140`;
+    }
+    comment?.addEventListener('input', setCharCount);
+
+    toggle.addEventListener('click', () => {
+      const open = !panel.classList.contains('hidden');
+      panel.classList.toggle('hidden', open);
+    });
+
+    function selectThumbs(v: 1 | -1) {
+      chosenThumbs = v;
+      thumbsUp.classList.toggle('border-green-500', v === 1);
+      thumbsUp.classList.toggle('bg-green-50', v === 1);
+      thumbsUp.classList.toggle('text-green-700', v === 1);
+      thumbsDown.classList.toggle('border-red-500', v === -1);
+      thumbsDown.classList.toggle('bg-red-50', v === -1);
+      thumbsDown.classList.toggle('text-red-700', v === -1);
+    }
+    thumbsUp.addEventListener('click', () => selectThumbs(1));
+    thumbsDown.addEventListener('click', () => selectThumbs(-1));
+
+    submitBtn.addEventListener('click', async () => {
+      if (chosenThumbs === null) {
+        showMessage('Please choose thumbs up or down.', true);
+        return;
+      }
+      submitBtn.setAttribute('disabled', '');
+      messageEl.classList.add('hidden');
+
+      const body = {
+        url: window.location.href,
+        viewport: `${window.innerWidth}x${window.innerHeight}`,
+        session_id: getSessionId(),
+        thumbs: chosenThumbs,
+        comment: comment?.value?.trim().slice(0, 140) ?? '',
+      };
+
+      try {
+        const res = await fetch('/api/site-feedback', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.status === 429) {
+          showMessage(
+            data.error ?? 'You can submit up to 3 feedback responses per day. Try again tomorrow.',
+            true
+          );
+          return;
+        }
+        if (!res.ok) {
+          showMessage(data.error ?? 'Something went wrong. Please try again.', true);
+          return;
+        }
+        showMessage('Thanks for your feedback!', false);
+        chosenThumbs = null;
+        thumbsUp.classList.remove('border-green-500', 'bg-green-50', 'text-green-700');
+        thumbsDown.classList.remove('border-red-500', 'bg-red-50', 'text-red-700');
+        if (comment) comment.value = '';
+        setCharCount();
+        setTimeout(() => panel.classList.add('hidden'), 1500);
+      } finally {
+        submitBtn.removeAttribute('disabled');
+      }
+    });
+  })();
+</script>

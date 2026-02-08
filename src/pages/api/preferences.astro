@@ -8,7 +8,6 @@ export const prerender = false;
 import { requireSession, requireDb, jsonResponse } from '../../lib/api-helpers';
 import { getUserByEmail, updateUserPreferences, type NotificationPreferences } from '../../lib/db';
 import { getOwnerByEmail, getPhonesArray, updateOwnerByEmail } from '../../lib/directory-db';
-import { sendSMS } from '../../lib/notifications';
 
 const auth = await requireSession(Astro);
 if (auth.response) return auth.response;
@@ -84,11 +83,9 @@ if (owner) {
   }
 }
 
-if (sendTestSms && phone && env) {
-  const result = await sendSMS(env, phone, 'Crooked Lake Reserve HOA: You are opted in to SMS alerts. Reply STOP to opt out.');
-  if (!result.ok) {
-    return jsonResponse({ success: true, saved: true, sms_test: false, sms_error: result.error }, 200);
-  }
+// SMS sending is disabled until the board enables it (costs HOA money).
+if (sendTestSms) {
+  return jsonResponse({ success: true, saved: true, sms_test: false, sms_error: 'SMS sending is not enabled yet.' }, 200);
 }
 
 return jsonResponse({ success: true, saved: true });

@@ -5,7 +5,7 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie } from '../../../lib/auth';
+import { getSessionFromCookie, getEffectiveRole, isElevatedRole } from '../../../lib/auth';
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
@@ -17,8 +17,9 @@ const session = await getSessionFromCookie(
 if (!session) {
   return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
 }
-const isBoardOrAdmin = session.role === 'board' || session.role === 'admin';
-if (!isBoardOrAdmin) {
+const effectiveRole = getEffectiveRole(session);
+const canManageBackup = effectiveRole === 'board' || effectiveRole === 'admin' || effectiveRole === 'arb_board';
+if (!canManageBackup) {
   return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403, headers: { 'Content-Type': 'application/json' } });
 }
 

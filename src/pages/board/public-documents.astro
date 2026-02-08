@@ -5,18 +5,18 @@ import BoardLayout from '../../layouts/BoardLayout.astro';
 import { getBoardContext } from '../../lib/board-context';
 import { listPublicDocuments } from '../../lib/public-documents-db';
 import { BOARD_ONLY_SLUGS, ARB_FORM_SLUG } from '../../lib/public-documents-db';
-import { listArbRequestsByOwner } from '../../lib/arb-db';
+import { listArbRequestsByHousehold } from '../../lib/arb-db';
 import { sanitizeForScriptInjection } from '../../lib/sanitize';
 
 const ctx = await getBoardContext(Astro);
 if (ctx.redirect) return Astro.redirect(ctx.redirect);
-const { env, session } = ctx;
-const isBoard = session.role === 'board' || session.role === 'admin' || session.role === 'arb_board';
-const isArb = session.role === 'arb' || isBoard;
+const { env, session, effectiveRole } = ctx;
+const isBoard = effectiveRole === 'board' || effectiveRole === 'admin' || effectiveRole === 'arb_board';
+const isArb = effectiveRole === 'arb' || isBoard;
 
 const db = env?.DB;
 const docs = db ? await listPublicDocuments(db) : [];
-const allRequests = db ? await listArbRequestsByOwner(db, session.email) : [];
+const allRequests = db ? await listArbRequestsByHousehold(db, session.email) : [];
 const draftCount = allRequests.filter((r) => r.status === 'pending').length;
 
 function canEdit(slug: string): boolean {
@@ -35,7 +35,7 @@ function formatDate(s: string | null): string {
 }
 ---
 
-<BoardLayout title="Public documents" subtitle="Update bylaws, covenants, proxy form, and ARB request form" draftCount={draftCount} role={session.role}>
+<BoardLayout title="Public documents" subtitle="Update bylaws, covenants, proxy form, and ARB request form" draftCount={draftCount} role={effectiveRole} session={session} elevatedUntil={session.elevated_until}>
   <div id="public-doc-message" class="hidden mb-4 p-4 rounded-xl border" role="status" aria-live="polite" aria-atomic="true"></div>
   <div class="mb-8 p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-900" role="alert">
     <p class="font-semibold">These documents are publicly accessible.</p>
