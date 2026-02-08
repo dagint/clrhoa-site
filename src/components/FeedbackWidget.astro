@@ -91,13 +91,16 @@
 
     if (!panel || !toggle || !thumbsUp || !thumbsDown || !submitBtn || !messageEl) return;
 
+    const thumbsUpEl = thumbsUp;
+    const thumbsDownEl = thumbsDown;
+    const messageElRef = messageEl;
     let chosenThumbs: 1 | -1 | null = null;
 
     function showMessage(text: string, isError: boolean) {
-      messageEl.textContent = text;
-      messageEl.classList.toggle('text-red-600', isError);
-      messageEl.classList.toggle('text-green-600', !isError);
-      messageEl.classList.remove('hidden');
+      messageElRef.textContent = text;
+      messageElRef.classList.toggle('text-red-600', isError);
+      messageElRef.classList.toggle('text-green-600', !isError);
+      messageElRef.classList.remove('hidden');
     }
 
     function setCharCount() {
@@ -112,15 +115,15 @@
 
     function selectThumbs(v: 1 | -1) {
       chosenThumbs = v;
-      thumbsUp.classList.toggle('border-green-500', v === 1);
-      thumbsUp.classList.toggle('bg-green-50', v === 1);
-      thumbsUp.classList.toggle('text-green-700', v === 1);
-      thumbsDown.classList.toggle('border-red-500', v === -1);
-      thumbsDown.classList.toggle('bg-red-50', v === -1);
-      thumbsDown.classList.toggle('text-red-700', v === -1);
+      thumbsUpEl.classList.toggle('border-green-500', v === 1);
+      thumbsUpEl.classList.toggle('bg-green-50', v === 1);
+      thumbsUpEl.classList.toggle('text-green-700', v === 1);
+      thumbsDownEl.classList.toggle('border-red-500', v === -1);
+      thumbsDownEl.classList.toggle('bg-red-50', v === -1);
+      thumbsDownEl.classList.toggle('text-red-700', v === -1);
     }
-    thumbsUp.addEventListener('click', () => selectThumbs(1));
-    thumbsDown.addEventListener('click', () => selectThumbs(-1));
+    thumbsUpEl.addEventListener('click', () => selectThumbs(1));
+    thumbsDownEl.addEventListener('click', () => selectThumbs(-1));
 
     submitBtn.addEventListener('click', async () => {
       if (chosenThumbs === null) {
@@ -128,7 +131,7 @@
         return;
       }
       submitBtn.setAttribute('disabled', '');
-      messageEl.classList.add('hidden');
+      messageElRef.classList.add('hidden');
 
       const body = {
         url: window.location.href,
@@ -158,8 +161,8 @@
         }
         showMessage('Thanks for your feedback!', false);
         chosenThumbs = null;
-        thumbsUp.classList.remove('border-green-500', 'bg-green-50', 'text-green-700');
-        thumbsDown.classList.remove('border-red-500', 'bg-red-50', 'text-red-700');
+        thumbsUpEl.classList.remove('border-green-500', 'bg-green-50', 'text-green-700');
+        thumbsDownEl.classList.remove('border-red-500', 'bg-red-50', 'text-red-700');
         if (comment) comment.value = '';
         setCharCount();
         setTimeout(() => panel.classList.add('hidden'), 1500);

@@ -15,6 +15,10 @@ vi.mock('../src/lib/directory-db', () => ({
   listEmailsAtSameAddress: vi.fn(),
 }));
 
+/** Minimal type for D1 mock in tests (no Cloudflare globals in vitest). */
+interface D1Database {
+  prepare?: unknown;
+}
 const mockDb = {} as D1Database;
 
 const sessionOwner = {

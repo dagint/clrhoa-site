@@ -41,12 +41,6 @@ function isPdfFilename(filename: string): boolean {
   return /\.pdf$/i.test(filename);
 }
 
-function getAllFileUrls(files: ArbFile[]): string[] {
-  return files
-    .map((f) => getFileViewUrl(f.r2_keys))
-    .filter((url): url is string => url !== null);
-}
-
 const APPLICATION_TYPES = ['Exterior Paint', 'Landscape Installation', 'Swimming Pool', 'Recreational Equipment', 'Fencing', 'Other'];
 function selectedTypes(applicationType: string | null): string[] {
   return applicationType ? applicationType.split(',').map((s) => s.trim()).filter(Boolean) : [];

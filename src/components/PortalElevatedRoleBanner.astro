@@ -153,11 +153,11 @@ const label = role === 'admin' ? 'Administrator' : role === 'arb_board' ? 'ARB +
 
       function bindAssumeRoleButtons() {
         form?.querySelectorAll('.assume-role-btn').forEach((btn) => {
-          btn.addEventListener('click', async function () {
-            const role = (this as HTMLElement).getAttribute('data-role') || 'none';
+          btn.addEventListener('click', async function (this: HTMLButtonElement) {
+            const role = this.getAttribute('data-role') || 'none';
             const token = getCsrf();
             clearError();
-            (this as HTMLButtonElement).disabled = true;
+            this.disabled = true;
             try {
               const res = await fetch('/api/admin/assume-role', {
                 method: 'POST',
@@ -194,11 +194,11 @@ const label = role === 'admin' ? 'Administrator' : role === 'arb_board' ? 'ARB +
                   statusEl.appendChild(p);
                 }
               } else {
-                (this as HTMLButtonElement).disabled = false;
+                this.disabled = false;
                 showError(data.error || 'Couldn\'t switch role. Please try again or refresh the page.');
               }
             } catch (e) {
-              (this as HTMLButtonElement).disabled = false;
+              this.disabled = false;
               showError('Couldn\'t switch role. Please try again or refresh the page.');
             }
           });

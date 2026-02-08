@@ -3,16 +3,9 @@
  * Run via: npx tsx scripts/apply-retention-policies.ts [local|remote]
  *
  * This script should be run periodically (e.g., weekly) via cron or scheduled Worker.
- * When run as a Worker with env.DB and env.CLOURHOA_FILES, also call deleteOldCompletedMaintenance(db, { r2: env.CLOURHOA_FILES }).
+ * When run as a Worker with env.DB and env.CLOURHOA_FILES, use data-retention helpers:
+ * applyRetentionPolicies, softDeleteOldAuditLogs, purgeOldCompletedMaintenancePhotos, deleteOldCompletedMaintenance.
  */
-
-import {
-  applyRetentionPolicies,
-  softDeleteOldAuditLogs,
-  permanentlyDeleteOldRecords,
-  purgeOldCompletedMaintenancePhotos,
-  deleteOldCompletedMaintenance,
-} from '../src/lib/data-retention';
 
 const env = process.argv[2] || 'remote';
 

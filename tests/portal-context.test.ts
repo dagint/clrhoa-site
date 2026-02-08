@@ -46,7 +46,7 @@ describe('getPortalContext', () => {
     };
     const result = await getPortalContext(astro);
     expect(result.session).toBeNull();
-    expect(result.env?.SESSION_SECRET).toBe('secret');
+    expect((result.env as unknown as { SESSION_SECRET?: string })?.SESSION_SECRET).toBe('secret');
     expect(vi.mocked(getSessionFromCookie)).toHaveBeenCalledWith(
       expect.any(String),
       'secret'
@@ -67,7 +67,7 @@ describe('getPortalContext', () => {
     };
     const result = await getPortalContext(astro);
     expect(result.session).toEqual(session);
-    expect(result.env?.SESSION_SECRET).toBe('secret');
+    expect((result.env as unknown as { SESSION_SECRET?: string })?.SESSION_SECRET).toBe('secret');
   });
 
   it('with fingerprint: true passes userAgent and ipAddress', async () => {

@@ -7,14 +7,21 @@
 import type { SessionPayload } from './auth';
 import { getSessionFromCookie, getEffectiveRole } from './auth';
 
+/** Env shape available to portal pages (DB, SESSION_SECRET, etc.). Explicit type so Astro.locals inference does not narrow to never. */
+export interface PortalEnv {
+  SESSION_SECRET?: string;
+  DB?: D1Database;
+  [key: string]: unknown;
+}
+
 /** Minimal Astro-like context for portal pages. */
 export interface PortalContextAstro {
   request: Request;
-  locals: { runtime?: { env?: { SESSION_SECRET?: string; DB?: D1Database } } };
+  locals: { runtime?: { env?: PortalEnv } };
 }
 
 export interface PortalContextResult {
-  env: PortalContextAstro['locals']['runtime'] extends { env: infer E } ? E : undefined;
+  env: PortalEnv | undefined;
   session: SessionPayload | null;
   effectiveRole: string;
   userAgent?: string | null;

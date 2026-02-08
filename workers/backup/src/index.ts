@@ -134,7 +134,7 @@ async function exportD1(env: Env): Promise<string> {
 }
 
 async function gzipBuffer(data: Uint8Array): Promise<Uint8Array> {
-  const stream = new Blob([data]).stream().pipeThrough(new CompressionStream("gzip"));
+  const stream = new Blob([data as BlobPart]).stream().pipeThrough(new CompressionStream("gzip"));
   const ab = await new Response(stream).arrayBuffer();
   return new Uint8Array(ab);
 }

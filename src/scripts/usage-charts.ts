@@ -23,7 +23,7 @@ function initCharts(data: ChartData) {
   const topPages = data.topPages ?? [];
 
   if (daily.length) {
-    const dailyEl = document.getElementById('chart-daily');
+    const dailyEl = document.getElementById('chart-daily') as HTMLCanvasElement | null;
     if (dailyEl) {
       new Chart(dailyEl.getContext('2d')!, {
         type: 'bar',
@@ -38,7 +38,7 @@ function initCharts(data: ChartData) {
       });
     }
     // Line chart: active users + page views over time (same daily data)
-    const activeEl = document.getElementById('chart-active-users');
+    const activeEl = document.getElementById('chart-active-users') as HTMLCanvasElement | null;
     if (activeEl) {
       const dailyWithUsers = daily as { date: string; views: number; uniqueSessions: number; uniqueUsers?: number }[];
       const blue = 'rgb(59, 130, 246)';
@@ -64,7 +64,7 @@ function initCharts(data: ChartData) {
   }
 
   if (weekly.length) {
-    const weeklyEl = document.getElementById('chart-weekly');
+    const weeklyEl = document.getElementById('chart-weekly') as HTMLCanvasElement | null;
     if (weeklyEl) {
       new Chart(weeklyEl.getContext('2d')!, {
         type: 'bar',
@@ -81,7 +81,7 @@ function initCharts(data: ChartData) {
   }
 
   if (topPages.length) {
-    const topEl = document.getElementById('chart-top-pages');
+    const topEl = document.getElementById('chart-top-pages') as HTMLCanvasElement | null;
     if (topEl) {
       const labels = topPages.map((p) => (p.path.length > 40 ? p.path.slice(0, 37) + '...' : p.path));
       new Chart(topEl.getContext('2d')!, {

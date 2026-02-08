@@ -5,6 +5,11 @@
 import { describe, it, expect } from 'vitest';
 import { jsonResponse, requireDb } from '../src/lib/api-helpers';
 
+/** Minimal type for D1 mock in tests (no Cloudflare globals in vitest). */
+interface D1Database {
+  prepare?: unknown;
+}
+
 describe('jsonResponse', () => {
   it('returns Response with JSON body and Content-Type', async () => {
     const res = jsonResponse({ ok: true });
