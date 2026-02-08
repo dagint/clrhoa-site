@@ -1,0 +1,250 @@
+---
+/**
+ * POST /api/vendors/upload-csv — bulk upload vendors from CSV (board, admin, arb_board).
+ * FormData: file (or csv), csrf_token.
+ * CSV columns: name, category, phone, email, website, notes, show_on_public (optional; 1 or 0, default 1).
+ * Header row optional; case-insensitive column names.
+ */
+export const prerender = false;
+
+import { getSessionFromCookie, verifyCsrfToken, verifyOrigin, getEffectiveRole, isElevatedRole } from '../../../lib/auth';
+import { insertVendor } from '../../../lib/vendors-db';
+import { checkRateLimit, getRateLimitConfig } from '../../../lib/rate-limit';
+import { getSecurityMonitor } from '../../../lib/monitoring';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const userAgent = Astro.request.headers.get('user-agent') ?? null;
+const ipAddress = Astro.request.headers.get('cf-connecting-ip') ??
+  Astro.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
+let session = await getSessionFromCookie(
+  Astro.request.headers.get('cookie') ?? undefined,
+  env?.SESSION_SECRET,
+  userAgent,
+  ipAddress
+);
+
+if (!session && env?.SESSION_SECRET) {
+  session = await getSessionFromCookie(
+    Astro.request.headers.get('cookie') ?? undefined,
+    env.SESSION_SECRET
+  );
+}
+
+if (!session) {
+  return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+    status: 401,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const effectiveRole = getEffectiveRole(session);
+if (!isElevatedRole(effectiveRole)) {
+  return new Response(JSON.stringify({ error: 'Forbidden. Board or admin access required.' }), {
+    status: 403,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const origin = Astro.request.headers.get('origin');
+const referer = Astro.request.headers.get('referer');
+const expectedOrigin = Astro.url.origin;
+if (!verifyOrigin(origin, referer, expectedOrigin)) {
+  return new Response(JSON.stringify({ error: 'Invalid origin.' }), {
+    status: 403,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const db = env?.DB;
+if (!db) {
+  return new Response(JSON.stringify({ error: 'Server configuration error' }), {
+    status: 503,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const clientIpAddress = Astro.clientAddress || Astro.request.headers.get('cf-connecting-ip') || ipAddress;
+const rateLimitKv = env?.KV;
+const endpoint = '/api/vendors/upload-csv';
+const rateLimitConfig = getRateLimitConfig(endpoint);
+const securityMonitor = getSecurityMonitor();
+if (rateLimitConfig && rateLimitKv) {
+  const rateLimit = await checkRateLimit(
+    rateLimitKv,
+    endpoint,
+    clientIpAddress,
+    rateLimitConfig.maxRequests,
+    rateLimitConfig.windowSeconds
+  );
+  if (!rateLimit.allowed) {
+    securityMonitor.trackRateLimit(endpoint, session.email, clientIpAddress);
+    return new Response(
+      JSON.stringify({
+        error: `Rate limit exceeded. Maximum ${rateLimitConfig.maxRequests} uploads per ${rateLimitConfig.windowSeconds / 60} minutes. Please try again later.`,
+      }),
+      {
+        status: 429,
+        headers: {
+          'Content-Type': 'application/json',
+          'X-RateLimit-Limit': rateLimitConfig.maxRequests.toString(),
+          'X-RateLimit-Remaining': '0',
+          'X-RateLimit-Reset': rateLimit.resetAt.toString(),
+        },
+      }
+    );
+  }
+}
+
+if (Astro.request.method !== 'POST') {
+  return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+    status: 405,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+let formData: FormData;
+try {
+  formData = await Astro.request.formData();
+} catch {
+  return new Response(JSON.stringify({ error: 'Invalid form data' }), {
+    status: 400,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const csrf = (formData.get('csrf_token') ?? formData.get('csrfToken'))?.toString() ?? '';
+if (!verifyCsrfToken(session, csrf)) {
+  return new Response(JSON.stringify({ error: 'Invalid security token.' }), {
+    status: 403,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const file = formData.get('file') ?? formData.get('csv');
+if (!file || typeof file === 'string') {
+  return new Response(JSON.stringify({ error: 'No CSV file provided. Use form field "file" or "csv".' }), {
+    status: 400,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const MAX_CSV_BYTES = 1 * 1024 * 1024;
+const MAX_CSV_ROWS = 500;
+const fileBlob = file as Blob;
+if (fileBlob.size > MAX_CSV_BYTES) {
+  return new Response(JSON.stringify({ error: `CSV file must be under ${MAX_CSV_BYTES / 1024 / 1024}MB.` }), {
+    status: 400,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+let text: string;
+try {
+  text = await fileBlob.text();
+} catch {
+  return new Response(JSON.stringify({ error: 'Could not read file as text' }), {
+    status: 400,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+function parseCsvLine(line: string): string[] {
+  const out: string[] = [];
+  let cur = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') {
+      inQuotes = !inQuotes;
+    } else if (inQuotes) {
+      cur += c;
+    } else if (c === ',' || c === '\t') {
+      out.push(cur.trim());
+      cur = '';
+    } else {
+      cur += c;
+    }
+  }
+  out.push(cur.trim());
+  return out;
+}
+
+const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+if (lines.length === 0) {
+  return new Response(JSON.stringify({ success: true, added: 0, message: 'File is empty' }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const header = parseCsvLine(lines[0]!);
+const col = (name: string) => {
+  const lower = name.toLowerCase();
+  const i = header.findIndex((h) => h.toLowerCase() === lower);
+  return i >= 0 ? i : -1;
+};
+const nameCol = col('name') >= 0 ? col('name') : 0;
+const categoryCol = col('category') >= 0 ? col('category') : 1;
+const phoneCol = col('phone') >= 0 ? col('phone') : 2;
+const emailCol = col('email') >= 0 ? col('email') : 3;
+const websiteCol = col('website') >= 0 ? col('website') : 4;
+const notesCol = col('notes') >= 0 ? col('notes') : 5;
+const showOnPublicCol = col('show_on_public') >= 0 ? col('show_on_public') : -1;
+
+let startRow = 0;
+const first = header.map((h) => h.toLowerCase());
+if (first.includes('name') || first.includes('category') || first.includes('email')) {
+  startRow = 1;
+}
+
+if (lines.length - startRow > MAX_CSV_ROWS) {
+  return new Response(JSON.stringify({ error: `CSV has too many data rows. Maximum ${MAX_CSV_ROWS} rows.` }), {
+    status: 400,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+let added = 0;
+const errors: string[] = [];
+
+for (let i = startRow; i < lines.length; i++) {
+  const row = parseCsvLine(lines[i]!);
+  const name = (row[nameCol] ?? '').trim() || null;
+  const category = (row[categoryCol] ?? '').trim() || null;
+  const phone = (row[phoneCol] ?? '').trim() || null;
+  const email = (row[emailCol] ?? '').trim()?.toLowerCase() || null;
+  const website = (row[websiteCol] ?? '').trim() || null;
+  const notes = (row[notesCol] ?? '').trim() || null;
+  let showOnPublic = 1;
+  if (showOnPublicCol >= 0) {
+    const val = (row[showOnPublicCol] ?? '').trim().toLowerCase();
+    showOnPublic = val === '0' || val === 'false' || val === 'no' ? 0 : 1;
+  }
+  if (!name) continue;
+
+  try {
+    await insertVendor(db, {
+      name,
+      category,
+      phone,
+      email,
+      website: website || null,
+      notes: notes || null,
+      show_on_public: showOnPublic,
+    });
+    added += 1;
+  } catch (e) {
+    errors.push(`Row ${i + 1}: ${e instanceof Error ? e.message : String(e)}`);
+  }
+}
+
+return new Response(JSON.stringify({
+  success: true,
+  added,
+  ...(errors.length ? { errors } : {}),
+}), {
+  status: 200,
+  headers: { 'Content-Type': 'application/json' },
+});
+---
