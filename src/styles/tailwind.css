@@ -1,3 +1,6 @@
+/* Portal theme (dark mode) - variables and .dark overrides */
+@import './theme.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

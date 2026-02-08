@@ -1,0 +1,58 @@
+# Cloudflare Pages + D1/KV/R2 for CLR HOA portal
+# Run: npx wrangler d1 create clrhoa_db
+#      npx wrangler kv namespace create clrhoa_users
+#      npx wrangler r2 bucket create clrhoa-files
+# Then replace placeholder IDs below. Set SESSION_SECRET via: npx wrangler secret put SESSION_SECRET
+# Local dev: add SESSION_SECRET to .dev.vars
+
+name = "clrhoa-site"
+compatibility_date = "2025-02-01"
+compatibility_flags = ["nodejs_compat"]
+
+# D1: portal users (email, role, name, created)
+[[d1_databases]]
+binding = "DB"
+database_name = "clrhoa_db"
+database_id = "a214f9da-3577-4ee7-bc50-bc9b9754a79c"
+
+# KV: email whitelist (key = lowercase email, value = "1" or JSON { "role": "admin" })
+# id = the value printed when you ran: npx wrangler kv namespace create clrhoa_users
+[[kv_namespaces]]
+binding = "CLOURHOA_USERS"
+id = "e936ea7760c04b268c4472eb24575d46"
+
+# Adapter expects SESSION KV. id = from: npx wrangler kv namespace create SESSION
+[[kv_namespaces]]
+binding = "SESSION"
+id = "f2a5e8346928438baa1ca38e40ab200a"
+
+# KV: rate limiting (API) and login lockout. Create: npx wrangler kv namespace create RATE_LIMIT
+# Then set binding = "KV" and id = the printed id (replace placeholder below).
+[[kv_namespaces]]
+binding = "KV"
+id = "9249762b4c7b483a9785097db451f8e6"
+
+# R2: portal files (redacted minutes, budgets)
+[[r2_buckets]]
+binding = "CLOURHOA_FILES"
+bucket_name = "clrhoa-files"
+
+# SESSION_SECRET: set via wrangler secret put SESSION_SECRET (and .dev.vars for local)
+
+# Backup: for Board "Download backup" and backup Worker. Set CLOUDFLARE_API_TOKEN via wrangler secret put.
+# Optional Google Drive: set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, BACKUP_ENCRYPTION_KEY via wrangler secret put.
+# CLOUDFLARE_ACCOUNT_ID = your Cloudflare account id (dashboard URL or API)
+
+# Phase 3.5: Notifications — email (Resend or MailChannels) + Twilio. Change emails without code.
+# Email: set RESEND_API_KEY (recommended, free tier) or MAILCHANNELS_API_KEY via wrangler secret put.
+# Twilio: set TWILIO_* vars for SMS. See docs/EMAIL_PROVIDER_OPTIONS.md and docs/PHASE35_NOTIFICATIONS_SETUP.md.
+[vars]
+NOTIFY_BOARD_EMAIL = "your_personal@gmail.com"
+NOTIFY_ARB_EMAIL = "your_personal@gmail.com"
+NOTIFY_NOREPLY_EMAIL = "noreply@clrhoa.com"
+# RESEND_API_KEY = "re_..."   # preferred; set via wrangler secret put
+# MAILCHANNELS_API_KEY = "your_key"   # used only when RESEND_API_KEY is not set
+MAILCHANNELS_API_KEY = "your_key"
+TWILIO_ACCOUNT_SID = "your_sid"
+TWILIO_AUTH_TOKEN = "your_token"
+TWILIO_PHONE_NUMBER = "+15551234567"

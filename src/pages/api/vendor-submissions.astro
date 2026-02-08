@@ -1,0 +1,320 @@
+---
+/**
+ * /api/vendor-submissions
+ * POST: any authenticated user — submit a vendor suggestion (FormData: name, category, phone, email, notes, files).
+ * GET: board/arb/admin — list pending (and recent) submissions.
+ * PUT: board/arb/admin — approve or reject (JSON: id, action, review_notes).
+ */
+export const prerender = false;
+
+import { getSessionFromCookie, verifyCsrfToken, verifyOrigin, getEffectiveRole } from '../../lib/auth';
+import {
+  listPendingSubmissions,
+  listSubmissions,
+  getSubmissionById,
+  insertSubmission,
+  updateSubmissionStatus,
+  type VendorSubmission,
+} from '../../lib/vendor-submissions-db';
+import { insertVendor, updateVendor, insertVendorAuditLog, type VendorFile } from '../../lib/vendors-db';
+
+const REQUEST_TIMEOUT_MS = 30 * 1000;
+
+function generateId(): string {
+  const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
+  let id = '';
+  const bytes = new Uint8Array(21);
+  crypto.getRandomValues(bytes);
+  for (let i = 0; i < 21; i++) id += chars[bytes[i]! % chars.length];
+  return id;
+}
+
+function safeFileName(name: string): string {
+  return name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 100) || 'file';
+}
+
+function parseSubmissionFiles(filesJson: string | null): VendorFile[] {
+  if (!filesJson) return [];
+  try {
+    const arr = JSON.parse(filesJson) as { name?: string; key?: string }[];
+    return Array.isArray(arr) ? arr.filter((f) => f && f.key).map((f) => ({ name: f.name ?? 'File', key: f.key! })) : [];
+  } catch {
+    return [];
+  }
+}
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const userAgent = Astro.request.headers.get('user-agent') ?? null;
+const ipAddress = Astro.request.headers.get('cf-connecting-ip') ?? 
+  Astro.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
+let session = await getSessionFromCookie(
+  Astro.request.headers.get('cookie') ?? undefined,
+  env?.SESSION_SECRET,
+  userAgent,
+  ipAddress
+);
+
+if (!session && env?.SESSION_SECRET) {
+  session = await getSessionFromCookie(
+    Astro.request.headers.get('cookie') ?? undefined,
+    env.SESSION_SECRET
+  );
+}
+
+if (!session) {
+  return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+    status: 401,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const effectiveRole = getEffectiveRole(session);
+const isReviewer = effectiveRole === 'board' || effectiveRole === 'admin' || effectiveRole === 'arb' || effectiveRole === 'arb_board';
+const origin = Astro.request.headers.get('origin');
+const referer = Astro.request.headers.get('referer');
+const expectedOrigin = Astro.url.origin;
+if (!verifyOrigin(origin, referer, expectedOrigin)) {
+  return new Response(JSON.stringify({ error: 'Invalid origin.' }), {
+    status: 403,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const db = env?.DB;
+const r2 = env?.CLOURHOA_FILES;
+if (!db) {
+  return new Response(JSON.stringify({ error: 'Server configuration error' }), {
+    status: 503,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+// GET: list submissions (reviewers only)
+if (Astro.request.method === 'GET') {
+  if (!isReviewer) {
+    return new Response(JSON.stringify({ error: 'Forbidden' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  const status = Astro.url.searchParams.get('status');
+  const submissions = status
+    ? await listSubmissions(db, { status })
+    : await listPendingSubmissions(db);
+  return new Response(JSON.stringify({ submissions }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+// PUT: approve or reject (reviewers only)
+if (Astro.request.method === 'PUT') {
+  if (!isReviewer) {
+    return new Response(JSON.stringify({ error: 'Forbidden' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  let body: { id?: string; action?: string; review_notes?: string; csrf_token?: string; csrfToken?: string };
+  try {
+    body = await Astro.request.json();
+  } catch {
+    return new Response(JSON.stringify({ error: 'Invalid JSON' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  if (!verifyCsrfToken(session, body.csrf_token ?? body.csrfToken)) {
+    return new Response(JSON.stringify({ error: 'Invalid security token.' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  const id = (body.id ?? '').trim();
+  const action = (body.action ?? '').toLowerCase();
+  const reviewNotes = (body.review_notes ?? '').trim() || null;
+  if (!id || (action !== 'approve' && action !== 'reject')) {
+    return new Response(JSON.stringify({ error: 'id and action (approve|reject) required.' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  const submission = await getSubmissionById(db, id);
+  if (!submission || submission.status !== 'pending') {
+    return new Response(JSON.stringify({ error: 'Submission not found or already reviewed.' }), {
+      status: 404,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  if (action === 'reject') {
+    const updated = await updateSubmissionStatus(db, id, 'rejected', session.email, reviewNotes, null);
+    if (!updated) {
+      return new Response(JSON.stringify({ error: 'Update failed.' }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    return new Response(JSON.stringify({ success: true, action: 'rejected' }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  // Approve: create vendor and copy submission files to vendor R2 path (visible on public & portal)
+  const vendorId = await insertVendor(db, {
+    name: submission.name ?? '',
+    category: submission.category ?? 'Other',
+    phone: submission.phone,
+    email: submission.email,
+    website: submission.website ?? null,
+    notes: submission.notes,
+    filesJson: '[]',
+    show_on_public: 1,
+  });
+
+  const submissionFiles = parseSubmissionFiles(submission.files);
+  const vendorFiles: VendorFile[] = [];
+  if (r2 && submissionFiles.length > 0) {
+    for (const f of submissionFiles) {
+      const obj = await r2.get(f.key);
+      if (obj?.body) {
+        const partId = generateId().slice(0, 8);
+        const safe = safeFileName(f.name);
+        const newKey = `vendors/${vendorId}/${partId}_${safe}`;
+        await r2.put(newKey, obj.body, {
+          httpMetadata: { contentType: obj.httpMetadata?.contentType ?? 'application/octet-stream' },
+        });
+        vendorFiles.push({ name: f.name, key: newKey });
+      }
+    }
+    if (vendorFiles.length > 0) {
+      await updateVendor(db, vendorId, { filesJson: JSON.stringify(vendorFiles) });
+    }
+  }
+
+  const clientIp = Astro.clientAddress || Astro.request.headers.get('cf-connecting-ip') || null;
+  await insertVendorAuditLog(db, { vendor_id: vendorId, vendor_name: submission.name ?? null, action: 'created', done_by_email: session.email, ip_address: clientIp });
+
+  const updated = await updateSubmissionStatus(db, id, 'approved', session.email, reviewNotes, vendorId);
+  if (!updated) {
+    return new Response(JSON.stringify({ error: 'Failed to update submission status.' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  return new Response(JSON.stringify({ success: true, action: 'approved', vendorId }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+// POST: submit a vendor suggestion (any authenticated user)
+if (Astro.request.method !== 'POST') {
+  return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+    status: 405,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+let formData: FormData;
+try {
+  const formDataPromise = Astro.request.formData();
+  const timeoutPromise = new Promise<never>((_, rej) => setTimeout(() => rej(new Error('Request timeout')), REQUEST_TIMEOUT_MS));
+  formData = await Promise.race([formDataPromise, timeoutPromise]);
+} catch (e) {
+  return new Response(JSON.stringify({ error: 'Invalid form data or request timeout.' }), {
+    status: 400,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const csrfToken = (formData.get('csrf_token') as string) ?? (formData.get('csrfToken') as string);
+if (!verifyCsrfToken(session, csrfToken)) {
+  return new Response(JSON.stringify({ error: 'Invalid security token. Please refresh the page.' }), {
+    status: 403,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const name = (formData.get('name') as string)?.trim();
+const category = (formData.get('category') as string)?.trim() ?? null;
+const phone = (formData.get('phone') as string)?.trim() ?? null;
+const email = (formData.get('email') as string)?.trim() ?? null;
+const website = (formData.get('website') as string)?.trim() ?? null;
+const notes = (formData.get('notes') as string)?.trim() ?? null;
+
+if (!name) {
+  return new Response(JSON.stringify({ error: 'Vendor name is required.' }), {
+    status: 400,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const fileIndices = new Set<number>();
+for (const key of formData.keys()) {
+  const m = /^file_(\d+)$/.exec(key);
+  if (m) fileIndices.add(parseInt(m[1]!, 10));
+}
+const sortedIndices = Array.from(fileIndices).sort((a, b) => a - b);
+const files: { name: string; file: File }[] = [];
+for (const i of sortedIndices) {
+  const file = formData.get('file_' + i);
+  if (file instanceof File && file.size > 0) {
+    files.push({ name: file.name || 'file', file });
+  }
+}
+
+const submissionId = await insertSubmission(db, {
+  name,
+  category: category ?? 'Other',
+  phone,
+  email,
+  website,
+  notes,
+  filesJson: '[]',
+  submittedBy: session.email,
+});
+
+const uploadedFiles: VendorFile[] = [];
+if (r2 && files.length > 0) {
+  for (const { name: fileName, file } of files) {
+    const partId = generateId().slice(0, 8);
+    const safe = safeFileName(fileName);
+    const key = `vendor-submissions/${submissionId}/${partId}_${safe}`;
+    const buf = await file.arrayBuffer();
+    await r2.put(key, buf, { httpMetadata: { contentType: file.type || 'application/octet-stream' } });
+    uploadedFiles.push({ name: fileName, key });
+  }
+  await db
+    .prepare('UPDATE vendor_submissions SET files = ? WHERE id = ?')
+    .bind(JSON.stringify(uploadedFiles), submissionId)
+    .run();
+}
+
+const accept = Astro.request.headers.get('accept') ?? '';
+const wantsJson = accept.includes('application/json');
+if (!wantsJson) {
+  const path = '/portal/vendors?submitted=1';
+  try {
+    const url = new URL(Astro.request.url);
+    if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
+      return Astro.redirect(`http://${url.host}${path}`);
+    }
+  } catch (_) { /* use relative redirect */ }
+  return Astro.redirect(path);
+}
+return new Response(
+  JSON.stringify({
+    success: true,
+    id: submissionId,
+    message: 'Your suggestion has been submitted. A board or committee member will review it before it appears on the vendor list.',
+  }),
+  {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  }
+);
+---

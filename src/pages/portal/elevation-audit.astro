@@ -1,0 +1,86 @@
+---
+/**
+ * Read-only PIM elevation audit: who requested elevated access and when.
+ * Visible to users with an elevated whitelist role (board, ARB, admin) without requiring them to elevate.
+ * Full audit logs (directory, ARB, etc.) remain on Board and require elevated access.
+ */
+export const prerender = false;
+
+import PortalLayout from '../../layouts/PortalLayout.astro';
+import ProtectedPage from '../../components/ProtectedPage.astro';
+import PortalNav from '../../components/PortalNav.astro';
+import { getPortalContext } from '../../lib/portal-context';
+import { listArbRequestsByHousehold } from '../../lib/arb-db';
+import { listPimElevationLog } from '../../lib/pim-db';
+import { ELEVATED_ROLES } from '../../lib/auth';
+
+const { env, session, effectiveRole } = await getPortalContext(Astro);
+if (!session) return Astro.redirect('/portal/login');
+
+const whitelistRole = (session.role ?? 'member').toLowerCase();
+const canView = ELEVATED_ROLES.has(whitelistRole);
+if (!canView) return Astro.redirect('/portal/dashboard');
+
+const db = env?.DB;
+const pimLog = db ? await listPimElevationLog(db, 500) : [];
+const allRequests = db ? await listArbRequestsByHousehold(db, session.email) : [];
+const draftCount = allRequests.filter((r) => r.status === 'pending').length;
+
+function formatDate(s: string | null): string {
+  if (!s) return '—';
+  try {
+    const d = new Date(s);
+    return Number.isNaN(d.getTime()) ? s : d.toLocaleString();
+  } catch {
+    return s ?? '—';
+  }
+}
+---
+
+<PortalLayout title="Elevation audit (read-only) | Member Portal | Crooked Lake Reserve HOA">
+  <ProtectedPage>
+    <div class="min-h-screen portal-theme-bg font-body">
+      <PortalNav currentPath="/portal/elevation-audit" draftCount={draftCount} role={effectiveRole} staffRole={session?.role ?? ''} />
+
+      <main class="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+        <div class="mb-6 p-4 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 text-sm" role="status">
+          <strong>Read-only.</strong> This page shows when someone requested or dropped elevated access. It does not require you to elevate. For the full audit log (directory, ARB, payments, etc.), use Board → Audit logs after requesting elevated access.
+        </div>
+
+        <h1 class="text-2xl font-heading font-bold text-clr-green mb-2">PIM: elevated access requests</h1>
+        <p class="text-gray-600 mb-6">Who elevated or dropped temporary access, and when that access was set to expire.</p>
+
+        <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          {pimLog.length === 0 ? (
+            <p class="p-4 text-gray-500">No elevation entries yet.</p>
+          ) : (
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead class="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">When</th>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">Email</th>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">Role</th>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">Action</th>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">Expires at</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pimLog.map((row) => (
+                    <tr class="border-b border-gray-100 hover:bg-gray-50/50">
+                      <td class="py-2 px-3 text-gray-600">{formatDate(row.elevated_at)}</td>
+                      <td class="py-2 px-3">{row.email ?? '—'}</td>
+                      <td class="py-2 px-3">{row.role ?? '—'}</td>
+                      <td class="py-2 px-3">{row.action === 'elevate' ? 'Elevated' : 'Dropped'}</td>
+                      <td class="py-2 px-3 text-gray-600">{row.expires_at ? formatDate(row.expires_at) : '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </main>
+    </div>
+  </ProtectedPage>
+</PortalLayout>

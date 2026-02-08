@@ -1,5 +1,6 @@
 ---
 title: Proxy Form
+slug: proxy-form
 category: Forms
 description: Use this form to designate a proxy for HOA votes when you cannot attend a meeting.
 fileUrl: /docs/CLR-Proxy-v1.docx

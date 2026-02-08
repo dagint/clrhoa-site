@@ -1,0 +1,129 @@
+---
+/**
+ * POST /api/login — email whitelist auth. Sets HttpOnly session cookie and redirects to /portal/dashboard.
+ * Body: application/x-www-form-urlencoded with "email" (and optional "name").
+ */
+export const prerender = false;
+
+import { getWhitelistRole, createSessionCookieValue, SESSION_COOKIE_NAME, checkAccountLockout, recordFailedLoginAttempt, clearFailedLoginAttempts } from '../../lib/auth';
+import { getUserByEmail, upsertUser } from '../../lib/db';
+import { getOwnerByEmail } from '../../lib/directory-db';
+import { insertLoginHistory } from '../../lib/login-history-db';
+import { createLogger, maskEmail } from '../../lib/logging';
+import { getSecurityMonitor } from '../../lib/monitoring';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const kv = env?.CLOURHOA_USERS;
+const rateLimitKv = env?.KV; // For login lockout tracking
+const db = env?.DB;
+const secret = env?.SESSION_SECRET;
+const logger = createLogger({ endpoint: '/api/login' });
+const securityMonitor = getSecurityMonitor();
+
+if (Astro.request.method !== 'POST') {
+  return new Response(null, { status: 405, headers: { Allow: 'POST' } });
+}
+
+let email: string;
+let name: string | null = null;
+try {
+  const body = await Astro.request.formData();
+  email = (body.get('email') as string)?.trim() ?? '';
+  const nameVal = body.get('name');
+  name = typeof nameVal === 'string' ? nameVal.trim() || null : null;
+} catch {
+  return Astro.redirect('/portal/login?error=invalid');
+}
+
+if (!email) {
+  return Astro.redirect('/portal/login?error=missing');
+}
+
+const normalized = email.toLowerCase();
+if (!kv || !db || !secret) {
+  logger.error('Missing configuration', { email: maskEmail(normalized) });
+  return Astro.redirect('/portal/login?error=config');
+}
+
+  // Check account lockout
+  const ipAddress = Astro.clientAddress || Astro.request.headers.get('cf-connecting-ip') || null;
+  if (rateLimitKv) {
+    const lockoutUntil = await checkAccountLockout(rateLimitKv, normalized);
+    if (lockoutUntil) {
+      logger.warn('Login attempt on locked account', {
+        email: maskEmail(normalized),
+        ip: ipAddress,
+        lockoutUntil: new Date(lockoutUntil * 1000).toISOString(),
+      });
+      securityMonitor.trackFailedLogin(normalized, ipAddress, 'account_locked');
+      const minutesRemaining = Math.ceil((lockoutUntil - Date.now() / 1000) / 60);
+      return Astro.redirect(`/portal/login?error=locked&minutes=${minutesRemaining}`);
+    }
+  }
+
+// Directory is the authoritative source for portal access. Exception: admins can log in without being in directory.
+const whitelistRole = await getWhitelistRole(kv, normalized);
+const isAdmin = whitelistRole === 'admin';
+const owner = db ? await getOwnerByEmail(db, normalized) : null;
+const inDirectory = isAdmin || owner != null;
+if (!inDirectory) {
+  if (rateLimitKv) {
+    await recordFailedLoginAttempt(rateLimitKv, normalized, ipAddress);
+  }
+  logger.warn('Login attempt: not in directory and not admin', { email: maskEmail(normalized) });
+  securityMonitor.trackFailedLogin(normalized, ipAddress, 'not_authorized');
+  return Astro.redirect('/portal/login?error=unauthorized');
+}
+
+// Ensure directory members are on KV for role sync (board/arb/member). Admins already in KV.
+if (owner != null && kv) {
+  const existing = await kv.get(normalized);
+  if (existing == null) await kv.put(normalized, '1'); // member
+}
+let user = await getUserByEmail(db, normalized);
+// Prefer directory (owner) name for "Welcome back, FirstName" in portal; fall back to form name then existing user name
+const nameForSession = (owner?.name?.trim()) || name || (user?.name?.trim()) || null;
+if (!user) {
+  user = await upsertUser(db, normalized, nameForSession, whitelistRole);
+} else if (whitelistRole !== 'member' && user.role === 'member') {
+  user = await upsertUser(db, normalized, nameForSession, whitelistRole);
+} else if (nameForSession !== (user.name ?? null)) {
+  // Refresh name from directory so session and DB stay in sync
+  user = await upsertUser(db, normalized, nameForSession, whitelistRole);
+}
+
+// Clear failed login attempts on successful login
+if (rateLimitKv) {
+  await clearFailedLoginAttempts(rateLimitKv, normalized);
+}
+
+const userAgent = Astro.request.headers.get('user-agent');
+const cookieValue = await createSessionCookieValue(
+  { email: user.email, role: user.role, name: nameForSession },
+  secret,
+  userAgent,
+  ipAddress
+);
+
+// Log successful login (with masked PII)
+logger.info('Successful login', { email: maskEmail(normalized), role: user.role, ip: ipAddress });
+
+// Record login for "last logon" and profile history (one row per login)
+if (db) {
+  await insertLoginHistory(db, normalized, ipAddress, userAgent ?? null).catch((err) => {
+    logger.warn('Failed to record login history', { error: err instanceof Error ? err.message : String(err) });
+  });
+}
+
+const destination = new URL('/portal/dashboard', Astro.url.origin);
+const response = Astro.redirect(destination.toString());
+
+// Set Secure in production (HTTPS)
+const isSecure = Astro.url.protocol === 'https:';
+response.headers.set(
+  'Set-Cookie',
+  `${SESSION_COOKIE_NAME}=${cookieValue}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${60 * 60 * 24 * 7}${isSecure ? '; Secure' : ''}`
+);
+
+return response;

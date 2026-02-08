@@ -31,7 +31,7 @@ const dueDates = [
     <div class="max-w-2xl mx-auto mb-12 text-center">
       <h1 class="text-4xl font-heading font-bold text-clr-green mb-4">Dues & Payment Information</h1>
       <p class="text-gray-700 font-body text-lg">
-        Quarterly assessments and payment information for Crooked Lake Reserve homeowners.
+        Quarterly dues and payment information for Crooked Lake Reserve homeowners.
       </p>
     </div>
 
@@ -41,13 +41,13 @@ const dueDates = [
         <svg class="w-8 h-8 text-clr-orange" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
         </svg>
-        <h2 class="text-2xl font-heading font-bold text-clr-green">Quarterly Assessments</h2>
+        <h2 class="text-2xl font-heading font-bold text-clr-green">Quarterly dues</h2>
       </div>
 
       {quarterlyAmount && (
         <div class="bg-clr-beige/30 border border-gray-200 rounded-lg p-6 mb-6">
           <p class="text-gray-700 font-body mb-2">
-            <strong class="text-clr-green text-lg">Quarterly Amount:</strong>
+            <strong class="text-clr-green text-lg">Quarterly dues amount:</strong>
           </p>
           <p class="text-3xl font-heading font-bold text-clr-green mb-4">${quarterlyAmount}</p>
           <p class="text-gray-700 font-body text-sm">
@@ -70,7 +70,7 @@ const dueDates = [
       {!quarterlyAmount && (
         <div class="bg-yellow-50 border-2 border-yellow-200 rounded-lg p-4">
           <p class="text-yellow-800 font-body text-sm">
-            <strong>Note:</strong> The quarterly assessment amount is reviewed annually by the Board during meetings. If there are material changes to the assessment amount, homeowners will be notified by mail. Please contact the Board for the current amount.
+            <strong>Note:</strong> The quarterly dues amount is reviewed by the Board and can change. The Board may also add special assessments (one-time charges). Homeowners will be notified of any changes. Contact the Board for the current amount.
           </p>
         </div>
       )}
@@ -180,7 +180,7 @@ const dueDates = [
         <div class="bg-blue-50 border-2 border-blue-200 rounded-lg p-6">
           <h3 class="text-lg font-heading font-semibold text-blue-900 mb-2">Payment Questions?</h3>
           <p class="text-blue-800 font-body mb-3">
-            If you have questions about your assessment amount, payment status, or need to discuss payment arrangements, please contact the Board.
+            If you have questions about your dues amount, payment status, or need to discuss payment arrangements, please contact the Board.
           </p>
           <a
             href="/contact?recipient=board"
@@ -192,27 +192,27 @@ const dueDates = [
       </div>
     </section>
 
-    <!-- Assessment Review Process -->
+    <!-- Dues & special assessments -->
     <section class="bg-clr-green/10 border-2 border-clr-green/30 rounded-2xl p-8">
-      <h2 class="text-xl font-heading font-bold text-clr-green mb-4">Assessment Review Process</h2>
+      <h2 class="text-xl font-heading font-bold text-clr-green mb-4">Dues & special assessments</h2>
       <p class="text-gray-700 font-body mb-4">
-        The Board reviews the annual assessment amount during Board meetings each year. Assessment amounts typically remain consistent unless material changes are needed.
+        The Board sets the quarterly dues amount and may change it when needed. The Board can also add <strong>special assessments</strong> (one-time charges for specific projects or needs). Dues amounts typically stay the same unless the Board approves a change.
       </p>
       <div class="bg-white border border-gray-200 rounded-lg p-4 mb-4">
-        <h3 class="text-lg font-heading font-semibold text-clr-green mb-2">Notification of Changes</h3>
+        <h3 class="text-lg font-heading font-semibold text-clr-green mb-2">Notification of changes</h3>
         <p class="text-gray-700 font-body text-sm mb-2">
-          If there are <strong>material changes</strong> to the assessment amount, homeowners will be notified by mail. This notification will include:
+          If the <strong>quarterly dues amount</strong> changes or a <strong>special assessment</strong> is added, homeowners will be notified. Notification may include:
         </p>
         <ul class="space-y-1 text-gray-700 font-body text-sm list-disc list-inside ml-4">
-          <li>Updated assessment amount</li>
-          <li>Effective date of the change</li>
+          <li>Updated dues amount or special assessment details</li>
+          <li>Effective date</li>
           <li>Quarterly payment schedule</li>
           <li>Payment instructions and mailing address</li>
           <li>Late fee information (if applicable)</li>
         </ul>
       </div>
       <p class="text-gray-700 font-body text-sm">
-        If you have questions about the current assessment amount or need to verify your payment amount, please contact the Board.
+        For the current dues amount, special assessments, or to verify your balance, log in to the Member Portal (<strong>More → Dues</strong>) or contact the Board.
       </p>
     </section>
   </div>

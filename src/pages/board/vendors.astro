@@ -1,0 +1,387 @@
+---
+export const prerender = false;
+
+import BoardLayout from '../../layouts/BoardLayout.astro';
+import { getBoardContext } from '../../lib/board-context';
+import { listVendors } from '../../lib/vendors-db';
+import { listPendingSubmissions } from '../../lib/vendor-submissions-db';
+import { listArbRequestsByHousehold } from '../../lib/arb-db';
+import { escapeHtml } from '../../lib/sanitize';
+
+const ctx = await getBoardContext(Astro);
+if (ctx.redirect) return Astro.redirect(ctx.redirect);
+const { env, session, effectiveRole } = ctx;
+const isBoardOrAdmin = effectiveRole === 'board' || effectiveRole === 'admin' || effectiveRole === 'arb_board';
+
+const db = env?.DB;
+const vendorsList = db ? await listVendors(db) : [];
+const pendingSubmissions = db ? await listPendingSubmissions(db) : [];
+const allRequests = db ? await listArbRequestsByHousehold(db, session.email) : [];
+const draftCount = allRequests.filter((r) => r.status === 'pending').length;
+
+function parseFiles(filesJson: string | null): { name: string; key: string }[] {
+  if (!filesJson) return [];
+  try {
+    const arr = JSON.parse(filesJson);
+    if (!Array.isArray(arr)) return [];
+    return arr.filter((f) => f && typeof f === 'object' && f.key).map((f) => ({ name: (f && f.name) ?? 'File', key: f.key }));
+  } catch {
+    return [];
+  }
+}
+---
+
+<BoardLayout title="Vendors" subtitle="Manage recommended vendors" draftCount={draftCount} role={effectiveRole} session={session} elevatedUntil={session.elevated_until}>
+  <div id="csrf-holder" class="hidden" data-csrf={escapeHtml(session.csrfToken ?? '')} aria-hidden="true"></div>
+  <div id="vendors-message" class="hidden mb-4 p-4 rounded-xl border" role="status" aria-live="polite" aria-atomic="true"></div>
+      {pendingSubmissions.length > 0 && (
+        <section class="mb-8">
+          <h2 class="text-xl font-heading font-bold text-clr-green mb-3">Pending vendor suggestions</h2>
+          <p class="text-sm text-gray-600 mb-4">Members have suggested these vendors. Approve to add them to the list, or reject with an optional note.</p>
+          <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <ul class="divide-y divide-gray-100">
+              {pendingSubmissions.map((sub) => {
+                const subFiles = parseFiles(sub.files);
+                return (
+                  <li class="p-4">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <span class="font-medium text-gray-900">{sub.name ?? '-'}</span>
+                        {sub.category && <span class="ml-2 text-sm text-gray-500">({sub.category})</span>}
+                        {sub.phone && <div class="text-sm text-gray-600">{sub.phone}</div>}
+                        {sub.email && <div class="text-sm text-gray-600">{sub.email}</div>}
+                        {sub.website && (
+                          <div class="text-sm text-gray-600"><a href={sub.website.startsWith('http') ? sub.website : `https://${sub.website}`} target="_blank" rel="noopener noreferrer" class="text-clr-green hover:underline">{sub.website}</a></div>
+                        )}
+                        {sub.notes && <p class="text-sm text-gray-500 mt-1">{sub.notes}</p>}
+                        {sub.submitted_by && <p class="text-xs text-gray-400 mt-1">Submitted by {sub.submitted_by}</p>}
+                        {subFiles.length > 0 && (
+                          <div class="mt-2 text-sm text-clr-green">
+                            {subFiles.map((f) => (
+                              <a href={`/api/portal/file/${encodeURIComponent(f.key)}`} class="mr-2 hover:underline">{f.name}</a>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <div class="flex flex-col sm:flex-row gap-2">
+                        <button type="button" class="approve-submission-btn px-3 py-1.5 bg-clr-green text-white rounded-lg text-sm font-medium hover:brightness-110" data-id={sub.id}>Approve</button>
+                        <button type="button" class="reject-submission-btn px-3 py-1.5 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300" data-id={sub.id}>Reject</button>
+                      </div>
+                    </div>
+                    <div class="reject-notes-wrap hidden mt-2" data-for={sub.id}>
+                      <label class="block text-xs font-medium text-gray-500 mb-1">Rejection note (optional)</label>
+                      <input type="text" class="reject-notes-input block w-full rounded border border-gray-200 px-2 py-1 text-sm" placeholder="e.g. Duplicate or not relevant" />
+                      <button type="button" class="confirm-reject-btn mt-2 px-3 py-1 bg-red-100 text-red-700 rounded text-sm" data-id={sub.id}>Confirm reject</button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        </section>
+      )}
+
+      {isBoardOrAdmin && (
+        <>
+      <h2 class="text-2xl font-heading font-bold text-clr-green mb-6">Add or edit vendor</h2>
+
+      <form id="vendor-form" class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-8 space-y-4">
+        <input type="hidden" name="action" id="form-action" value="create" />
+        <input type="hidden" name="id" id="form-vendor-id" value="" />
+        <input type="hidden" name="csrf_token" id="form-csrf" value={escapeHtml(session.csrfToken ?? '')} />
+        <div>
+          <label for="vendor-name" class="block text-sm font-medium text-gray-700">Name *</label>
+          <input type="text" id="vendor-name" name="name" required class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2" />
+        </div>
+        <div>
+          <label for="vendor-category" class="block text-sm font-medium text-gray-700">Category</label>
+          <input type="text" id="vendor-category" name="category" placeholder="e.g. Landscaping, Plumbing" class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2" />
+        </div>
+        <div>
+          <label for="vendor-phone" class="block text-sm font-medium text-gray-700">Phone</label>
+          <input type="text" id="vendor-phone" name="phone" class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2" />
+        </div>
+        <div>
+          <label for="vendor-email" class="block text-sm font-medium text-gray-700">Email</label>
+          <input type="email" id="vendor-email" name="email" class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2" />
+        </div>
+        <div>
+          <label for="vendor-website" class="block text-sm font-medium text-gray-700">Website (optional)</label>
+          <input type="url" id="vendor-website" name="website" placeholder="https://example.com" class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2" />
+        </div>
+        <div>
+          <label for="vendor-notes" class="block text-sm font-medium text-gray-700">Notes</label>
+          <textarea id="vendor-notes" name="notes" rows={3} class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2"></textarea>
+        </div>
+        <fieldset class="rounded-lg border border-gray-200 bg-gray-50/80 p-4" aria-describedby="vendor-visibility-desc">
+          <legend class="text-sm font-medium text-gray-800">Visibility</legend>
+          <p id="vendor-visibility-desc" class="sr-only">Choose whether this vendor appears on the public site, in the portal, or both.</p>
+          <div class="mt-2 space-y-3">
+            <label class="flex items-start gap-3 cursor-pointer">
+              <input type="radio" name="show_on_public" id="vendor-show-public-portal" value="1" checked class="mt-0.5 rounded-full border-gray-300 text-clr-green focus:ring-clr-green" />
+              <span class="text-sm">
+                <span class="font-medium text-gray-800">Show on public & portal</span>
+                <span class="block text-gray-600 mt-0.5">This vendor appears on the public Resources vendor page and in the member portal.</span>
+              </span>
+            </label>
+            <label class="flex items-start gap-3 cursor-pointer">
+              <input type="radio" name="show_on_public" id="vendor-show-portal-only" value="0" class="mt-0.5 rounded-full border-gray-300 text-clr-green focus:ring-clr-green" />
+              <span class="text-sm">
+                <span class="font-medium text-gray-800">Portal only</span>
+                <span class="block text-gray-600 mt-0.5">This vendor appears only in the member portal (not on the public website).</span>
+              </span>
+            </label>
+          </div>
+        </fieldset>
+        <div>
+          <label class="block text-sm font-medium text-gray-700">Files (optional)</label>
+          <input type="file" id="vendor-files" name="file_0" multiple class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:rounded file:border-0 file:bg-clr-green file:px-4 file:py-2 file:text-white file:font-medium hover:file:brightness-110" />
+        </div>
+        <div class="flex gap-3">
+          <button type="submit" id="vendor-submit" class="px-4 py-2 bg-clr-green text-white rounded-lg font-medium hover:brightness-110">Create vendor</button>
+          <button type="button" id="vendor-cancel-edit" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 hidden">Cancel edit</button>
+        </div>
+      </form>
+
+      <h3 class="text-lg font-heading font-semibold text-clr-green mb-3">Current vendors</h3>
+      {vendorsList.length === 0 ? (
+        <p class="text-gray-500">No vendors yet. Add one above.</p>
+      ) : (
+        <ul class="space-y-3">
+          {vendorsList.map((v) => {
+            const files = parseFiles(v.files);
+            return (
+              <li class="bg-white rounded-xl border border-gray-100 p-4 shadow-sm flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <span class="font-medium text-gray-900">{v.name ?? '-'}</span>
+                  {v.category && <span class="ml-2 text-sm text-gray-500">({v.category})</span>}
+                  {v.phone && <div class="text-sm text-gray-600">{v.phone}</div>}
+                  {v.website && (
+                    <div class="text-sm text-gray-600"><a href={v.website.startsWith('http') ? v.website : `https://${v.website}`} target="_blank" rel="noopener noreferrer" class="text-clr-green hover:underline">Website</a></div>
+                  )}
+                  {files.length > 0 && (
+                    <div class="mt-1 text-sm text-clr-green">
+                      {files.map((f) => (
+                        <a href={`/api/portal/file/${encodeURIComponent(f.key)}`} class="mr-2 hover:underline">{f.name}</a>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div class="flex gap-2">
+                  <button type="button" class="edit-vendor-btn text-sm text-clr-green hover:underline" data-id={v.id} data-name={v.name ?? ''} data-category={v.category ?? ''} data-phone={v.phone ?? ''} data-email={v.email ?? ''} data-website={v.website ?? ''} data-notes={v.notes ?? ''} data-show-on-public={String(v.show_on_public ? 1 : 0)}>Edit</button>
+                  <button type="button" class="delete-vendor-btn text-sm text-red-600 hover:underline" data-id={v.id}>Delete</button>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+        </>
+      )}
+  <script>
+    (function () {
+      if (typeof window === 'undefined') return;
+      var csrfHolder = document.getElementById('csrf-holder');
+      var csrfToken = (csrfHolder && csrfHolder.getAttribute('data-csrf')) || '';
+      window.csrfToken = csrfToken;
+
+      const form = document.getElementById('vendor-form');
+      const actionInput = document.getElementById('form-action');
+      const idInput = document.getElementById('form-vendor-id');
+      const nameInput = document.getElementById('vendor-name');
+      const categoryInput = document.getElementById('vendor-category');
+      const phoneInput = document.getElementById('vendor-phone');
+      const emailInput = document.getElementById('vendor-email');
+      const websiteInput = document.getElementById('vendor-website');
+      const notesInput = document.getElementById('vendor-notes');
+      const fileInput = document.getElementById('vendor-files');
+      const submitBtn = document.getElementById('vendor-submit');
+      const cancelBtn = document.getElementById('vendor-cancel-edit');
+      const csrfInput = document.getElementById('form-csrf');
+      const radioPublicPortal = document.getElementById('vendor-show-public-portal');
+      const radioPortalOnly = document.getElementById('vendor-show-portal-only');
+
+      function setFormCreate() {
+        actionInput.value = 'create';
+        idInput.value = '';
+        nameInput.value = '';
+        categoryInput.value = '';
+        phoneInput.value = '';
+        emailInput.value = '';
+        if (websiteInput) websiteInput.value = '';
+        notesInput.value = '';
+        if (radioPublicPortal) (radioPublicPortal as HTMLInputElement).checked = true;
+        if (radioPortalOnly) (radioPortalOnly as HTMLInputElement).checked = false;
+        if (fileInput) fileInput.value = '';
+        submitBtn.textContent = 'Create vendor';
+        cancelBtn.classList.add('hidden');
+      }
+
+      document.querySelectorAll('.edit-vendor-btn').forEach((btn) => {
+        btn.addEventListener('click', function () {
+          const id = this.getAttribute('data-id');
+          const name = this.getAttribute('data-name') ?? '';
+          const category = this.getAttribute('data-category') ?? '';
+          const phone = this.getAttribute('data-phone') ?? '';
+          const email = this.getAttribute('data-email') ?? '';
+          const website = this.getAttribute('data-website') ?? '';
+          const notes = this.getAttribute('data-notes') ?? '';
+          const showOnPublic = this.getAttribute('data-show-on-public') === '1';
+          actionInput.value = 'update';
+          idInput.value = id || '';
+          nameInput.value = name;
+          categoryInput.value = category;
+          phoneInput.value = phone;
+          emailInput.value = email;
+          if (websiteInput) websiteInput.value = website;
+          notesInput.value = notes;
+          if (radioPublicPortal) (radioPublicPortal as HTMLInputElement).checked = showOnPublic;
+          if (radioPortalOnly) (radioPortalOnly as HTMLInputElement).checked = !showOnPublic;
+          submitBtn.textContent = 'Update vendor';
+          cancelBtn.classList.remove('hidden');
+        });
+      });
+
+      if (cancelBtn) {
+        cancelBtn.addEventListener('click', setFormCreate);
+      }
+
+      const msgEl = document.getElementById('vendors-message');
+      function showVendorsMessage(text, isError) {
+        if (!msgEl) return;
+        msgEl.textContent = text;
+        msgEl.className = 'mb-4 p-4 rounded-xl border ' + (isError ? 'bg-red-50 border-red-200 text-red-800' : 'bg-green-50 border-green-200 text-green-800');
+        msgEl.classList.remove('hidden');
+      }
+      function clearVendorsMessage() { if (msgEl) { msgEl.textContent = ''; msgEl.classList.add('hidden'); } }
+
+      document.querySelectorAll('.delete-vendor-btn').forEach((btn) => {
+        btn.addEventListener('click', async function () {
+          const id = this.getAttribute('data-id');
+          if (!id || !confirm('Delete this vendor?')) return;
+          clearVendorsMessage();
+          const token = (csrfInput && csrfInput.value) || csrfToken || '';
+          const b = this; b.disabled = true; b.setAttribute('aria-busy', 'true');
+          try {
+            const res = await fetch('/api/vendors', {
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ id, csrf_token: token }),
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+              showVendorsMessage('Vendor removed.', false);
+              setTimeout(function () { window.location.reload(); }, 1500);
+            } else {
+              showVendorsMessage(data.error || 'Delete failed', true);
+            }
+          } catch (err) {
+            showVendorsMessage('Network error. Try again.', true);
+          } finally {
+            b.disabled = false; b.removeAttribute('aria-busy');
+          }
+        });
+      });
+
+      const token = (csrfInput && csrfInput.value) || csrfToken || '';
+      document.querySelectorAll('.approve-submission-btn').forEach((btn) => {
+        btn.addEventListener('click', async function () {
+          const id = this.getAttribute('data-id');
+          if (!id || !confirm('Add this vendor to the recommended list?')) return;
+          clearVendorsMessage();
+          const b = this; b.disabled = true; b.setAttribute('aria-busy', 'true');
+          try {
+            const res = await fetch('/api/vendor-submissions', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ id, action: 'approve', csrf_token: token }),
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+              showVendorsMessage('Vendor approved and added to the list.', false);
+              setTimeout(function () { window.location.reload(); }, 1500);
+            } else {
+              showVendorsMessage(data.error || 'Approve failed', true);
+            }
+          } catch (err) {
+            showVendorsMessage('Network error. Try again.', true);
+          } finally {
+            b.disabled = false; b.removeAttribute('aria-busy');
+          }
+        });
+      });
+      document.querySelectorAll('.reject-submission-btn').forEach((btn) => {
+        btn.addEventListener('click', function () {
+          const id = this.getAttribute('data-id');
+          if (!id) return;
+          const wrap = document.querySelector('.reject-notes-wrap[data-for="' + (typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(id) : id) + '"]');
+          wrap?.classList.toggle('hidden');
+        });
+      });
+      document.querySelectorAll('.confirm-reject-btn').forEach((btn) => {
+        btn.addEventListener('click', async function () {
+          const id = this.getAttribute('data-id');
+          if (!id) return;
+          clearVendorsMessage();
+          const b = this; b.disabled = true; b.setAttribute('aria-busy', 'true');
+          try {
+            const wrap = document.querySelector('.reject-notes-wrap[data-for="' + (typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(id) : id) + '"]');
+            const notesEl = wrap ? wrap.querySelector('.reject-notes-input') : null;
+            const reviewNotes = (notesEl && notesEl.value) ? notesEl.value.trim() : null;
+            const res = await fetch('/api/vendor-submissions', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ id, action: 'reject', review_notes: reviewNotes, csrf_token: token }),
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+              showVendorsMessage('Suggestion rejected.', false);
+              setTimeout(function () { window.location.reload(); }, 1500);
+            } else {
+              showVendorsMessage(data.error || 'Reject failed', true);
+            }
+          } catch (err) {
+            showVendorsMessage('Network error. Try again.', true);
+          } finally {
+            b.disabled = false; b.removeAttribute('aria-busy');
+          }
+        });
+      });
+
+      form?.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        clearVendorsMessage();
+        const token = (csrfInput && csrfInput.value) || csrfToken || '';
+        const formData = new FormData(form);
+        formData.set('csrf_token', token);
+        if (actionInput.value === 'update' && idInput.value) {
+          formData.set('id', idInput.value);
+        }
+        // Append multiple files as file_0, file_1, ...
+        if (fileInput?.files?.length) {
+          for (let i = 0; i < fileInput.files.length; i++) {
+            formData.set('file_' + i, fileInput.files[i]!);
+          }
+        }
+        const method = actionInput.value === 'update' ? 'PUT' : 'POST';
+        submitBtn.disabled = true;
+        submitBtn.setAttribute('aria-busy', 'true');
+        try {
+          const res = await fetch('/api/vendors', { method, body: formData });
+          const data = await res.json();
+          if (res.ok && data.success) {
+            showVendorsMessage(actionInput.value === 'update' ? 'Vendor updated.' : 'Vendor added.', false);
+            setTimeout(function () { window.location.reload(); }, 1500);
+          } else {
+            showVendorsMessage(data.error || 'Request failed', true);
+          }
+        } catch (err) {
+          showVendorsMessage('Network error. Try again.', true);
+        } finally {
+          submitBtn.disabled = false;
+          submitBtn.removeAttribute('aria-busy');
+        }
+      });
+    })();
+  </script>
+</BoardLayout>

@@ -1,0 +1,136 @@
+---
+/**
+ * POST /api/arb-notes — Update ARB internal notes or owner notes for a request.
+ * ARB/Board/Admin can set arb_internal_notes; Owner can set owner_notes (pending only).
+ */
+export const prerender = false;
+
+import { getSessionFromCookie, verifyCsrfToken, verifyOrigin, getEffectiveRole, canApproveArb } from '../../lib/auth';
+import { checkRateLimit, getRateLimitConfig } from '../../lib/rate-limit';
+import { getSecurityMonitor } from '../../lib/monitoring';
+import { getArbRequest } from '../../lib/arb-db';
+import { listEmailsAtSameAddress } from '../../lib/directory-db.js';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const session = await getSessionFromCookie(
+  Astro.request.headers.get('cookie') ?? undefined,
+  env?.SESSION_SECRET
+);
+
+if (!session) {
+  return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+    status: 401,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+// CSRF protection: verify origin
+const origin = Astro.request.headers.get('origin');
+const referer = Astro.request.headers.get('referer');
+const expectedOrigin = Astro.url.origin;
+if (!verifyOrigin(origin, referer, expectedOrigin)) {
+  return new Response(JSON.stringify({ error: 'Invalid origin. Request blocked for security.' }), {
+    status: 403,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+if (Astro.request.method !== 'POST') {
+  return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+    status: 405,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const db = env?.DB;
+if (!db) {
+  return new Response(JSON.stringify({ error: 'Server configuration error' }), {
+    status: 503,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+let body: { requestId?: string; arbInternalNotes?: string; ownerNotes?: string; csrfToken?: string };
+try {
+  body = await Astro.request.json();
+} catch {
+  return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
+    status: 400,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+// CSRF token verification
+if (!verifyCsrfToken(session, body.csrfToken)) {
+  return new Response(
+    JSON.stringify({ error: 'Invalid security token. Please refresh the page and try again.' }),
+    { status: 403, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+
+const requestId = (body.requestId ?? '').trim();
+if (!requestId) {
+  return new Response(JSON.stringify({ error: 'Missing requestId.' }), {
+    status: 400,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const request = await getArbRequest(db, requestId);
+if (!request) {
+  return new Response(JSON.stringify({ error: 'Request not found.' }), {
+    status: 404,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const householdEmails = await listEmailsAtSameAddress(db, request.owner_email);
+const isOwnerOrHousehold = householdEmails.includes(session.email.trim().toLowerCase());
+const effectiveRole = getEffectiveRole(session);
+const canSetArbNotes = canApproveArb(effectiveRole);
+
+// Update ARB internal notes (ARB/Board only; admins may not)
+if (body.arbInternalNotes !== undefined && canSetArbNotes) {
+  const notes = body.arbInternalNotes.trim() || null;
+  const result = await db
+    .prepare(`UPDATE arb_requests SET arb_internal_notes = ?, updated_at = datetime('now') WHERE id = ?`)
+    .bind(notes, requestId)
+    .run();
+  
+  if ((result.meta.changes ?? 0) > 0) {
+    return new Response(
+      JSON.stringify({ success: true, requestId, message: 'ARB notes updated.' }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+  return new Response(JSON.stringify({ error: 'Update failed.' }), {
+    status: 500,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+// Update owner notes (owner or household, pending only)
+if (body.ownerNotes !== undefined && isOwnerOrHousehold && request.status === 'pending') {
+  const notes = body.ownerNotes.trim() || null;
+  const result = await db
+    .prepare(`UPDATE arb_requests SET owner_notes = ?, updated_at = datetime('now') WHERE id = ? AND status = 'pending'`)
+    .bind(notes, requestId)
+    .run();
+  
+  if ((result.meta.changes ?? 0) > 0) {
+    return new Response(
+      JSON.stringify({ success: true, requestId, message: 'Owner notes updated.' }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+  return new Response(JSON.stringify({ error: 'Update failed.' }), {
+    status: 500,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+return new Response(JSON.stringify({ error: 'Forbidden or invalid request.' }), {
+  status: 403,
+  headers: { 'Content-Type': 'application/json' },
+});

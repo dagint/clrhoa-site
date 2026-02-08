@@ -4,11 +4,12 @@ Complete security documentation for the Crooked Lake Reserve HOA website.
 
 ## Overview
 
-This site implements multiple layers of security to protect both the site and its users. Current security posture: **A (92/100)**.
+This site implements multiple layers of security for both the **public site** and the **member portal/board**. Current security posture: **A (90/100)**. Public pages use only safe, non-PII data; portal and board are protected by session auth, role-based access, rate limiting, and centralized access control.
 
 ## Quick Links
 
 - [Security Assessment](#security-assessment) - Overall security evaluation
+- [Portal & API security](#portal--api-security) - Auth, CSRF, access control, rate limiting
 - [Security Headers](#security-headers) - HTTP security headers configuration
 - [Dependency Security](#dependency-security) - Managing dependencies and vulnerabilities
 - [Security Monitoring](#security-monitoring) - Monitoring and incident response
@@ -16,18 +17,27 @@ This site implements multiple layers of security to protect both the site and it
 
 ## Security Assessment
 
-**Current Status**: A (92/100) - Excellent
+**Current Status**: A (90/100) - Strong
 
 ### Strengths
 
-- ✅ Static site architecture (minimal attack surface)
-- ✅ Comprehensive security headers (CSP, HSTS, etc.)
+- ✅ Hybrid architecture: public (minimal surface, no PII) + portal/board (session auth, D1/KV/R2)
+- ✅ Session auth: signed cookies, optional fingerprint, login lockout, rate limiting
+- ✅ Centralized access control (ARB ownership/elevated); file access validated
+- ✅ Comprehensive security headers (CSP, HSTS, etc.) in middleware
+- ✅ Input sanitization and parameterized queries; CSRF and origin checks on mutations
 - ✅ Form security (StaticForms: honeypot + optional reCAPTCHA)
-- ✅ Privacy protection (no exposed PII)
-- ✅ Automated dependency updates (Dependabot)
-- ✅ External script integrity (SRI)
+- ✅ robots.txt and security.txt; Dependabot enabled
 
-See `SECURITY_ASSESSMENT.md` for detailed analysis and `SECURITY_SUMMARY.md` for executive summary.
+See `SECURITY_ASSESSMENT.md` for detailed analysis and `SECURITY_SUMMARY.md` for the executive summary.
+
+## Portal & API security
+
+- **Session**: Signed cookie (HMAC-SHA256), HttpOnly, Secure, SameSite=Lax; optional inactivity timeout and user-agent+IP fingerprint. KV whitelist controls who can log in.
+- **CSRF / origin**: Mutating APIs verify origin/referer and use CSRF tokens where applicable (e.g. ARB actions, preferences).
+- **Authorization**: Middleware enforces session for `/portal/*` and elevated role for `/board/*` and elevated API prefixes. Resource-level checks use `requireArbRequestAccess` and `requireArbRequestOwner` in `src/lib/access-control.ts`.
+- **Rate limiting**: Per-IP limits (KV) on login, ARB endpoints, directory reveal, CSV upload; login lockout after failed attempts. See `RATE_LIMITING.md`.
+- **Data access**: Documented in `DATA_ACCESS_CONTROL.md` (who can see what; directory and ARB audit logging).
 
 ## Security Headers
 
@@ -144,11 +154,14 @@ npm run build
 
 ## Related Documentation
 
-- `SECURITY_ASSESSMENT.md` - Detailed security analysis
-- `SECURITY_SUMMARY.md` - Executive summary
+- `SECURITY_ASSESSMENT.md` - Detailed security analysis and current posture
+- `SECURITY_SUMMARY.md` - Executive summary and score breakdown
+- `SECURITY_CHECKLIST.md` - Quick verification checklist
 - `SECURITY_HEADERS.md` - Header configuration guide
+- `DATA_ACCESS_CONTROL.md` - Who can access what; audit logging
+- `RATE_LIMITING.md` - API and login rate limits
 - `DEPENDENCY_SECURITY.md` - Dependency management
-- `SECURITY_MONITORING.md` - Monitoring procedures
+- `SECURITY_MONITORING.md` - Monitoring and incident response
 - `SRI.md` - Subresource Integrity guide
 - `ENVIRONMENT_VARIABLES.md` - PII protection
 

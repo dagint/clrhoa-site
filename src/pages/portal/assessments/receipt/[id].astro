@@ -1,0 +1,173 @@
+---
+/**
+ * Print receipt for a single dues payment. Shows payment date, amount, periods covered (quarters),
+ * and balance after. For full-year or multi-quarter payments, lists each period.
+ */
+export const prerender = false;
+
+import PortalLayout from '../../../../layouts/PortalLayout.astro';
+import ProtectedPage from '../../../../components/ProtectedPage.astro';
+import PortalNav from '../../../../components/PortalNav.astro';
+import { getPortalContext } from '../../../../lib/portal-context';
+import { getOwnerByEmail, getPrimaryOwnerEmailForAddress } from '../../../../lib/directory-db';
+import { getPaymentById } from '../../../../lib/assessments-db';
+import { listArbRequestsByHousehold } from '../../../../lib/arb-db';
+
+const { id } = Astro.params;
+const { env, session, effectiveRole } = await getPortalContext(Astro);
+if (!session) return Astro.redirect('/portal/login');
+
+const db = env?.DB;
+if (!db || !id) return Astro.redirect('/portal/assessments');
+
+const owner = db ? await getOwnerByEmail(db, session.email) : null;
+const assessmentEmail = db && owner?.address
+  ? (await getPrimaryOwnerEmailForAddress(db, owner.address)) ?? session.email
+  : session.email;
+
+const payment = await getPaymentById(db, id, assessmentEmail);
+if (!payment) return Astro.redirect('/portal/assessments');
+
+const draftCount = db
+  ? (await listArbRequestsByHousehold(db, session.email)).filter((r) => r.status === 'pending').length
+  : 0;
+
+const HOA_NAME = 'Crooked Lake Reserve HOA';
+
+/** Quarter end dates (last day of quarter). Due date = 1st of next quarter month in display. */
+const QUARTERS = [
+  { q: 'Q1', dueMonth: 0, dueDay: 1, endMonth: 2, endDay: 31 },
+  { q: 'Q2', dueMonth: 3, dueDay: 1, endMonth: 5, endDay: 30 },
+  { q: 'Q3', dueMonth: 6, dueDay: 1, endMonth: 8, endDay: 30 },
+  { q: 'Q4', dueMonth: 9, dueDay: 1, endMonth: 11, endDay: 31 },
+];
+
+function toLocalDateString(year: number, month: number, day: number): string {
+  return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+/** List quarters covered by this payment (through paid_through_after). Returns { quarter, year, dueDate }[]. */
+function getQuartersCovered(paidThroughAfter: string | null): { quarter: string; year: number; dueDate: string }[] {
+  if (!paidThroughAfter || !/^\d{4}-\d{2}-\d{2}$/.test(paidThroughAfter)) return [];
+  const end = new Date(paidThroughAfter + 'T23:59:59');
+  const endYear = end.getFullYear();
+  const list: { quarter: string; year: number; dueDate: string }[] = [];
+  for (let y = endYear - 1; y <= endYear + 1; y++) {
+    for (let i = 0; i < 4; i++) {
+      const qu = QUARTERS[i]!;
+      const qEnd = new Date(y, qu.endMonth, qu.endDay);
+      if (qEnd <= end) list.push({ quarter: qu.q, year: y, dueDate: toLocalDateString(y, qu.dueMonth, qu.dueDay) });
+    }
+  }
+  return list;
+}
+
+/** When paid_through_after is missing (old payment), infer one quarter from payment date. */
+function inferQuarterFromPaidAt(paidAt: string): { quarter: string; year: number; dueDate: string }[] {
+  const d = new Date(paidAt + 'T12:00:00');
+  const y = d.getFullYear();
+  const m = d.getMonth();
+  const qIndex = m <= 2 ? 0 : m <= 5 ? 1 : m <= 8 ? 2 : 3;
+  const qu = QUARTERS[qIndex]!;
+  return [{ quarter: qu.q, year: y, dueDate: toLocalDateString(y, qu.dueMonth, qu.dueDay) }];
+}
+
+const periodsCovered = payment.paid_through_after
+  ? getQuartersCovered(payment.paid_through_after)
+  : inferQuarterFromPaidAt(payment.paid_at);
+
+function formatDate(s: string | null): string {
+  if (!s) return '—';
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(s.trim());
+  if (match) {
+    const d = new Date(parseInt(match[1], 10), parseInt(match[2], 10) - 1, parseInt(match[3], 10));
+    if (!Number.isNaN(d.getTime())) return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  }
+  return new Date(s).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+}
+
+function formatCurrency(n: number): string {
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n);
+}
+---
+
+<PortalLayout title="Payment receipt | Dues | Member Portal | Crooked Lake Reserve HOA">
+  <ProtectedPage>
+    <div class="min-h-screen portal-theme-bg font-body">
+      <PortalNav currentPath="/portal/assessments" draftCount={draftCount} role={effectiveRole} staffRole={session?.role ?? ''} />
+
+      <main class="max-w-2xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+        <div class="receipt-only bg-white rounded-2xl shadow-sm border border-gray-200 p-8 sm:p-10">
+          <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+            <h1 class="text-xl font-heading font-bold text-clr-green">Dues payment receipt</h1>
+            <button type="button" onclick="window.print()" class="no-print inline-flex items-center gap-2 bg-clr-green hover:brightness-110 text-white px-4 py-2 rounded-xl font-medium text-sm">
+              Print receipt
+            </button>
+          </div>
+
+          <p class="text-lg font-semibold text-gray-900 mb-1">{HOA_NAME}</p>
+          <p class="text-sm text-gray-600 mb-6">This is a receipt for your dues payment. Keep it for your records.</p>
+
+          <dl class="grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm mb-6">
+            <dt class="font-medium text-gray-700">Property / member</dt>
+            <dd class="text-gray-900">{owner?.name ?? session.email}</dd>
+            {owner?.address && (
+              <>
+                <dt class="font-medium text-gray-700">Address</dt>
+                <dd class="text-gray-900">{owner.address}</dd>
+              </>
+            )}
+            <dt class="font-medium text-gray-700">Payment date</dt>
+            <dd class="text-gray-900">{formatDate(payment.paid_at)}</dd>
+            <dt class="font-medium text-gray-700">Amount paid</dt>
+            <dd class="text-gray-900 font-semibold">{formatCurrency(payment.amount)}</dd>
+            {payment.payment_method && (
+              <>
+                <dt class="font-medium text-gray-700">Payment method</dt>
+                <dd class="text-gray-900">{payment.payment_method === 'electronic_transfer' ? 'Electronic transfer' : payment.payment_method === 'check' ? 'Check' : payment.payment_method === 'cash' ? 'Cash' : payment.payment_method}</dd>
+              </>
+            )}
+            {payment.payment_method === 'check' && payment.check_number && (
+              <>
+                <dt class="font-medium text-gray-700">Check number</dt>
+                <dd class="text-gray-900">{payment.check_number}</dd>
+              </>
+            )}
+            <dt class="font-medium text-gray-700">Account balance after payment</dt>
+            <dd class="text-gray-900">{formatCurrency(payment.balance_after)}</dd>
+            {payment.recorded_by && (
+              <>
+                <dt class="font-medium text-gray-700">Recorded by</dt>
+                <dd class="text-gray-600">{payment.recorded_by}</dd>
+              </>
+            )}
+          </dl>
+
+          <section class="border-t border-gray-200 pt-6" aria-labelledby="periods-heading">
+            <h2 id="periods-heading" class="text-sm font-semibold text-gray-700 mb-2">Periods covered by this payment</h2>
+            <p class="text-sm text-gray-600 mb-3">Quarterly dues are due on the 1st of January, April, July, and October. This payment applies to the following period(s):</p>
+            <ul class="list-disc list-inside space-y-1 text-sm text-gray-900">
+              {periodsCovered.map((p) => (
+                <li>{p.quarter} {p.year} — due {formatDate(p.dueDate)}</li>
+              ))}
+            </ul>
+          </section>
+
+          <p class="text-xs text-gray-500 mt-8">Receipt generated from Member Portal. Payment ID: {payment.id}</p>
+        </div>
+
+        <p class="no-print mt-6 text-center">
+          <a href="/portal/assessments" class="text-clr-green hover:underline font-medium">Back to Dues</a>
+        </p>
+      </main>
+    </div>
+  </ProtectedPage>
+</PortalLayout>
+
+<style>
+  @media print {
+    .no-print { display: none !important; }
+    body { background: white; }
+    .receipt-only { box-shadow: none; border: 1px solid #e5e7eb; }
+  }
+</style>

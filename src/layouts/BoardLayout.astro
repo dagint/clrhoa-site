@@ -1,0 +1,52 @@
+---
+/**
+ * Shared layout for board/admin/ARB pages. Uses the same chrome as the portal
+ * (PortalLayout + PortalNav) so board pages feel part of the member portal.
+ */
+import '../styles/tailwind.css';
+import PortalLayout from './PortalLayout.astro';
+import ProtectedPage from '../components/ProtectedPage.astro';
+import PortalNav from '../components/PortalNav.astro';
+import PortalElevatedRoleBanner from '../components/PortalElevatedRoleBanner.astro';
+import BoardNav from '../components/BoardNav.astro';
+import ArbNav from '../components/ArbNav.astro';
+import PimElevationBanner from '../components/PimElevationBanner.astro';
+import type { SessionPayload } from '../lib/auth';
+
+interface Props {
+  title: string;
+  subtitle?: string;
+  draftCount?: number;
+  role: string;
+  /** Optional: session for assume-role banner when role is admin. */
+  session?: SessionPayload | null;
+  /** Optional: PIM elevated_until (Unix ms). When set and > now, show expiry banner. */
+  elevatedUntil?: number;
+  /** Optional: wider main (e.g. audit logs). Default max-w-4xl */
+  mainWide?: boolean;
+  /** Show elevated-role banner (only on pages that modify members or content). Default true. Set false for read-only e.g. audit logs. */
+  showRoleBanner?: boolean;
+}
+const { title, subtitle = '', draftCount = 0, role, session, elevatedUntil, mainWide = false, showRoleBanner = true } = Astro.props;
+const currentPath = Astro.url.pathname;
+const showPimBanner = typeof elevatedUntil === 'number' && elevatedUntil > Date.now();
+---
+
+<PortalLayout title={`${title} | Board | Member Portal | Crooked Lake Reserve HOA`}>
+  <ProtectedPage>
+    <div class="min-h-screen portal-theme-bg font-body">
+      {showPimBanner && <PimElevationBanner elevatedUntil={elevatedUntil!} role={role} />}
+      <PortalNav currentPath={currentPath} draftCount={draftCount} role={role} staffRole={role} />
+      {showRoleBanner && <PortalElevatedRoleBanner role={role} session={session} />}
+      {role === 'arb' ? <ArbNav currentPath={currentPath} /> : <BoardNav currentPath={currentPath} />}
+
+      <main class={mainWide ? 'max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-12' : 'max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12'}>
+        <div class="mb-6">
+          <h1 class="text-xl font-heading font-bold text-clr-green">{title}</h1>
+          {subtitle && <p class="text-sm text-gray-500 mt-0.5">{subtitle}</p>}
+        </div>
+        <slot />
+      </main>
+    </div>
+  </ProtectedPage>
+</PortalLayout>

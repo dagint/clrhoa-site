@@ -1,0 +1,105 @@
+---
+/**
+ * POST /api/sms-feature-request — Record that this member wants SMS (auth required, uses owner's lot_number).
+ * GET /api/sms-feature-request — Admin only: counts + list of requests.
+ */
+export const prerender = false;
+
+import { getSessionFromCookie, isElevatedRole, getEffectiveRole } from '../../lib/auth';
+import { getOwnerByEmail, validateLotNumber } from '../../lib/directory-db';
+import { insertSmsFeatureRequest, getSmsFeatureRequestCounts, listSmsFeatureRequests } from '../../lib/sms-feature-request-db';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const db = env?.DB;
+
+if (Astro.request.method === 'POST') {
+  const session = await getSessionFromCookie(
+    Astro.request.headers.get('cookie') ?? undefined,
+    env?.SESSION_SECRET
+  );
+  if (!session) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  if (!db) {
+    return new Response(JSON.stringify({ error: 'Server error' }), {
+      status: 503,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  const owner = await getOwnerByEmail(db, session.email);
+  const lotNumber = owner?.lot_number?.trim() ?? null;
+  if (!lotNumber || !validateLotNumber(lotNumber)) {
+    return new Response(
+      JSON.stringify({
+        error: 'Lot number required. Set your lot number (1–25) in your directory info on Profile.',
+      }),
+      {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
+  }
+
+  try {
+    const id = await insertSmsFeatureRequest(db, { lot_number: lotNumber });
+    return new Response(JSON.stringify({ success: true, id }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  } catch (e) {
+    return new Response(
+      JSON.stringify({ error: e instanceof Error ? e.message : 'Failed to record request' }),
+      {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
+  }
+}
+
+if (Astro.request.method === 'GET') {
+  const session = await getSessionFromCookie(
+    Astro.request.headers.get('cookie') ?? undefined,
+    env?.SESSION_SECRET
+  );
+  if (!session || !isElevatedRole(getEffectiveRole(session))) {
+    return new Response(JSON.stringify({ error: 'Forbidden' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  if (!db) {
+    return new Response(JSON.stringify({ error: 'Server error' }), {
+      status: 503,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  const [counts, list] = await Promise.all([
+    getSmsFeatureRequestCounts(db),
+    listSmsFeatureRequests(db, 500),
+  ]);
+
+  return new Response(
+    JSON.stringify({
+      distinctLots: counts.distinctLots,
+      totalRequests: counts.totalRequests,
+      requests: list,
+    }),
+    {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    }
+  );
+}
+
+return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+  status: 405,
+  headers: { 'Content-Type': 'application/json' },
+});
+---

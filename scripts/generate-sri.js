@@ -65,7 +65,8 @@ function fetchAndHash(url) {
 
     // Handle redirects at the request level
     request.on('redirect', (res) => {
-      request.abort();
+      if (typeof request.destroy === 'function') request.destroy();
+      else request.abort?.();
       const redirectUrl = res.headers.location;
       if (redirectUrl) {
         const fullUrl = redirectUrl.startsWith('http') 

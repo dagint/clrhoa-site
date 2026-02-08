@@ -1,0 +1,144 @@
+---
+/**
+ * GET /api/owners/me — return the current user's directory row (owner where email = session.email).
+ * PUT /api/owners/me — update or create that row (name, address, phones). Body: JSON { name?, address?, phones? } (phones = array of strings).
+ */
+export const prerender = false;
+
+import { getSessionFromCookie, verifyCsrfToken, verifyOrigin, getEffectiveRole } from '../../../lib/auth';
+import { getOwnerByEmail, upsertOwnerByEmail, insertDirectoryLog, validateLotNumber } from '../../../lib/directory-db';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const userAgent = Astro.request.headers.get('user-agent') ?? null;
+const ipAddress = Astro.request.headers.get('cf-connecting-ip') ?? 
+  Astro.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
+let session = await getSessionFromCookie(
+  Astro.request.headers.get('cookie') ?? undefined,
+  env?.SESSION_SECRET,
+  userAgent,
+  ipAddress
+);
+
+if (!session && env?.SESSION_SECRET) {
+  session = await getSessionFromCookie(
+    Astro.request.headers.get('cookie') ?? undefined,
+    env.SESSION_SECRET
+  );
+}
+
+if (!session) {
+  return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+    status: 401,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const origin = Astro.request.headers.get('origin');
+const referer = Astro.request.headers.get('referer');
+const expectedOrigin = Astro.url.origin;
+if (!verifyOrigin(origin, referer, expectedOrigin)) {
+  return new Response(JSON.stringify({ error: 'Invalid origin.' }), {
+    status: 403,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const db = env?.DB;
+if (!db) {
+  return new Response(JSON.stringify({ error: 'Server configuration error' }), {
+    status: 503,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const email = session.email.trim().toLowerCase();
+
+// GET: return current user's owner row (or null)
+if (Astro.request.method === 'GET') {
+  const owner = await getOwnerByEmail(db, email);
+  if (!owner) {
+    return new Response(JSON.stringify({ owner: null }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  const phones = owner.phones ? (() => {
+    try {
+      const arr = JSON.parse(owner.phones) as unknown;
+      return Array.isArray(arr) ? arr.filter((p): p is string => typeof p === 'string') : [];
+    } catch { return []; }
+  })() : (owner.phone ? [owner.phone] : []);
+  return new Response(JSON.stringify({
+    owner: {
+      id: owner.id,
+      name: owner.name,
+      address: owner.address,
+      lot_number: owner.lot_number ?? null,
+      phone: owner.phone,
+      phones,
+      email: owner.email,
+    },
+  }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+// PUT: update or create
+if (Astro.request.method !== 'PUT') {
+  return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+    status: 405,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+let body: { name?: string; address?: string; lot_number?: string; phones?: string[]; csrf_token?: string; csrfToken?: string };
+try {
+  body = await Astro.request.json();
+} catch {
+  return new Response(JSON.stringify({ error: 'Invalid JSON' }), {
+    status: 400,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+if (!verifyCsrfToken(session, body.csrf_token ?? body.csrfToken)) {
+  return new Response(JSON.stringify({ error: 'Invalid security token.' }), {
+    status: 403,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const name = typeof body.name === 'string' ? body.name.trim() || null : undefined;
+const address = typeof body.address === 'string' ? body.address.trim() || null : undefined;
+const lotNumber = typeof body.lot_number === 'string' ? (body.lot_number.trim() || null) : undefined;
+const rawPhones = Array.isArray(body.phones) ? body.phones.filter((p): p is string => typeof p === 'string').map((p) => p.trim()).filter(Boolean) : undefined;
+const MAX_PHONES = 5;
+const phonesArr = rawPhones !== undefined ? rawPhones.slice(0, MAX_PHONES) : undefined;
+const phonesJson = phonesArr !== undefined ? JSON.stringify(phonesArr) : undefined;
+
+// If lot number is provided, validate format (1–25). Empty/null is allowed (optional field).
+if (lotNumber !== undefined && lotNumber !== null && lotNumber !== '') {
+  if (!validateLotNumber(lotNumber)) {
+    return new Response(JSON.stringify({ error: 'Lot number must be 1–25 when provided.' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+}
+
+const result = await upsertOwnerByEmail(db, email, { name, address, lot_number: lotNumber, phones: phonesJson });
+
+const clientIp = Astro.clientAddress || Astro.request.headers.get('cf-connecting-ip') || null;
+await insertDirectoryLog(db, session.email, '(directory info updated)', null, null, getEffectiveRole(session) ?? null, clientIp);
+
+return new Response(JSON.stringify({
+  success: true,
+  id: result.id,
+  created: result.created,
+}), {
+  status: 200,
+  headers: { 'Content-Type': 'application/json' },
+});
+---

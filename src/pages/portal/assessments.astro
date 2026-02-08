@@ -1,0 +1,347 @@
+---
+export const prerender = false;
+
+import PortalLayout from '../../layouts/PortalLayout.astro';
+import ProtectedPage from '../../components/ProtectedPage.astro';
+import PortalNav from '../../components/PortalNav.astro';
+import { getPortalContext } from '../../lib/portal-context';
+import { getOwnerByEmail, getPrimaryOwnerEmailForAddress } from '../../lib/directory-db';
+import { listArbRequestsByHousehold } from '../../lib/arb-db';
+import { getAssessmentByOwner, getPaymentHistory, listSpecialAssessmentsByOwner } from '../../lib/assessments-db';
+
+const { env, session, effectiveRole } = await getPortalContext(Astro, { fingerprint: true });
+if (!session) return Astro.redirect('/portal/login');
+
+const db = env?.DB;
+const draftCount = db
+  ? (await listArbRequestsByHousehold(db, session.email)).filter((r) => r.status === 'pending').length
+  : 0;
+// Assessments are per property (address). Use primary owner at this address so everyone at the same address sees the same dues.
+const owner = db ? await getOwnerByEmail(db, session.email) : null;
+const assessmentEmail = db && owner?.address
+  ? (await getPrimaryOwnerEmailForAddress(db, owner.address)) ?? session.email
+  : session.email;
+const assessment = db ? await getAssessmentByOwner(db, assessmentEmail) : null;
+const paymentHistory = db ? await getPaymentHistory(db, assessmentEmail) : [];
+const specialAssessments = db ? await listSpecialAssessmentsByOwner(db, assessmentEmail) : [];
+const unpaidSpecials = specialAssessments.filter((s) => !s.paid_at);
+const totalDueFromSpecials = unpaidSpecials.reduce((sum, s) => sum + s.amount, 0);
+
+const lateFeeDays = typeof import.meta.env.PUBLIC_LATE_FEE_DAYS !== 'undefined' ? Number(import.meta.env.PUBLIC_LATE_FEE_DAYS) : 3;
+const lateFeeAmount = typeof import.meta.env.PUBLIC_LATE_FEE_AMOUNT !== 'undefined' ? Number(import.meta.env.PUBLIC_LATE_FEE_AMOUNT) : 25;
+const quarterlyAmountRaw = (import.meta.env.PUBLIC_QUARTERLY_DUES_AMOUNT ?? '').toString().trim();
+const quarterlyAmountDisplay = quarterlyAmountRaw ? (Number(quarterlyAmountRaw) ? `$${Number(quarterlyAmountRaw).toFixed(2)}` : `$${quarterlyAmountRaw}`) : null;
+
+const now = new Date();
+now.setHours(0, 0, 0, 0);
+
+// Quarterly schedule: Q1=Jan 1, Q2=Apr 1, Q3=Jul 1, Q4=Oct 1 (authority: 1st of each quarter). Quarter end = last day of quarter for "paid through" comparison.
+const QUARTERS = [
+  { q: 'Q1', dueMonth: 0, dueDay: 1, endMonth: 2, endDay: 31 },
+  { q: 'Q2', dueMonth: 3, dueDay: 1, endMonth: 5, endDay: 30 },
+  { q: 'Q3', dueMonth: 6, dueDay: 1, endMonth: 8, endDay: 30 },
+  { q: 'Q4', dueMonth: 9, dueDay: 1, endMonth: 11, endDay: 31 },
+];
+
+/** Format YYYY-MM-DD from local date parts (avoid toISOString() which shifts to UTC and can show last day of prior month). */
+function toLocalDateString(year: number, month: number, day: number): string {
+  return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+function getCurrentQuarterIndex(): number {
+  const m = now.getMonth();
+  if (m <= 2) return 0;
+  if (m <= 5) return 1;
+  if (m <= 8) return 2;
+  return 3;
+}
+
+function buildQuarterSchedule(): { quarter: string; year: number; dueDate: string; dueDateObj: Date; quarterEndDate: string; status: 'Paid' | 'Due' | 'Overdue' | 'Upcoming' }[] {
+  const today = new Date(now);
+  today.setHours(0, 0, 0, 0);
+  const paidThrough = assessment?.paid_through ? new Date(assessment.paid_through + 'T23:59:59') : null;
+  const startQi = getCurrentQuarterIndex();
+  const startYear = now.getFullYear();
+  const endYear = startYear + 1;
+  const rows: { quarter: string; year: number; dueDate: string; dueDateObj: Date; quarterEndDate: string; status: 'Paid' | 'Due' | 'Overdue' | 'Upcoming' }[] = [];
+  for (let y = startYear; y <= endYear; y++) {
+    const startQ = y === startYear ? startQi : 0;
+    for (let i = startQ; i < 4; i++) {
+      const qu = QUARTERS[i]!;
+      const dueDateObj = new Date(y, qu.dueMonth, qu.dueDay);
+      const quarterEnd = new Date(y, qu.endMonth, qu.endDay);
+      const dueDate = toLocalDateString(y, qu.dueMonth, qu.dueDay);
+      const quarterEndDate = toLocalDateString(y, qu.endMonth, qu.endDay);
+      let status: 'Paid' | 'Due' | 'Overdue' | 'Upcoming';
+      if (paidThrough && quarterEnd <= paidThrough) status = 'Paid';
+      else if (dueDateObj < today) status = 'Overdue';
+      else if (dueDateObj.getTime() === today.getTime()) status = 'Due';
+      else status = 'Upcoming';
+      rows.push({ quarter: qu.q, year: y, dueDate, dueDateObj, quarterEndDate, status });
+    }
+  }
+  return rows;
+}
+
+const quarterSchedule = buildQuarterSchedule();
+// When paid_through is set and today <= paid_through, owner is current (e.g. full-year payers) — no overdue/due reminders
+const isPaidThrough =
+  !!assessment?.paid_through &&
+  new Date(assessment.paid_through + 'T23:59:59') >= now;
+
+let isOverdue = false;
+let daysOverdue = 0;
+let lateFeeMessage = '';
+if (!isPaidThrough && assessment?.next_due) {
+  const due = new Date(assessment.next_due);
+  due.setHours(0, 0, 0, 0);
+  if (due < now) {
+    isOverdue = true;
+    daysOverdue = Math.floor((now.getTime() - due.getTime()) / (24 * 60 * 60 * 1000));
+    const fee = lateFeeAmount;
+    lateFeeMessage = `${daysOverdue} day${daysOverdue === 1 ? '' : 's'} late = +$${fee}`;
+  }
+}
+
+function formatDate(s: string | null): string {
+  if (!s) return '-';
+  try {
+    // Parse YYYY-MM-DD as local date; otherwise "2026-01-01" is UTC midnight and shows as Dec 31 in US TZ
+    const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(s.trim());
+    if (match) {
+      const year = parseInt(match[1], 10);
+      const month = parseInt(match[2], 10) - 1;
+      const day = parseInt(match[3], 10);
+      const d = new Date(year, month, day);
+      if (!Number.isNaN(d.getTime())) return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+    }
+    return new Date(s).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+  } catch {
+    return s;
+  }
+}
+
+function formatCurrency(n: number): string {
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n);
+}
+
+function daysRemaining(nextDue: string | null): number | null {
+  if (!nextDue) return null;
+  const due = new Date(nextDue);
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  due.setHours(0, 0, 0, 0);
+  const diff = Math.ceil((due.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
+  return diff;
+}
+---
+
+<PortalLayout title="Dues | Member Portal | Crooked Lake Reserve HOA">
+  <ProtectedPage>
+  <div class="min-h-screen portal-theme-bg font-body">
+    <PortalNav currentPath="/portal/assessments" draftCount={draftCount} role={effectiveRole} staffRole={session?.role ?? ''} />
+
+    <main class="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+      <h2 class="text-2xl font-heading font-bold text-clr-green mb-2">Dues & balance</h2>
+      <p class="text-gray-600 mb-2">
+        View your balance, dues schedule, and payment history. No payment processing here; pay by the method specified by the board.
+      </p>
+      <p class="text-sm text-gray-500 mb-6">
+        Your balance may include quarterly dues and any <strong>special assessments</strong> the board has added. The board can change the dues amount per quarter; check the schedule below or contact the board for the current amount.
+      </p>
+
+      {!assessment ? (
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center mb-8">
+          <p class="text-gray-600 mb-2">No dues record found for your account.</p>
+          <p class="text-sm text-gray-500 mb-4">If you just joined, the board may need to add you to the roster. Otherwise, contact the board if you believe this is an error.</p>
+          <a href="/portal/faq" class="text-clr-green font-semibold hover:underline">See FAQ</a>
+        </div>
+      ) : (
+        <div class={`rounded-2xl shadow-sm border p-6 mb-8 ${isOverdue || totalDueFromSpecials > 0 ? 'bg-red-50 border-red-200' : 'bg-white border-gray-100'}`}>
+          <p class="text-sm text-gray-500 mb-1">Current balance</p>
+          <p class={`text-3xl font-heading font-bold ${isOverdue || totalDueFromSpecials > 0 ? 'text-red-700' : 'text-clr-green'}`}>
+            {formatCurrency(assessment.balance + totalDueFromSpecials)}
+            {totalDueFromSpecials > 0 && (
+              <span class="text-lg font-normal ml-2 text-gray-600">
+                (includes {formatCurrency(assessment.balance)} dues + {formatCurrency(totalDueFromSpecials)} special)
+              </span>
+            )}
+            {assessment.next_due && !isPaidThrough && (
+              <span class="text-lg font-normal ml-2">
+                Due {formatDate(assessment.next_due)}
+              </span>
+            )}
+            {isPaidThrough && assessment.paid_through && (
+              <span class="text-lg font-normal ml-2 text-clr-green">
+                Paid through {formatDate(assessment.paid_through)}
+              </span>
+            )}
+          </p>
+          {isPaidThrough && assessment.paid_through && (
+            <p class="text-sm text-gray-600 mt-2">Current and future dues are paid. No action needed.</p>
+          )}
+          {!isPaidThrough && assessment.next_due && daysRemaining(assessment.next_due) !== null && !isOverdue && (
+            <p class="text-sm text-gray-600 mt-2">
+              {daysRemaining(assessment.next_due)! > 0
+                ? `${daysRemaining(assessment.next_due)} days remaining`
+                : 'Due today'}
+            </p>
+          )}
+          {isOverdue && lateFeeMessage && (
+            <p class="text-sm font-semibold text-red-700 mt-2">Late fee: {lateFeeMessage}</p>
+          )}
+        </div>
+      )}
+
+      <!-- How to pay: link to public dues page (same content), in a collapsible. -->
+      <section class="mb-8" aria-labelledby="how-to-pay-heading">
+        <details class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden group">
+          <summary id="how-to-pay-heading" class="flex items-center gap-2 cursor-pointer list-none py-4 px-5 font-heading font-semibold text-clr-green hover:bg-gray-50 transition-colors">
+            <span class="text-lg">How to pay</span>
+            <svg class="w-5 h-5 text-gray-400 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </summary>
+          <div class="border-t border-gray-100 px-5 pb-5 pt-2">
+            <p class="text-gray-600 text-sm mb-4">
+              Payment methods, mailing address, drop-off options, and late fee information are on the same page we use for the public site.
+            </p>
+            <a
+              href="/dues"
+              class="inline-flex items-center gap-2 bg-clr-green hover:brightness-110 text-white px-5 py-2.5 rounded-xl font-semibold text-sm"
+            >
+              Dues &amp; Payment Information
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+            </a>
+          </div>
+        </details>
+      </section>
+
+      <!-- Dues schedule: current quarter through end of next year (auto-filled). Paid/Due/Overdue/Upcoming. -->
+      <section class="mb-8" aria-labelledby="dues-schedule-heading">
+        <h3 id="dues-schedule-heading" class="text-lg font-heading font-semibold text-clr-green mb-3">Dues schedule</h3>
+        <p class="text-sm text-gray-600 mb-3">
+          Quarterly dues (due Jan 1, Apr 1, Jul 1, Oct 1). Shown from this quarter through next year. The board may add special assessments or change the amount per quarter; any special assessments appear in the balance above.
+        </p>
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-gray-200 bg-gray-50">
+                <th class="text-left py-3 px-4 font-semibold text-gray-700">Quarter</th>
+                <th class="text-left py-3 px-4 font-semibold text-gray-700">Due date</th>
+                <th class="text-right py-3 px-4 font-semibold text-gray-700">Amount</th>
+                <th class="text-left py-3 px-4 font-semibold text-gray-700">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {quarterSchedule.map((row) => (
+                <tr class="border-b border-gray-100 last:border-0">
+                  <td class="py-3 px-4 font-medium">{row.quarter} {row.year}</td>
+                  <td class="py-3 px-4">{formatDate(row.dueDate)}</td>
+                  <td class="py-3 px-4 text-right">{quarterlyAmountDisplay ?? '—'}</td>
+                  <td class="py-3 px-4">
+                    {row.status === 'Paid' && <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Paid</span>}
+                    {row.status === 'Upcoming' && <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">Upcoming</span>}
+                    {row.status === 'Due' && <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800">Due</span>}
+                    {row.status === 'Overdue' && <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">Overdue</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {assessment && (
+        <>
+          {specialAssessments.length > 0 && (
+            <section class="mb-6" aria-labelledby="special-assessments-heading">
+              <h3 id="special-assessments-heading" class="text-lg font-heading font-semibold text-clr-green mb-3">Special assessments</h3>
+              <p class="text-sm text-gray-600 mb-3">One-off bills from the board (e.g. capital improvements). Pay by the method specified by the board.</p>
+              <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                <table class="w-full text-sm">
+                  <thead class="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                      <th class="text-left py-2 px-4 font-medium text-gray-700">Description</th>
+                      <th class="text-right py-2 px-4 font-medium text-gray-700">Amount</th>
+                      <th class="text-left py-2 px-4 font-medium text-gray-700">Due</th>
+                      <th class="text-left py-2 px-4 font-medium text-gray-700">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {specialAssessments.map((s) => (
+                      <tr class="border-b border-gray-100 last:border-0">
+                        <td class="py-2 px-4">{s.description}</td>
+                        <td class="py-2 px-4 text-right">{formatCurrency(s.amount)}</td>
+                        <td class="py-2 px-4">{formatDate(s.due_date)}</td>
+                        <td class="py-2 px-4">
+                          {s.paid_at ? <span class="text-green-600">Paid {formatDate(s.paid_at)}</span> : <span class="text-amber-600 font-medium">Due</span>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
+
+          {assessment.invoice_r2_key && (
+            <p class="mb-6">
+              <a
+                href={`/api/portal/file/${encodeURIComponent(assessment.invoice_r2_key)}`}
+                class="inline-flex items-center gap-2 bg-clr-green hover:brightness-110 text-white px-6 py-3 rounded-xl font-semibold text-sm"
+              >
+                Download latest invoice (PDF)
+              </a>
+            </p>
+          )}
+
+          <h3 class="text-lg font-heading font-semibold text-clr-green mb-3">Payment history (last 12 months)</h3>
+          <p class="text-sm text-gray-600 mb-3">Payments you’ve made; these match the &quot;Paid&quot; quarters in the schedule above.</p>
+          {paymentHistory.length === 0 ? (
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 text-center">
+              <p class="text-gray-600">No payments recorded in the last 12 months.</p>
+              <p class="text-sm text-gray-500 mt-1">Payments are added by the board when you pay. Contact the board if you’ve paid and don’t see it here.</p>
+            </div>
+          ) : (
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+              <table class="w-full text-sm">
+                <thead>
+                  <tr class="border-b border-gray-100 bg-gray-50">
+                    <th class="text-left py-3 px-4 font-semibold text-gray-700">Payment date</th>
+                    <th class="text-left py-3 px-4 font-semibold text-gray-700">Recorded</th>
+                    <th class="text-left py-3 px-4 font-semibold text-gray-700">Recorded by</th>
+                    <th class="text-left py-3 px-4 font-semibold text-gray-700">Method</th>
+                    <th class="text-left py-3 px-4 font-semibold text-gray-700">Check #</th>
+                    <th class="text-right py-3 px-4 font-semibold text-gray-700">Amount</th>
+                    <th class="text-right py-3 px-4 font-semibold text-gray-700">Balance after</th>
+                    <th class="text-left py-3 px-4 font-semibold text-gray-700">Receipt</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paymentHistory.map((p) => (
+                    <tr class="border-b border-gray-100">
+                      <td class="py-3 px-4">{formatDate(p.paid_at)}</td>
+                      <td class="py-3 px-4">{formatDate(p.created)}</td>
+                      <td class="py-3 px-4 text-gray-600">{p.recorded_by ?? '—'}</td>
+                      <td class="py-3 px-4">{p.payment_method === 'electronic_transfer' ? 'E-transfer' : p.payment_method === 'check' ? 'Check' : p.payment_method === 'cash' ? 'Cash' : p.payment_method ?? '—'}</td>
+                      <td class="py-3 px-4">{p.check_number ?? '—'}</td>
+                      <td class="py-3 px-4 text-right">{formatCurrency(p.amount)}</td>
+                      <td class="py-3 px-4 text-right">{formatCurrency(p.balance_after)}</td>
+                      <td class="py-3 px-4">
+                        <a href={`/portal/assessments/receipt/${p.id}`} target="_blank" rel="noopener noreferrer" class="text-clr-green hover:underline text-sm font-medium">Print receipt</a>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
+      )}
+    </main>
+  </div>
+  </ProtectedPage>
+</PortalLayout>

@@ -1,0 +1,16 @@
+---
+/** Client beacon: record page view (path) to /api/usage/record. No PII; session via cookie. */
+---
+
+<script>
+  (function () {
+    const path = typeof window !== 'undefined' ? window.location.pathname || '/' : '/';
+    fetch('/api/usage/record', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path }),
+      keepalive: true,
+      credentials: 'same-origin',
+    }).catch(() => {});
+  })();
+</script>

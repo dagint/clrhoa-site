@@ -1,0 +1,274 @@
+---
+export const prerender = false;
+
+import BoardLayout from '../../layouts/BoardLayout.astro';
+import { getBoardContext } from '../../lib/board-context';
+import { listPreapprovalItems, listPreapprovalCategories, parsePhotos } from '../../lib/preapproval-db';
+import { listArbRequestsByHousehold } from '../../lib/arb-db';
+
+const ctx = await getBoardContext(Astro);
+if (ctx.redirect) return Astro.redirect(ctx.redirect);
+const { env, session, effectiveRole } = ctx;
+
+const db = env?.DB;
+const items = db ? await listPreapprovalItems(db) : [];
+const categories = db ? await listPreapprovalCategories(db) : [];
+const allRequests = db ? await listArbRequestsByHousehold(db, session.email) : [];
+const draftCount = allRequests.filter((r) => r.status === 'pending').length;
+---
+
+<BoardLayout title="Pre-approval library" subtitle="ARB can add items; one Board member must approve before they appear in the member library" draftCount={draftCount} role={effectiveRole} session={session} elevatedUntil={session.elevated_until}>
+  <h2 class="text-xl font-heading font-bold text-clr-green mb-6">Add pre-approval item</h2>
+      <form id="library-form" class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-8 space-y-4">
+        <input type="hidden" name="id" id="form-id" value="" />
+        <input type="hidden" name="csrf_token" id="form-csrf" value={session.csrfToken ?? ''} />
+        <div>
+          <label for="lib-category" class="block text-sm font-medium text-gray-700">Category</label>
+          <input type="text" id="lib-category" name="category" list="lib-categories" placeholder="e.g. Fencing, Exterior Paint" class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2" />
+          <datalist id="lib-categories">
+            {categories.map((c) => (
+              <option value={c} />
+            ))}
+          </datalist>
+        </div>
+        <div>
+          <label for="lib-title" class="block text-sm font-medium text-gray-700">Title *</label>
+          <input type="text" id="lib-title" name="title" required class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2" placeholder="e.g. Standard wood fence" />
+        </div>
+        <div>
+          <label for="lib-description" class="block text-sm font-medium text-gray-700">Description (optional)</label>
+          <textarea id="lib-description" name="description" rows={2} class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2" placeholder="Brief description"></textarea>
+        </div>
+        <div>
+          <label for="lib-rules" class="block text-sm font-medium text-gray-700">Rules / notes</label>
+          <textarea id="lib-rules" name="rules" rows={3} class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2" placeholder="Requirements, dimensions, materials that owners should follow. This text is shown in the template."></textarea>
+        </div>
+        <div id="lib-photos-section">
+          <label class="block text-sm font-medium text-gray-700">Photos (1-5 images)</label>
+          <input type="file" id="lib-files" name="file_0" accept="image/*" multiple class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:rounded file:border-0 file:bg-clr-green file:px-4 file:py-2 file:text-white file:font-medium" />
+          <p class="text-xs text-gray-500 mt-1">First image is used as the card thumbnail. Max 5 images. Photos are automatically resized and compressed for web to reduce size.</p>
+        </div>
+        <div class="flex gap-3">
+          <button type="submit" id="lib-submit" class="px-4 py-2 bg-clr-green text-white rounded-lg font-medium hover:brightness-110">Add item</button>
+          <button type="button" id="lib-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 hidden">Cancel edit</button>
+        </div>
+      </form>
+
+      <h3 class="text-lg font-heading font-semibold text-clr-green mb-3">Current items</h3>
+      {items.length === 0 ? (
+        <p class="text-gray-500">No items yet. Add one above.</p>
+      ) : (
+        <ul class="space-y-4">
+          {items.map((item) => {
+            const photos = parsePhotos(item.photos);
+            const isPending = (item.approved ?? 1) === 0;
+            return (
+              <li class="bg-white rounded-xl border border-gray-100 p-4 shadow-sm flex flex-wrap gap-4 items-start" data-id={item.id}>
+                {photos[0] && (
+                  <div class="w-24 h-24 rounded-lg overflow-hidden bg-gray-100 shrink-0">
+                    <img src={`/api/portal/file/${encodeURIComponent(photos[0].key)}`} alt="" class="w-full h-full object-cover" />
+                  </div>
+                )}
+                <div class="flex-1 min-w-0">
+                  <span class="font-medium text-gray-900">{item.title ?? '-'}</span>
+                  {item.category && <span class="ml-2 text-sm text-gray-500">({item.category})</span>}
+                  {isPending && (
+                    <span class="ml-2 inline-block px-2 py-0.5 text-xs font-medium rounded bg-amber-100 text-amber-800">Pending board approval</span>
+                  )}
+                  {item.rules && <p class="text-sm text-gray-600 mt-1 line-clamp-2">{item.rules}</p>}
+                  {photos.length > 0 && (
+                    <p class="text-xs text-gray-500 mt-1">{photos.length} photo(s)</p>
+                  )}
+                </div>
+                <div class="flex gap-2 shrink-0 flex-wrap">
+                  {effectiveRole === 'board' && isPending && (
+                    <button type="button" class="lib-approve-btn px-3 py-1.5 text-sm bg-clr-green text-white rounded-lg hover:brightness-110" data-id={item.id}>Approve</button>
+                  )}
+                  <button type="button" class="lib-edit-btn px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200" data-id={item.id} data-category={item.category ?? ''} data-title={item.title ?? ''} data-description={item.description ?? ''} data-rules={item.rules ?? ''} data-photos={item.photos ?? '[]'}>Edit</button>
+                  <button type="button" class="lib-delete-btn px-3 py-1.5 text-sm bg-red-50 text-red-700 rounded-lg hover:bg-red-100" data-id={item.id}>Delete</button>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+  <script is:inline>
+    (function () {
+      var form = document.getElementById('library-form');
+      var idInput = document.getElementById('form-id');
+      var categoryInput = document.getElementById('lib-category');
+      var titleInput = document.getElementById('lib-title');
+      var descriptionInput = document.getElementById('lib-description');
+      var rulesInput = document.getElementById('lib-rules');
+      var fileInput = document.getElementById('lib-files');
+      var submitBtn = document.getElementById('lib-submit');
+      var cancelBtn = document.getElementById('lib-cancel');
+      var photosSection = document.getElementById('lib-photos-section');
+      var csrfInput = document.getElementById('form-csrf');
+
+      var LIBRARY_PHOTO_MAX_WIDTH = 1920;
+      var LIBRARY_PHOTO_JPEG_QUALITY = 0.82;
+
+      function optimizeImageForWeb(file) {
+        var imageTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/heic'];
+        var isImage = file.type && (imageTypes.indexOf(file.type) !== -1 || file.type.indexOf('image/') === 0);
+        if (!isImage) return Promise.resolve(file);
+        return new Promise(function (resolve) {
+          var img = new Image();
+          var url = URL.createObjectURL(file);
+          img.onload = function () {
+            URL.revokeObjectURL(url);
+            var w = img.naturalWidth;
+            var h = img.naturalHeight;
+            if (w > LIBRARY_PHOTO_MAX_WIDTH) {
+              h = Math.round((h * LIBRARY_PHOTO_MAX_WIDTH) / w);
+              w = LIBRARY_PHOTO_MAX_WIDTH;
+            }
+            var canvas = document.createElement('canvas');
+            canvas.width = w;
+            canvas.height = h;
+            var ctx = canvas.getContext('2d');
+            if (!ctx) { resolve(file); return; }
+            ctx.drawImage(img, 0, 0, w, h);
+            canvas.toBlob(function (blob) {
+              var name = file.name.replace(/\.[^.]+$/i, '.jpg');
+              resolve(blob ? new File([blob], name, { type: 'image/jpeg' }) : file);
+            }, 'image/jpeg', LIBRARY_PHOTO_JPEG_QUALITY);
+          };
+          img.onerror = function () {
+            URL.revokeObjectURL(url);
+            resolve(file);
+          };
+          img.src = url;
+        });
+      }
+
+      function setFormCreate() {
+        idInput.value = '';
+        categoryInput.value = '';
+        titleInput.value = '';
+        descriptionInput.value = '';
+        rulesInput.value = '';
+        if (fileInput) fileInput.value = '';
+        submitBtn.textContent = 'Add item';
+        cancelBtn.classList.add('hidden');
+        photosSection.classList.remove('hidden');
+      }
+
+      function setFormEdit(id, category, title, description, rules) {
+        idInput.value = id;
+        categoryInput.value = category || '';
+        titleInput.value = title || '';
+        descriptionInput.value = description || '';
+        rulesInput.value = rules || '';
+        submitBtn.textContent = 'Update item';
+        cancelBtn.classList.remove('hidden');
+        photosSection.classList.add('hidden');
+      }
+
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var id = idInput.value.trim();
+        var token = (csrfInput && csrfInput.value) || '';
+
+        if (id) {
+          fetch('/api/preapproval', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              id: id,
+              category: categoryInput.value.trim() || null,
+              title: titleInput.value.trim(),
+              description: descriptionInput.value.trim() || null,
+              rules: rulesInput.value.trim() || null,
+              csrf_token: token
+            })
+          })
+            .then(function (r) { return r.json().then(function (data) { return { ok: r.ok, data: data }; }); })
+            .then(function (_) {
+              if (_.ok) { setFormCreate(); window.location.reload(); }
+              else alert(_.data.error || 'Update failed');
+            })
+            .catch(function () { alert('Network error'); });
+          return;
+        }
+
+        submitBtn.disabled = true;
+        var rawFiles = fileInput && fileInput.files && fileInput.files.length
+          ? Array.prototype.slice.call(fileInput.files, 0, 5)
+          : [];
+        Promise.all(rawFiles.map(function (f) { return optimizeImageForWeb(f); }))
+          .then(function (optimizedFiles) {
+            var formData = new FormData(form);
+            formData.set('csrf_token', token);
+            optimizedFiles.forEach(function (f, i) {
+              if (f && f.size > 0) formData.set('file_' + i, f);
+            });
+            return fetch('/api/preapproval', { method: 'POST', body: formData })
+              .then(function (r) { return r.json().then(function (data) { return { ok: r.ok, data: data }; }); });
+          })
+          .then(function (_) {
+            if (_.ok) { setFormCreate(); window.location.reload(); }
+            else alert(_.data.error || 'Create failed');
+          })
+          .catch(function () { alert('Network error'); })
+          .then(function () { submitBtn.disabled = false; });
+      });
+
+      cancelBtn.addEventListener('click', setFormCreate);
+
+      document.querySelectorAll('.lib-edit-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          setFormEdit(
+            this.getAttribute('data-id'),
+            this.getAttribute('data-category'),
+            this.getAttribute('data-title'),
+            this.getAttribute('data-description'),
+            this.getAttribute('data-rules')
+          );
+        });
+      });
+
+      document.querySelectorAll('.lib-delete-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var id = this.getAttribute('data-id');
+          if (!id || !confirm('Delete this item? This cannot be undone.')) return;
+          var token = (csrfInput && csrfInput.value) || '';
+          fetch('/api/preapproval', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: id, csrf_token: token })
+          })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+              if (data.success) window.location.reload();
+              else alert(data.error || 'Delete failed');
+            })
+            .catch(function () { alert('Network error'); });
+        });
+      });
+
+      document.querySelectorAll('.lib-approve-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var id = this.getAttribute('data-id');
+          if (!id) return;
+          var token = (csrfInput && csrfInput.value) || '';
+          var b = this;
+          b.disabled = true;
+          fetch('/api/preapproval', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: id, approved: 1, csrf_token: token })
+          })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+              if (data.success) window.location.reload();
+              else { alert(data.error || 'Approve failed'); b.disabled = false; }
+            })
+            .catch(function () { alert('Network error'); b.disabled = false; });
+        });
+      });
+    })();
+  </script>
+</BoardLayout>

@@ -1,0 +1,79 @@
+---
+export const prerender = false;
+
+import PortalLayout from '../../layouts/PortalLayout.astro';
+import ProtectedPage from '../../components/ProtectedPage.astro';
+import PortalNav from '../../components/PortalNav.astro';
+import { getPortalContext } from '../../lib/portal-context';
+import { listArbRequestsByHousehold } from '../../lib/arb-db';
+
+const { env, session, effectiveRole } = await getPortalContext(Astro);
+if (!session) return Astro.redirect('/portal/login');
+
+const db = env?.DB;
+const allRequests = db ? await listArbRequestsByHousehold(db, session.email) : [];
+const draftCount = allRequests.filter((r) => r.status === 'pending').length;
+const isElevated = ['admin', 'arb_board', 'board', 'arb'].includes(effectiveRole);
+---
+
+<PortalLayout title="Act as Board / Act as ARB — How-to | Member Portal | Crooked Lake Reserve HOA">
+  <ProtectedPage>
+    <div class="min-h-screen portal-theme-bg font-body">
+      <PortalNav currentPath="/portal/assume-role-help" draftCount={draftCount} role={effectiveRole} staffRole={session?.role ?? ''} />
+
+      <main class="max-w-3xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+        <h1 class="text-2xl font-heading font-bold text-clr-green mb-2">Act as Board / Act as ARB</h1>
+        <p class="text-gray-600 text-sm mb-6">A short guide for ARB+Board and Administrators. If you don’t see the yellow banner with role buttons, this guide is for members who have Administrator or ARB+Board access.</p>
+
+        <div class="prose prose-sm max-w-none text-gray-700 space-y-6">
+          <section>
+            <h2 class="text-lg font-heading font-semibold text-clr-green mt-6 mb-2">Who can use this?</h2>
+            <ul class="list-disc pl-5 space-y-1">
+              <li><strong>Administrators</strong> can assume <strong>Board</strong> or <strong>ARB</strong> (one at a time) to provide technical assistance. They normally have view-only access to Dues and ARB requests until they assume a role.</li>
+              <li><strong>ARB+Board</strong> members can switch between acting as <strong>Board</strong> or <strong>ARB</strong> (one at a time). They choose which role they are acting in when doing Board or ARB tasks.</li>
+            </ul>
+          </section>
+
+          <section>
+            <h2 class="text-lg font-heading font-semibold text-clr-green mt-6 mb-2">When to use “Act as Board” vs “Act as ARB”</h2>
+            <ul class="list-disc pl-5 space-y-2">
+              <li><strong>Act as Board</strong> — Use when you need to do Board tasks: record dues payments, manage directory, documents, meetings, vendors, and other board operations. The portal will show you the same options a Board member sees (e.g. “Record payment” on Dues).</li>
+              <li><strong>Act as ARB</strong> — Use when you need to do ARB tasks: review and approve or reject ARB requests. The portal will show you the same options an ARB member sees.</li>
+            </ul>
+            <p class="mt-2">You can only be in <strong>one</strong> assumed role at a time. To switch, you must <strong>drop</strong> the current role (or wait for the timeout) before choosing the other.</p>
+          </section>
+
+          <section>
+            <h2 class="text-lg font-heading font-semibold text-clr-green mt-6 mb-2">Drop role / Return to Admin</h2>
+            <ul class="list-disc pl-5 space-y-1">
+              <li><strong>ARB+Board:</strong> Use <strong>“Drop role”</strong> to stop acting as Board or ARB. You’ll return to your normal ARB+Board view and can choose “Act as Board” or “Act as ARB” again when needed.</li>
+              <li><strong>Administrators:</strong> Use <strong>“Return to Admin (view only)”</strong> to stop acting as Board or ARB. You’ll return to view-only access. Use “Act as Board” or “Act as ARB” again when you need to perform actions.</li>
+            </ul>
+          </section>
+
+          <section>
+            <h2 class="text-lg font-heading font-semibold text-clr-green mt-6 mb-2">Timeout (2 hours)</h2>
+            <p>After you assume a role, it automatically <strong>expires after 2 hours</strong>. The banner shows something like “Role expires in ~1h 45m.” When the time runs out, you’re no longer acting as that role. You can <strong>drop the role</strong> at any time. Before assuming the <strong>other</strong> role (e.g. switch from Board to ARB), you must drop or wait for the current role to expire.</p>
+          </section>
+
+          <section>
+            <h2 class="text-lg font-heading font-semibold text-clr-green mt-6 mb-2">If something doesn’t update</h2>
+            <p>After you assume a role, the yellow banner updates right away. If you don’t see new options (e.g. “Record payment” or ARB approve buttons), <strong>refresh the page</strong> so the rest of the portal matches your current role.</p>
+          </section>
+
+          <section>
+            <h2 class="text-lg font-heading font-semibold text-clr-green mt-6 mb-2">Actions are logged</h2>
+            <p>All assume-role actions (and actions you take while acting as Board or ARB) are logged for transparency and audit. Board and Admins can review the “Admin assume role” audit section on the Audit logs page (this section is only visible to Board and Admin, not to ARB or ARB+Board).</p>
+          </section>
+        </div>
+
+        <p class="mt-8 text-sm text-gray-500">
+          <a href="/portal/board" class="text-clr-green hover:underline">← Back to Board</a>
+          {isElevated && (
+            <> · <a href="/board/audit-logs" class="text-clr-green hover:underline">Audit logs</a></>
+          )}
+        </p>
+      </main>
+    </div>
+  </ProtectedPage>
+</PortalLayout>

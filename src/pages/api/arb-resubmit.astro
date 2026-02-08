@@ -1,0 +1,106 @@
+---
+/**
+ * POST /api/arb-resubmit — Owner submits (or resubmits) a pending request for ARB review.
+ * Body: requestId (JSON) or request_id (form). Sets status to in_review.
+ */
+export const prerender = false;
+
+import { getSessionFromCookie, verifyCsrfToken, verifyOrigin } from '../../lib/auth';
+import { checkRateLimit, getRateLimitConfig } from '../../lib/rate-limit';
+import { getSecurityMonitor } from '../../lib/monitoring';
+import { setArbRequestInReview } from '../../lib/arb-db';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const session = await getSessionFromCookie(
+  Astro.request.headers.get('cookie') ?? undefined,
+  env?.SESSION_SECRET
+);
+
+if (!session) {
+  return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+    status: 401,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+// CSRF protection: verify origin
+const origin = Astro.request.headers.get('origin');
+const referer = Astro.request.headers.get('referer');
+const expectedOrigin = Astro.url.origin;
+if (!verifyOrigin(origin, referer, expectedOrigin)) {
+  return new Response(JSON.stringify({ error: 'Invalid origin. Request blocked for security.' }), {
+    status: 403,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+if (Astro.request.method !== 'POST') {
+  return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+    status: 405,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const db = env?.DB;
+if (!db) {
+  return new Response(JSON.stringify({ error: 'Server configuration error' }), {
+    status: 503,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+let requestId: string | null = null;
+let csrfToken: string | null = null;
+const contentType = Astro.request.headers.get('content-type') ?? '';
+if (contentType.includes('application/json')) {
+  try {
+    const body = await Astro.request.json();
+    requestId = (body.requestId ?? body.request_id ?? '').trim() || null;
+    csrfToken = body.csrfToken || null;
+  } catch {
+    requestId = null;
+  }
+} else {
+  const formData = await Astro.request.formData();
+  requestId = (formData.get('request_id') ?? formData.get('requestId')) as string;
+  requestId = requestId?.trim() || null;
+  csrfToken = formData.get('csrf_token') as string | null;
+}
+
+// CSRF token verification
+if (!verifyCsrfToken(session, csrfToken)) {
+  return new Response(
+    JSON.stringify({ error: 'Invalid security token. Please refresh the page and try again.' }),
+    { status: 403, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+
+if (!requestId) {
+  return new Response(JSON.stringify({ error: 'Request ID is required.' }), {
+    status: 400,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const clientIp = Astro.clientAddress || Astro.request.headers.get('cf-connecting-ip') || null;
+const updated = await setArbRequestInReview(db, requestId, session.email, clientIp);
+
+if (!updated) {
+  return new Response(
+    JSON.stringify({
+      error: 'Request not found, not yours, or not in a state that can be submitted for review (must be pending).',
+    }),
+    { status: 404, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+
+return new Response(
+  JSON.stringify({
+    success: true,
+    requestId,
+    message: 'Request submitted for ARB review. You can no longer edit it until the ARB returns it for revision.',
+  }),
+  { status: 200, headers: { 'Content-Type': 'application/json' } }
+);
+---

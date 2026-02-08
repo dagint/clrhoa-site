@@ -1,0 +1,168 @@
+---
+/**
+ * POST /api/log-phone-view — log directory phone or email reveal and return value.
+ * Body (JSON): { ownerId, csrf_token, reveal?: 'phone' | 'email' }. Default reveal is 'phone'.
+ * Authenticated users only. Logs to directory_logs and returns { phone, phones } or { email }.
+ */
+export const prerender = false;
+
+import { getSessionFromCookie, verifyCsrfToken, verifyOrigin, isElevatedRole, getEffectiveRole } from '../../lib/auth';
+import { getOwnerById, getPhonesArray, insertDirectoryLog } from '../../lib/directory-db';
+import { checkRateLimit, getRateLimitConfig } from '../../lib/rate-limit';
+import { getSecurityMonitor } from '../../lib/monitoring';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const userAgent = Astro.request.headers.get('user-agent') ?? null;
+const ipAddress = Astro.request.headers.get('cf-connecting-ip') ?? 
+  Astro.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
+let session = await getSessionFromCookie(
+  Astro.request.headers.get('cookie') ?? undefined,
+  env?.SESSION_SECRET,
+  userAgent,
+  ipAddress
+);
+
+if (!session && env?.SESSION_SECRET) {
+  session = await getSessionFromCookie(
+    Astro.request.headers.get('cookie') ?? undefined,
+    env.SESSION_SECRET
+  );
+}
+
+if (!session) {
+  return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+    status: 401,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const origin = Astro.request.headers.get('origin');
+const referer = Astro.request.headers.get('referer');
+const expectedOrigin = Astro.url.origin;
+if (!verifyOrigin(origin, referer, expectedOrigin)) {
+  return new Response(JSON.stringify({ error: 'Invalid origin. Request blocked for security.' }), {
+    status: 403,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+if (Astro.request.method !== 'POST') {
+  return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+    status: 405,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const db = env?.DB;
+if (!db) {
+  return new Response(JSON.stringify({ error: 'Server configuration error' }), {
+    status: 503,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const clientIpAddress = Astro.clientAddress || Astro.request.headers.get('cf-connecting-ip') || ipAddress;
+const rateLimitKv = env?.KV;
+const endpoint = '/api/log-phone-view';
+const rateLimitConfig = getRateLimitConfig(endpoint);
+const securityMonitor = getSecurityMonitor();
+if (rateLimitConfig && rateLimitKv) {
+  const rateLimit = await checkRateLimit(
+    rateLimitKv,
+    endpoint,
+    clientIpAddress,
+    rateLimitConfig.maxRequests,
+    rateLimitConfig.windowSeconds
+  );
+  if (!rateLimit.allowed) {
+    securityMonitor.trackRateLimit(endpoint, session.email, clientIpAddress);
+    if (env?.NOTIFY_BOARD_EMAIL) {
+      const { sendEmail } = await import('../../lib/notifications');
+      const body = `<p>Directory abuse / rate limit exceeded.</p><p>User: ${session.email}</p><p>IP: ${clientIpAddress ?? 'unknown'}</p><p>Endpoint: ${endpoint}</p>`;
+      await sendEmail(env, env.NOTIFY_BOARD_EMAIL, 'Directory abuse / rate limit', body);
+    }
+    return new Response(
+      JSON.stringify({
+        error: `Rate limit exceeded. Too many directory lookups. Please try again in a minute.`,
+      }),
+      {
+        status: 429,
+        headers: {
+          'Content-Type': 'application/json',
+          'X-RateLimit-Limit': rateLimitConfig.maxRequests.toString(),
+          'X-RateLimit-Remaining': '0',
+          'X-RateLimit-Reset': rateLimit.resetAt.toString(),
+        },
+      }
+    );
+  }
+}
+
+let body: { ownerId?: string; csrf_token?: string; csrfToken?: string; reveal?: string };
+try {
+  body = await Astro.request.json();
+} catch {
+  return new Response(JSON.stringify({ error: 'Invalid JSON' }), {
+    status: 400,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const csrfToken = body.csrf_token ?? body.csrfToken;
+if (!verifyCsrfToken(session, csrfToken)) {
+  return new Response(JSON.stringify({ error: 'Invalid security token. Please refresh the page.' }), {
+    status: 403,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const ownerId = (body.ownerId ?? '').trim();
+if (!ownerId) {
+  return new Response(JSON.stringify({ error: 'ownerId is required.' }), {
+    status: 400,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const reveal = (body.reveal ?? 'phone').toLowerCase() === 'email' ? 'email' : 'phone';
+
+const owner = await getOwnerById(db, ownerId);
+if (!owner) {
+  return new Response(JSON.stringify({ error: 'Owner not found.' }), {
+    status: 404,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const optedOut = owner.share_contact_with_members === 0;
+const viewerElevated = isElevatedRole(getEffectiveRole(session));
+if (optedOut && !viewerElevated) {
+  return new Response(
+    JSON.stringify({
+      error: 'This member has chosen not to share contact details with other members. Board, ARB, and Admin can still view for operational needs (all access is audited).',
+    }),
+    { status: 403, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+
+const viewerRole = getEffectiveRole(session) ?? 'member';
+
+if (reveal === 'email') {
+  const email = owner.email?.trim() ?? '';
+  await insertDirectoryLog(db, session.email, owner.name, null, email || null, viewerRole, ipAddress);
+  return new Response(JSON.stringify({ email: email || null }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const phones = getPhonesArray(owner);
+const firstPhone = phones[0] ?? owner.phone ?? '';
+await insertDirectoryLog(db, session.email, owner.name, firstPhone, null, viewerRole, ipAddress);
+
+return new Response(JSON.stringify({ phone: firstPhone, phones }), {
+  status: 200,
+  headers: { 'Content-Type': 'application/json' },
+});
+---

@@ -1,0 +1,496 @@
+---
+export const prerender = false;
+
+import BoardLayout from '../../layouts/BoardLayout.astro';
+import { getBoardContext } from '../../lib/board-context';
+import { getRolesForEmails, isBoardOrArbOnly } from '../../lib/auth';
+import { listOwners } from '../../lib/directory-db';
+import { listArbRequestsByHousehold } from '../../lib/arb-db';
+
+const ctx = await getBoardContext(Astro);
+if (ctx.redirect) return Astro.redirect(ctx.redirect);
+const { env, session, effectiveRole } = ctx;
+const canEditDirectory = isBoardOrArbOnly(effectiveRole) || effectiveRole === 'admin';
+
+const db = env?.DB;
+const owners = db ? await listOwners(db) : [];
+const ownerRoles = await getRolesForEmails(env?.CLOURHOA_USERS, owners.map((o) => o.email));
+const allRequests = db ? await listArbRequestsByHousehold(db, session.email) : [];
+const draftCount = allRequests.filter((r) => r.status === 'pending').length;
+const csrfToken = session?.csrfToken ?? '';
+const csvFileInputClass = 'block w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border file:border-gray-300 file:bg-gray-50 file:text-gray-700 hover:file:bg-gray-100';
+const submitBtnClass = 'px-4 py-2 bg-clr-green text-white rounded-lg font-medium hover:brightness-110';
+const cancelEditBtnClass = 'px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 hidden';
+const checkboxClass = 'rounded border-gray-300 text-clr-green focus:ring-clr-green';
+
+function roleLabel(role: string): string {
+  return role === 'arb' ? 'ARB' : role === 'board' ? 'Board' : role === 'arb_board' ? 'ARB + Board' : role === 'admin' ? 'Admin' : role;
+}
+---
+
+<BoardLayout title="Directory" subtitle="Manage homeowner directory" draftCount={draftCount} role={effectiveRole} session={session} elevatedUntil={session.elevated_until}>
+  <div id="directory-message" class="hidden mb-4 p-4 rounded-xl border" role="status" aria-live="polite" aria-atomic="true"></div>
+  {canEditDirectory && (
+  <>
+  <h2 class="text-xl font-heading font-bold text-clr-green mb-6">Add or edit owner</h2>
+
+      <form id="owner-form" class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-8 space-y-4">
+        <input type="hidden" name="id" id="form-owner-id" value="" />
+        <input type="hidden" name="csrf_token" id="form-csrf" value={csrfToken} />
+        <div>
+          <label for="owner-name" class="block text-sm font-medium text-gray-700">Name</label>
+          <input type="text" id="owner-name" name="name" class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2" />
+        </div>
+        <div>
+          <label for="owner-address" class="block text-sm font-medium text-gray-700">Address</label>
+          <input type="text" id="owner-address" name="address" class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2" />
+        </div>
+        <div>
+          <label for="owner-lot-number" class="block text-sm font-medium text-gray-700">Lot number</label>
+          <input type="text" id="owner-lot-number" name="lot_number" inputmode="numeric" min="1" max="25" class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2" placeholder="1–25" />
+          <p class="mt-1 text-xs text-gray-500">1–25 only. Required for elevated roles (ARB, Board, Admin).</p>
+        </div>
+        <div>
+          <label for="owner-phone" class="block text-sm font-medium text-gray-700">Phone</label>
+          <input type="text" id="owner-phone" name="phone" class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2" />
+        </div>
+        <div>
+          <label for="owner-email" class="block text-sm font-medium text-gray-700">Email <span class="text-red-600">*</span></label>
+          <input type="email" id="owner-email" name="email" required class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2" placeholder="Required" />
+        </div>
+        <div>
+          <label for="owner-role" class="block text-sm font-medium text-gray-700">Site role</label>
+          <select id="owner-role" name="role" class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2">
+            <option value="member">Member</option>
+            <option value="arb">ARB</option>
+            <option value="board">Board</option>
+            <option value="arb_board">ARB + Board</option>
+            <option value="admin">Admin</option>
+          </select>
+          <p id="elevated-role-warning" class="mt-2 text-sm text-amber-700 hidden" role="alert">
+            This role has elevated access (ARB dashboard, Board tools, or full admin). Assign only to trusted people.
+          </p>
+        </div>
+        <div>
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" id="owner-is-primary" name="is_primary" class={checkboxClass} checked />
+            <span class="text-sm font-medium text-gray-700">Primary contact at this address</span>
+          </label>
+          <p class="mt-1 text-xs text-gray-500">One primary per property for dues/assessments. Uncheck if another person at this address is the primary.</p>
+        </div>
+        <div id="owner-form-message" class="hidden p-3 rounded-lg border" role="status" aria-live="polite"></div>
+        <div class="flex gap-3">
+          <button type="submit" id="owner-submit" class={submitBtnClass} aria-busy="false">Add owner</button>
+          <button type="button" id="owner-cancel-edit" class={cancelEditBtnClass}>Cancel edit</button>
+        </div>
+      </form>
+
+      <h3 class="text-lg font-heading font-semibold text-clr-green mb-3 mt-8">Upload directory (CSV)</h3>
+      <p class="text-sm text-gray-600 mb-2">Upload a CSV with columns <strong>name</strong>, <strong>address</strong>, <strong>lot_number</strong> (optional, 1 to 25), <strong>phone</strong>, <strong>email</strong>. First row may be a header. Rows with an existing email are updated; others are added.</p>
+      <form id="csv-upload-form" class="flex flex-wrap items-end gap-3 mb-8">
+        <input type="hidden" name="csrf_token" id="csv-csrf" value={csrfToken} />
+        <div>
+          <label for="csv-file" class="block text-sm font-medium text-gray-700 mb-1">CSV file</label>
+          <input type="file" id="csv-file" name="file" accept=".csv,text/csv,text/plain" class={csvFileInputClass} />
+        </div>
+        <button type="submit" id="csv-upload-btn" class={submitBtnClass}>Upload CSV</button>
+      </form>
+      <p id="csv-result" class="mb-6 text-sm hidden" role="status"></p>
+  </>
+  )}
+
+      <h3 class="text-lg font-heading font-semibold text-clr-green mb-3">Current directory</h3>
+      {owners.length === 0 ? (
+        <p class="text-gray-500">No owners yet. Add one above or upload a CSV. Members will see them on the portal Directory page.</p>
+      ) : (
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          {canEditDirectory && (
+          <div class="px-4 py-2 bg-gray-50 border-b border-gray-200 flex flex-wrap items-center gap-3">
+            <a href="/api/directory-export" class="px-3 py-1.5 text-sm bg-clr-green text-white rounded-lg font-medium hover:brightness-110" download>Export full directory (CSV)</a>
+            <button type="button" id="delete-selected-btn" class="px-3 py-1.5 text-sm bg-red-100 text-red-700 rounded-lg font-medium hover:bg-red-200 disabled:opacity-50 disabled:pointer-events-none" disabled>Delete selected</button>
+          </div>
+          )}
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+              <tr>
+                {canEditDirectory && (
+                <th scope="col" class="px-4 py-3 text-left w-10">
+                  <label class="flex items-center gap-1 cursor-pointer">
+                    <input type="checkbox" id="select-all-owners" class="rounded border-gray-300 text-clr-green focus:ring-clr-green" aria-label="Select all" />
+                    <span class="text-xs font-medium text-gray-500 uppercase">Select</span>
+                  </label>
+                </th>
+                )}
+                <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-24">Role</th>
+                <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-16">Lot #</th>
+                <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Address</th>
+                <th scope="col" class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase w-20">Primary</th>
+                {canEditDirectory && <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>}
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+              {owners.map((owner) => {
+                const role = owner.email ? ownerRoles.get(owner.email.trim().toLowerCase()) : null;
+                return (
+                <tr>
+                  {canEditDirectory && (
+                  <td class="px-4 py-3">
+                    <input type="checkbox" class="owner-row-checkbox rounded border-gray-300 text-clr-green focus:ring-clr-green" data-id={owner.id} aria-label="Select row" />
+                  </td>
+                  )}
+                  <td class="px-4 py-3 text-gray-900">{owner.name ?? '-'}</td>
+                  <td class="px-4 py-3">
+                    {role ? (
+                      <span class="inline-block px-2 py-0.5 text-xs font-medium rounded bg-clr-green/15 text-clr-green" title={`HOA role: ${roleLabel(role)}`}>
+                        {roleLabel(role)}
+                      </span>
+                    ) : (
+                      <span class="text-gray-400">-</span>
+                    )}
+                  </td>
+                  <td class="px-4 py-3 text-gray-600">{owner.lot_number ?? '-'}</td>
+                  <td class="px-4 py-3 text-gray-600">{owner.address ?? '-'}</td>
+                  <td class="px-4 py-3 text-center">
+                    {(owner.is_primary ?? 1) === 1 ? (
+                      <span class="inline-block px-2 py-0.5 text-xs font-medium rounded bg-clr-green/15 text-clr-green" title="Primary contact for this address (dues/assessments)">Primary</span>
+                    ) : (
+                      <span class="text-gray-400">—</span>
+                    )}
+                  </td>
+                  {canEditDirectory && (
+                  <td class="px-4 py-3">
+                    <button type="button" class="edit-owner-btn text-sm text-clr-green hover:underline mr-2" data-id={owner.id} data-name={owner.name ?? ''} data-address={owner.address ?? ''} data-lot-number={owner.lot_number ?? ''} data-phone={owner.phone ?? ''} data-email={owner.email ?? ''} data-role={role ?? 'member'} data-is-primary={(owner.is_primary ?? 1) === 1 ? '1' : '0'}>Edit</button>
+                    <button type="button" class="delete-owner-btn text-sm text-red-600 hover:underline" data-id={owner.id}>Delete</button>
+                  </td>
+                  )}
+                </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {owners.some((o) => o.lot_number?.trim()) && (() => {
+        const seen = new Set();
+        const pairs = [];
+        for (const o of owners) {
+          const lot = o.lot_number?.trim();
+          if (!lot) continue;
+          const addr = (o.address ?? '').trim();
+          const key = `${lot}\t${addr}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          pairs.push({ lot_number: lot, address: addr || '—' });
+        }
+        pairs.sort((a, b) => {
+          const na = parseInt(a.lot_number, 10) || 0;
+          const nb = parseInt(b.lot_number, 10) || 0;
+          return na - nb;
+        });
+        return (
+        <section class="mt-10" aria-labelledby="lot-address-heading">
+          <h3 id="lot-address-heading" class="text-lg font-heading font-semibold text-clr-green mb-3">Lot # → Address</h3>
+          <p class="text-sm text-gray-600 mb-3">One row per lot number and address. Multiple owners at the same address share one lot.</p>
+          <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <table class="min-w-full divide-y divide-gray-200">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-20">Lot #</th>
+                  <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Address</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100">
+                {pairs.map((row) => (
+                    <tr>
+                      <td class="px-4 py-3 font-medium text-gray-900">{row.lot_number}</td>
+                      <td class="px-4 py-3 text-gray-600">{row.address}</td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+        );
+      })()}
+
+  <script is:inline>
+    (function () {
+      if (typeof window === 'undefined') return;
+      var csrfInput = document.getElementById('form-csrf');
+      window.csrfToken = (csrfInput && csrfInput.value) || '';
+
+      const form = document.getElementById('owner-form');
+      const idInput = document.getElementById('form-owner-id');
+      const nameInput = document.getElementById('owner-name');
+      const addressInput = document.getElementById('owner-address');
+      const lotNumberInput = document.getElementById('owner-lot-number');
+      const phoneInput = document.getElementById('owner-phone');
+      const emailInput = document.getElementById('owner-email');
+      const roleSelect = document.getElementById('owner-role');
+      const elevatedWarning = document.getElementById('elevated-role-warning');
+      const isPrimaryCheckbox = document.getElementById('owner-is-primary');
+      const submitBtn = document.getElementById('owner-submit');
+      const cancelBtn = document.getElementById('owner-cancel-edit');
+
+      const ELEVATED_ROLES = ['arb', 'board', 'arb_board', 'admin'];
+      function isElevatedRole(r) {
+        return ELEVATED_ROLES.indexOf((r || '').toLowerCase()) !== -1;
+      }
+      function updateElevatedWarning() {
+        const r = roleSelect?.value || 'member';
+        if (elevatedWarning) elevatedWarning.classList.toggle('hidden', !isElevatedRole(r));
+      }
+      roleSelect?.addEventListener('change', updateElevatedWarning);
+
+      let formInitialRole = 'member';
+      function setFormCreate() {
+        idInput.value = '';
+        nameInput.value = '';
+        addressInput.value = '';
+        if (lotNumberInput) lotNumberInput.value = '';
+        phoneInput.value = '';
+        emailInput.value = '';
+        if (roleSelect) { roleSelect.value = 'member'; formInitialRole = 'member'; }
+        if (isPrimaryCheckbox) isPrimaryCheckbox.checked = true;
+        updateElevatedWarning();
+        submitBtn.textContent = 'Add owner';
+        cancelBtn.classList.add('hidden');
+      }
+
+      function validLotNumber(v) {
+        if (v == null) return false;
+        const t = String(v).trim();
+        const n = parseInt(t, 10);
+        return Number.isInteger(n) && n >= 1 && n <= 25;
+      }
+
+      document.querySelectorAll('.edit-owner-btn').forEach((btn) => {
+        btn.addEventListener('click', function () {
+          idInput.value = this.getAttribute('data-id') ?? '';
+          nameInput.value = this.getAttribute('data-name') ?? '';
+          addressInput.value = this.getAttribute('data-address') ?? '';
+          if (lotNumberInput) lotNumberInput.value = this.getAttribute('data-lot-number') ?? '';
+          phoneInput.value = this.getAttribute('data-phone') ?? '';
+          emailInput.value = this.getAttribute('data-email') ?? '';
+          const role = this.getAttribute('data-role') || 'member';
+          formInitialRole = role;
+          if (roleSelect) roleSelect.value = role;
+          if (isPrimaryCheckbox) isPrimaryCheckbox.checked = (this.getAttribute('data-is-primary') || '1') === '1';
+          updateElevatedWarning();
+          submitBtn.textContent = 'Update owner';
+          cancelBtn.classList.remove('hidden');
+        });
+      });
+
+      if (cancelBtn) {
+        cancelBtn.addEventListener('click', setFormCreate);
+      }
+
+      function getSelectedIds() {
+        return Array.from(document.querySelectorAll('.owner-row-checkbox:checked'))
+          .map(function (el) { return el.getAttribute('data-id'); })
+          .filter(function (id) { return !!id; });
+      }
+
+      function updateDeleteSelectedState() {
+        const btn = document.getElementById('delete-selected-btn');
+        if (btn) btn.disabled = getSelectedIds().length === 0;
+      }
+
+      const selectAll = document.getElementById('select-all-owners');
+      if (selectAll) {
+        selectAll.addEventListener('change', function () {
+          document.querySelectorAll('.owner-row-checkbox').forEach(function (cb) {
+            cb.checked = selectAll.checked;
+          });
+          updateDeleteSelectedState();
+        });
+      }
+
+      document.querySelectorAll('.owner-row-checkbox').forEach((cb) => {
+        cb.addEventListener('change', updateDeleteSelectedState);
+      });
+
+      const dirMsg = document.getElementById('directory-message');
+      const formMsg = document.getElementById('owner-form-message');
+      function showDirMsg(text, isError) {
+        if (!dirMsg) return;
+        dirMsg.textContent = text;
+        dirMsg.className = 'mb-4 p-4 rounded-xl border ' + (isError ? 'bg-red-50 border-red-200 text-red-800' : 'bg-green-50 border-green-200 text-green-800');
+        dirMsg.classList.remove('hidden');
+      }
+      function showFormMsg(text, isError) {
+        if (!formMsg) return;
+        formMsg.textContent = text;
+        formMsg.className = 'p-3 rounded-lg border ' + (isError ? 'bg-red-50 border-red-200 text-red-800' : 'bg-green-50 border-green-200 text-green-800');
+        formMsg.classList.remove('hidden');
+      }
+      function clearFormMsg() { if (formMsg) { formMsg.textContent = ''; formMsg.classList.add('hidden'); } }
+
+      const deleteSelectedBtn = document.getElementById('delete-selected-btn');
+      if (deleteSelectedBtn) {
+        deleteSelectedBtn.addEventListener('click', async function () {
+          const ids = getSelectedIds();
+          if (ids.length === 0) return;
+          if (!confirm(`Remove ${ids.length} owner(s) from the directory?`)) return;
+          const token = (csrfInput && csrfInput.value) || csrfToken || '';
+          deleteSelectedBtn.disabled = true;
+          deleteSelectedBtn.setAttribute('aria-busy', 'true');
+          try {
+            const res = await fetch('/api/owners', {
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ ids, csrf_token: token }),
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+              showDirMsg('Owner(s) removed.', false);
+              setTimeout(function () { window.location.reload(); }, 1500);
+            } else {
+              showDirMsg(data.error || 'Delete failed', true);
+            }
+          } catch (err) {
+            showDirMsg('Network error. Try again.', true);
+          } finally {
+            deleteSelectedBtn.disabled = false;
+            deleteSelectedBtn.removeAttribute('aria-busy');
+          }
+        });
+      }
+
+      document.querySelectorAll('.delete-owner-btn').forEach((btn) => {
+        btn.addEventListener('click', async function () {
+          const id = this.getAttribute('data-id');
+          if (!id || !confirm('Remove this owner from the directory?')) return;
+          const token = (csrfInput && csrfInput.value) || csrfToken || '';
+          const b = this; b.disabled = true; b.setAttribute('aria-busy', 'true');
+          try {
+            const res = await fetch('/api/owners', {
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ ids: [id], csrf_token: token }),
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+              showDirMsg('Owner removed.', false);
+              setTimeout(function () { window.location.reload(); }, 1500);
+            } else {
+              showDirMsg(data.error || 'Delete failed', true);
+            }
+          } catch (err) {
+            showDirMsg('Network error. Try again.', true);
+          } finally {
+            b.disabled = false; b.removeAttribute('aria-busy');
+          }
+        });
+      });
+
+      form?.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        clearFormMsg();
+        const token = (csrfInput && csrfInput.value) || csrfToken || '';
+        const id = idInput.value.trim();
+        const selectedRole = (roleSelect && roleSelect.value) || 'member';
+        const lotNumber = lotNumberInput ? lotNumberInput.value.trim() || null : null;
+        const isNewAdd = !id;
+        const isChangingToElevated = isElevatedRole(selectedRole) && (isNewAdd || !isElevatedRole(formInitialRole));
+        if (isChangingToElevated && !confirm('Assigning an elevated role gives this person access to ARB and/or Board tools. Are you sure you want to assign this role?')) {
+          return;
+        }
+        if (isElevatedRole(selectedRole) && !validLotNumber(lotNumber)) {
+          showFormMsg('Lot number is required for elevated roles. Use 1–25 only.', true);
+          return;
+        }
+        const payload = {
+          name: nameInput.value.trim() || null,
+          address: addressInput.value.trim() || null,
+          lot_number: lotNumber,
+          phone: phoneInput.value.trim() || null,
+          email: emailInput.value.trim() || null,
+          role: selectedRole,
+          is_primary: isPrimaryCheckbox ? isPrimaryCheckbox.checked : true,
+          csrf_token: token,
+        };
+        if (isNewAdd && !payload.email) {
+          showFormMsg('Email is required when adding a user.', true);
+          return;
+        }
+        submitBtn.disabled = true;
+        submitBtn.setAttribute('aria-busy', 'true');
+        try {
+          if (id) {
+            const res = await fetch('/api/owners', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ ...payload, id }),
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+              showFormMsg('Owner updated.', false);
+              setTimeout(function () { window.location.reload(); }, 1500);
+            } else {
+              showFormMsg(data.error || 'Update failed', true);
+            }
+          } else {
+            const res = await fetch('/api/owners', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload),
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+              showFormMsg('Owner added.', false);
+              setTimeout(function () { window.location.reload(); }, 1500);
+            } else {
+              showFormMsg(data.error || 'Add failed', true);
+            }
+          }
+        } catch (err) {
+          showFormMsg('Network error. Try again.', true);
+        } finally {
+          submitBtn.disabled = false;
+          submitBtn.removeAttribute('aria-busy');
+        }
+      });
+
+      const csvForm = document.getElementById('csv-upload-form');
+      const csvFile = document.getElementById('csv-file');
+      const csvResult = document.getElementById('csv-result');
+      const csvUploadBtn = document.getElementById('csv-upload-btn');
+      if (csvForm && csvFile && csvResult && csvUploadBtn) {
+        csvForm.addEventListener('submit', async function (e) {
+          e.preventDefault();
+          if (!csvFile.files?.length) {
+            csvResult.textContent = 'Please choose a CSV file.';
+            csvResult.classList.remove('hidden');
+            return;
+          }
+          const csvCsrf = document.getElementById('csv-csrf');
+          const token = (csvCsrf && csvCsrf.value) || csrfToken || '';
+          const formData = new FormData();
+          formData.set('file', csvFile.files[0]);
+          formData.set('csrf_token', token);
+          csvUploadBtn.disabled = true;
+          csvResult.classList.add('hidden');
+          try {
+            const res = await fetch('/api/owners/upload-csv', { method: 'POST', body: formData });
+            const data = await res.json();
+            if (res.ok && data.success) {
+              csvResult.textContent = `Upload complete: ${data.added ?? 0} added, ${data.updated ?? 0} updated.${data.errors?.length ? ' Some rows had errors.' : ''}`;
+              csvResult.classList.remove('hidden');
+              csvFile.value = '';
+              window.location.reload();
+            } else {
+              csvResult.textContent = data.error || 'Upload failed';
+              csvResult.classList.remove('hidden');
+            }
+          } finally {
+            csvUploadBtn.disabled = false;
+          }
+        });
+      }
+    })();
+  </script>
+</BoardLayout>

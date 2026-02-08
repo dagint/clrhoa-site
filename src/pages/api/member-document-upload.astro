@@ -1,0 +1,156 @@
+---
+/**
+ * POST /api/member-document-upload — Board: upload member-only doc (minutes, budgets, other).
+ * FormData: category, title, file, csrf_token. Stored in R2 under member-docs/, metadata in D1.
+ */
+export const prerender = false;
+
+import { getSessionFromCookie, verifyCsrfToken, verifyOrigin, getEffectiveRole } from '../../lib/auth';
+import { isMemberDocCategory, insertMemberDocument } from '../../lib/member-documents-db';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const session = await getSessionFromCookie(
+  Astro.request.headers.get('cookie') ?? undefined,
+  env?.SESSION_SECRET
+);
+
+if (!session) {
+  return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+    status: 401,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const effectiveRole = getEffectiveRole(session);
+const isBoard = effectiveRole === 'board' || effectiveRole === 'admin' || effectiveRole === 'arb_board';
+if (!isBoard) {
+  return new Response(JSON.stringify({ error: 'Forbidden. Only Board, Admin, or ARB+Board can upload member documents.' }), {
+    status: 403,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const origin = Astro.request.headers.get('origin');
+const referer = Astro.request.headers.get('referer');
+if (!verifyOrigin(origin, referer, Astro.url.origin)) {
+  return new Response(JSON.stringify({ error: 'Invalid origin' }), { status: 403, headers: { 'Content-Type': 'application/json' } });
+}
+
+if (Astro.request.method !== 'POST') {
+  return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+    status: 405,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+let body: FormData;
+try {
+  body = await Astro.request.formData();
+} catch {
+  return new Response(JSON.stringify({ error: 'Invalid form' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+}
+
+const csrf = body.get('csrf_token')?.toString();
+if (!verifyCsrfToken(csrf, session)) {
+  return new Response(JSON.stringify({ error: 'Invalid CSRF token' }), { status: 403, headers: { 'Content-Type': 'application/json' } });
+}
+
+const category = body.get('category')?.toString()?.trim()?.toLowerCase();
+if (!category || !isMemberDocCategory(category)) {
+  return new Response(JSON.stringify({ error: 'Invalid category. Use: minutes, budgets, other' }), {
+    status: 400,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const title = body.get('title')?.toString()?.trim();
+if (!title || title.length > 200) {
+  return new Response(JSON.stringify({ error: 'Title is required (max 200 characters)' }), {
+    status: 400,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const file = body.get('file');
+if (!file || !(file instanceof File) || file.size === 0) {
+  return new Response(JSON.stringify({ error: 'No file provided' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+}
+
+const MINUTES_TYPES = [
+  'application/pdf',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/msword',
+];
+const BUDGETS_OTHER_TYPES = [
+  ...MINUTES_TYPES,
+  'text/csv',
+  'text/plain', // some CSVs sent as text/plain
+  'application/csv',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+];
+const allowedByCategory =
+  category === 'minutes' ? MINUTES_TYPES : BUDGETS_OTHER_TYPES;
+const isAllowed = allowedByCategory.includes(file.type) || (file.type === 'text/plain' && category !== 'minutes' && /\.csv$/i.test(file.name));
+if (!isAllowed) {
+  const msg = category === 'minutes'
+    ? 'Minutes: use PDF or Word (.pdf, .docx, .doc).'
+    : 'Budgets / Other: use PDF, Word, CSV, Excel (.xls, .xlsx), or images (JPEG, PNG, GIF, WebP).';
+  return new Response(JSON.stringify({ error: msg }), {
+    status: 400,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const db = env?.DB;
+const r2 = env?.CLOURHOA_FILES;
+if (!db || !r2) {
+  return new Response(JSON.stringify({ error: 'Server configuration error' }), { status: 503, headers: { 'Content-Type': 'application/json' } });
+}
+
+function getSafeExt(file: File): string {
+  const name = file.name || '';
+  const ext = name.includes('.') ? name.split('.').pop()?.toLowerCase() ?? '' : '';
+  const fromType: Record<string, string> = {
+    'application/pdf': 'pdf',
+    'application/msword': 'doc',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+    'text/csv': 'csv',
+    'application/csv': 'csv',
+    'application/vnd.ms-excel': 'xls',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
+    'image/jpeg': 'jpg',
+    'image/png': 'png',
+    'image/gif': 'gif',
+    'image/webp': 'webp',
+  };
+  if (fromType[file.type]) return fromType[file.type];
+  if (['pdf', 'doc', 'docx', 'csv', 'xls', 'xlsx', 'jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) return ext === 'jpeg' ? 'jpg' : ext;
+  if (file.type.startsWith('image/')) return 'jpg';
+  return 'bin';
+}
+const safeExt = getSafeExt(file);
+const uniqueId = crypto.randomUUID?.() ?? Date.now().toString(36);
+const fileKey = `member-docs/${category}/${uniqueId}.${safeExt}`;
+
+const buf = await file.arrayBuffer();
+await r2.put(fileKey, buf, {
+  httpMetadata: { contentType: file.type },
+});
+
+const id = await insertMemberDocument(db, category, title, fileKey, file.type, session.email);
+
+return new Response(
+  JSON.stringify({
+    success: true,
+    id,
+    message: 'Document uploaded. Members can view it on the Documents page.',
+  }),
+  { status: 200, headers: { 'Content-Type': 'application/json' } }
+);
+---

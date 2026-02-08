@@ -1,0 +1,235 @@
+---
+export const prerender = false;
+
+import PortalLayout from '../../layouts/PortalLayout.astro';
+import ProtectedPage from '../../components/ProtectedPage.astro';
+import PortalNav from '../../components/PortalNav.astro';
+import { getPortalContext } from '../../lib/portal-context';
+import { getRolesForEmails, isElevatedRole } from '../../lib/auth';
+import { listOwners } from '../../lib/directory-db';
+import { listArbRequestsByHousehold } from '../../lib/arb-db';
+
+const { env, session, effectiveRole } = await getPortalContext(Astro, { fingerprint: true });
+if (!session) return Astro.redirect('/portal/login');
+
+const db = env?.DB;
+const owners = db ? await listOwners(db) : [];
+const ownerRoles = await getRolesForEmails(env?.CLOURHOA_USERS, owners.map((o) => o.email));
+const allRequests = db ? await listArbRequestsByHousehold(db, session.email) : [];
+const draftCount = allRequests.filter((r) => r.status === 'pending').length;
+
+/** Display label for HOA role in directory (board, admin, arb only). */
+function roleLabel(role: string): string {
+  return role === 'arb' ? 'ARB' : role === 'board' ? 'Board' : role === 'arb_board' ? 'ARB + Board' : role === 'admin' ? 'Admin' : role;
+}
+const viewerElevated = isElevatedRole(effectiveRole);
+function canRevealContact(owner: { share_contact_with_members?: number | null }): boolean {
+  return owner.share_contact_with_members !== 0 || viewerElevated;
+}
+---
+
+<PortalLayout title="Directory | Member Portal | Crooked Lake Reserve HOA">
+  <ProtectedPage>
+  <div class="min-h-screen portal-theme-bg font-body">
+    <PortalNav currentPath="/portal/directory" draftCount={draftCount} role={effectiveRole} staffRole={session?.role ?? ''} />
+
+    <main class="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+      <h2 class="text-2xl font-heading font-bold text-clr-green mb-2">Homeowner Directory</h2>
+      <p class="text-gray-600 mb-4">
+        View names and addresses. Where allowed, click &quot;Reveal phone&quot; or &quot;Reveal email&quot; to see contact details. <strong>When you reveal a number or email, that action is logged for audit</strong>—the board can see who viewed which contact. Members who opt out of sharing with other members will show &quot;Not shared with members&quot;; Board, ARB, and Admin can still view for operational needs (all access is audited).
+      </p>
+      <p class="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2 mb-6" role="note">
+        Revealing a phone number or email is logged. Your view is recorded for transparency.
+      </p>
+
+      <div class="mb-4">
+        <label for="dir-search" class="sr-only">Search by name, address, lot number, or email</label>
+        <input
+          id="dir-search"
+          type="search"
+          placeholder="Search by name, address, lot #, or email..."
+          class="w-full max-w-md px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-clr-green focus:border-clr-green"
+          aria-label="Search directory"
+        />
+      </div>
+
+      {owners.length === 0 ? (
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 portal-theme-card portal-card-accent p-8 text-center text-gray-500">
+          No directory entries yet. The board can add owners from Board: Directory.
+        </div>
+      ) : (
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 portal-theme-card portal-card-accent overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200" id="directory-table">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                  <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-24">Role</th>
+                  <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-16">Lot #</th>
+                  <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Address</th>
+                  <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
+                  <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100">
+                {owners.map((owner) => {
+                  const role = owner.email ? ownerRoles.get(owner.email.trim().toLowerCase()) : null;
+                  return (
+                  <tr class="dir-row" data-name={(owner.name ?? '').toLowerCase()} data-address={(owner.address ?? '').toLowerCase()} data-email={(owner.email ?? '').toLowerCase()} data-lot={(owner.lot_number ?? '').toLowerCase()}>
+                    <td class="px-4 py-3 text-gray-900">{owner.name ?? '-'}</td>
+                    <td class="px-4 py-3">
+                      {role ? (
+                        <span class="inline-block px-2 py-0.5 text-xs font-medium rounded bg-clr-green/15 text-clr-green" title={`HOA role: ${roleLabel(role)}`}>
+                          {roleLabel(role)}
+                        </span>
+                      ) : (
+                        <span class="text-gray-400">-</span>
+                      )}
+                    </td>
+                    <td class="px-4 py-3 text-gray-600">{owner.lot_number ?? '-'}</td>
+                    <td class="px-4 py-3 text-gray-600">{owner.address ?? '-'}</td>
+                    <td class="px-4 py-3">
+                      {canRevealContact(owner) ? (
+                        <span class="phone-placeholder" data-owner-id={owner.id}>
+                          <button
+                            type="button"
+                            class="reveal-phone-btn text-sm text-clr-green hover:underline font-medium"
+                            data-owner-id={owner.id}
+                            title="Reveal phone — this action is logged for audit"
+                            aria-label="Reveal phone (this action is logged)"
+                          >
+                            Reveal phone
+                          </button>
+                        </span>
+                      ) : (
+                        <span class="text-gray-400 text-sm">Not shared with members</span>
+                      )}
+                    </td>
+                    <td class="px-4 py-3">
+                      {canRevealContact(owner) ? (
+                        <span class="email-placeholder" data-owner-id={owner.id}>
+                          <button
+                            type="button"
+                            class="reveal-email-btn text-sm text-clr-green hover:underline font-medium"
+                            data-owner-id={owner.id}
+                            title="Reveal email — this action is logged for audit"
+                            aria-label="Reveal email (this action is logged)"
+                          >
+                            Reveal email
+                          </button>
+                        </span>
+                      ) : (
+                        <span class="text-gray-400 text-sm">Not shared with members</span>
+                      )}
+                    </td>
+                  </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </main>
+  </div>
+
+  <script define:vars={{ owners: owners, csrfToken: session.csrfToken ?? '' }}>
+    (function () {
+      if (typeof window === 'undefined') return;
+      window.csrfToken = csrfToken || '';
+
+      const searchInput = document.getElementById('dir-search');
+      const rows = document.querySelectorAll('.dir-row');
+
+      if (searchInput) {
+        searchInput.addEventListener('input', function () {
+          const q = (this.value || '').toLowerCase().trim();
+          rows.forEach((row) => {
+            const name = (row.getAttribute('data-name') || '');
+            const address = (row.getAttribute('data-address') || '');
+            const email = (row.getAttribute('data-email') || '');
+            const lot = (row.getAttribute('data-lot') || '');
+            const show = !q || name.includes(q) || address.includes(q) || email.includes(q) || lot.includes(q);
+            row.style.display = show ? '' : 'none';
+          });
+        });
+      }
+
+      document.querySelectorAll('.reveal-email-btn').forEach((btn) => {
+        btn.addEventListener('click', async function () {
+          const ownerId = this.getAttribute('data-owner-id');
+          if (!ownerId) return;
+          const token = (typeof window !== 'undefined' && window.csrfToken) || csrfToken || '';
+          const placeholder = document.querySelector('.email-placeholder[data-owner-id="' + ownerId + '"]');
+          if (!placeholder) return;
+          btn.disabled = true;
+          btn.textContent = 'Loading…';
+          try {
+            const res = await fetch('/api/log-phone-view', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ ownerId, csrf_token: token, reveal: 'email' }),
+            });
+            const data = await res.json();
+            const span = document.createElement('span');
+            if (res.ok && data.email !== undefined) {
+              span.className = 'text-gray-900';
+              span.textContent = data.email || '-';
+            } else {
+              span.className = 'text-red-600 text-sm';
+              span.textContent = data.error || 'Failed';
+            }
+            placeholder.textContent = '';
+            placeholder.appendChild(span);
+          } catch (e) {
+            placeholder.textContent = '';
+            const err = document.createElement('span');
+            err.className = 'text-red-600 text-sm';
+            err.textContent = 'Network error';
+            placeholder.appendChild(err);
+          }
+        });
+      });
+
+      document.querySelectorAll('.reveal-phone-btn').forEach((btn) => {
+        btn.addEventListener('click', async function () {
+          const ownerId = this.getAttribute('data-owner-id');
+          if (!ownerId) return;
+          const token = (typeof window !== 'undefined' && window.csrfToken) || csrfToken || '';
+          const placeholder = document.querySelector(`.phone-placeholder[data-owner-id="${ownerId}"]`);
+          if (!placeholder) return;
+          btn.disabled = true;
+          btn.textContent = 'Loading…';
+          try {
+            const res = await fetch('/api/log-phone-view', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ ownerId, csrf_token: token }),
+            });
+            const data = await res.json();
+            const span = document.createElement('span');
+            if (res.ok && (data.phone !== undefined || Array.isArray(data.phones))) {
+              const display = Array.isArray(data.phones) && data.phones.length > 0
+                ? data.phones.join(', ')
+                : (data.phone || '-');
+              span.className = 'text-gray-900';
+              span.textContent = display;
+            } else {
+              span.className = 'text-red-600 text-sm';
+              span.textContent = data.error || 'Failed';
+            }
+            placeholder.textContent = '';
+            placeholder.appendChild(span);
+          } catch (e) {
+            placeholder.textContent = '';
+            const err = document.createElement('span');
+            err.className = 'text-red-600 text-sm';
+            err.textContent = 'Network error';
+            placeholder.appendChild(err);
+          }
+        });
+      });
+    })();
+  </script>
+  </ProtectedPage>
+</PortalLayout>

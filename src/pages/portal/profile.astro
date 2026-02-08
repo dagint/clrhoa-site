@@ -1,0 +1,576 @@
+---
+export const prerender = false;
+
+import PortalLayout from '../../layouts/PortalLayout.astro';
+import ProtectedPage from '../../components/ProtectedPage.astro';
+import PortalNav from '../../components/PortalNav.astro';
+import { getPortalContext } from '../../lib/portal-context';
+import { getOwnerByEmail, getPhonesArray, listHouseholdMembersWithLogin } from '../../lib/directory-db';
+import { listArbRequestsByHousehold } from '../../lib/arb-db';
+import { getUserByEmail, type NotificationPreferences } from '../../lib/db';
+import { getLastLogonTime, listLoginHistoryByEmail } from '../../lib/login-history-db';
+import { NOTIFICATION_TYPES } from '../../lib/notifications';
+
+const LOGIN_PAGE_SIZES = [10, 25, 50, 100] as const;
+const DEFAULT_LOGIN_PAGE_SIZE = 10;
+
+const { env, session, effectiveRole } = await getPortalContext(Astro);
+if (!session) return Astro.redirect('/portal/login');
+
+const url = Astro.url;
+const getPage = (key: string): number => {
+  const p = url.searchParams.get(key);
+  const n = p ? parseInt(p, 10) : 1;
+  return Number.isNaN(n) || n < 1 ? 1 : Math.min(n, 500);
+};
+const getLimit = (): number => {
+  const p = url.searchParams.get('login_limit');
+  const n = p ? parseInt(p, 10) : DEFAULT_LOGIN_PAGE_SIZE;
+  return LOGIN_PAGE_SIZES.includes(n as (typeof LOGIN_PAGE_SIZES)[number]) ? n : DEFAULT_LOGIN_PAGE_SIZE;
+};
+const loginPage = getPage('login_page');
+const loginPageSize = getLimit();
+
+function loginActivityPageUrl(key: string, value: number): string {
+  const u = new URL(url);
+  if (value <= 1) u.searchParams.delete(key);
+  else u.searchParams.set(key, String(value));
+  if (loginPageSize !== DEFAULT_LOGIN_PAGE_SIZE) u.searchParams.set('login_limit', String(loginPageSize));
+  return u.pathname + u.search;
+}
+
+const db = env?.DB;
+const owner = db ? await getOwnerByEmail(db, session.email) : null;
+const phonesInitial = owner ? getPhonesArray(owner) : [];
+if (phonesInitial.length === 0) phonesInitial.push('');
+const allRequests = db ? await listArbRequestsByHousehold(db, session.email) : [];
+const draftCount = allRequests.filter((r) => r.status === 'pending').length;
+
+let smsPhone = '';
+let sms_optin = false;
+let notification_preferences: NotificationPreferences = {};
+if (db) {
+  const user = await getUserByEmail(db, session.email);
+  if (user) {
+    smsPhone = user.phone?.trim() ?? '';
+    sms_optin = user.sms_optin === 1 || user.sms_optin === true;
+    if (user.notification_preferences?.trim()) {
+      try {
+        notification_preferences = JSON.parse(user.notification_preferences) as NotificationPreferences;
+      } catch {}
+    }
+  }
+}
+
+const hasName = !!(owner?.name?.trim());
+const hasAddress = !!(owner?.address?.trim());
+const hasPhones = phonesInitial.some((p) => !!(p && String(p).trim()));
+// Admin accounts (e.g. service providers) are not required to have an address
+const profileComplete =
+  effectiveRole === 'admin' ? hasName && hasPhones : hasName && hasAddress && hasPhones;
+const requiredParam = Astro.url.searchParams.get('required') === '1';
+const startInEditMode = !profileComplete || requiredParam;
+const pushEnabled = notification_preferences['push_enabled'] === true;
+
+const lastLogon = db ? await getLastLogonTime(db, session.email) : null;
+const loginHistory = db ? await listLoginHistoryByEmail(db, session.email, loginPageSize, (loginPage - 1) * loginPageSize) : [];
+
+const householdMembersWithLogin = db ? await listHouseholdMembersWithLogin(db, session.email) : [];
+
+function formatLoginTime(iso: string | null): string {
+  if (!iso) return '—';
+  try {
+    const d = new Date(iso);
+    return Number.isNaN(d.getTime()) ? iso : d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+  } catch {
+    return iso ?? '—';
+  }
+}
+---
+
+<PortalLayout title="Profile | Member Portal | Crooked Lake Reserve HOA">
+  <ProtectedPage>
+  <div class="min-h-screen portal-theme-bg font-body">
+    <PortalNav currentPath="/portal/profile" draftCount={draftCount} role={effectiveRole} staffRole={session?.role ?? ''} />
+
+    <main class="max-w-2xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+      <h2 class="text-2xl font-heading font-bold text-clr-green mb-2">Profile</h2>
+      <p class="text-gray-600 mb-2">
+        Your directory listing and notification preferences. Directory info is shown to other members and prefills ARB requests.
+      </p>
+      <p class="text-gray-600 mb-6">
+        <a href="/portal/my-activity" class="text-clr-green font-medium hover:underline">My activity</a> — view a log of your own actions (directory reveals, ARB request updates).
+      </p>
+
+      {requiredParam && (
+        <div class="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg text-amber-900" role="alert">
+          <strong>Profile required.</strong>
+          {effectiveRole === 'admin'
+            ? ' Please complete your name and at least one phone number.'
+            : ' Please complete your name, address, and at least one phone number.'}
+        </div>
+      )}
+
+      <!-- Section 1: Directory listing -->
+      <section class="mb-10" aria-labelledby="profile-dir-heading">
+        <h3 id="profile-dir-heading" class="text-lg font-heading font-semibold text-clr-green mb-3">Directory listing</h3>
+        <div id="profile-view" class={`bg-white rounded-2xl shadow-sm border border-gray-100 portal-theme-card portal-card-accent p-6 ${startInEditMode ? 'hidden' : ''}`}>
+          <dl class="space-y-4">
+            <div>
+              <dt class="text-sm font-medium text-gray-500">Name</dt>
+              <dd id="profile-view-name" class="mt-0.5 text-gray-900">{owner?.name?.trim() || 'Not set'}</dd>
+            </div>
+            <div>
+              <dt class="text-sm font-medium text-gray-500">Property address</dt>
+              <dd id="profile-view-address" class="mt-0.5 text-gray-900">{owner?.address?.trim() || 'Not set'}</dd>
+            </div>
+            <div>
+              <dt class="text-sm font-medium text-gray-500">Lot number</dt>
+              <dd id="profile-view-lot" class="mt-0.5 text-gray-900">{owner?.lot_number?.trim() || 'Not set'}</dd>
+            </div>
+            <div>
+              <dt class="text-sm font-medium text-gray-500">Phone numbers</dt>
+              <dd id="profile-view-phones" class="mt-0.5 text-gray-900">{phonesInitial.filter((p) => p && String(p).trim()).join(', ') || 'Not set'}</dd>
+            </div>
+            <div>
+              <dt class="text-sm font-medium text-gray-500">Email</dt>
+              <dd class="mt-0.5 text-gray-900">{session.email}</dd>
+              <p class="text-xs text-gray-500 mt-0.5">Login address; cannot be changed here.</p>
+            </div>
+          </dl>
+          <div class="mt-6">
+            <button type="button" id="profile-edit-btn" class="px-4 py-2 bg-clr-green text-white rounded-lg font-medium hover:brightness-110">Edit directory info</button>
+          </div>
+        </div>
+
+        <form id="my-info-form" class={`bg-white rounded-2xl shadow-sm border border-gray-100 portal-theme-card portal-card-accent p-6 space-y-4 ${startInEditMode ? '' : 'hidden'}`}>
+          <input type="hidden" name="csrf_token" id="my-info-csrf" value={session.csrfToken ?? ''} />
+          <div>
+            <label for="my-info-name" class="block text-sm font-medium text-gray-700">Name</label>
+            <input type="text" id="my-info-name" name="name" class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2" value={owner?.name ?? ''} placeholder="Your name" />
+          </div>
+          <div>
+            <label for="my-info-address" class="block text-sm font-medium text-gray-700">Property address</label>
+            <input type="text" id="my-info-address" name="address" class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2" value={owner?.address ?? ''} placeholder="Street, lot or address" />
+            <p class="mt-1 text-xs text-gray-500">Used in the directory and to prefill the ARB request form.</p>
+          </div>
+          <div>
+            <label for="my-info-lot-number" class="block text-sm font-medium text-gray-700">Lot number</label>
+            <input type="text" id="my-info-lot-number" name="lot_number" inputmode="numeric" min="1" max="25" class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2" value={owner?.lot_number ?? ''} placeholder="1–25" />
+            <p class="mt-1 text-xs text-gray-500">Optional. Use 1–25 if you know your lot number.</p>
+          </div>
+          <div>
+            <div class="flex items-center justify-between">
+              <label class="block text-sm font-medium text-gray-700">Phone numbers (directory)</label>
+              <button type="button" id="my-info-add-phone" class="text-sm text-clr-green hover:underline">Add another</button>
+            </div>
+            <p class="text-xs text-gray-500 mt-0.5">These appear in the member directory. Add or edit below; the SMS number in Notifications will be added here if it is new.</p>
+            <div id="my-info-phones" class="mt-2 space-y-2">
+              {phonesInitial.map((p, i) => (
+                <div class="flex gap-2 items-center phone-row">
+                  <input type="tel" class="phone-input mt-1 block flex-1 rounded-lg border border-gray-200 px-3 py-2" value={p} placeholder="(555) 555-5555" data-index={i} />
+                  <button type="button" class="remove-phone text-sm text-red-600 hover:underline shrink-0" data-index={i} aria-label="Remove phone">Remove</button>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div class="flex gap-3 flex-wrap items-center">
+            <button type="submit" id="my-info-submit" class="px-4 py-2 bg-clr-green text-white rounded-lg font-medium hover:brightness-110">Save directory info</button>
+            <button type="button" id="profile-cancel-btn" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300">Cancel</button>
+            <span id="my-info-message" class="text-sm text-gray-500"></span>
+          </div>
+        </form>
+      </section>
+
+      <!-- Section: Household accounts (others at same address who can sign in) -->
+      <section aria-labelledby="profile-household-heading" class="mb-10">
+        <h3 id="profile-household-heading" class="text-lg font-heading font-semibold text-clr-green mb-3">Household accounts</h3>
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 portal-theme-card p-6">
+          <p class="text-sm text-gray-600 mb-4">
+            Other people at your property address who are in the directory and have portal sign-in. You can see who else can log in here; each person manages their own account from My account.
+          </p>
+          {householdMembersWithLogin.length === 0 ? (
+            <p class="text-sm text-gray-500">No other household members with portal access at your address. Only directory entries with the same property address who have a portal account appear here.</p>
+          ) : (
+            <ul class="space-y-3" role="list">
+              {householdMembersWithLogin.map((m) => (
+                <li class="flex items-center justify-between gap-3 py-2 border-b border-gray-100 last:border-b-0 last:pb-0">
+                  <div>
+                    <span class="font-medium text-gray-900">{m.name || 'No name'}</span>
+                    {m.is_primary === 1 && (
+                      <span class="ml-2 text-xs text-gray-500">Primary contact</span>
+                    )}
+                  </div>
+                  <span class="text-sm text-gray-600">{m.email}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </section>
+
+      <!-- Section 2: Contact sharing with other members -->
+      <section aria-labelledby="profile-contact-heading" class="mb-10">
+        <h3 id="profile-contact-heading" class="text-lg font-heading font-semibold text-clr-green mb-3">Directory contact sharing</h3>
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 portal-theme-card p-6">
+          <label class="flex items-start gap-3 cursor-pointer">
+            <input type="checkbox" id="share-contact-with-members" name="share_contact_with_members" class="mt-1 rounded border-gray-300 text-clr-green focus:ring-clr-green" checked={owner?.share_contact_with_members !== 0} />
+            <span class="flex-1">
+              <span class="font-medium text-gray-900">Allow other members to request my phone and email</span>
+              <p class="text-sm text-gray-600 mt-1">When unchecked, your phone and email are not revealable by other members in the homeowner directory. <strong>Board, ARB, and Admin can still view your contact info for operational needs</strong>; every view is recorded in the audit log for transparency.</p>
+            </span>
+          </label>
+          <p class="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-3 mt-3">Even if you opt out, Board members, ARB members, and Admins can see your phone and email when needed to run the HOA. All such access is logged in the audit log.</p>
+          <p class="text-sm text-gray-500 mt-2">Save your choice using &quot;Save notifications&quot; below.</p>
+        </div>
+      </section>
+
+      <!-- Section: Login activity -->
+      <section aria-labelledby="profile-login-heading" class="mb-10">
+        <h3 id="profile-login-heading" class="text-lg font-heading font-semibold text-clr-green mb-3">Login activity</h3>
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 portal-theme-card p-6">
+          <p class="text-sm text-gray-600 mb-3">
+            Last logon: <strong>{formatLoginTime(lastLogon)}</strong>
+          </p>
+          <p class="text-sm text-gray-500 mb-4">Recent sign-ins to your account. If you see a time or device you don’t recognize, change your password (if applicable) and contact the board.</p>
+          {loginHistory.length === 0 ? (
+            <p class="text-sm text-gray-500">No login history yet. History is recorded each time you sign in.</p>
+          ) : (
+            <>
+              <div class="flex flex-wrap items-center gap-2 mb-3">
+                <label for="profile-login-per-page" class="text-sm text-gray-600">Per page:</label>
+                <select id="profile-login-per-page" name="login_limit" class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-700 focus:border-clr-green focus:outline-none focus:ring-1 focus:ring-clr-green" aria-label="Login history entries per page">
+                  {LOGIN_PAGE_SIZES.map((size) => (
+                    <option value={size} selected={loginPageSize === size}>{size}</option>
+                  ))}
+                </select>
+              </div>
+              <div class="rounded-xl border border-gray-200 overflow-hidden">
+                <div class="overflow-x-auto">
+                  <table class="w-full text-sm">
+                    <thead class="bg-gray-50 border-b border-gray-200">
+                      <tr>
+                        <th class="text-left py-2 px-3 font-medium text-gray-700">When</th>
+                        <th class="text-left py-2 px-3 font-medium text-gray-700">IP address</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {loginHistory.map((row) => (
+                        <tr class="border-b border-gray-100 last:border-0">
+                          <td class="py-2 px-3 text-gray-700">{formatLoginTime(row.logged_at)}</td>
+                          <td class="py-2 px-3 font-mono text-gray-600">{row.ip_address?.trim() || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <nav class="flex items-center justify-between gap-2 py-2 px-3 border-t border-gray-200 bg-gray-50 text-sm" aria-label="Login activity pagination">
+                  <span class="text-gray-600">Page {loginPage}</span>
+                  <div class="flex gap-2">
+                    {loginPage > 1 && <a href={loginActivityPageUrl('login_page', loginPage - 1)} class="text-clr-green hover:underline font-medium">Previous</a>}
+                    {loginHistory.length === loginPageSize && <a href={loginActivityPageUrl('login_page', loginPage + 1)} class="text-clr-green hover:underline font-medium">Next</a>}
+                  </div>
+                </nav>
+              </div>
+              <script>
+                document.getElementById('profile-login-per-page')?.addEventListener('change', function () {
+                  const limit = (this as HTMLSelectElement).value;
+                  const u = new URL(window.location.href);
+                  u.searchParams.set('login_limit', limit);
+                  u.searchParams.delete('login_page');
+                  if (limit === '10') u.searchParams.delete('login_limit');
+                  window.location.href = u.pathname + u.search;
+                });
+              </script>
+            </>
+          )}
+        </div>
+      </section>
+
+      <!-- Section 3: Notifications -->
+      <section aria-labelledby="profile-notif-heading">
+        <h3 id="profile-notif-heading" class="text-lg font-heading font-semibold text-clr-green mb-3">Notifications</h3>
+        <form id="preferences-form" class="bg-white rounded-2xl shadow-sm border border-gray-100 portal-theme-card p-6 space-y-6">
+          <div>
+            <p class="text-sm font-medium text-gray-700 mb-2">Email notification types</p>
+            <p class="text-sm text-gray-500 mb-4">Uncheck any type to stop receiving those emails. Account email: <strong>{session.email}</strong></p>
+            <ul class="space-y-3" aria-label="Notification type toggles">
+              {NOTIFICATION_TYPES.map((t) => (
+                <li class="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
+                  <label class="flex items-center gap-2 cursor-pointer flex-shrink-0">
+                    <input type="checkbox" name="notification_type" value={t.id} data-notification-id={t.id} class="rounded border-gray-300 text-clr-green focus:ring-clr-green notification-type-cb" checked={notification_preferences[t.id] !== false} />
+                    <span class="text-sm font-medium text-gray-700">{t.label}</span>
+                  </label>
+                  <span class="text-sm text-gray-500 sm:ml-6">{t.description}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div class="rounded-lg border border-amber-200 bg-amber-50 p-4 mb-4">
+            <p class="text-sm font-medium text-amber-900 mb-1">SMS notifications (not yet available)</p>
+            <p class="text-sm text-amber-800 mb-3">Sending text alerts would <strong>cost the HOA money</strong> (carrier fees per message). No SMS messages are sent until the board enables this feature.</p>
+            <p class="text-sm text-amber-800 mb-3">If you want SMS alerts when they become available, click below. The board will see how many members want SMS.</p>
+            <div class="flex flex-wrap items-center gap-2">
+              <button type="button" id="btn-request-sms" class="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg font-medium text-sm">Request SMS (costs HOA money)</button>
+              <span id="sms-request-message" class="text-sm text-amber-800 hidden"></span>
+            </div>
+          </div>
+          <div class="opacity-75" aria-describedby="sms-locked-note">
+            <p id="sms-locked-note" class="text-xs text-gray-500 mb-2">Your preferences below will apply when SMS is enabled. No messages are sent until then.</p>
+            <p class="text-sm font-medium text-gray-700 mb-1">SMS alerts (opt-in)</p>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" id="sms_optin" name="sms_optin" class="rounded border-gray-300 text-clr-green focus:ring-clr-green" checked={sms_optin} />
+              <span class="text-sm font-medium text-gray-700">Receive SMS alerts</span>
+            </label>
+            <p class="text-sm text-gray-500 mt-1">Text alerts for important HOA updates. Standard messaging rates may apply.</p>
+          </div>
+          <div class="opacity-75 mt-2">
+            <label for="phone" class="block text-sm font-medium text-gray-700 mb-1">Phone number for SMS</label>
+            <input type="tel" id="phone" name="phone" value={smsPhone} placeholder="+1 555 123 4567" class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2" />
+            <p class="text-xs text-gray-500 mt-1">Used for SMS alerts when enabled. If this number is not already in your directory listing above, it will be added when you save.</p>
+          </div>
+          <div class="flex flex-wrap gap-3 mt-4">
+            <button type="submit" class="bg-clr-green hover:brightness-110 text-white px-6 py-2 rounded-xl font-semibold text-sm">Save notifications</button>
+            <button type="button" id="btn-test-sms" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-6 py-2 rounded-xl font-semibold text-sm" disabled title="SMS sending is disabled until the board enables it">Send test SMS</button>
+          </div>
+          <div class="pt-4 border-t border-gray-100">
+            <p class="text-sm font-medium text-gray-700 mb-2">Browser push notifications</p>
+            <p class="text-sm text-gray-500 mb-2">Receive push alerts in this browser when enabled. You can enable or disable at any time.</p>
+            <p id="push-status" class="text-sm text-gray-600 mb-2">{pushEnabled ? 'Push is enabled.' : 'Push is disabled.'}</p>
+            <div class="flex flex-wrap gap-2">
+              <button type="button" id="btn-enable-push" class="bg-clr-green hover:brightness-110 text-white px-4 py-2 rounded-lg font-medium text-sm">{pushEnabled ? 'Push enabled' : 'Enable push'}</button>
+              <button type="button" id="btn-disable-push" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg font-medium text-sm">Disable push</button>
+            </div>
+          </div>
+          <p id="pref-message" class="text-sm hidden"></p>
+        </form>
+      </section>
+    </main>
+  </div>
+
+  <script is:inline>
+    (function () {
+      const form = document.getElementById('my-info-form');
+      const submitBtn = document.getElementById('my-info-submit');
+      const messageEl = document.getElementById('my-info-message');
+      const csrfInput = document.getElementById('my-info-csrf');
+      const container = document.getElementById('my-info-phones');
+      const addBtn = document.getElementById('my-info-add-phone');
+      const profileView = document.getElementById('profile-view');
+      const profileEditBtn = document.getElementById('profile-edit-btn');
+      const profileCancelBtn = document.getElementById('profile-cancel-btn');
+      const viewName = document.getElementById('profile-view-name');
+      const viewAddress = document.getElementById('profile-view-address');
+      const viewPhones = document.getElementById('profile-view-phones');
+
+      function showEditMode() {
+        if (profileView) profileView.classList.add('hidden');
+        if (form) form.classList.remove('hidden');
+      }
+      function showViewMode() {
+        if (profileView) profileView.classList.remove('hidden');
+        if (form) form.classList.add('hidden');
+      }
+      const viewLot = document.getElementById('profile-view-lot');
+      function updateViewFromForm() {
+        const name = document.getElementById('my-info-name')?.value?.trim() || 'Not set';
+        const address = document.getElementById('my-info-address')?.value?.trim() || 'Not set';
+        const lot = document.getElementById('my-info-lot-number')?.value?.trim() || 'Not set';
+        const phones = [];
+        container?.querySelectorAll('.phone-input').forEach(function (input) {
+          const v = input.value?.trim();
+          if (v) phones.push(v);
+        });
+        if (viewName) viewName.textContent = name;
+        if (viewAddress) viewAddress.textContent = address;
+        if (viewLot) viewLot.textContent = lot;
+        if (viewPhones) viewPhones.textContent = phones.length ? phones.join(', ') : 'Not set';
+      }
+
+      profileEditBtn?.addEventListener('click', showEditMode);
+      profileCancelBtn?.addEventListener('click', function () {
+        updateViewFromForm();
+        showViewMode();
+        if (messageEl) messageEl.textContent = '';
+      });
+
+      addBtn?.addEventListener('click', function () {
+        const row = document.createElement('div');
+        row.className = 'flex gap-2 items-center phone-row';
+        const idx = container?.querySelectorAll('.phone-row').length ?? 0;
+        row.innerHTML = '<input type="tel" class="phone-input mt-1 block flex-1 rounded-lg border border-gray-200 px-3 py-2" placeholder="(555) 555-5555" data-index="' + idx + '" /><button type="button" class="remove-phone text-sm text-red-600 hover:underline shrink-0" data-index="' + idx + '" aria-label="Remove phone">Remove</button>';
+        row.querySelector('.remove-phone')?.addEventListener('click', function () {
+          if ((container?.querySelectorAll('.phone-row').length ?? 0) > 1) row.remove();
+        });
+        container?.appendChild(row);
+      });
+
+      document.querySelectorAll('.remove-phone').forEach((btn) => {
+        btn.addEventListener('click', function () {
+          const row = this.closest('.phone-row');
+          if (container && (container.querySelectorAll('.phone-row').length ?? 0) > 1) row?.remove();
+        });
+      });
+
+      form?.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        if (!messageEl) return;
+        messageEl.textContent = '';
+        const token = (csrfInput && csrfInput.value) || '';
+        const phones = [];
+        container?.querySelectorAll('.phone-input').forEach((input) => {
+          const v = input.value?.trim();
+          if (v) phones.push(v);
+        });
+        const lotNumber = document.getElementById('my-info-lot-number')?.value?.trim() || null;
+        const payload = { name: document.getElementById('my-info-name')?.value?.trim() || null, address: document.getElementById('my-info-address')?.value?.trim() || null, lot_number: lotNumber, phones: phones.length ? phones : [], csrf_token: token };
+        submitBtn.disabled = true;
+        try {
+          const res = await fetch('/api/owners/me', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+          const data = await res.json();
+          if (res.ok && data.success) {
+            messageEl.textContent = data.created ? 'Saved. You are now in the directory.' : 'Saved.';
+            messageEl.className = 'text-sm text-clr-green';
+            updateViewFromForm();
+            showViewMode();
+            if (window.location.search.indexOf('required=1') !== -1) { window.location.href = '/portal/dashboard'; return; }
+          } else {
+            messageEl.textContent = data.error || 'Save failed.';
+            messageEl.className = 'text-sm text-red-600';
+          }
+        } catch (err) {
+          messageEl.textContent = 'Network error. Try again.';
+          messageEl.className = 'text-sm text-red-600';
+        } finally {
+          submitBtn.disabled = false;
+        }
+      });
+
+      const prefForm = document.getElementById('preferences-form');
+      const prefMsg = document.getElementById('pref-message');
+      function showPrefMsg(text, isError) {
+        if (!prefMsg) return;
+        prefMsg.textContent = text;
+        prefMsg.classList.remove('hidden', 'text-red-600', 'text-green-600');
+        prefMsg.classList.add(isError ? 'text-red-600' : 'text-green-600');
+      }
+      prefForm?.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        const phoneEl = prefForm.querySelector('#phone');
+        const phone = (phoneEl && phoneEl.value) ? String(phoneEl.value).trim() : '';
+        const smsEl = prefForm.querySelector('#sms_optin');
+        const sms_optin = !!(smsEl && smsEl.checked);
+        const shareContactEl = document.getElementById('share-contact-with-members');
+        const share_contact_with_members = !!(shareContactEl && shareContactEl.checked);
+        const notification_preferences = {};
+        prefForm.querySelectorAll('.notification-type-cb').forEach(function (cb) {
+          notification_preferences[cb.dataset.notificationId || cb.value] = cb.checked;
+        });
+        try {
+          const res = await fetch('/api/preferences', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone, sms_optin, notification_preferences, share_contact_with_members }), credentials: 'same-origin' });
+          const data = await res.json();
+          if (data.success) showPrefMsg('Notifications saved.', false);
+          else showPrefMsg(data.error || 'Failed to save', true);
+        } catch (err) {
+          showPrefMsg('Network error. Please try again.', true);
+        }
+      });
+      document.getElementById('btn-request-sms')?.addEventListener('click', async function () {
+        const btn = document.getElementById('btn-request-sms');
+        const msgEl = document.getElementById('sms-request-message');
+        if (!btn || !msgEl) return;
+        btn.disabled = true;
+        msgEl.classList.remove('hidden');
+        msgEl.textContent = 'Recording…';
+        try {
+          const res = await fetch('/api/sms-feature-request', { method: 'POST', credentials: 'same-origin' });
+          const data = await res.json().catch(function () { return {}; });
+          if (res.ok && data.success) {
+            msgEl.textContent = 'Request recorded. The board will see how many members want SMS.';
+          } else {
+            msgEl.textContent = data.error || 'Request failed. Try again.';
+            msgEl.classList.add('text-red-600');
+          }
+        } catch (err) {
+          msgEl.textContent = 'Network error. Try again.';
+          msgEl.classList.add('text-red-600');
+        }
+        btn.disabled = false;
+      });
+
+      document.getElementById('btn-test-sms')?.addEventListener('click', async function () {
+        const phone = (prefForm?.querySelector('#phone'))?.value?.trim();
+        if (!phone) { showPrefMsg('Enter a phone number and save first, then try again.', true); return; }
+        try {
+          const res = await fetch('/api/preferences', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone, sms_optin: true, send_test_sms: 1 }), credentials: 'same-origin' });
+          const data = await res.json();
+          if (data.success && data.sms_test !== false) showPrefMsg('Test SMS sent. Check your phone.', false);
+          else if (data.sms_error) showPrefMsg('SMS failed: ' + data.sms_error, true);
+          else showPrefMsg('Preferences saved. Test SMS may not have been sent.', false);
+        } catch (err) {
+          showPrefMsg('Network error.', true);
+        }
+      });
+
+      function getCurrentNotificationPrefs() {
+        const prefs = {};
+        prefForm.querySelectorAll('.notification-type-cb').forEach(function (cb) {
+          prefs[cb.dataset.notificationId || cb.value] = cb.checked;
+        });
+        return prefs;
+      }
+      function savePushEnabled(value) {
+        const phoneEl = prefForm.querySelector('#phone');
+        const smsEl = prefForm.querySelector('#sms_optin');
+        const phone = (phoneEl && phoneEl.value) ? String(phoneEl.value).trim() : '';
+        const sms_optin = !!(smsEl && smsEl.checked);
+        const notification_preferences = getCurrentNotificationPrefs();
+        notification_preferences.push_enabled = value;
+        const csrfEl = document.getElementById('my-info-csrf');
+        const token = (csrfEl && csrfEl.value) || '';
+        return fetch('/api/preferences', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone, sms_optin, notification_preferences }),
+          credentials: 'same-origin'
+        });
+      }
+      function updatePushUI(enabled) {
+        const statusEl = document.getElementById('push-status');
+        const enableBtn = document.getElementById('btn-enable-push');
+        if (statusEl) statusEl.textContent = enabled ? 'Push is enabled.' : 'Push is disabled.';
+        if (enableBtn) { enableBtn.textContent = enabled ? 'Push enabled' : 'Enable push'; enableBtn.disabled = enabled; }
+      }
+
+      document.getElementById('btn-enable-push')?.addEventListener('click', async function () {
+        const btn = this;
+        if (btn.disabled) return;
+        if (!('Notification' in window)) { showPrefMsg('Push notifications are not supported in this browser.', true); return; }
+        try {
+          const permission = await Notification.requestPermission();
+          if (permission === 'granted') {
+            const res = await savePushEnabled(true);
+            const data = await res.json();
+            if (data.success) { updatePushUI(true); showPrefMsg('Push notifications enabled.', false); }
+            else showPrefMsg(data.error || 'Failed to save', true);
+          } else {
+            showPrefMsg('Permission denied or dismissed.', true);
+          }
+        } catch (err) {
+          showPrefMsg('Could not enable push. Try again.', true);
+        }
+      });
+      document.getElementById('btn-disable-push')?.addEventListener('click', async function () {
+        try {
+          const res = await savePushEnabled(false);
+          const data = await res.json();
+          if (data.success) { updatePushUI(false); document.getElementById('btn-enable-push').disabled = false; document.getElementById('btn-enable-push').textContent = 'Enable push'; showPrefMsg('Push notifications disabled.', false); }
+          else showPrefMsg(data.error || 'Failed to save', true);
+        } catch (err) {
+          showPrefMsg('Could not disable push. Try again.', true);
+        }
+      });
+    })();
+  </script>
+  </ProtectedPage>
+</PortalLayout>

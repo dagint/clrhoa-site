@@ -7,7 +7,7 @@ const physicalCity = import.meta.env.PUBLIC_PHYSICAL_ADDRESS_CITY ?? 'Eustis';
 const physicalState = import.meta.env.PUBLIC_PHYSICAL_ADDRESS_STATE ?? 'FL';
 const physicalZip = import.meta.env.PUBLIC_PHYSICAL_ADDRESS_ZIP ?? '32726';
 const fullAddress = `${physicalStreet}, ${physicalCity}, ${physicalState} ${physicalZip}`;
-const mapDescription = `Crooked Lake Reserve — ${fullAddress}. Satellite view and Lake County GIS parcel map.`;
+const mapDescription = `Crooked Lake Reserve - ${fullAddress}. Satellite view and Lake County GIS parcel map.`;
 ---
 
 <ResourcesLayout title="Community Map" description={mapDescription} currentSection="map">
@@ -40,10 +40,10 @@ const mapDescription = `Crooked Lake Reserve — ${fullAddress}. Satellite view 
     <!-- Google Maps embed: satellite view -->
     <section class="mb-8">
       <div class="bg-white p-2 sm:p-4 rounded-2xl shadow-sm border border-gray-100 max-w-5xl mx-auto overflow-hidden">
-        <p class="text-sm text-clr-gray font-body mb-2 text-center">Satellite view — {fullAddress}</p>
+        <p class="text-sm text-clr-gray font-body mb-2 text-center">Satellite view - {fullAddress}</p>
         <div class="aspect-video w-full rounded-xl overflow-hidden bg-gray-100">
           <iframe
-            title={`Crooked Lake Reserve — ${fullAddress} satellite view on Google Maps`}
+            title={`Crooked Lake Reserve - ${fullAddress} satellite view on Google Maps`}
             src={`https://www.google.com/maps?q=${encodeURIComponent(fullAddress)}&z=17&t=k&output=embed`}
             width="100%"
             height="100%"

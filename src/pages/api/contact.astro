@@ -1,0 +1,97 @@
+---
+/**
+ * POST /api/contact — public contact form. Sends email to NOTIFY_BOARD_EMAIL via configured provider (Resend or MailChannels).
+ * Body: name, email, message, recipient (form or JSON). No auth required.
+ */
+export const prerender = false;
+
+import { sendEmail } from '../../lib/notifications';
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+
+const boardEmail = env?.NOTIFY_BOARD_EMAIL;
+const site = import.meta.env.SITE ?? 'https://clrhoa.com';
+
+if (Astro.request.method !== 'POST') {
+  return new Response(null, { status: 405, headers: { Allow: 'POST' } });
+}
+
+let name = '';
+let email = '';
+let message = '';
+let recipient = '';
+try {
+  const ct = Astro.request.headers.get('content-type') ?? '';
+  if (ct.includes('application/json')) {
+    const body = await Astro.request.json() as Record<string, unknown>;
+    name = String(body.name ?? '').trim();
+    email = String(body.email ?? '').trim();
+    message = String(body.message ?? '').trim();
+    recipient = String(body.recipient ?? '').trim();
+  } else {
+    const form = await Astro.request.formData();
+    name = (form.get('name') as string)?.trim() ?? '';
+    email = (form.get('email') as string)?.trim() ?? '';
+    message = (form.get('message') as string)?.trim() ?? '';
+    recipient = (form.get('recipient') as string)?.trim() ?? '';
+  }
+} catch {
+  return new Response(JSON.stringify({ error: 'Invalid body' }), {
+    status: 400,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+if (!name || !email || !message) {
+  return new Response(JSON.stringify({ error: 'Name, email, and message are required' }), {
+    status: 400,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+if (!boardEmail || !env) {
+  return new Response(JSON.stringify({ error: 'Contact form is not configured' }), {
+    status: 503,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const recipientLabel = recipient === 'arb' ? 'ARB' : recipient === 'vendor' ? 'Vendor Information Request' : 'Board of Directors';
+const htmlBody = `
+<p><strong>Public contact form</strong></p>
+<p>Recipient: ${recipientLabel}</p>
+<p><strong>From:</strong> ${escapeHtml(name)} &lt;${escapeHtml(email)}&gt;</p>
+<p><strong>Message:</strong></p>
+<pre>${escapeHtml(message)}</pre>
+<hr>
+<p><em>Sent via ${site}/contact</em></p>
+`;
+
+const result = await sendEmail(env, boardEmail, `Contact form: ${recipientLabel} - ${name}`, htmlBody);
+
+if (!result.ok) {
+  return new Response(JSON.stringify({ error: 'Failed to send message. Please try again.' }), {
+    status: 502,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const accept = Astro.request.headers.get('accept') ?? '';
+if (accept.includes('application/json')) {
+  return new Response(JSON.stringify({ success: true, redirect: `${site}/contact/thanks` }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+return Astro.redirect(`${site}/contact/thanks`);
+---

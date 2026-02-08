@@ -1,0 +1,50 @@
+---
+/**
+ * GET /api/board/backup-status — Board/Admin only. Returns whether Cloudflare credentials
+ * are configured (for manual download) and last R2 backup run time. Does not expose secrets.
+ */
+export const prerender = false;
+
+import { getSessionFromCookie, getEffectiveRole } from '../../../lib/auth';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env as Record<string, unknown> & { CLOUDFLARE_ACCOUNT_ID?: string; CLOUDFLARE_API_TOKEN?: string };
+const session = await getSessionFromCookie(
+  Astro.request.headers.get('cookie') ?? undefined,
+  env?.SESSION_SECRET as string | undefined
+);
+
+if (!session) {
+  return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
+}
+const effectiveRole = getEffectiveRole(session);
+const canManageBackup = effectiveRole === 'board' || effectiveRole === 'admin' || effectiveRole === 'arb_board';
+if (!canManageBackup) {
+  return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403, headers: { 'Content-Type': 'application/json' } });
+}
+
+const manual_download_configured = Boolean(
+  env?.CLOUDFLARE_ACCOUNT_ID && String(env.CLOUDFLARE_ACCOUNT_ID).trim() !== '' &&
+  env?.CLOUDFLARE_API_TOKEN && String(env.CLOUDFLARE_API_TOKEN).trim() !== ''
+);
+
+let last_r2_backup_at: string | null = null;
+let last_google_backup_at: string | null = null;
+const db = env?.DB;
+if (db) {
+  try {
+    const row = await db.prepare(
+      `SELECT last_r2_backup_at, last_google_backup_at FROM backup_config WHERE id = 1`
+    ).first<{ last_r2_backup_at: string | null; last_google_backup_at: string | null }>();
+    if (row?.last_r2_backup_at) last_r2_backup_at = row.last_r2_backup_at;
+    if (row?.last_google_backup_at) last_google_backup_at = row.last_google_backup_at;
+  } catch {
+    // Column may not exist before migration
+  }
+}
+
+return new Response(
+  JSON.stringify({ manual_download_configured, last_r2_backup_at, last_google_backup_at }),
+  { status: 200, headers: { 'Content-Type': 'application/json' } }
+);
+---

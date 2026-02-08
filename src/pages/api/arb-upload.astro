@@ -1,0 +1,635 @@
+---
+/**
+ * POST /api/arb-upload — authenticated ARB request submission.
+ * Multipart: description, esign (checkbox), files[] (image/* or PDF).
+ * Limits: 5MB per file, 25MB total. Stores in R2 (originals/; review/ & archive/ when Sharp available).
+ */
+export const prerender = false;
+
+import { getSessionFromCookie, verifyCsrfToken, verifyOrigin, updateSessionActivity, SESSION_COOKIE_NAME } from '../../lib/auth';
+import { createLogger, maskEmail, maskRequestId } from '../../lib/logging';
+import { getSecurityMonitor } from '../../lib/monitoring';
+import { checkRateLimit, getRateLimitConfig } from '../../lib/rate-limit';
+import {
+  getNextArbRequestId,
+  createArbFileId,
+  insertArbRequest,
+  insertArbFile,
+  setArbRequestInReview,
+} from '../../lib/arb-db';
+
+const MAX_FILE_BYTES = 5 * 1024 * 1024;
+const MAX_TOTAL_BYTES = 25 * 1024 * 1024;
+const MAX_REQUEST_SIZE_BYTES = 100 * 1024 * 1024; // 100MB max request size (Cloudflare Workers default)
+const REQUEST_TIMEOUT_MS = 30 * 1000; // 30 seconds timeout for file uploads
+const ALLOWED_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+  'image/heic',
+  'application/pdf',
+];
+
+function isAllowedType(t: string): boolean {
+  if (ALLOWED_TYPES.includes(t)) return true;
+  if (t.startsWith('image/')) return true;
+  return false;
+}
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const userAgent = Astro.request.headers.get('user-agent') ?? null;
+const ipAddress = Astro.request.headers.get('cf-connecting-ip') ?? 
+                  Astro.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
+let session = await getSessionFromCookie(
+  Astro.request.headers.get('cookie') ?? undefined,
+  env?.SESSION_SECRET,
+  userAgent,
+  ipAddress
+);
+
+// If session validation fails due to fingerprint mismatch, try without fingerprint check
+if (!session && env?.SESSION_SECRET) {
+  session = await getSessionFromCookie(
+    Astro.request.headers.get('cookie') ?? undefined,
+    env.SESSION_SECRET
+  );
+}
+if (!session) {
+  return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+    status: 401,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+// Logger will be updated with requestId after creation
+let logger = createLogger({ 
+  endpoint: '/api/arb-upload',
+  email: session.email
+});
+
+// CSRF protection: verify origin
+const origin = Astro.request.headers.get('origin');
+const referer = Astro.request.headers.get('referer');
+const expectedOrigin = Astro.url.origin;
+// Use Astro.clientAddress if available, otherwise fall back to the ipAddress we already extracted
+const clientIpAddress = Astro.clientAddress || ipAddress;
+const securityMonitor = getSecurityMonitor();
+
+if (!verifyOrigin(origin, referer, expectedOrigin)) {
+  securityMonitor.trackCsrfFailure('/api/arb-upload', clientIpAddress);
+  return new Response(JSON.stringify({ error: 'Invalid origin. Request blocked for security.' }), {
+    status: 403,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+// Rate limiting: max 5 submissions per user per day
+const MAX_SUBMISSIONS_PER_DAY = 5;
+const kv = env?.KV;
+if (kv) {
+  const today = new Date().toISOString().split('T')[0];
+  const rateLimitKey = `arb_submit:${session.email}:${today}`;
+  const count = await kv.get(rateLimitKey, { type: 'text' });
+  const currentCount = parseInt(count ?? '0', 10);
+  if (currentCount >= MAX_SUBMISSIONS_PER_DAY) {
+    securityMonitor.trackRateLimit('/api/arb-upload', session.email, clientIpAddress);
+    return new Response(
+      JSON.stringify({
+        error: `Rate limit exceeded. Maximum ${MAX_SUBMISSIONS_PER_DAY} submissions per day. Please try again tomorrow.`,
+      }),
+      { status: 429, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+}
+
+if (Astro.request.method !== 'POST') {
+  return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+    status: 405,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const db = env?.DB;
+const r2 = env?.CLOURHOA_FILES;
+if (!db || !r2) {
+  return new Response(JSON.stringify({ error: 'Server configuration error' }), {
+    status: 503,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+let description = '';
+let esign = false;
+let applicantName: string | null = null;
+let phone: string | null = null;
+let propertyAddress: string | null = null;
+let applicationType: string | null = null;
+/** Each item: original + optional review/archive (resized) blobs */
+const fileGroups: { name: string; type: string; size: number; original: Blob; review?: Blob; archive?: Blob }[] = [];
+
+// Set up timeout protection
+const timeoutPromise = new Promise<never>((_, reject) => {
+  setTimeout(() => reject(new Error('Request timeout')), REQUEST_TIMEOUT_MS);
+});
+
+try {
+  // Race between formData parsing and timeout
+  const formDataPromise = Astro.request.formData();
+  const formData = await Promise.race([formDataPromise, timeoutPromise]);
+  
+  // Check request size (approximate - Content-Length header)
+  const contentLength = Astro.request.headers.get('content-length');
+  if (contentLength) {
+    const sizeBytes = parseInt(contentLength, 10);
+    if (sizeBytes > MAX_REQUEST_SIZE_BYTES) {
+      return new Response(
+        JSON.stringify({
+          error: `Request too large. Maximum size is ${(MAX_REQUEST_SIZE_BYTES / 1024 / 1024).toFixed(0)}MB.`,
+        }),
+        { status: 413, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+  }
+  
+  // CSRF token verification (from hidden form field)
+  const csrfToken = formData.get('csrf_token') as string | null;
+  
+  // If session doesn't have CSRF token, try to update it (might be an old session)
+  if (!session.csrfToken && env?.SESSION_SECRET) {
+    const updatedCookieValue = await updateSessionActivity(
+      Astro.request.headers.get('cookie') ?? undefined,
+      env.SESSION_SECRET,
+      userAgent,
+      ipAddress
+    );
+    if (updatedCookieValue) {
+      // Try with fingerprint first
+      let updatedSession = await getSessionFromCookie(
+        `${SESSION_COOKIE_NAME}=${updatedCookieValue}`,
+        env.SESSION_SECRET,
+        userAgent,
+        ipAddress
+      );
+      // If that fails, try without fingerprint (cookie might have been updated on page load)
+      if (!updatedSession) {
+        updatedSession = await getSessionFromCookie(
+          `${SESSION_COOKIE_NAME}=${updatedCookieValue}`,
+          env.SESSION_SECRET
+        );
+      }
+      if (updatedSession?.csrfToken) {
+        session = updatedSession;
+      }
+    }
+  }
+  
+  // Verify CSRF token - if it fails, try reading session without fingerprint as fallback
+  // This handles cases where page updated cookie but API reads old session due to fingerprint mismatch
+  let csrfValid = verifyCsrfToken(session, csrfToken);
+  if (!csrfValid && env?.SESSION_SECRET && csrfToken) {
+    // Try to get session without fingerprint check (in case cookie was updated on page)
+    const fallbackSession = await getSessionFromCookie(
+      Astro.request.headers.get('cookie') ?? undefined,
+      env.SESSION_SECRET
+    );
+    if (fallbackSession && verifyCsrfToken(fallbackSession, csrfToken)) {
+      session = fallbackSession;
+      csrfValid = true;
+    }
+  }
+  
+  if (!csrfValid) {
+    logger.warn('CSRF token validation failed', { 
+      hasSessionToken: !!session.csrfToken,
+      hasRequestToken: !!csrfToken,
+      sessionEmail: session.email 
+    });
+    securityMonitor.trackCsrfFailure('/api/arb-upload', clientIpAddress);
+    return new Response(
+      JSON.stringify({ error: 'Invalid security token. Please refresh the page and try again.' }),
+      { status: 403, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+  
+  description = (formData.get('description') as string)?.trim() ?? '';
+  const action = (formData.get('action') as string)?.trim() || 'submit'; // 'draft' or 'submit', default to 'submit' for backward compatibility
+  esign = formData.get('esign') === 'on' || formData.get('esign') === '1';
+  applicantName = (formData.get('applicant_name') as string)?.trim() || null;
+  phone = (formData.get('phone') as string)?.trim() || null;
+  propertyAddress = (formData.get('property_address') as string)?.trim() || null;
+  const types = formData.getAll('application_type');
+  applicationType = Array.isArray(types) && types.length > 0
+    ? types.map((t) => String(t).trim()).filter(Boolean).join(', ')
+    : null;
+
+  const indices = new Set<number>();
+  for (const key of formData.keys()) {
+    const m = /^file_(\d+)$/.exec(key);
+    if (m) indices.add(parseInt(m[1]!, 10));
+  }
+  const sortedIndices = Array.from(indices).sort((a, b) => a - b);
+
+  for (const i of sortedIndices) {
+    const original = formData.get('file_' + i);
+    if (!(original instanceof File) || original.size === 0) continue;
+    const review = formData.get('file_' + i + '_review');
+    const archive = formData.get('file_' + i + '_archive');
+    fileGroups.push({
+      name: original.name || 'file',
+      type: original.type,
+      size: original.size,
+      original,
+      review: review instanceof File && review.size > 0 ? review : undefined,
+      archive: archive instanceof File && archive.size > 0 ? archive : undefined,
+    });
+  }
+  if (fileGroups.length === 0) {
+    const fileList = formData.getAll('files');
+    for (const entry of fileList) {
+      if (entry instanceof File && entry.size > 0) {
+        fileGroups.push({
+          name: entry.name || 'file',
+          type: entry.type,
+          size: entry.size,
+          original: entry,
+        });
+      }
+    }
+  }
+} catch (e) {
+  if (e instanceof Error && e.message === 'Request timeout') {
+    logger.error('Request timeout', { timeoutMs: REQUEST_TIMEOUT_MS });
+    securityMonitor.trackApiError('/api/arb-upload', e);
+    return new Response(
+      JSON.stringify({ error: 'Request timed out. Please try again with smaller files or fewer attachments.' }),
+      { status: 408, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+  logger.error('Form data parsing failed', { error: String(e) });
+  return new Response(
+    JSON.stringify({ error: 'Invalid form data. Please try again.' }),
+    { status: 400, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+
+if (!description) {
+  return new Response(
+    JSON.stringify({ error: 'Description is required.' }),
+    { status: 400, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+
+const applicantNameTrim = (applicantName ?? '').trim();
+const phoneTrim = (phone ?? '').trim();
+const propertyAddressTrim = (propertyAddress ?? '').trim();
+if (!applicantNameTrim) {
+  return new Response(
+    JSON.stringify({ error: "Applicant's name is required." }),
+    { status: 400, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+if (!phoneTrim) {
+  return new Response(
+    JSON.stringify({ error: 'Phone number is required.' }),
+    { status: 400, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+if (!propertyAddressTrim) {
+  return new Response(
+    JSON.stringify({ error: 'Property address is required.' }),
+    { status: 400, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+
+// Validate action parameter
+const isSubmit = action === 'submit';
+const isDraft = action === 'draft';
+if (!isSubmit && !isDraft) {
+  return new Response(
+    JSON.stringify({ error: 'Invalid action. Must be "draft" or "submit".' }),
+    { status: 400, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+
+// E-signature is required only when submitting for review
+if (isSubmit && !esign) {
+  return new Response(
+    JSON.stringify({
+      error: 'You must certify that the information is accurate (e-signature checkbox) to submit for review.',
+    }),
+    { status: 400, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+
+// Server-side file type validation: check actual MIME type, not just extension
+async function validateFileMimeType(file: File): Promise<boolean> {
+  // Read first bytes to detect actual file type
+  const buffer = await file.arrayBuffer();
+  const bytes = new Uint8Array(buffer);
+  
+  // Check magic numbers for common file types
+  // JPEG: FF D8 FF
+  if (bytes[0] === 0xFF && bytes[1] === 0xD8 && bytes[2] === 0xFF) {
+    return file.type === 'image/jpeg' || file.type === 'image/jpg';
+  }
+  // PNG: 89 50 4E 47 0D 0A 1A 0A
+  if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4E && bytes[3] === 0x47) {
+    return file.type === 'image/png';
+  }
+  // GIF: 47 49 46 38 (GIF8)
+  if (bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x38) {
+    return file.type === 'image/gif';
+  }
+  // WebP: RIFF...WEBP
+  if (bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46) {
+    // Check for WEBP signature at offset 8
+    if (bytes.length >= 12 && 
+        bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50) {
+      return file.type === 'image/webp';
+    }
+  }
+  // PDF: %PDF
+  if (bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46) {
+    return file.type === 'application/pdf';
+  }
+  // HEIC: ftyp...heic (check at offset 4)
+  if (bytes.length >= 12 && 
+      bytes[4] === 0x66 && bytes[5] === 0x74 && bytes[6] === 0x79 && bytes[7] === 0x70) {
+    // Check for 'heic' or 'mif1' (HEIF variants)
+    const brand = String.fromCharCode(bytes[8], bytes[9], bytes[10], bytes[11]);
+    if (brand === 'heic' || brand === 'mif1' || brand === 'msf1') {
+      return file.type === 'image/heic' || file.type === 'image/heif';
+    }
+  }
+  
+  // If no magic number match, fall back to declared MIME type check
+  return isAllowedType(file.type) || file.type === 'application/pdf';
+}
+
+let totalBytes = 0;
+for (const f of fileGroups) {
+  if (f.size > MAX_FILE_BYTES) {
+    return new Response(
+      JSON.stringify({
+        error: `File "${f.name}" exceeds 5MB limit. Maximum size per file is 5MB.`,
+      }),
+      { status: 400, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+  
+  // Server-side MIME type validation
+  const isValidMime = await validateFileMimeType(f.original);
+  if (!isValidMime) {
+    return new Response(
+      JSON.stringify({
+        error: `File "${f.name}" has invalid type or content. Allowed: images (JPEG, PNG, GIF, WebP, HEIC) and PDF only. The file content does not match the declared type.`,
+      }),
+      { status: 400, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+  
+  // Also validate review and archive versions if present
+  if (f.review) {
+    const isValidReview = await validateFileMimeType(f.review);
+    if (!isValidReview) {
+      return new Response(
+        JSON.stringify({
+          error: `Review version of "${f.name}" has invalid type or content.`,
+        }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+  }
+  if (f.archive) {
+    const isValidArchive = await validateFileMimeType(f.archive);
+    if (!isValidArchive) {
+      return new Response(
+        JSON.stringify({
+          error: `Archive version of "${f.name}" has invalid type or content.`,
+        }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+  }
+  
+  totalBytes += f.size;
+}
+if (totalBytes > MAX_TOTAL_BYTES) {
+  return new Response(
+    JSON.stringify({
+      error: `Total upload size exceeds 25MB limit. Current total: ${(totalBytes / 1024 / 1024).toFixed(1)}MB.`,
+    }),
+    { status: 400, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+
+// Check for duplicate requests (same owner, similar description within last 30 days)
+try {
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const recentRequests = await db
+    .prepare(
+      `SELECT id, description, created FROM arb_requests WHERE owner_email = ? AND created > ? ORDER BY created DESC LIMIT 10`
+    )
+    .bind(session.email.toLowerCase(), thirtyDaysAgo.toISOString())
+    .all<{ id: string; description: string; created: string }>();
+  
+  // Simple similarity check: if description is very similar (80%+ match) or exact duplicate
+  const descLower = description.toLowerCase().trim();
+  for (const req of recentRequests.results ?? []) {
+    const reqDescLower = req.description.toLowerCase().trim();
+    if (descLower === reqDescLower) {
+      return new Response(
+        JSON.stringify({
+          error: `Duplicate request detected. You submitted an identical request (${req.id}) on ${new Date(req.created).toLocaleDateString()}. Please check your existing requests or modify this submission.`,
+          duplicateRequestId: req.id,
+        }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+    // Simple similarity: check if descriptions are very similar (80%+ words match)
+    const descWords = new Set(descLower.split(/\s+/).filter(w => w.length > 3));
+    const reqWords = new Set(reqDescLower.split(/\s+/).filter(w => w.length > 3));
+    if (descWords.size > 0 && reqWords.size > 0) {
+      const intersection = new Set([...descWords].filter(w => reqWords.has(w)));
+      const similarity = intersection.size / Math.max(descWords.size, reqWords.size);
+      if (similarity > 0.8) {
+        return new Response(
+          JSON.stringify({
+            error: `Similar request detected. You submitted a very similar request (${req.id}) on ${new Date(req.created).toLocaleDateString()}. Please review your existing requests or modify this submission to be more distinct.`,
+            duplicateRequestId: req.id,
+            warning: true,
+          }),
+          { status: 400, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+  }
+} catch (e) {
+  logger.error('Duplicate check failed', { error: String(e) });
+  // Don't block submission if duplicate check fails
+}
+
+let requestId: string;
+try {
+  requestId = await getNextArbRequestId(db);
+} catch (e) {
+  logger.error('getNextArbRequestId failed', { error: String(e) });
+  return new Response(
+    JSON.stringify({ error: 'Could not generate request number. Please try again.' }),
+    { status: 500, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+
+const clientIp = Astro.clientAddress || Astro.request.headers.get('cf-connecting-ip') || null;
+try {
+  await insertArbRequest(db, requestId, session.email, description, {
+    applicantName,
+    phone,
+    propertyAddress,
+    applicationType,
+    ip_address: clientIp,
+  });
+  
+  // If submitting for review, update status from 'pending' to 'in_review'
+  if (isSubmit) {
+    const submitted = await setArbRequestInReview(db, requestId, session.email, clientIp);
+    if (!submitted) {
+      logger.warn('Failed to update status to in_review', { requestId });
+      // Don't fail the request - it's saved as pending, user can resubmit later
+    }
+  }
+  
+  // Increment rate limit counter only for submissions (not drafts)
+  if (isSubmit && kv) {
+    const today = new Date().toISOString().split('T')[0];
+    const rateLimitKey = `arb_submit:${session.email}:${today}`;
+    const count = await kv.get(rateLimitKey, { type: 'text' });
+    const currentCount = parseInt(count ?? '0', 10);
+    await kv.put(rateLimitKey, String(currentCount + 1), { expirationTtl: 86400 }); // 24 hours
+  }
+} catch (e) {
+  logger.error('ARB insertArbRequest failed', { error: String(e) });
+  return new Response(
+    JSON.stringify({
+      error: 'Could not save request. If testing locally, ensure D1 ARB tables exist (run db:arb:init:local).',
+    }),
+    { status: 500, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+
+const r2Prefix = `arb/${requestId}`;
+const uploadedKeys: string[] = []; // Track uploaded files for cleanup on failure
+
+try {
+  for (const f of fileGroups) {
+    const fileId = createArbFileId();
+    const ext = f.name.includes('.') ? f.name.split('.').pop()! : 'bin';
+    const safeName = `${fileId}.${ext}`;
+    const originalKey = `${r2Prefix}/originals/${safeName}`;
+
+    try {
+      const origBuf = await f.original.arrayBuffer();
+      await r2.put(originalKey, origBuf, {
+        httpMetadata: { contentType: f.type || 'application/octet-stream' },
+      });
+      uploadedKeys.push(originalKey);
+    } catch (e) {
+      logger.error('R2 put original failed', { file: f.name, error: String(e) });
+      // Cleanup uploaded files
+      for (const key of uploadedKeys) {
+        try {
+          await r2.delete(key);
+        } catch (cleanupErr) {
+          console.error('Failed to cleanup file:', key, cleanupErr);
+        }
+      }
+      return new Response(
+        JSON.stringify({ error: 'Failed to store file. Please try again.' }),
+        { status: 500, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    let reviewKey: string | null = null;
+    let archiveKey: string | null = null;
+    if (f.review) {
+      reviewKey = `${r2Prefix}/review/${fileId}.jpg`;
+      try {
+        await r2.put(reviewKey, await f.review.arrayBuffer(), {
+          httpMetadata: { contentType: 'image/jpeg' },
+        });
+        uploadedKeys.push(reviewKey);
+      } catch (e) {
+        logger.error('R2 put review failed', { file: f.name, error: String(e) });
+      }
+    }
+    if (f.archive) {
+      archiveKey = `${r2Prefix}/archive/${fileId}.jpg`;
+      try {
+        await r2.put(archiveKey, await f.archive.arrayBuffer(), {
+          httpMetadata: { contentType: 'image/jpeg' },
+        });
+        uploadedKeys.push(archiveKey);
+      } catch (e) {
+        logger.error('R2 put archive failed', { file: f.name, error: String(e) });
+      }
+    }
+
+    const r2KeysJson = JSON.stringify({
+      originals: [originalKey],
+      review: reviewKey ? [reviewKey] : [],
+      archive: archiveKey ? [archiveKey] : [],
+    });
+    try {
+      await insertArbFile(db, fileId, requestId, f.name, r2KeysJson, f.size);
+    } catch (e) {
+      logger.error('ARB insertArbFile failed', { file: f.name, error: String(e) });
+      // Cleanup uploaded files
+      for (const key of uploadedKeys) {
+        try {
+          await r2.delete(key);
+        } catch (cleanupErr) {
+          console.error('Failed to cleanup file:', key, cleanupErr);
+        }
+      }
+      return new Response(
+        JSON.stringify({ error: 'Could not save file record. Please try again.' }),
+        { status: 500, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+  }
+} catch (uploadErr) {
+  // Cleanup any uploaded files if something went wrong
+  logger.error('File upload error', { error: String(uploadErr) });
+  for (const key of uploadedKeys) {
+    try {
+      await r2.delete(key);
+    } catch (cleanupErr) {
+      console.error('Failed to cleanup file:', key, cleanupErr);
+    }
+  }
+  return new Response(
+    JSON.stringify({ error: 'Failed to upload files. Please try again.' }),
+    { status: 500, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+
+if (isSubmit && env?.NOTIFY_ARB_EMAIL) {
+  const { sendEmail } = await import('../../lib/notifications');
+  const link = `${Astro.url.origin}/portal/arb-dashboard`;
+  const body = `<p>New ARB request <strong>#${requestId}</strong> submitted by ${session.email}.</p><p><a href="${link}">View ARB Dashboard</a></p>`;
+  await sendEmail(env, env.NOTIFY_ARB_EMAIL, `New ARB Request #${requestId}`, body);
+}
+
+return new Response(
+  JSON.stringify({
+    success: true,
+    requestId,
+    message: isSubmit 
+      ? 'Your ARB request has been submitted and is pending review.'
+      : 'Your ARB request has been saved as a draft. You can edit and submit it later from "My requests".',
+  }),
+  { status: 200, headers: { 'Content-Type': 'application/json' } }
+);

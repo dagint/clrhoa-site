@@ -1,0 +1,89 @@
+---
+export const prerender = false;
+
+import PortalLayout from '../../layouts/PortalLayout.astro';
+import ProtectedPage from '../../components/ProtectedPage.astro';
+import PortalNav from '../../components/PortalNav.astro';
+import { getPortalContext } from '../../lib/portal-context';
+import { isElevatedRole, getEffectiveRole } from '../../lib/auth';
+import { listArbRequestsByHousehold } from '../../lib/arb-db';
+
+const { env, session, effectiveRole } = await getPortalContext(Astro, { fingerprint: true });
+if (!session) return Astro.redirect('/portal/login');
+
+const whitelistRole = session.role?.toLowerCase() ?? 'member';
+const hasStaffWhitelistRole = isElevatedRole(whitelistRole);
+const isCurrentlyElevated = isElevatedRole(getEffectiveRole(session));
+
+// No staff role: send to dashboard (they shouldn't be here)
+if (!hasStaffWhitelistRole) {
+  return Astro.redirect('/portal/dashboard');
+}
+
+// Already elevated: send to return URL or dashboard
+if (isCurrentlyElevated) {
+  const returnUrl = Astro.url.searchParams.get('return');
+  const safeReturn = returnUrl && returnUrl.startsWith('/') && !returnUrl.startsWith('//') ? returnUrl : null;
+  return Astro.redirect(safeReturn ?? '/portal/dashboard');
+}
+
+const db = env?.DB;
+const allRequests = db ? await listArbRequestsByHousehold(db, session.email) : [];
+const draftCount = allRequests.filter((r) => r.status === 'pending').length;
+
+const returnParam = Astro.url.searchParams.get('return');
+const returnLabel = returnParam && returnParam.startsWith('/board') ? 'Board' : returnParam && returnParam.startsWith('/admin') ? 'Admin' : returnParam && returnParam.includes('arb-dashboard') ? 'ARB Dashboard' : returnParam ? 'that page' : null;
+---
+
+<PortalLayout title="Request elevated access | Member Portal | Crooked Lake Reserve HOA">
+  <ProtectedPage>
+  <div class="min-h-screen portal-theme-bg font-body">
+    <PortalNav currentPath="/portal/request-elevated-access" draftCount={draftCount} role={effectiveRole} staffRole={session.role ?? ''} />
+
+    <main class="max-w-2xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+      <div class="bg-white rounded-2xl shadow-sm border border-gray-100 portal-theme-card p-6 sm:p-8">
+        <h1 class="text-2xl font-heading font-bold text-clr-green mb-2">Elevated access required</h1>
+        <p class="text-gray-600 portal-theme-text-muted mb-4">
+          You have a Board, ARB, or Admin role. To use Board tools (directory, dues, meetings, documents, audit logs) or the ARB dashboard, you need to request <strong>elevated access</strong> for a short time.
+        </p>
+        <p class="text-sm text-gray-600 mb-6">
+          Elevated access lasts 2 hours. When you’re done, use <strong>Drop access</strong> in the banner to return to normal member view. All requests are logged for transparency.
+        </p>
+        <div class="flex flex-wrap items-center gap-3">
+          <button type="button" id="pim-elevate-btn" class="bg-amber-600 hover:bg-amber-700 text-white px-5 py-2.5 rounded-lg font-semibold text-sm shadow-sm">
+            Request elevated access
+          </button>
+          <a href="/portal/dashboard" class="text-sm text-gray-600 hover:text-clr-green underline">Back to dashboard</a>
+        </div>
+        {returnLabel && (
+          <p class="mt-4 text-sm text-gray-500 portal-theme-text-muted">
+            After you request access, you’ll be taken to {returnLabel}.
+          </p>
+        )}
+      </div>
+    </main>
+  </div>
+  <script define:vars={{ returnParam }}>
+    (function () {
+      var btn = document.getElementById('pim-elevate-btn');
+      if (!btn) return;
+      btn.addEventListener('click', function () {
+        var b = /** @type {HTMLButtonElement} */ (btn);
+        b.disabled = true;
+        fetch('/api/pim/elevate', { method: 'POST', credentials: 'same-origin' })
+          .then(function (r) {
+            if (r.ok) {
+              var go = (typeof returnParam === 'string' && returnParam.startsWith('/') && !returnParam.startsWith('//'))
+                ? returnParam
+                : '/portal/dashboard';
+              window.location.href = go;
+            } else {
+              b.disabled = false;
+            }
+          })
+          .catch(function () { b.disabled = false; });
+      });
+    })();
+  </script>
+  </ProtectedPage>
+</PortalLayout>

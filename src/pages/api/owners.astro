@@ -1,0 +1,262 @@
+---
+/**
+ * /api/owners — board-only CRUD for directory owners.
+ * GET: list owners. POST: create. PUT: update. DELETE: delete.
+ */
+export const prerender = false;
+
+import { getSessionFromCookie, verifyCsrfToken, verifyOrigin, setLoginWhitelistRole, removeFromLoginWhitelistUnlessAdmin, VALID_ROLES, isElevatedRole, getEffectiveRole, isBoardOrArbOnly } from '../../lib/auth';
+import { listOwners, getOwnerById, insertOwner, updateOwner, deleteOwners, getOwnerByEmail, getOwnersByIds, validateLotNumber } from '../../lib/directory-db';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const userAgent = Astro.request.headers.get('user-agent') ?? null;
+const ipAddress = Astro.request.headers.get('cf-connecting-ip') ?? 
+  Astro.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
+let session = await getSessionFromCookie(
+  Astro.request.headers.get('cookie') ?? undefined,
+  env?.SESSION_SECRET,
+  userAgent,
+  ipAddress
+);
+
+if (!session && env?.SESSION_SECRET) {
+  session = await getSessionFromCookie(
+    Astro.request.headers.get('cookie') ?? undefined,
+    env.SESSION_SECRET
+  );
+}
+
+if (!session) {
+  return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+    status: 401,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const effectiveRole = getEffectiveRole(session);
+/** List directory: any elevated role. Write: board, arb, arb_board, or admin (admins can manage directory). */
+const canManageDirectory = isElevatedRole(effectiveRole);
+const canWriteDirectory = isBoardOrArbOnly(effectiveRole) || effectiveRole === 'admin';
+const origin = Astro.request.headers.get('origin');
+const referer = Astro.request.headers.get('referer');
+const expectedOrigin = Astro.url.origin;
+if (!verifyOrigin(origin, referer, expectedOrigin)) {
+  return new Response(JSON.stringify({ error: 'Invalid origin.' }), {
+    status: 403,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const db = env?.DB;
+if (!db) {
+  return new Response(JSON.stringify({ error: 'Server configuration error' }), {
+    status: 503,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+// GET: list owners (board, admin, arb)
+if (Astro.request.method === 'GET') {
+  if (!canManageDirectory) {
+    return new Response(JSON.stringify({ error: 'Forbidden' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  const owners = await listOwners(db);
+  return new Response(JSON.stringify({ owners }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+// POST: create owner (board, arb, arb_board only; not admin)
+if (Astro.request.method === 'POST') {
+  if (!canWriteDirectory) {
+    return new Response(JSON.stringify({ error: 'Forbidden' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  let body: { name?: string; address?: string; phone?: string; email?: string; role?: string; lot_number?: string; csrf_token?: string; csrfToken?: string };
+  try {
+    body = await Astro.request.json();
+  } catch {
+    return new Response(JSON.stringify({ error: 'Invalid JSON' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  if (!verifyCsrfToken(session, body.csrf_token ?? body.csrfToken)) {
+    return new Response(JSON.stringify({ error: 'Invalid security token.' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  const emailRaw = body.email?.trim();
+  if (!emailRaw) {
+    return new Response(JSON.stringify({ error: 'Email is required when adding a user.' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  const role = (body.role ?? 'member').trim().toLowerCase();
+  const roleToStore = VALID_ROLES.has(role) ? role : 'member';
+  const lotNumber = body.lot_number?.trim() || null;
+  if (isElevatedRole(roleToStore) && !validateLotNumber(lotNumber)) {
+    return new Response(JSON.stringify({ error: 'Lot number is required for elevated roles (ARB, Board, Admin). Use 1–25.' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  const id = await insertOwner(
+    db,
+    {
+      name: body.name ?? null,
+      address: body.address ?? null,
+      lot_number: lotNumber,
+      phone: body.phone ?? null,
+      email: emailRaw,
+    },
+    session.email
+  );
+  await setLoginWhitelistRole(env?.CLOURHOA_USERS, emailRaw, roleToStore);
+  return new Response(JSON.stringify({ success: true, id }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+// PUT: update owner (board, arb, arb_board only; not admin)
+if (Astro.request.method === 'PUT') {
+  if (!canWriteDirectory) {
+    return new Response(JSON.stringify({ error: 'Forbidden' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  let body: { id?: string; name?: string; address?: string; phone?: string; email?: string; role?: string; is_primary?: boolean; lot_number?: string; csrf_token?: string; csrfToken?: string };
+  try {
+    body = await Astro.request.json();
+  } catch {
+    return new Response(JSON.stringify({ error: 'Invalid JSON' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  if (!verifyCsrfToken(session, body.csrf_token ?? body.csrfToken)) {
+    return new Response(JSON.stringify({ error: 'Invalid security token.' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  const id = (body.id ?? '').trim();
+  if (!id) {
+    return new Response(JSON.stringify({ error: 'id is required.' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  const existing = await getOwnerById(db, id);
+  const oldEmail = existing?.email?.trim().toLowerCase();
+  const role = body.role !== undefined ? (String(body.role).trim().toLowerCase()) : undefined;
+  const roleToStore = role !== undefined && VALID_ROLES.has(role) ? role : undefined;
+  const lotNumber = body.lot_number !== undefined ? (body.lot_number?.trim() || null) : undefined;
+  if (roleToStore !== undefined && isElevatedRole(roleToStore)) {
+    const effectiveLot = lotNumber !== undefined ? lotNumber : (existing?.lot_number ?? null);
+    if (!validateLotNumber(effectiveLot)) {
+      return new Response(JSON.stringify({ error: 'Lot number is required for elevated roles. Use 1–25.' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+  }
+  const updated = await updateOwner(db, id, {
+    name: body.name,
+    address: body.address,
+    lot_number: lotNumber,
+    phone: body.phone,
+    email: body.email,
+    is_primary: body.is_primary,
+  }, session.email);
+  if (!updated) {
+    return new Response(JSON.stringify({ error: 'Owner not found or update failed.' }), {
+      status: 404,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  const kv = env?.CLOURHOA_USERS;
+  const newEmail = body.email?.trim().toLowerCase();
+  if (kv && newEmail) {
+    if (oldEmail && newEmail !== oldEmail) {
+      const oldValue = await kv.get(oldEmail);
+      await removeFromLoginWhitelistUnlessAdmin(kv, oldEmail);
+      if (oldValue != null) await kv.put(newEmail, oldValue);
+    } else if (roleToStore !== undefined) {
+      await setLoginWhitelistRole(kv, newEmail, roleToStore);
+    }
+  }
+  return new Response(JSON.stringify({ success: true, id }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+// DELETE: delete one or more owners (board, arb, arb_board only; not admin)
+if (Astro.request.method === 'DELETE') {
+  if (!canWriteDirectory) {
+    return new Response(JSON.stringify({ error: 'Forbidden' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  let body: { id?: string; ids?: string[]; csrf_token?: string; csrfToken?: string };
+  try {
+    body = await Astro.request.json();
+  } catch {
+    return new Response(JSON.stringify({ error: 'Invalid JSON' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  if (!verifyCsrfToken(session, body.csrf_token ?? body.csrfToken)) {
+    return new Response(JSON.stringify({ error: 'Invalid security token.' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  const ids = Array.isArray(body.ids) ? body.ids : (body.id ? [body.id.trim()] : []);
+  const trimmed = ids.map((x) => (typeof x === 'string' ? x.trim() : '')).filter(Boolean);
+  if (trimmed.length === 0) {
+    return new Response(JSON.stringify({ error: 'id or ids is required.' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  const MAX_DELETE_IDS = 500;
+  if (trimmed.length > MAX_DELETE_IDS) {
+    return new Response(JSON.stringify({ error: `Too many IDs. Maximum ${MAX_DELETE_IDS} per request.` }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  // Resolve emails before delete so we can revoke login (KV) for removed owners. Admins are left on KV.
+  const ownersToDelete = await getOwnersByIds(db, trimmed);
+  const deleted = await deleteOwners(db, trimmed);
+  const kv = env?.CLOURHOA_USERS;
+  for (const owner of ownersToDelete) {
+    const email = owner.email?.trim();
+    if (email) await removeFromLoginWhitelistUnlessAdmin(kv, email);
+  }
+  return new Response(JSON.stringify({ success: true, deleted }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+  status: 405,
+  headers: { 'Content-Type': 'application/json' },
+});
+---

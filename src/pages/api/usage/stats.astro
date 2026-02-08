@@ -1,0 +1,45 @@
+---
+/**
+ * GET /api/usage/stats — Public aggregate stats: daily and weekly views + unique sessions (anon).
+ */
+export const prerender = false;
+
+import { getDailyStats, getWeeklyStats } from '../../../lib/usage-db';
+
+const runtime = Astro.locals.runtime;
+const db = runtime?.env?.DB;
+
+if (Astro.request.method !== 'GET') {
+  return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+    status: 405,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+if (!db) {
+  return new Response(JSON.stringify({ error: 'Unavailable' }), {
+    status: 503,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const u = new URL(Astro.request.url);
+const days = Math.min(Math.max(parseInt(u.searchParams.get('days') ?? '30', 10) || 30, 7), 90);
+const weeks = Math.min(Math.max(parseInt(u.searchParams.get('weeks') ?? '12', 10) || 12, 4), 52);
+
+const [daily, weekly] = await Promise.all([
+  getDailyStats(db, days),
+  getWeeklyStats(db, weeks),
+]);
+
+return new Response(
+  JSON.stringify({
+    daily,
+    weekly,
+  }),
+  {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  }
+);
+---

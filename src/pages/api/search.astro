@@ -1,0 +1,23 @@
+---
+/**
+ * GET /api/search?q=... — Search ARB, meetings, vendors, owners (authenticated).
+ */
+export const prerender = false;
+
+import { requireSession, requireDb, jsonResponse } from '../../lib/api-helpers';
+import { getEffectiveRole } from '../../lib/auth';
+import { runPortalSearch } from '../../lib/search';
+
+const auth = await requireSession(Astro);
+if (auth.response) return auth.response;
+const { session } = auth;
+
+const dbResult = requireDb(Astro.locals.runtime?.env);
+if (dbResult.response) return dbResult.response;
+const { db } = dbResult;
+
+const url = new URL(Astro.request.url);
+const q = (url.searchParams.get('q') ?? '').trim();
+const result = await runPortalSearch(db, q, { email: session.email, role: getEffectiveRole(session) });
+return jsonResponse(result);
+---

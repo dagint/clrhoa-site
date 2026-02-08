@@ -1,5 +1,6 @@
 ---
 title: ARB Request Form (2026)
+slug: arb-request-form
 category: Forms
 description: Submit this form to request Architectural Review Board (ARB) approval for modifications or improvements to your property.
 fileUrl: /docs/CLR-ARB-Request-Form-2026.docx

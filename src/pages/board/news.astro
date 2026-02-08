@@ -1,0 +1,229 @@
+---
+export const prerender = false;
+
+import BoardLayout from '../../layouts/BoardLayout.astro';
+import { getBoardContext } from '../../lib/board-context';
+import { listAllNewsItems, getNewsItemImageKeys } from '../../lib/news-items-db';
+import { listArbRequestsByHousehold } from '../../lib/arb-db';
+import { escapeHtml } from '../../lib/sanitize';
+
+const ctx = await getBoardContext(Astro);
+if (ctx.redirect) return Astro.redirect(ctx.redirect);
+const { env, session, effectiveRole } = ctx;
+const isBoard = effectiveRole === 'board' || effectiveRole === 'admin' || effectiveRole === 'arb_board';
+if (!isBoard) return Astro.redirect('/portal/dashboard');
+
+const db = env?.DB;
+const allRequests = db ? await listArbRequestsByHousehold(db, session.email) : [];
+const draftCount = allRequests.filter((r) => r.status === 'pending').length;
+const items = db ? await listAllNewsItems(db) : [];
+
+function formatDate(s: string | null): string {
+  if (!s) return '—';
+  try {
+    return new Date(s).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+  } catch {
+    return s;
+  }
+}
+---
+
+<BoardLayout title="News" subtitle="Add announcements with photos; choose where they appear" draftCount={draftCount} role={effectiveRole} session={session} elevatedUntil={session.elevated_until}>
+  <div id="csrf-holder" class="hidden" data-csrf={escapeHtml(session.csrfToken ?? '')} aria-hidden="true"></div>
+  <div class="mb-6">
+    <h2 class="text-xl font-heading font-bold text-clr-green mb-2">Add news</h2>
+    <p class="text-sm text-gray-600 mb-4">Add announcements and optional photos (e.g. event photos, tag sale, holiday decorations). Choose where each item appears using the checkboxes below.</p>
+    <form id="news-form" class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-4 max-w-2xl">
+      <div>
+        <label for="news-title" class="block text-sm font-medium text-gray-700">Title *</label>
+        <input type="text" id="news-title" name="title" required class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2" placeholder="e.g. Spring Fling 2026 – Photos" />
+      </div>
+      <div>
+        <label for="news-body" class="block text-sm font-medium text-gray-700">Body *</label>
+        <textarea id="news-body" name="body" rows="6" required class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2" placeholder="Announcement text..."></textarea>
+      </div>
+
+      <fieldset class="space-y-3" aria-describedby="placement-desc">
+        <legend class="text-sm font-semibold text-gray-800">Where should this appear?</legend>
+        <p id="placement-desc" class="text-xs text-gray-500">Check one or both. Public = anyone can see on the website; Portal = members only when signed in.</p>
+        <div class="flex flex-wrap gap-6">
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" id="news-public" name="show_on_public" value="1" class="rounded border-gray-300 text-clr-green focus:ring-clr-green" />
+            <span class="text-sm font-medium text-gray-700">Public News page</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" id="news-portal" name="show_on_portal" value="1" checked class="rounded border-gray-300 text-clr-green focus:ring-clr-green" />
+            <span class="text-sm font-medium text-gray-700">Member portal News</span>
+          </label>
+        </div>
+      </fieldset>
+
+      <div>
+        <label for="news-photos" class="block text-sm font-medium text-gray-700">Photos (optional)</label>
+        <input type="file" id="news-photos" name="file" accept="image/jpeg,image/png,image/gif,image/webp,image/heic" multiple class="mt-1 block w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-clr-green/10 file:text-clr-green file:font-medium hover:file:bg-clr-green/20" />
+        <p class="mt-1 text-xs text-gray-500">JPEG, PNG, GIF, or WebP. Up to 15 images, 5MB each. Photos are automatically resized and compressed for web (no originals kept). Great for event photos, tag sale listings, or holiday decorations.</p>
+      </div>
+
+      <div class="flex gap-2">
+        <button type="submit" id="news-submit-btn" class="bg-clr-green hover:brightness-110 text-white px-4 py-2 rounded-lg font-medium text-sm">Publish</button>
+      </div>
+      <p id="news-form-message" class="text-sm hidden" role="status"></p>
+    </form>
+  </div>
+
+  <div>
+    <h2 class="text-xl font-heading font-bold text-clr-green mb-3">Recent news</h2>
+    {items.length === 0 ? (
+      <p class="text-gray-500 text-sm">No board news yet. Add one above.</p>
+    ) : (
+      <ul class="space-y-3">
+        {items.map((item) => {
+          const publicLabel = item.is_public === 1;
+          const portalLabel = item.show_on_portal !== 0;
+          const placement = publicLabel && portalLabel ? 'Public + Portal' : publicLabel ? 'Public only' : portalLabel ? 'Portal only' : '—';
+          const imageCount = getNewsItemImageKeys(item).length;
+          return (
+          <li class="bg-white rounded-xl border border-gray-100 p-4 flex flex-wrap items-start justify-between gap-3">
+            <div class="min-w-0 flex-1">
+              <h3 class="font-semibold text-clr-green">{item.title}</h3>
+              <p class="text-sm text-gray-500 mt-0.5">{formatDate(item.created_at)} · {placement}{imageCount > 0 ? ` · ${imageCount} photo${imageCount === 1 ? '' : 's'}` : ''}</p>
+              <p class="text-sm text-gray-600 mt-1 line-clamp-2">{item.body.slice(0, 150)}{item.body.length > 150 ? '…' : ''}</p>
+            </div>
+            {item.is_public === 1 && (
+              <a href={`/news/item/${item.id}`} target="_blank" rel="noopener noreferrer" class="text-sm text-clr-orange hover:underline shrink-0">View on site →</a>
+            )}
+          </li>
+        );})}
+      </ul>
+    )}
+  </div>
+
+  <script define:vars={{ csrfToken: typeof session !== 'undefined' && session?.csrfToken ? session.csrfToken : '' }}>
+    (function () {
+      const form = document.getElementById('news-form');
+      const msgEl = document.getElementById('news-form-message');
+      const submitBtn = document.getElementById('news-submit-btn');
+      const getCsrf = () => (document.getElementById('csrf-holder')?.getAttribute('data-csrf') ?? csrfToken ?? '').trim();
+
+      const NEWS_PHOTO_MAX_WIDTH = 1920;
+      const NEWS_PHOTO_JPEG_QUALITY = 0.82;
+
+      function showMsg(text, isError) {
+        if (!msgEl) return;
+        msgEl.textContent = text;
+        msgEl.classList.remove('hidden', 'text-green-600', 'text-red-600');
+        msgEl.classList.add(isError ? 'text-red-600' : 'text-green-600');
+      }
+
+      /** Optimize image for web: resize to max width, compress as JPEG. Returns optimized File or original on failure. */
+      function optimizeImageForWeb(file) {
+        const imageTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/heic'];
+        const isImage = file.type && (imageTypes.includes(file.type) || file.type.startsWith('image/'));
+        if (!isImage) return Promise.resolve(file);
+
+        return new Promise(function (resolve) {
+          const img = new Image();
+          const url = URL.createObjectURL(file);
+          img.onload = function () {
+            URL.revokeObjectURL(url);
+            let w = img.naturalWidth;
+            let h = img.naturalHeight;
+            if (w > NEWS_PHOTO_MAX_WIDTH) {
+              h = Math.round((h * NEWS_PHOTO_MAX_WIDTH) / w);
+              w = NEWS_PHOTO_MAX_WIDTH;
+            }
+            const canvas = document.createElement('canvas');
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) { resolve(file); return; }
+            ctx.drawImage(img, 0, 0, w, h);
+            canvas.toBlob(function (blob) {
+              const name = file.name.replace(/\.[^.]+$/i, '.jpg');
+              resolve(blob ? new File([blob], name, { type: 'image/jpeg' }) : file);
+            }, 'image/jpeg', NEWS_PHOTO_JPEG_QUALITY);
+          };
+          img.onerror = function () {
+            URL.revokeObjectURL(url);
+            resolve(file);
+          };
+          img.src = url;
+        });
+      }
+
+      form?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const title = form.querySelector('#news-title')?.value?.trim();
+        const body = form.querySelector('#news-body')?.value?.trim();
+        const showOnPublic = form.querySelector('#news-public')?.checked ?? false;
+        const showOnPortal = form.querySelector('#news-portal')?.checked ?? true;
+        const fileInput = form.querySelector('#news-photos');
+        let files = fileInput?.files ? Array.from(fileInput.files).filter((f) => f.size > 0) : [];
+
+        if (!title || !body) {
+          showMsg('Title and body are required.', true);
+          return;
+        }
+        if (!showOnPublic && !showOnPortal) {
+          showMsg('Select at least one: Public News page or Member portal News.', true);
+          return;
+        }
+        msgEl?.classList.add('hidden');
+        if (submitBtn) { submitBtn.disabled = true; submitBtn.setAttribute('aria-busy', 'true'); }
+
+        try {
+          if (files.length > 0 && msgEl) {
+            msgEl.textContent = 'Optimizing photos for web…';
+            msgEl.classList.remove('hidden', 'text-red-600');
+            msgEl.classList.add('text-green-600');
+          }
+          const optimizedFiles = await Promise.all(files.map((f) => optimizeImageForWeb(f)));
+          files = optimizedFiles.filter(Boolean);
+
+          const res = await fetch('/api/news-items', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({
+              title,
+              body,
+              show_on_public: showOnPublic ? 1 : 0,
+              show_on_portal: showOnPortal ? 1 : 0,
+            }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok || !data.success) {
+            showMsg(data.error || 'Failed to publish.', true);
+            return;
+          }
+          const id = data.id;
+
+          if (files.length > 0) {
+            const fd = new FormData();
+            fd.set('news_item_id', id);
+            fd.set('csrf_token', getCsrf());
+            files.forEach((f) => fd.append('file', f));
+            const photoRes = await fetch('/api/news-item-photos', {
+              method: 'POST',
+              credentials: 'same-origin',
+              body: fd,
+            });
+            const photoData = await photoRes.json().catch(() => ({}));
+            if (!photoRes.ok) {
+              showMsg(photoData.error || 'Published but photos failed to upload.', true);
+              return;
+            }
+          }
+
+          showMsg('Published.' + (files.length > 0 ? ' Photos added (optimized for web).' : ''), false);
+          form.reset();
+          setTimeout(() => window.location.reload(), 600);
+        } catch {
+          showMsg('Network error.', true);
+        } finally {
+          if (submitBtn) { submitBtn.disabled = false; submitBtn.removeAttribute('aria-busy'); }
+        }
+      });
+    })();
+  </script>
+</BoardLayout>

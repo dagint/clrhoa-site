@@ -1,0 +1,92 @@
+---
+/**
+ * GET: return current user preferences (phone, sms_optin).
+ * POST: update preferences (phone?, sms_optin?). Optional: send_test_sms=1 to send a test SMS.
+ */
+export const prerender = false;
+
+import { requireSession, requireDb, jsonResponse } from '../../lib/api-helpers';
+import { getUserByEmail, updateUserPreferences, type NotificationPreferences } from '../../lib/db';
+import { getOwnerByEmail, getPhonesArray, updateOwnerByEmail } from '../../lib/directory-db';
+
+const auth = await requireSession(Astro);
+if (auth.response) return auth.response;
+const { session } = auth;
+
+const dbResult = requireDb(Astro.locals.runtime?.env);
+if (dbResult.response) return dbResult.response;
+const { db } = dbResult;
+
+if (Astro.request.method === 'GET') {
+  const user = await getUserByEmail(db, session.email);
+  if (!user) return jsonResponse({ error: 'User not found' }, 404);
+  const sms_optin = user.sms_optin === 1 || user.sms_optin === true;
+  let notification_preferences: NotificationPreferences = {};
+  if (user.notification_preferences?.trim()) {
+    try {
+      notification_preferences = JSON.parse(user.notification_preferences) as NotificationPreferences;
+    } catch {
+      /* ignore */
+    }
+  }
+  const owner = await getOwnerByEmail(db, session.email);
+  const share_contact_with_members = owner?.share_contact_with_members !== 0;
+  return jsonResponse({ phone: user.phone ?? '', sms_optin, notification_preferences, share_contact_with_members });
+}
+
+if (Astro.request.method !== 'POST') {
+  return new Response(null, { status: 405, headers: { Allow: 'GET, POST' } });
+}
+
+let body: Record<string, unknown>;
+try {
+  const ct = Astro.request.headers.get('content-type') ?? '';
+  body = ct.includes('application/json') ? await Astro.request.json() : Object.fromEntries(await Astro.request.formData());
+} catch {
+  return jsonResponse({ error: 'Invalid body' }, 400);
+}
+
+const phone = body.phone !== undefined ? String(body.phone).trim() || null : undefined;
+const sms_optin = body.sms_optin !== undefined ? (body.sms_optin === true || body.sms_optin === 'true' || body.sms_optin === '1' || body.sms_optin === 1) : undefined;
+const sendTestSms = body.send_test_sms === true || body.send_test_sms === '1' || body.send_test_sms === 1;
+const share_contact_with_members = body.share_contact_with_members !== undefined
+  ? (body.share_contact_with_members === true || body.share_contact_with_members === 1 || body.share_contact_with_members === '1' ? 1 : 0)
+  : undefined;
+let notification_preferences: NotificationPreferences | undefined;
+if (body.notification_preferences !== undefined && typeof body.notification_preferences === 'object' && body.notification_preferences !== null) {
+  const raw = body.notification_preferences as Record<string, unknown>;
+  notification_preferences = {};
+  for (const key of Object.keys(raw)) {
+    const v = raw[key];
+    notification_preferences[key] = v === true || v === 'true' || v === '1' || v === 1;
+  }
+}
+
+await updateUserPreferences(db, session.email, { phone, sms_optin, notification_preferences });
+
+const owner = await getOwnerByEmail(db, session.email);
+if (owner) {
+  const updates: { phones?: string; share_contact_with_members?: number } = {};
+  if (share_contact_with_members !== undefined) updates.share_contact_with_members = share_contact_with_members;
+  if (phone?.trim()) {
+    const existingPhones = getPhonesArray(owner);
+    const normalized = phone.trim();
+    const alreadyListed = existingPhones.some((p) => p?.trim() && p.trim() === normalized);
+    if (!alreadyListed) {
+      const newPhones = [...existingPhones.filter((p) => p?.trim())];
+      if (!newPhones.includes(normalized)) newPhones.push(normalized);
+      updates.phones = JSON.stringify(newPhones.slice(0, 10));
+    }
+  }
+  if (Object.keys(updates).length > 0) {
+    await updateOwnerByEmail(db, session.email, updates);
+  }
+}
+
+// SMS sending is disabled until the board enables it (costs HOA money).
+if (sendTestSms) {
+  return jsonResponse({ success: true, saved: true, sms_test: false, sms_error: 'SMS sending is not enabled yet.' }, 200);
+}
+
+return jsonResponse({ success: true, saved: true });
+---

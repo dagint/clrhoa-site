@@ -1,0 +1,111 @@
+---
+export const prerender = false;
+
+import BoardLayout from '../../layouts/BoardLayout.astro';
+import { getBoardContext } from '../../lib/board-context';
+import { listSiteFeedback } from '../../lib/site-feedback-db';
+
+const ctx = await getBoardContext(Astro);
+if (ctx.redirect) return Astro.redirect(ctx.redirect);
+const { env, session, effectiveRole } = ctx;
+
+const db = env?.DB;
+const q = Astro.url.searchParams;
+const from = q.get('from') ?? '';
+const to = q.get('to') ?? '';
+const thumbsParam = q.get('thumbs') ?? '';
+const urlContains = q.get('url') ?? '';
+
+const thumbsFilter = thumbsParam === '1' ? 1 : thumbsParam === '-1' ? -1 : undefined;
+const feedback = db
+  ? await listSiteFeedback(db, {
+      from: from.trim() || undefined,
+      to: to.trim() || undefined,
+      thumbs: thumbsFilter,
+      urlContains: urlContains.trim() || undefined,
+      limit: 500,
+    })
+  : [];
+
+function formatDate(s: string | null): string {
+  if (!s) return '—';
+  try {
+    const d = new Date(s);
+    return Number.isNaN(d.getTime()) ? s : d.toLocaleString();
+  } catch {
+    return s ?? '—';
+  }
+}
+
+const csvParams = new URLSearchParams();
+if (from.trim()) csvParams.set('from', from.trim());
+if (to.trim()) csvParams.set('to', to.trim());
+if (thumbsParam === '1' || thumbsParam === '-1') csvParams.set('thumbs', thumbsParam);
+if (urlContains.trim()) csvParams.set('url', urlContains.trim());
+csvParams.set('export', 'csv');
+const csvHref = `/api/site-feedback?${csvParams.toString()}`;
+---
+
+<BoardLayout title="Site feedback" subtitle="Widget submissions (thumbs + comment). No PII." draftCount={0} role={effectiveRole} session={session} elevatedUntil={session.elevated_until} mainWide showRoleBanner={false}>
+  <div class="mb-6 flex flex-wrap items-end gap-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
+    <form method="get" action="/admin/feedback" class="flex flex-wrap items-end gap-3">
+      <label class="flex flex-col gap-1 text-sm font-medium text-gray-700">
+        From (date)
+        <input type="date" name="from" value={from} class="rounded border border-gray-300 px-2 py-1.5 text-sm" />
+      </label>
+      <label class="flex flex-col gap-1 text-sm font-medium text-gray-700">
+        To (date)
+        <input type="date" name="to" value={to} class="rounded border border-gray-300 px-2 py-1.5 text-sm" />
+      </label>
+      <label class="flex flex-col gap-1 text-sm font-medium text-gray-700">
+        Thumbs
+        <select name="thumbs" class="rounded border border-gray-300 px-2 py-1.5 text-sm">
+          <option value="" selected={thumbsParam !== '1' && thumbsParam !== '-1'}>All</option>
+          <option value="1" selected={thumbsParam === '1'}>Up only</option>
+          <option value="-1" selected={thumbsParam === '-1'}>Down only</option>
+        </select>
+      </label>
+      <label class="flex flex-col gap-1 text-sm font-medium text-gray-700">
+        URL contains
+        <input type="text" name="url" value={urlContains} placeholder="e.g. /resources" class="rounded border border-gray-300 px-2 py-1.5 text-sm w-40" />
+      </label>
+      <button type="submit" class="rounded bg-clr-green px-3 py-1.5 text-sm font-medium text-white hover:bg-clr-green/90">Apply</button>
+    </form>
+    <a href={csvHref} download class="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50">
+      Export CSV
+    </a>
+  </div>
+
+  <div class="rounded-xl border border-gray-200 bg-white overflow-hidden">
+    {feedback.length === 0 ? (
+      <p class="p-6 text-gray-500">No feedback matching the filters.</p>
+    ) : (
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50 border-b border-gray-200">
+            <tr>
+              <th class="text-left py-2 px-3 font-medium text-gray-700">Time</th>
+              <th class="text-left py-2 px-3 font-medium text-gray-700">Thumbs</th>
+              <th class="text-left py-2 px-3 font-medium text-gray-700">URL</th>
+              <th class="text-left py-2 px-3 font-medium text-gray-700">Viewport</th>
+              <th class="text-left py-2 px-3 font-medium text-gray-700">Session</th>
+              <th class="text-left py-2 px-3 font-medium text-gray-700">Comment</th>
+            </tr>
+          </thead>
+          <tbody>
+            {feedback.map((row) => (
+              <tr class="border-b border-gray-100 hover:bg-gray-50/50">
+                <td class="py-2 px-3 text-gray-600 whitespace-nowrap">{formatDate(row.created_at)}</td>
+                <td class="py-2 px-3">{row.thumbs === 1 ? '👍' : '👎'}</td>
+                <td class="py-2 px-3 max-w-xs truncate" title={row.url}>{row.url || '—'}</td>
+                <td class="py-2 px-3 text-gray-600">{row.viewport ?? '—'}</td>
+                <td class="py-2 px-3 font-mono text-gray-500 text-xs">{row.session_id ?? '—'}</td>
+                <td class="py-2 px-3 max-w-sm">{row.comment ?? '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )}
+  </div>
+</BoardLayout>

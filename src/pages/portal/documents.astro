@@ -1,0 +1,89 @@
+---
+export const prerender = false;
+
+import PortalLayout from '../../layouts/PortalLayout.astro';
+import ProtectedPage from '../../components/ProtectedPage.astro';
+import PortalNav from '../../components/PortalNav.astro';
+import { getPortalContext } from '../../lib/portal-context';
+import { listArbRequestsByHousehold } from '../../lib/arb-db';
+import { listMemberDocuments } from '../../lib/member-documents-db';
+import { MEMBER_DOC_CATEGORIES, MEMBER_DOC_CATEGORY_LABELS } from '../../lib/member-documents-db';
+
+const { env, session, effectiveRole } = await getPortalContext(Astro);
+if (!session) return Astro.redirect('/portal/login');
+
+const db = env?.DB;
+const allRequests = db ? await listArbRequestsByHousehold(db, session.email) : [];
+const draftCount = allRequests.filter((r) => r.status === 'pending').length;
+
+const docs = db ? await listMemberDocuments(db) : [];
+
+function formatDate(s: string | null): string {
+  if (!s) return '';
+  try {
+    return new Date(s).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+  } catch {
+    return s;
+  }
+}
+
+const docsByCategory = MEMBER_DOC_CATEGORIES.map((cat) => ({
+  category: cat,
+  label: MEMBER_DOC_CATEGORY_LABELS[cat],
+  docs: docs.filter((d) => d.category === cat),
+}));
+---
+
+<PortalLayout title="Documents | Member Portal | Crooked Lake Reserve HOA">
+  <ProtectedPage>
+  <div class="min-h-screen portal-theme-bg font-body">
+    <PortalNav currentPath="/portal/documents" draftCount={draftCount} role={effectiveRole} staffRole={session?.role ?? ''} />
+
+    <main class="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+      <h2 class="text-2xl font-heading font-bold text-clr-green mb-2">Member documents</h2>
+      <p class="text-gray-600 mb-6">
+        Redacted minutes, budgets, and other member-only files.
+      </p>
+
+      {docs.length === 0 ? (
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center text-gray-500">
+          <p>No member documents yet. Check back later.</p>
+          <p class="mt-2 text-sm">Contact the board if you need a document added.</p>
+        </div>
+      ) : (
+        <div class="space-y-8">
+          {docsByCategory.map(({ category, label, docs: catDocs }) => (
+            catDocs.length > 0 && (
+              <section>
+                <h3 class="text-lg font-heading font-semibold text-clr-green mb-3">{label}</h3>
+                <ul class="space-y-2">
+                  {catDocs.map((doc) => (
+                    <li>
+                      <a
+                        href={`/api/portal/file/${encodeURIComponent(doc.file_key)}`}
+                        class="flex items-center gap-3 bg-white rounded-xl border border-gray-100 p-4 shadow-sm hover:shadow-md hover:border-clr-green/30 transition-all"
+                      >
+                        <span class="text-clr-green font-medium flex-1">{doc.title}</span>
+                        {doc.uploaded_at && (
+                          <span class="text-sm text-gray-500">
+                            {formatDate(doc.uploaded_at)}
+                          </span>
+                        )}
+                        <span class="text-clr-orange font-medium text-sm">Download</span>
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )
+          ))}
+        </div>
+      )}
+
+      <p class="mt-8 text-sm text-gray-500">
+        <a href="/documents" class="text-clr-green hover:underline">View public documents</a> (covenants, bylaws, forms).
+      </p>
+    </main>
+  </div>
+  </ProtectedPage>
+</PortalLayout>

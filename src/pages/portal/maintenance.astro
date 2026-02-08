@@ -1,0 +1,225 @@
+---
+export const prerender = false;
+
+import PortalLayout from '../../layouts/PortalLayout.astro';
+import ProtectedPage from '../../components/ProtectedPage.astro';
+import PortalNav from '../../components/PortalNav.astro';
+import { getPortalContext } from '../../lib/portal-context';
+import { listArbRequestsByHousehold } from '../../lib/arb-db';
+import { listMaintenanceByHousehold, parsePhotosJson, MAINTENANCE_CATEGORIES } from '../../lib/maintenance-db';
+
+const { env, session, effectiveRole } = await getPortalContext(Astro, { fingerprint: true });
+if (!session) return Astro.redirect('/portal/login');
+
+const db = env?.DB;
+const draftCount = db
+  ? (await listArbRequestsByHousehold(db, session.email)).filter((r) => r.status === 'pending').length
+  : 0;
+const requests = db ? await listMaintenanceByHousehold(db, session.email) : [];
+
+const categories = MAINTENANCE_CATEGORIES;
+
+function categoryLabel(cat: string): string {
+  return cat === 'general' ? 'General' : cat.charAt(0).toUpperCase() + cat.slice(1);
+}
+
+function formatDate(s: string): string {
+  try {
+    return new Date(s).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+  } catch {
+    return s;
+  }
+}
+---
+
+<PortalLayout title="Maintenance | Member Portal | Crooked Lake Reserve HOA">
+  <ProtectedPage>
+  <div class="min-h-screen portal-theme-bg font-body">
+    <PortalNav currentPath="/portal/maintenance" draftCount={draftCount} role={effectiveRole} staffRole={session?.role ?? ''} />
+
+    <main class="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+      <h2 class="text-2xl font-heading font-bold text-clr-green mb-2">Maintenance requests</h2>
+      <p class="text-gray-600 portal-theme-text-muted mb-6">
+        Report common-area maintenance or repair issues. The board will review and update status.
+      </p>
+
+      <section class="bg-white portal-theme-card rounded-2xl shadow-sm border border-gray-100 p-6 mb-8">
+        <h3 class="text-lg font-heading font-semibold text-clr-green mb-4">New request</h3>
+        <form id="maintenance-form" class="space-y-4">
+          <div>
+            <label for="maint-category" class="block text-sm font-medium text-gray-700 portal-theme-text">Category *</label>
+            <select id="maint-category" name="category" required class="mt-1 block w-full rounded-lg border border-gray-200 portal-theme-input px-3 py-2">
+              {categories.map((c) => (
+                <option value={c}>{categoryLabel(c)}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label for="maint-description" class="block text-sm font-medium text-gray-700 portal-theme-text">Description *</label>
+            <textarea id="maint-description" name="description" required rows="4" class="mt-1 block w-full rounded-lg border border-gray-200 portal-theme-input px-3 py-2" placeholder="Describe the issue and location..."></textarea>
+          </div>
+          <div>
+            <label for="maint-photos" class="block text-sm font-medium text-gray-700 portal-theme-text">Photos (optional)</label>
+            <input type="file" id="maint-photos" name="photos" accept="image/jpeg,image/png,image/gif,image/webp,image/heic" multiple class="mt-1 block w-full text-sm text-gray-500 portal-theme-text-muted file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-clr-green file:text-white" />
+            <p class="text-xs text-gray-500 portal-theme-text-muted mt-1">JPEG, PNG, GIF, WebP, or HEIC. Up to 25MB total. Photos are automatically resized and compressed for web.</p>
+          </div>
+          <p id="maint-form-status" class="text-sm text-clr-green hidden" role="status" aria-live="polite"></p>
+          <button type="submit" id="maint-submit-btn" class="bg-clr-green hover:brightness-110 text-white px-6 py-2 rounded-xl font-semibold text-sm">
+            Submit request
+          </button>
+        </form>
+      </section>
+
+      <h3 class="text-lg font-heading font-semibold text-clr-green mb-3">Your requests</h3>
+      {requests.length === 0 ? (
+        <div class="bg-white portal-theme-card rounded-2xl shadow-sm border border-gray-100 p-8 text-center text-gray-500 portal-theme-text-muted">
+          No maintenance requests yet.
+        </div>
+      ) : (
+        <ul class="space-y-4">
+          {requests.map((r) => {
+            const photos = parsePhotosJson(r.photos);
+            return (
+              <li class="bg-white portal-theme-card rounded-2xl shadow-sm border border-gray-100 p-4">
+                <div class="flex flex-wrap justify-between gap-2">
+                  <div>
+                    <span class="font-medium text-clr-green">{categoryLabel(r.category)}</span>
+                    <span class="text-sm text-gray-500 portal-theme-text-muted ml-2">{formatDate(r.created)}</span>
+                    <span class={`ml-2 text-xs font-medium px-2 py-0.5 rounded ${r.status === 'completed' ? 'bg-green-100 text-green-800' : r.status === 'in_progress' ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-700 portal-theme-text'}`}>
+                      {r.status}
+                    </span>
+                  </div>
+                </div>
+                <p class="text-gray-600 portal-theme-text-muted text-sm mt-1 line-clamp-2">{r.description}</p>
+                {r.vendor_assigned && (
+                  <p class="text-sm text-gray-500 portal-theme-text-muted mt-1">Vendor: {r.vendor_assigned}</p>
+                )}
+                {photos.length > 0 && (
+                  <div class="flex flex-wrap gap-2 mt-2">
+                    {photos.slice(0, 5).map((key) => (
+                      <a
+                        href={`/api/portal/file/${encodeURIComponent(key)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="text-sm text-clr-green hover:underline"
+                      >
+                        View photo
+                      </a>
+                    ))}
+                    {photos.length > 5 && <span class="text-sm text-gray-500 portal-theme-text-muted">+{photos.length - 5} more</span>}
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </main>
+  </div>
+  </ProtectedPage>
+</PortalLayout>
+
+<script>
+  (function () {
+    const form = document.getElementById('maintenance-form');
+    const statusEl = document.getElementById('maint-form-status');
+    const submitBtn = document.getElementById('maint-submit-btn');
+
+    const MAINT_PHOTO_MAX_WIDTH = 1920;
+    const MAINT_PHOTO_JPEG_QUALITY = 0.82;
+
+    /** Optimize image for web: resize to max width, compress as JPEG. Same as news. */
+    function optimizeImageForWeb(file) {
+      const imageTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/heic'];
+      const isImage = file.type && (imageTypes.includes(file.type) || file.type.startsWith('image/'));
+      if (!isImage) return Promise.resolve(file);
+
+      return new Promise(function (resolve) {
+        const img = new Image();
+        const url = URL.createObjectURL(file);
+        img.onload = function () {
+          URL.revokeObjectURL(url);
+          let w = img.naturalWidth;
+          let h = img.naturalHeight;
+          if (w > MAINT_PHOTO_MAX_WIDTH) {
+            h = Math.round((h * MAINT_PHOTO_MAX_WIDTH) / w);
+            w = MAINT_PHOTO_MAX_WIDTH;
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            resolve(file);
+            return;
+          }
+          ctx.drawImage(img, 0, 0, w, h);
+          canvas.toBlob(
+            function (blob) {
+              const name = file.name.replace(/\.[^.]+$/i, '.jpg');
+              resolve(blob ? new File([blob], name, { type: 'image/jpeg' }) : file);
+            },
+            'image/jpeg',
+            MAINT_PHOTO_JPEG_QUALITY
+          );
+        };
+        img.onerror = function () {
+          URL.revokeObjectURL(url);
+          resolve(file);
+        };
+        img.src = url;
+      });
+    }
+
+    function showStatus(text) {
+      if (!statusEl) return;
+      statusEl.textContent = text;
+      statusEl.classList.remove('hidden');
+    }
+
+    form?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const category = (form.querySelector('[name="category"]') as HTMLSelectElement)?.value;
+      const description = (form.querySelector('[name="description"]') as HTMLTextAreaElement)?.value?.trim();
+      if (!description) {
+        alert('Please enter a description');
+        return;
+      }
+      const fileInput = form.querySelector('[name="photos"]') as HTMLInputElement;
+      let files = fileInput?.files ? Array.from(fileInput.files).filter((f) => f.size > 0) : [];
+
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.setAttribute('aria-busy', 'true');
+      }
+      if (files.length > 0) showStatus('Optimizing photos for web…');
+
+      try {
+        if (files.length > 0) {
+          const optimized = await Promise.all(files.map((f) => optimizeImageForWeb(f)));
+          files = optimized.filter(Boolean);
+        }
+        const fd = new FormData();
+        fd.set('category', category ?? '');
+        fd.set('description', description);
+        files.forEach((f) => fd.append('photos', f));
+
+        const res = await fetch('/api/maintenance-submit', { method: 'POST', body: fd, credentials: 'same-origin' });
+        const data = await res.json();
+        if (data.success) {
+          showStatus('Submitted. Photos optimized for web.');
+          window.location.reload();
+        } else {
+          alert(data.error || 'Failed to submit');
+        }
+      } catch {
+        alert('Network error. Please try again.');
+      } finally {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.removeAttribute('aria-busy');
+        }
+      }
+    });
+  })();
+</script>

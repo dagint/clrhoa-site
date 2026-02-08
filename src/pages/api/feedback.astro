@@ -1,0 +1,233 @@
+---
+/**
+ * /api/feedback — CRUD for feedback docs + owner responses.
+ * GET: ?list=active (portal) | ?list=all (board) | ?id= (single doc + counts).
+ * POST: create doc (board) | submit response (owner). Body determines action.
+ * PUT: update doc (board). DELETE: delete doc (board).
+ */
+export const prerender = false;
+
+import { requireSession, requireDb, jsonResponse } from '../../lib/api-helpers';
+import { getEffectiveRole } from '../../lib/auth';
+import {
+  listActiveFeedbackDocs,
+  listAllFeedbackDocs,
+  getFeedbackDocById,
+  getFeedbackResponse,
+  getFeedbackResponseCounts,
+  listFeedbackResponses,
+  setFeedbackResponse,
+  createFeedbackDocId,
+  insertFeedbackDoc,
+  updateFeedbackDoc,
+  deleteFeedbackDoc,
+} from '../../lib/feedback-db';
+import { listOwners } from '../../lib/directory-db';
+import { getUserByEmail, getNotificationPrefsForEmails } from '../../lib/db';
+import { sendEmail, shouldSendNotification } from '../../lib/notifications';
+
+const auth = await requireSession(Astro);
+if (auth.response) return auth.response;
+const { session } = auth;
+
+const dbResult = requireDb(Astro.locals.runtime?.env);
+if (dbResult.response) return dbResult.response;
+const { db } = dbResult;
+
+const effectiveRole = getEffectiveRole(session);
+const isBoard = effectiveRole === 'board' || effectiveRole === 'admin' || effectiveRole === 'arb_board';
+const url = new URL(Astro.request.url);
+
+if (Astro.request.method === 'GET') {
+  if (url.searchParams.get('export') === 'csv' && isBoard) {
+    const id = url.searchParams.get('id');
+    if (!id) return jsonResponse({ error: 'id required' }, 400);
+    const doc = await getFeedbackDocById(db, id);
+    if (!doc) return jsonResponse({ error: 'Not found' }, 404);
+    const rows = await listFeedbackResponses(db, id);
+    const header = 'Email,Acknowledged,Approved,Comments,Responded\n';
+    const csv = header + rows.map((r) => `${r.owner_email},${r.acknowledged ? 'Yes' : 'No'},${r.approved === 1 ? 'Yes' : r.approved === 0 ? 'No' : ''},"${(r.comments ?? '').replace(/"/g, '""')}",${r.responded}`).join('\n');
+    return new Response(csv, {
+      headers: {
+        'Content-Type': 'text/csv',
+        'Content-Disposition': `attachment; filename="feedback-${id}.csv"`,
+      },
+    });
+  }
+  const id = url.searchParams.get('id');
+  if (id) {
+    const doc = await getFeedbackDocById(db, id);
+    if (!doc) return jsonResponse({ error: 'Not found' }, 404);
+    const counts = await getFeedbackResponseCounts(db, id);
+    const myResponse = await getFeedbackResponse(db, id, session.email);
+    return jsonResponse({
+      doc: {
+        id: doc.id,
+        title: doc.title,
+        description: doc.description,
+        r2_key: doc.r2_key,
+        deadline: doc.deadline,
+        created_by: doc.created_by,
+        created: doc.created,
+      },
+      counts: isBoard ? counts : undefined,
+      my_response: myResponse
+        ? {
+            acknowledged: myResponse.acknowledged === 1,
+            approved: myResponse.approved === 1 ? true : myResponse.approved === 0 ? false : null,
+            comments: myResponse.comments,
+            responded: myResponse.responded,
+          }
+        : null,
+    });
+  }
+  const list = url.searchParams.get('list');
+  if (list === 'all' && isBoard) {
+    const docs = await listAllFeedbackDocs(db);
+    return jsonResponse({ docs });
+  }
+  const docs = await listActiveFeedbackDocs(db);
+  const withResponses = await Promise.all(
+    docs.map(async (d) => {
+      const myResponse = await getFeedbackResponse(db, d.id, session.email);
+      return {
+        ...d,
+        my_response: myResponse
+          ? {
+              acknowledged: myResponse.acknowledged === 1,
+              approved: myResponse.approved === 1 ? true : myResponse.approved === 0 ? false : null,
+              comments: myResponse.comments,
+              responded: myResponse.responded,
+            }
+          : null,
+      };
+    })
+  );
+  return jsonResponse({ docs: withResponses });
+}
+
+if (Astro.request.method === 'POST') {
+  let body: Record<string, unknown>;
+  try {
+    const ct = Astro.request.headers.get('content-type') ?? '';
+    body = ct.includes('application/json') ? await Astro.request.json() : Object.fromEntries(await Astro.request.formData());
+  } catch {
+    return jsonResponse({ error: 'Invalid body' }, 400);
+  }
+
+  const action = body.action ?? body._action;
+  if (action === 'response') {
+    const docId = String(body.doc_id ?? '').trim();
+    if (!docId) return jsonResponse({ error: 'doc_id required' }, 400);
+    const doc = await getFeedbackDocById(db, docId);
+    if (!doc) return jsonResponse({ error: 'Document not found' }, 404);
+    const acknowledged = body.acknowledged === true || body.acknowledged === 'true' || body.acknowledged === 1;
+    const approved =
+      body.approved === true || body.approved === 'true' || body.approved === 1
+        ? true
+        : body.approved === false || body.approved === 'false' || body.approved === 0
+          ? false
+          : null;
+    const comments = body.comments != null ? String(body.comments).trim() : undefined;
+    await setFeedbackResponse(db, docId, session.email, { acknowledged, approved, comments: comments ?? null });
+    if (env?.NOTIFY_NOREPLY_EMAIL) {
+      const user = await getUserByEmail(db, session.email);
+      let prefs: Record<string, boolean> | null = null;
+      if (user?.notification_preferences?.trim()) {
+        try {
+          prefs = JSON.parse(user.notification_preferences) as Record<string, boolean>;
+        } catch {
+          /* ignore */
+        }
+      }
+      if (shouldSendNotification(prefs, 'feedback_response_confirm')) {
+        await sendEmail(
+          env,
+          session.email,
+          'Your feedback was recorded',
+          `<p>Thank you. Your response for &quot;${doc.title ?? 'Document'}&quot; has been recorded.</p>`,
+          { html: true }
+        );
+      }
+    }
+    return jsonResponse({ success: true, message: 'Thank you, your vote recorded.' });
+  }
+
+  if (!isBoard) return jsonResponse({ error: 'Forbidden' }, 403);
+  if (action === 'create') {
+    const title = String(body.title ?? '').trim();
+    const deadline = body.deadline ? String(body.deadline).trim() : null;
+    if (!title) return jsonResponse({ error: 'title required' }, 400);
+    const id = createFeedbackDocId();
+    await insertFeedbackDoc(db, id, {
+      title,
+      description: body.description != null ? String(body.description).trim() : null,
+      r2_key: body.r2_key != null ? String(body.r2_key).trim() : null,
+      deadline,
+      created_by: session.email,
+    });
+    const owners = await listOwners(db);
+    const ownerEmails = owners.map((o) => o.email).filter(Boolean) as string[];
+    if (env?.NOTIFY_NOREPLY_EMAIL && ownerEmails.length > 0) {
+      const prefsRows = await getNotificationPrefsForEmails(db, ownerEmails.slice(0, 200));
+      const prefsByEmail = new Map<string, Record<string, boolean>>();
+      for (const row of prefsRows) {
+        let p: Record<string, boolean> = {};
+        if (row.notification_preferences?.trim()) {
+          try {
+            p = JSON.parse(row.notification_preferences) as Record<string, boolean>;
+          } catch {
+            /* ignore */
+          }
+        }
+        prefsByEmail.set(row.email, p);
+      }
+      const subject = 'New feedback request ready';
+      const bodyHtml = `<p>A new feedback request &quot;${title}&quot; is available. Please sign in to the portal and go to Feedback to read and respond.</p>`;
+      for (const to of ownerEmails.slice(0, 200)) {
+        if (!to?.trim()) continue;
+        const prefs = prefsByEmail.get(to.trim().toLowerCase()) ?? null;
+        if (shouldSendNotification(prefs, 'feedback_new_doc')) {
+          await sendEmail(env, to.trim(), subject, bodyHtml);
+        }
+      }
+    }
+    return jsonResponse({ success: true, id });
+  }
+
+  return jsonResponse({ error: 'Invalid action' }, 400);
+}
+
+if (Astro.request.method === 'PUT') {
+  if (!isBoard) return jsonResponse({ error: 'Forbidden' }, 403);
+  let body: Record<string, unknown>;
+  try {
+    const ct = Astro.request.headers.get('content-type') ?? '';
+    body = ct.includes('application/json') ? await Astro.request.json() : Object.fromEntries(await Astro.request.formData());
+  } catch {
+    return jsonResponse({ error: 'Invalid body' }, 400);
+  }
+  const id = String(body.id ?? '').trim();
+  if (!id) return jsonResponse({ error: 'id required' }, 400);
+  const doc = await getFeedbackDocById(db, id);
+  if (!doc) return jsonResponse({ error: 'Not found' }, 404);
+  await updateFeedbackDoc(db, id, {
+    title: body.title !== undefined ? String(body.title).trim() : undefined,
+    description: body.description !== undefined ? (body.description ? String(body.description).trim() : null) : undefined,
+    r2_key: body.r2_key !== undefined ? (body.r2_key ? String(body.r2_key).trim() : null) : undefined,
+    deadline: body.deadline !== undefined ? (body.deadline ? String(body.deadline).trim() : null) : undefined,
+  });
+  return jsonResponse({ success: true });
+}
+
+if (Astro.request.method === 'DELETE') {
+  if (!isBoard) return jsonResponse({ error: 'Forbidden' }, 403);
+  const id = url.searchParams.get('id') || (await Astro.request.json().catch(() => ({})) as Record<string, string>).id;
+  if (!id) return jsonResponse({ error: 'id required' }, 400);
+  const ok = await deleteFeedbackDoc(db, id);
+  if (!ok) return jsonResponse({ error: 'Not found' }, 404);
+  return jsonResponse({ success: true });
+}
+
+return new Response(null, { status: 405, headers: { Allow: 'GET, POST, PUT, DELETE' } });
+---

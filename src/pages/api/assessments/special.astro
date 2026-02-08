@@ -1,0 +1,96 @@
+---
+/**
+ * /api/assessments/special — board: list (GET), add (POST), mark paid (PATCH).
+ * GET ?owner_email=... | POST body: owner_email, description, amount, due_date?, csrf_token | PATCH body: id, owner_email, paid_at, csrf_token
+ */
+export const prerender = false;
+
+import { getSessionFromCookie, verifyCsrfToken, verifyOrigin, getEffectiveRole, canRecordPayments } from '../../../lib/auth';
+import { listSpecialAssessmentsByOwner, addSpecialAssessment, markSpecialAssessmentPaid } from '../../../lib/assessments-db';
+
+function json(data: object, status = 200) {
+  return new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
+}
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const session = await getSessionFromCookie(
+  Astro.request.headers.get('cookie') ?? undefined,
+  env?.SESSION_SECRET
+);
+if (!session) return json({ error: 'Unauthorized' }, 401);
+const effectiveRole = getEffectiveRole(session);
+if (!canRecordPayments(effectiveRole)) return json({ error: 'Forbidden. Only Board or ARB+Board can manage special assessments.' }, 403);
+
+const origin = Astro.request.headers.get('origin');
+const referer = Astro.request.headers.get('referer');
+if (!verifyOrigin(origin, referer, Astro.url.origin)) return json({ error: 'Invalid origin.' }, 403);
+
+const db = env?.DB;
+if (!db) return json({ error: 'Server configuration error' }, 503);
+
+// GET: list by owner_email
+if (Astro.request.method === 'GET') {
+  const owner_email = Astro.url.searchParams.get('owner_email')?.trim()?.toLowerCase();
+  if (!owner_email) return json({ error: 'owner_email query required' }, 400);
+  const list = await listSpecialAssessmentsByOwner(db, owner_email);
+  return json({ special_assessments: list });
+}
+
+// POST: add special assessment
+if (Astro.request.method === 'POST') {
+  let body: Record<string, unknown>;
+  try {
+    body = await Astro.request.json();
+  } catch {
+    return json({ error: 'Invalid JSON' }, 400);
+  }
+  if (!verifyCsrfToken(session, (body.csrf_token ?? body.csrfToken) as string)) {
+    return json({ error: 'Invalid security token.' }, 403);
+  }
+  const owner_email = String(body.owner_email ?? '').trim();
+  const description = String(body.description ?? '').trim();
+  const amount = Number(body.amount);
+  const due_date = body.due_date != null ? String(body.due_date).trim() || null : null;
+  if (!owner_email) return json({ error: 'owner_email is required' }, 400);
+  if (!description) return json({ error: 'description is required' }, 400);
+  if (Number.isNaN(amount) || amount <= 0) return json({ error: 'amount must be a positive number' }, 400);
+  if (due_date && !/^\d{4}-\d{2}-\d{2}$/.test(due_date)) return json({ error: 'due_date must be YYYY-MM-DD' }, 400);
+  try {
+    const { id } = await addSpecialAssessment(db, {
+      owner_email,
+      description,
+      amount,
+      due_date: due_date || undefined,
+      created_by: session.email,
+    });
+    return json({ success: true, id });
+  } catch (e) {
+    console.error('[special-assessment add]', e);
+    return json({ error: 'Failed to add special assessment' }, 500);
+  }
+}
+
+// PATCH: mark paid
+if (Astro.request.method === 'PATCH') {
+  let body: Record<string, unknown>;
+  try {
+    body = await Astro.request.json();
+  } catch {
+    return json({ error: 'Invalid JSON' }, 400);
+  }
+  if (!verifyCsrfToken(session, (body.csrf_token ?? body.csrfToken) as string)) {
+    return json({ error: 'Invalid security token.' }, 403);
+  }
+  const id = String(body.id ?? '').trim();
+  const owner_email = String(body.owner_email ?? '').trim();
+  const paid_at = String(body.paid_at ?? '').trim();
+  if (!id || !owner_email) return json({ error: 'id and owner_email are required' }, 400);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(paid_at)) return json({ error: 'paid_at must be YYYY-MM-DD' }, 400);
+  const ok = await markSpecialAssessmentPaid(db, id, owner_email, paid_at);
+  if (!ok) return json({ error: 'Special assessment not found or already paid' }, 404);
+  return json({ success: true });
+}
+
+return new Response(null, { status: 405, headers: { Allow: 'GET, POST, PATCH' } });
+---

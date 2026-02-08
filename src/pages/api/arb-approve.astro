@@ -1,0 +1,224 @@
+---
+/**
+ * POST /api/arb-approve — ARB/Board only. Approve or reject a request; records e-signature.
+ * Body: requestId, action ('approve'|'reject'), arbEsign (e.g. "Name, ARB Member").
+ */
+export const prerender = false;
+
+import { getSessionFromCookie, verifyCsrfToken, verifyOrigin, getEffectiveRole, canApproveArb, isAdminActingAs } from '../../lib/auth';
+import { insertAdminAssumedRoleAudit } from '../../lib/admin-assumed-role-db';
+import { checkRateLimit, getRateLimitConfig } from '../../lib/rate-limit';
+import { getSecurityMonitor } from '../../lib/monitoring';
+import { getArbRequest, updateArbRequestStatus, setArbRequestPendingForRevision } from '../../lib/arb-db';
+import { verifySignedRequest, extractSignedRequest } from '../../lib/request-signing';
+import { createLogger } from '../../lib/logging';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const session = await getSessionFromCookie(
+  Astro.request.headers.get('cookie') ?? undefined,
+  env?.SESSION_SECRET
+);
+
+if (!session) {
+  return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+    status: 401,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+// CSRF protection: verify origin
+const origin = Astro.request.headers.get('origin');
+const referer = Astro.request.headers.get('referer');
+const expectedOrigin = Astro.url.origin;
+if (!verifyOrigin(origin, referer, expectedOrigin)) {
+  return new Response(JSON.stringify({ error: 'Invalid origin. Request blocked for security.' }), {
+    status: 403,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const effectiveRole = getEffectiveRole(session);
+if (!canApproveArb(effectiveRole)) {
+  return new Response(JSON.stringify({ error: 'Forbidden. Only ARB or Board can approve or reject requests. Admins may view only.' }), {
+    status: 403,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+if (Astro.request.method !== 'POST') {
+  return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+    status: 405,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const db = env?.DB;
+if (!db) {
+  return new Response(JSON.stringify({ error: 'Server configuration error' }), {
+    status: 503,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+let body: { requestId?: string; action?: string; arbEsign?: string; revisionNotes?: string; csrfToken?: string; timestamp?: number; nonce?: string; signature?: string };
+try {
+  body = await Astro.request.json();
+} catch {
+  return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
+    status: 400,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+// CSRF token verification
+if (!verifyCsrfToken(session, body.csrfToken)) {
+  return new Response(
+    JSON.stringify({ error: 'Invalid security token. Please refresh the page and try again.' }),
+    { status: 403, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+
+// Request signing verification for high-value operations (approve/reject)
+const secret = env?.SESSION_SECRET;
+if (secret && (body.action === 'approve' || body.action === 'reject')) {
+  const signedRequest = extractSignedRequest(Astro.request, body);
+  if (signedRequest) {
+    const bodyForSigning = JSON.stringify({
+      requestId: body.requestId,
+      action: body.action,
+      arbEsign: body.arbEsign,
+      csrfToken: body.csrfToken,
+    });
+    const isValid = await verifySignedRequest(
+      'POST',
+      '/api/arb-approve',
+      bodyForSigning,
+      signedRequest,
+      secret,
+      300 // 5 minutes
+    );
+    if (!isValid) {
+      securityMonitor.trackUnauthorizedAccess('/api/arb-approve', session.email, ipAddress, 'Invalid request signature');
+      logger.warn('Invalid request signature for approve/reject', { requestId: body.requestId, action: body.action });
+      return new Response(
+        JSON.stringify({ error: 'Invalid request signature or request expired. Please try again.' }),
+        { status: 403, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+  } else {
+    // For backward compatibility, allow unsigned requests but log warning
+    logger.warn('Unsigned request for high-value operation', { action: body.action, requestId: body.requestId });
+  }
+}
+
+const requestId = (body.requestId ?? '').trim();
+const action = (body.action ?? '').toLowerCase();
+const arbEsign = (body.arbEsign ?? '').trim();
+const revisionNotes = (body.revisionNotes ?? '').trim();
+
+if (!requestId) {
+  return new Response(JSON.stringify({ error: 'Missing requestId.' }), {
+    status: 400,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const request = await getArbRequest(db, requestId);
+if (!request) {
+  return new Response(JSON.stringify({ error: 'Request not found.' }), {
+    status: 404,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+// Request revision: in_review → pending (revision notes required)
+if (action === 'request_revision' || action === 'request revision') {
+  if (request.status !== 'in_review') {
+    return new Response(
+      JSON.stringify({ error: 'Only requests in review can be sent back for revision.' }),
+      { status: 400, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+  if (!revisionNotes) {
+    return new Response(
+      JSON.stringify({ error: 'Please provide revision notes (e.g. what is missing or what the owner should update).' }),
+      { status: 400, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+  const clientIp = Astro.clientAddress || Astro.request.headers.get('cf-connecting-ip') || null;
+  const updated = await setArbRequestPendingForRevision(db, requestId, revisionNotes, session.email, effectiveRole, clientIp);
+  if (!updated) {
+    return new Response(JSON.stringify({ error: 'Update failed.' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  return new Response(
+    JSON.stringify({
+      success: true,
+      requestId,
+      status: 'pending',
+      message: 'Request returned to owner for revision. They can edit and resubmit for review.',
+    }),
+    { status: 200, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+
+// Approve / Reject: require in_review and arbEsign
+if (!['approve', 'reject', 'rejected'].includes(action)) {
+  return new Response(
+    JSON.stringify({ error: 'Invalid action. Use "approve", "reject", or "request_revision".' }),
+    { status: 400, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+if (!arbEsign) {
+  return new Response(
+    JSON.stringify({ error: 'ARB e-signature (arbEsign) is required for approve/reject.' }),
+    { status: 400, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+if (request.status !== 'in_review') {
+  return new Response(
+    JSON.stringify({ error: `Request must be in review to approve/reject. Current status: ${request.status}.` }),
+    { status: 400, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+
+const status = action === 'approve' ? 'approved' : 'rejected';
+const esignRecord = `${status.toUpperCase()} | ${arbEsign} | ${session.email} | ${new Date().toISOString()}`;
+const clientIp = Astro.clientAddress || Astro.request.headers.get('cf-connecting-ip') || null;
+const updated = await updateArbRequestStatus(db, requestId, status, esignRecord, session.email, effectiveRole, clientIp);
+
+if (!updated) {
+  return new Response(JSON.stringify({ error: 'Update failed.' }), {
+    status: 500,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+if (isAdminActingAs(session) && session.assumed_role) {
+  try {
+    const actorRole = session.role?.toLowerCase() === 'arb_board' ? 'arb_board' : 'admin';
+    await insertAdminAssumedRoleAudit(db, {
+      admin_email: session.email,
+      actor_role: actorRole,
+      action: 'action',
+      role_assumed: session.assumed_role,
+      action_detail: `arb_approve request_id=${requestId} action=${action} status=${status}`,
+      ip_address: Astro.request.headers.get('cf-connecting-ip') ?? Astro.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null,
+    });
+  } catch (auditErr) {
+    console.error('[arb-approve] assume-role audit insert failed:', auditErr);
+  }
+}
+
+return new Response(
+  JSON.stringify({
+    success: true,
+    requestId,
+    status,
+    message: `Request ${status}.`,
+  }),
+  { status: 200, headers: { 'Content-Type': 'application/json' } }
+);

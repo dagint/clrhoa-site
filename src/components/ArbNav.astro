@@ -1,0 +1,35 @@
+---
+/**
+ * Nav for ARB role: ARB Dashboard and Pre-approval library only.
+ * Shown when user is acting as ARB (e.g. on /portal/board or /board/library).
+ */
+interface Props {
+  currentPath: string;
+}
+
+const { currentPath } = Astro.props;
+
+const links: { href: string; label: string }[] = [
+  { href: '/portal/board', label: 'ARB' },
+  { href: '/portal/arb-dashboard', label: 'ARB Dashboard' },
+  { href: '/board/library', label: 'Pre-approval library' },
+];
+
+function isCurrent(href: string): boolean {
+  if (href === '/portal/board') return currentPath === '/portal/board';
+  return currentPath.startsWith(href);
+}
+---
+
+<nav class="bg-white border-b border-gray-200 portal-theme-header px-4 sm:px-6 py-2" aria-label="ARB administration">
+  <div class="max-w-4xl mx-auto flex flex-wrap items-center gap-x-4 gap-y-1">
+    {links.map(({ href, label }) => (
+      <a
+        href={href}
+        class={`text-sm py-1.5 px-1 rounded hover:bg-gray-100 portal-theme-text ${isCurrent(href) ? 'font-semibold text-clr-green' : 'text-gray-600 portal-theme-text-muted hover:text-clr-green'}`}
+      >
+        {label}
+      </a>
+    ))}
+  </div>
+</nav>

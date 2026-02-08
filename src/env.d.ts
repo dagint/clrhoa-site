@@ -1,5 +1,39 @@
 /// <reference types="astro/client" />
 
+/**
+ * Cloudflare bindings and secrets used by the app.
+ * Keep in sync with wrangler.toml ([[d1_databases]], [[kv_namespaces]], [[r2_buckets]])
+ * and secrets set via `wrangler secret put`.
+ */
+interface Env {
+  DB: D1Database;
+  CLOURHOA_USERS: KVNamespace;
+  CLOURHOA_FILES: R2Bucket;
+  SESSION_SECRET: string;
+  KV?: KVNamespace;
+  CLOUDFLARE_ACCOUNT_ID?: string;
+  CLOUDFLARE_API_TOKEN?: string;
+  D1_DATABASE_ID?: string;
+  GOOGLE_CLIENT_ID?: string;
+  GOOGLE_CLIENT_SECRET?: string;
+  BACKUP_ENCRYPTION_KEY?: string;
+  NOTIFY_BOARD_EMAIL?: string;
+  NOTIFY_ARB_EMAIL?: string;
+  NOTIFY_NOREPLY_EMAIL?: string;
+  /** Resend (optional): if set, email uses Resend; else MailChannels. */
+  RESEND_API_KEY?: string;
+  MAILCHANNELS_API_KEY?: string;
+  TWILIO_ACCOUNT_SID?: string;
+  TWILIO_AUTH_TOKEN?: string;
+  TWILIO_PHONE_NUMBER?: string;
+}
+
+type Runtime = import('@astrojs/cloudflare').Runtime<Env>;
+
+declare namespace App {
+  interface Locals extends Runtime {}
+}
+
 interface ImportMetaEnv {
   // Form and security
   readonly PUBLIC_STATICFORMS_API_KEY?: string;

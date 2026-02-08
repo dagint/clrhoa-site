@@ -1,0 +1,204 @@
+---
+/**
+ * Shared portal navigation. Cleaner menu: main links + More dropdown + Help dropdown.
+ * Props: currentPath, draftCount, role (effective); optional staffRole (whitelist) so we show Board/ARB links for staff who haven't elevated yet (marked restricted).
+ */
+interface Props {
+  currentPath: string;
+  draftCount?: number;
+  role?: string;
+  /** Whitelist role (session.role). When board/arb/admin/arb_board, show elevated-only links; when not elevated, link to request-elevated-access. */
+  staffRole?: string;
+  arbInReviewCount?: number;
+  vendorPendingCount?: number;
+}
+const { currentPath, draftCount = 0, role = '', staffRole = '', arbInReviewCount = 0, vendorPendingCount = 0 } = Astro.props;
+/** Red bubble for Requests: non-final ARB requests (pending + in_review). */
+const nonFinalCount = draftCount + arbInReviewCount;
+
+function isCurrent(href: string) {
+  if (href === '/portal/dashboard') return currentPath === '/portal/dashboard';
+  if (href === '/portal/board') return currentPath === '/portal/board' || currentPath.startsWith('/board/');
+  return currentPath.startsWith(href);
+}
+const linkClass = (href: string) =>
+  isCurrent(href) ? 'text-clr-green font-medium' : 'text-gray-600 hover:text-clr-green portal-theme-text-muted';
+/** Effective role is elevated (user has current elevated access). */
+const isElevated = role === 'board' || role === 'admin' || role === 'arb' || role === 'arb_board';
+/** User has a staff whitelist role (can request elevation). Show Board/ARB links; when not elevated, they go to request-elevated-access. */
+const isStaffFromWhitelist = staffRole === 'board' || staffRole === 'admin' || staffRole === 'arb' || staffRole === 'arb_board';
+const isStaff = isElevated;
+---
+
+<header class="bg-white portal-theme-header portal-header-accent shadow-sm" role="banner">
+  <div class="max-w-4xl mx-auto px-4 sm:px-6 py-4">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <a href="/portal/dashboard" class="flex flex-col shrink-0">
+        <span class="flex items-center gap-2">
+          <span class="text-xl font-heading font-bold text-clr-green">Member Portal</span>
+          <span class="inline-flex items-center gap-1 rounded-full bg-clr-green/10 border border-clr-green/30 px-2 py-0.5 text-xs font-medium text-clr-green" aria-label="Members only area">Members only</span>
+        </span>
+        <span class="text-xs text-gray-500 portal-theme-text-muted mt-0.5">Crooked Lake Reserve HOA</span>
+      </a>
+
+      <nav class="flex flex-wrap items-center gap-2 sm:gap-3" aria-label="Portal navigation">
+        <a href="/portal/dashboard" class={`text-sm ${linkClass('/portal/dashboard')}`}>Home</a>
+        <a href="/portal/directory" class={`text-sm ${linkClass('/portal/directory')}`}>Directory</a>
+        <a href="/portal/documents" class={`text-sm ${linkClass('/portal/documents')}`}>Documents</a>
+        <a href="/portal/profile" class={`text-sm ${linkClass('/portal/profile')}`}>My account</a>
+
+        <div class="portal-nav-dropdown relative inline-block">
+          <details class="group" id="nav-more-details">
+            <summary class="list-none cursor-pointer text-sm text-gray-600 hover:text-clr-green portal-theme-text-muted flex items-center gap-0.5 py-1 px-2 rounded hover:bg-gray-100" aria-haspopup="true" aria-expanded="false" aria-controls="nav-more-menu">
+              More
+              <svg class="w-4 h-4 transition group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+            </summary>
+            <div id="nav-more-menu" class="absolute left-0 top-full mt-1 py-2 w-56 rounded-xl bg-white border border-gray-200 shadow-lg z-50 portal-theme-card" role="menu">
+              <a href="/portal/requests" class="flex items-center justify-between gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 portal-theme-text">
+                Requests
+                {nonFinalCount > 0 && <span class="bg-red-500 text-white text-xs font-bold rounded-full min-w-[1.25rem] h-5 flex items-center justify-center px-1" aria-label={`${nonFinalCount} in progress`}>{nonFinalCount}</span>}
+              </a>
+              <a href="/portal/my-requests" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 portal-theme-text">My requests (ARB)</a>
+              <a href="/portal/my-activity" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 portal-theme-text">My activity</a>
+              <a href="/portal/arb-request" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 portal-theme-text">New ARB request</a>
+              <a href="/portal/maintenance" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 portal-theme-text">Maintenance</a>
+              <a href="/portal/meetings" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 portal-theme-text">Meetings</a>
+              <a href="/portal/vendors" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 portal-theme-text">Vendors</a>
+              <a href="/portal/library" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 portal-theme-text">Pre-approval library</a>
+              <a href="/portal/assessments" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 portal-theme-text">Dues</a>
+              <a href="/portal/feedback" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 portal-theme-text">Feedback</a>
+              {isStaffFromWhitelist && (
+                <>
+                  <div class="border-t border-gray-100 my-1" />
+                  <p class="px-4 py-1.5 text-xs font-semibold text-amber-700 uppercase tracking-wide" id="nav-elevated-label">Board &amp; ARB (elevated access)</p>
+                  <a href={isElevated ? '/portal/arb-dashboard' : `/portal/request-elevated-access?return=${encodeURIComponent('/portal/arb-dashboard')}`} class="flex items-center justify-between gap-2 px-4 py-2 text-sm hover:bg-gray-50 {isElevated ? 'text-clr-green font-medium' : 'text-gray-600'}">
+                    <span>ARB Dashboard</span>
+                    {!isElevated && <span class="text-xs text-amber-600 font-medium" aria-hidden="true">Requires elevation</span>}
+                    {isElevated && arbInReviewCount > 0 && <span class="bg-amber-500 text-white text-xs font-bold rounded-full min-w-[1.25rem] h-5 flex items-center justify-center px-1" aria-label={`${arbInReviewCount} in review`}>{arbInReviewCount}</span>}
+                  </a>
+                  <a href={isElevated ? '/portal/board' : `/portal/request-elevated-access?return=${encodeURIComponent('/portal/board')}`} class="flex items-center justify-between gap-2 px-4 py-2 text-sm hover:bg-gray-50 {isElevated ? 'text-clr-green font-medium' : 'text-gray-600'}">
+                    <span>Board</span>
+                    {!isElevated && <span class="text-xs text-amber-600 font-medium" aria-hidden="true">Requires elevation</span>}
+                    {isElevated && vendorPendingCount > 0 && <span class="bg-amber-500 text-white text-xs font-bold rounded-full min-w-[1.25rem] h-5 flex items-center justify-center px-1" aria-label={`${vendorPendingCount} vendor submissions pending`}>{vendorPendingCount}</span>}
+                  </a>
+                  <a href={isElevated ? '/board/public-documents' : `/portal/request-elevated-access?return=${encodeURIComponent('/board/public-documents')}`} class="flex items-center justify-between gap-2 px-4 py-2 text-sm hover:bg-gray-50 {isElevated ? 'text-clr-green font-medium' : 'text-gray-600'}">
+                    <span>Public documents</span>
+                    {!isElevated && <span class="text-xs text-amber-600 font-medium" aria-hidden="true">Requires elevation</span>}
+                  </a>
+                  <a href={isElevated ? '/board/member-documents' : `/portal/request-elevated-access?return=${encodeURIComponent('/board/member-documents')}`} class="flex items-center justify-between gap-2 px-4 py-2 text-sm hover:bg-gray-50 {isElevated ? 'text-clr-green font-medium' : 'text-gray-600'}">
+                    <span>Member documents</span>
+                    {!isElevated && <span class="text-xs text-amber-600 font-medium" aria-hidden="true">Requires elevation</span>}
+                  </a>
+                  <a href={isElevated ? '/board/audit-logs' : `/portal/request-elevated-access?return=${encodeURIComponent('/board/audit-logs')}`} class="flex items-center justify-between gap-2 px-4 py-2 text-sm hover:bg-gray-50 {isElevated ? 'text-clr-green font-medium' : 'text-gray-600'}">
+                    <span>Audit logs</span>
+                    {!isElevated && <span class="text-xs text-amber-600 font-medium" aria-hidden="true">Requires elevation</span>}
+                  </a>
+                </>
+              )}
+            </div>
+          </details>
+        </div>
+
+        <div class="portal-nav-dropdown relative inline-block">
+          <details class="group" id="nav-help-details">
+            <summary class="list-none cursor-pointer text-sm text-gray-600 hover:text-clr-green portal-theme-text-muted flex items-center gap-0.5 py-1 px-2 rounded hover:bg-gray-100" aria-haspopup="true" aria-expanded="false" aria-controls="nav-help-menu">
+              Help
+              <svg class="w-4 h-4 transition group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+            </summary>
+            <div id="nav-help-menu" class="absolute right-0 top-full mt-1 py-2 w-52 rounded-xl bg-white border border-gray-200 shadow-lg z-50 portal-theme-card" role="menu">
+              <a href="/portal/news" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 portal-theme-text">News &amp; announcements</a>
+              <a href="/portal/docs" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 portal-theme-text">Documentation</a>
+              <a href="/portal/faq" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 portal-theme-text">FAQ</a>
+            </div>
+          </details>
+        </div>
+
+        <button type="button" id="theme-toggle" class="p-2 rounded-lg text-gray-500 hover:bg-gray-100 portal-theme-text-muted shrink-0" aria-label="Toggle dark mode" title="Toggle dark mode">
+          <span id="theme-icon-light" class="hidden" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg></span>
+          <span id="theme-icon-dark" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></span>
+        </button>
+
+        <a href="/" class="text-sm text-gray-500 hover:text-clr-green portal-theme-text-muted">Public site</a>
+        <a href="/api/logout" class="text-sm text-gray-500 hover:text-clr-orange">Sign out</a>
+      </nav>
+    </div>
+  </div>
+</header>
+
+<style>
+  .portal-nav-dropdown details summary::-webkit-details-marker { display: none; }
+</style>
+
+<script is:inline>
+  (function () {
+    var KEY = 'clrhoa_theme';
+    var root = document.documentElement;
+    var toggle = document.getElementById('theme-toggle');
+    var iconLight = document.getElementById('theme-icon-light');
+    var iconDark = document.getElementById('theme-icon-dark');
+    if (!toggle || !iconLight || !iconDark) return;
+    function applyTheme(dark) {
+      if (dark) {
+        root.classList.add('dark');
+        iconLight.classList.remove('hidden');
+        iconDark.classList.add('hidden');
+      } else {
+        root.classList.remove('dark');
+        iconLight.classList.add('hidden');
+        iconDark.classList.remove('hidden');
+      }
+    }
+    try {
+      var stored = localStorage.getItem(KEY);
+      var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      applyTheme(stored === 'dark' || (stored !== 'light' && prefersDark));
+    } catch (_) { applyTheme(false); }
+    toggle.addEventListener('click', function () {
+      var isDark = root.classList.toggle('dark');
+      try { localStorage.setItem(KEY, isDark ? 'dark' : 'light'); } catch (_) {}
+      iconLight.classList.toggle('hidden', !isDark);
+      iconDark.classList.toggle('hidden', isDark);
+    });
+
+    function syncDetailsAria() {
+      var more = document.getElementById('nav-more-details');
+      var help = document.getElementById('nav-help-details');
+      if (more && more.tagName === 'DETAILS') {
+        var moreSummary = more.querySelector('summary');
+        if (moreSummary) moreSummary.setAttribute('aria-expanded', String(more.open));
+      }
+      if (help && help.tagName === 'DETAILS') {
+        var helpSummary = help.querySelector('summary');
+        if (helpSummary) helpSummary.setAttribute('aria-expanded', String(help.open));
+      }
+    }
+    var moreDetails = document.getElementById('nav-more-details');
+    var helpDetails = document.getElementById('nav-help-details');
+    if (moreDetails) moreDetails.addEventListener('toggle', syncDetailsAria);
+    if (helpDetails) helpDetails.addEventListener('toggle', syncDetailsAria);
+    syncDetailsAria();
+
+    // Close dropdown when pointer leaves after a short delay (so it rolls up when focus moves away)
+    var closeDelayMs = 400;
+    function setupCloseOnLeave(container, detailsEl) {
+      if (!container || !detailsEl) return;
+      var closeTimer = null;
+      container.addEventListener('pointerleave', function () {
+        closeTimer = window.setTimeout(function () {
+          detailsEl.open = false;
+          closeTimer = null;
+        }, closeDelayMs);
+      });
+      container.addEventListener('pointerenter', function () {
+        if (closeTimer) {
+          window.clearTimeout(closeTimer);
+          closeTimer = null;
+        }
+      });
+    }
+    document.querySelectorAll('.portal-nav-dropdown').forEach(function (el) {
+      var detailsEl = el.querySelector('details');
+      if (detailsEl) setupCloseOnLeave(el, detailsEl);
+    });
+  })();
+</script>

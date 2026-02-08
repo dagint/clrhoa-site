@@ -1,5 +1,6 @@
 ---
 title: Bylaws
+slug: bylaws
 category: Governing Documents
 description: Bylaws (2005) including Addendum A. Governs the operation of the Crooked Lake Reserve HOA.
 fileUrl: /docs/CLR-Bylaws-2024.pdf

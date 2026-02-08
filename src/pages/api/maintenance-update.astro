@@ -1,0 +1,56 @@
+---
+/**
+ * POST /api/maintenance-update — board updates status/vendor for a request.
+ * Body: id, status?, vendor_assigned?
+ */
+export const prerender = false;
+
+import { requireSession, requireDb, jsonResponse } from '../../lib/api-helpers';
+import { getEffectiveRole } from '../../lib/auth';
+import { getMaintenanceById, updateMaintenanceRequest } from '../../lib/maintenance-db';
+
+const auth = await requireSession(Astro);
+if (auth.response) return auth.response;
+const { session } = auth;
+
+const effectiveRole = getEffectiveRole(session);
+const isBoard = effectiveRole === 'board' || effectiveRole === 'admin' || effectiveRole === 'arb_board';
+if (!isBoard) return jsonResponse({ error: 'Forbidden' }, 403);
+
+const dbResult = requireDb(Astro.locals.runtime?.env);
+if (dbResult.response) return dbResult.response;
+const { db } = dbResult;
+
+if (Astro.request.method !== 'POST' && Astro.request.method !== 'PUT') {
+  return new Response(null, { status: 405, headers: { Allow: 'POST, PUT' } });
+}
+
+let body: Record<string, unknown>;
+try {
+  const ct = Astro.request.headers.get('content-type') ?? '';
+  body = ct.includes('application/json') ? await Astro.request.json() : Object.fromEntries(await Astro.request.formData());
+} catch {
+  return jsonResponse({ error: 'Invalid body' }, 400);
+}
+
+const id = String(body.id ?? '').trim();
+if (!id) return jsonResponse({ error: 'id is required' }, 400);
+
+const status = body.status != null ? String(body.status).trim() : undefined;
+const vendorAssigned = body.vendor_assigned !== undefined ? (body.vendor_assigned ? String(body.vendor_assigned).trim() : null) : undefined;
+
+const validStatuses = ['reported', 'in_progress', 'completed'];
+if (status !== undefined && !validStatuses.includes(status)) {
+  return jsonResponse({ error: 'status must be reported, in_progress, or completed' }, 400);
+}
+
+const existing = await getMaintenanceById(db, id);
+if (!existing) return jsonResponse({ error: 'Request not found' }, 404);
+
+await updateMaintenanceRequest(db, id, {
+  status: status ?? existing.status,
+  vendor_assigned: vendorAssigned !== undefined ? vendorAssigned : existing.vendor_assigned,
+});
+
+return jsonResponse({ success: true, message: 'Updated' });
+---

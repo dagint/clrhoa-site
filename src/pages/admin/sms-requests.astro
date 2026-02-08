@@ -1,0 +1,61 @@
+---
+export const prerender = false;
+
+import BoardLayout from '../../layouts/BoardLayout.astro';
+import { getBoardContext } from '../../lib/board-context';
+import { getSmsFeatureRequestCounts, listSmsFeatureRequests } from '../../lib/sms-feature-request-db';
+
+const ctx = await getBoardContext(Astro);
+if (ctx.redirect) return Astro.redirect(ctx.redirect);
+const { env, session, effectiveRole } = ctx;
+
+const db = env?.DB;
+const counts = db ? await getSmsFeatureRequestCounts(db) : { distinctLots: 0, totalRequests: 0 };
+const requests = db ? await listSmsFeatureRequests(db, 500) : [];
+
+function formatDate(s: string | null): string {
+  if (!s) return '—';
+  try {
+    const d = new Date(s);
+    return Number.isNaN(d.getTime()) ? s : d.toLocaleString();
+  } catch {
+    return s ?? '—';
+  }
+}
+---
+
+<BoardLayout title="SMS feature requests" subtitle="Members who want SMS (costs HOA money). Sending is disabled." draftCount={0} role={effectiveRole} session={session} elevatedUntil={session.elevated_until} mainWide showRoleBanner={false}>
+  <div class="mb-6 rounded-lg border border-gray-200 bg-white p-6">
+    <p class="text-2xl font-heading font-bold text-clr-green">
+      {counts.distinctLots} {counts.distinctLots === 1 ? 'user wants' : 'users want'} SMS
+    </p>
+    <p class="text-sm text-gray-500 mt-1">
+      {counts.totalRequests} total request{counts.totalRequests === 1 ? '' : 's'} (by lot number). SMS sending is disabled; this report is for planning.
+    </p>
+  </div>
+
+  <div class="rounded-xl border border-gray-200 bg-white overflow-hidden">
+    {requests.length === 0 ? (
+      <p class="p-6 text-gray-500">No SMS feature requests yet.</p>
+    ) : (
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50 border-b border-gray-200">
+            <tr>
+              <th class="text-left py-2 px-3 font-medium text-gray-700">Lot</th>
+              <th class="text-left py-2 px-3 font-medium text-gray-700">Requested at</th>
+            </tr>
+          </thead>
+          <tbody>
+            {requests.map((row) => (
+              <tr class="border-b border-gray-100 hover:bg-gray-50/50">
+                <td class="py-2 px-3 font-medium">{row.lot_number}</td>
+                <td class="py-2 px-3 text-gray-600">{formatDate(row.created_at)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )}
+  </div>
+</BoardLayout>

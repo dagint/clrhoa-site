@@ -1,0 +1,67 @@
+---
+export const prerender = false;
+
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import { getPublicMeetingById } from '../../../lib/meetings-db';
+
+const { id } = Astro.params;
+if (!id) {
+  return Astro.redirect('/news');
+}
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const db = env?.DB;
+
+const meeting = db ? await getPublicMeetingById(db, id) : null;
+if (!meeting) {
+  return Astro.redirect('/news');
+}
+
+function formatDateTime(dt: string): string {
+  try {
+    return new Date(dt).toLocaleString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+  } catch {
+    return dt;
+  }
+}
+---
+
+<BaseLayout title={meeting.title ?? 'Meeting'} description={meeting.description ?? undefined}>
+  <article class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+    <div class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 max-w-2xl mx-auto">
+      <header class="mb-6">
+        <h1 class="text-4xl font-heading font-bold text-clr-green mb-4">{meeting.title ?? 'Meeting'}</h1>
+        <div class="text-clr-gray text-sm mb-4 font-body">
+          <time datetime={meeting.datetime}>
+            {formatDateTime(meeting.datetime)}
+          </time>
+        </div>
+        {meeting.location && (
+          <p class="text-gray-700 font-body">
+            <span class="font-medium">Location:</span> {meeting.location}
+          </p>
+        )}
+      </header>
+
+      {meeting.description && (
+        <div class="news-article-prose font-body text-base text-gray-700 whitespace-pre-wrap">
+          {meeting.description}
+        </div>
+      )}
+
+      <footer class="mt-8 pt-6 border-t border-gray-100">
+        <a href="/news" class="text-clr-orange font-semibold hover:underline font-body">
+          ← Back to News
+        </a>
+      </footer>
+    </div>
+  </article>
+</BaseLayout>

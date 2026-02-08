@@ -1,0 +1,98 @@
+---
+/**
+ * POST /api/maintenance-submit — owner submits a maintenance request.
+ * Multipart: category, description, photos[] (image/*, 5MB each, 25MB total).
+ * owner_email from session.
+ */
+export const prerender = false;
+
+import { requireSession, requireDb, jsonResponse } from '../../lib/api-helpers';
+import { createMaintenanceId, insertMaintenanceRequest, MAINTENANCE_CATEGORIES } from '../../lib/maintenance-db';
+
+const MAX_FILE_BYTES = 5 * 1024 * 1024;
+const MAX_TOTAL_BYTES = 25 * 1024 * 1024;
+const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/heic'];
+
+const auth = await requireSession(Astro);
+if (auth.response) return auth.response;
+const { session } = auth;
+
+const dbResult = requireDb(Astro.locals.runtime?.env);
+if (dbResult.response) return dbResult.response;
+const { db } = dbResult;
+const r2 = Astro.locals.runtime?.env?.CLOURHOA_FILES;
+if (!r2) return jsonResponse({ error: 'Server configuration error' }, 503);
+
+if (Astro.request.method !== 'POST') {
+  return new Response(null, { status: 405, headers: { Allow: 'POST' } });
+}
+
+let category = '';
+let description = '';
+const files: File[] = [];
+
+try {
+  const form = await Astro.request.formData();
+  category = String(form.get('category') ?? '').trim().toLowerCase();
+  description = String(form.get('description') ?? '').trim();
+  const photoList = form.getAll('photos');
+  for (const p of photoList) {
+    if (p instanceof File && p.size > 0) files.push(p);
+  }
+  if (form.get('photos') instanceof File) {
+    const p = form.get('photos') as File;
+    if (p.size > 0) files.push(p);
+  }
+} catch {
+  return jsonResponse({ error: 'Invalid form data' }, 400);
+}
+
+const validCategories = MAINTENANCE_CATEGORIES as readonly string[];
+if (!category || !validCategories.includes(category)) {
+  return jsonResponse({ error: 'Valid category is required' }, 400);
+}
+if (!description) {
+  return jsonResponse({ error: 'Description is required' }, 400);
+}
+
+let totalBytes = 0;
+for (const f of files) {
+  if (f.size > MAX_FILE_BYTES) {
+    return jsonResponse({ error: `File "${f.name}" exceeds 5MB limit` }, 400);
+  }
+  const type = f.type.toLowerCase();
+  if (!ALLOWED_TYPES.includes(type) && !type.startsWith('image/')) {
+    return jsonResponse({ error: `File "${f.name}" must be an image (JPEG, PNG, GIF, WebP, HEIC)` }, 400);
+  }
+  totalBytes += f.size;
+}
+if (totalBytes > MAX_TOTAL_BYTES) {
+  return jsonResponse({ error: 'Total photo size exceeds 25MB' }, 400);
+}
+
+const id = createMaintenanceId();
+const r2Prefix = `maintenance/${id}`;
+const photoKeys: string[] = [];
+
+for (let i = 0; i < files.length; i++) {
+  const f = files[i]!;
+  const ext = f.name.includes('.') ? f.name.split('.').pop()! : 'jpg';
+  const key = `${r2Prefix}/originals/${i}_${Date.now()}.${ext}`;
+  await r2.put(key, await f.arrayBuffer(), {
+    httpMetadata: { contentType: f.type || 'image/jpeg' },
+  });
+  photoKeys.push(key);
+}
+
+const photosJson = JSON.stringify(photoKeys);
+await insertMaintenanceRequest(db, id, session.email, category, description, photosJson);
+
+if (env?.NOTIFY_BOARD_EMAIL) {
+  const { sendEmail } = await import('../../lib/notifications');
+  const link = `${Astro.url.origin}/board/maintenance`;
+  const body = `<p>New maintenance request <strong>#${id}</strong></p><p>From: ${session.email}</p><p>Category: ${category}</p><p>Description: ${description.slice(0, 500)}${description.length > 500 ? '…' : ''}</p><p><a href="${link}">View Board Maintenance</a></p>`;
+  await sendEmail(env, env.NOTIFY_BOARD_EMAIL, `New Maintenance Request #${id}`, body);
+}
+
+return jsonResponse({ success: true, id, message: 'Maintenance request submitted' });
+---

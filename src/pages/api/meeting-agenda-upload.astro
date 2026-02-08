@@ -1,0 +1,65 @@
+---
+/**
+ * POST /api/meeting-agenda-upload — board uploads agenda (PDF or image) for a meeting.
+ * Multipart: file (application/pdf or image/jpeg, etc.). Images are expected to be resized client-side.
+ * Returns { key } for use in meeting create/update.
+ */
+export const prerender = false;
+
+import { requireSession, jsonResponse } from '../../lib/api-helpers';
+import { getEffectiveRole } from '../../lib/auth';
+
+const auth = await requireSession(Astro);
+if (auth.response) return auth.response;
+const { session } = auth;
+
+const effectiveRole = getEffectiveRole(session);
+const isBoard = effectiveRole === 'board' || effectiveRole === 'admin' || effectiveRole === 'arb_board';
+if (!isBoard) return jsonResponse({ error: 'Forbidden' }, 403);
+
+const r2 = Astro.locals.runtime?.env?.CLOURHOA_FILES;
+if (!r2) return jsonResponse({ error: 'Server configuration error' }, 503);
+
+if (Astro.request.method !== 'POST') {
+  return new Response(null, { status: 405, headers: { Allow: 'POST' } });
+}
+
+const ALLOWED_PDF = 'application/pdf';
+const ALLOWED_IMAGES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+const MAX_SIZE = 10 * 1024 * 1024;
+
+let file: File;
+let contentType: string;
+let ext: string;
+try {
+  const form = await Astro.request.formData();
+  const f = form.get('file');
+  if (!(f instanceof File) || f.size === 0) {
+    return jsonResponse({ error: 'No file or empty file' }, 400);
+  }
+  if (f.size > MAX_SIZE) {
+    return jsonResponse({ error: 'File must be under 10MB' }, 400);
+  }
+  if (f.type === ALLOWED_PDF) {
+    contentType = 'application/pdf';
+    ext = 'pdf';
+    file = f;
+  } else if (ALLOWED_IMAGES.includes(f.type) || (f.type && f.type.startsWith('image/'))) {
+    contentType = f.type === 'image/png' ? 'image/png' : f.type === 'image/webp' ? 'image/webp' : f.type === 'image/gif' ? 'image/gif' : 'image/jpeg';
+    ext = contentType === 'image/png' ? 'png' : contentType === 'image/webp' ? 'webp' : contentType === 'image/gif' ? 'gif' : 'jpg';
+    file = f;
+  } else {
+    return jsonResponse({ error: 'Only PDF or image files (JPEG, PNG, WebP, GIF) are allowed' }, 400);
+  }
+} catch {
+  return jsonResponse({ error: 'Invalid form data' }, 400);
+}
+
+const id = crypto.randomUUID?.() ?? Math.random().toString(36).slice(2) + Date.now().toString(36);
+const key = `meetings/agendas/${id}.${ext}`;
+await r2.put(key, await file.arrayBuffer(), {
+  httpMetadata: { contentType },
+});
+
+return jsonResponse({ success: true, key });
+---

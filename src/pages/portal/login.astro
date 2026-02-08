@@ -1,0 +1,80 @@
+---
+export const prerender = false;
+
+const url = Astro.url;
+const error = url.searchParams.get('error');
+const minutes = url.searchParams.get('minutes');
+const errorMessage =
+  error === 'missing'
+    ? 'Please enter your email address.'
+    : error === 'unauthorized'
+      ? 'This email is not on the member list. Contact the board if you believe this is an error.'
+      : error === 'locked'
+        ? `Account temporarily locked due to too many failed login attempts. Please try again in ${minutes || '15'} minutes.`
+        : error === 'invalid' || error === 'config'
+          ? 'Something went wrong. Please try again.'
+          : null;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Portal Login | Crooked Lake Reserve HOA</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#3B82F6" />
+    <meta name="robots" content="noindex, nofollow" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap"
+    />
+    <style is:inline>
+      body { font-family: Inter, system-ui, sans-serif; background: #f9fafb; color: #111827; min-height: 100vh; margin: 0; }
+      .container { max-width: 28rem; margin-left: auto; margin-right: auto; padding: 1rem; padding-top: 3rem; }
+      .card { background: #fff; border-radius: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,.08); border: 1px solid #e5e7eb; padding: 2rem; }
+      h1 { font-family: 'Playfair Display', serif; font-size: 1.5rem; font-weight: 700; color: #1e5f38; margin: 0 0 0.5rem 0; }
+      .sub { color: #6b7280; font-size: 0.875rem; margin-bottom: 1.5rem; }
+      label { display: block; font-weight: 500; color: #374151; margin-bottom: 0.375rem; font-size: 0.875rem; }
+      input { width: 100%; padding: 0.625rem 0.75rem; border: 1px solid #d1d5db; border-radius: 0.5rem; font-size: 1rem; box-sizing: border-box; }
+      input:focus { outline: none; border-color: #1e5f38; box-shadow: 0 0 0 3px rgba(30,95,56,.15); }
+      .btn { display: block; width: 100%; padding: 0.75rem 1rem; background: #1e5f38; color: #fff; border: none; border-radius: 0.5rem; font-size: 1rem; font-weight: 600; cursor: pointer; margin-top: 1rem; }
+      .btn:hover { filter: brightness(1.1); }
+      .err { background: #fef2f2; color: #b91c1c; padding: 0.75rem; border-radius: 0.5rem; font-size: 0.875rem; margin-bottom: 1rem; }
+      .back { margin-top: 1.5rem; text-align: center; }
+      .back a { color: #1e5f38; font-weight: 500; text-decoration: none; }
+      .back a:hover { text-decoration: underline; }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="card">
+        <h1>Member Portal</h1>
+        <p class="sub">Crooked Lake Reserve HOA - sign in with your registered email.</p>
+
+        {errorMessage && <div class="err" role="alert">{errorMessage}</div>}
+
+        <form action="/api/login" method="post" autocomplete="on">
+          <label for="email">Email address</label>
+          <input
+            id="email"
+            type="email"
+            name="email"
+            required
+            autocomplete="email"
+            placeholder="you@example.com"
+          />
+          <input type="hidden" name="name" value="" />
+          <button type="submit" class="btn">Sign in</button>
+        </form>
+
+        <div class="back">
+          <a href="/">← Back to site</a>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

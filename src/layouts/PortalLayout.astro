@@ -1,0 +1,38 @@
+---
+/**
+ * Layout for portal (member) pages. Ensures UTF-8 charset and consistent document structure
+ * so special characters (e.g. ellipsis …) and formatting render correctly.
+ * Includes global search bar and top spacing so all portal pages share the same chrome.
+ */
+import '../styles/tailwind.css';
+import GlobalSearch from '../components/GlobalSearch.astro';
+import FeedbackWidget from '../components/FeedbackWidget.astro';
+import UsageBeacon from '../components/UsageBeacon.astro';
+
+interface Props {
+  title?: string;
+}
+
+const { title = 'Member Portal | Crooked Lake Reserve HOA' } = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{title}</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#1e5f38" />
+    <meta name="robots" content="noindex, nofollow" />
+  </head>
+  <body class="min-h-screen bg-gray-50 text-gray-900 font-body">
+    <GlobalSearch fixed={true} class="portal-theme-header" />
+    <div class="pt-14">
+      <slot />
+    </div>
+    <FeedbackWidget />
+    <UsageBeacon />
+  </body>
+</html>

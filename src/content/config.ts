@@ -16,7 +16,7 @@ const documentsCollection = defineCollection({
   type: 'content',
   schema: z.object({
     title: z.string(),
-    slug: z.string().optional(),
+    slug: z.string().optional(), // when set, can be overridden by board/ARB uploads (bylaws, covenants, proxy-form, arb-request-form)
     category: z.enum(['Governing Documents', 'Policies', 'Forms', 'Minutes', 'Other']),
     description: z.string(),
     // Accept full URLs or site-relative paths (e.g. /documents/files/name.pdf)

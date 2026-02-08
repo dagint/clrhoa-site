@@ -1,6 +1,8 @@
 ---
 import '../styles/tailwind.css';
 import Analytics from '../components/Analytics.astro';
+import FeedbackWidget from '../components/FeedbackWidget.astro';
+import UsageBeacon from '../components/UsageBeacon.astro';
 
 interface Props {
   title: string;
@@ -555,10 +557,29 @@ const resourcesByCategory = {
 
           // Close dropdown when clicking outside
           document.addEventListener('click', (e) => {
-            if (!resourcesDropdown.contains(e.target as Node)) {
+            const target = e.target;
+            if (!target || !resourcesDropdown.contains(target)) {
               dropdownMenu?.classList.add('opacity-0', 'invisible');
               dropdownMenu?.classList.remove('opacity-100', 'visible');
               resourcesDropdownButton.setAttribute('aria-expanded', 'false');
+            }
+          });
+
+          // Close dropdown when pointer leaves after a short delay (roll up when focus moves away)
+          let closeTimer = null;
+          const closeDelayMs = 400;
+          resourcesDropdown.addEventListener('pointerleave', () => {
+            closeTimer = window.setTimeout(() => {
+              dropdownMenu?.classList.add('opacity-0', 'invisible');
+              dropdownMenu?.classList.remove('opacity-100', 'visible');
+              resourcesDropdownButton.setAttribute('aria-expanded', 'false');
+              closeTimer = null;
+            }, closeDelayMs);
+          });
+          resourcesDropdown.addEventListener('pointerenter', () => {
+            if (closeTimer) {
+              window.clearTimeout(closeTimer);
+              closeTimer = null;
             }
           });
         }
@@ -666,5 +687,7 @@ const resourcesByCategory = {
         </div>
       </div>
     </footer>
+    <FeedbackWidget />
+    <UsageBeacon />
   </body>
 </html>

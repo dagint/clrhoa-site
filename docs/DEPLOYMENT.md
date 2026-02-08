@@ -2,6 +2,8 @@
 
 Complete guide for deploying the Crooked Lake Reserve HOA website to Cloudflare Pages.
 
+**Portal and DB-backed updates:** If you are deploying the member portal and DB-backed public pages (vendors, news) to production for the first time, or need to ensure login and the allow list work, see **[DEPLOYMENT_PORTAL_PRODUCTION.md](./DEPLOYMENT_PORTAL_PRODUCTION.md)** for a focused checklist (D1/KV/R2, migrations, first admin in KV, and what won’t break).
+
 ## ✅ Pre-Deployment Checklist
 
 ### 1. Install Dependencies

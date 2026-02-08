@@ -17,11 +17,24 @@ yarn-error.log*
 pnpm-debug.log*
 *.log
 
-# environment variables
+# environment variables and secrets
 .env
 .env.local
 .env.production
+.env.development
+.env.test
 .env.*.local
+.dev.vars
+*.pem
+*.key
+*credentials*.json
+secrets*.json
+
+# Wrangler local state (D1 SQLite, KV cache, etc.)
+.wrangler/
+
+# D1/DB backups (contain PII and sensitive data)
+backups/
 
 # macOS-specific files
 .DS_Store

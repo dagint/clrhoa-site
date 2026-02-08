@@ -1,0 +1,80 @@
+---
+export const prerender = false;
+
+import PortalLayout from '../../layouts/PortalLayout.astro';
+import ProtectedPage from '../../components/ProtectedPage.astro';
+import PortalNav from '../../components/PortalNav.astro';
+import { getPortalContext } from '../../lib/portal-context';
+import { listPortalNewsItems, getNewsItemImageKeys } from '../../lib/news-items-db';
+import { listArbRequestsByHousehold } from '../../lib/arb-db';
+
+const { env, session, effectiveRole } = await getPortalContext(Astro);
+if (!session) return Astro.redirect('/portal/login');
+
+const db = env?.DB;
+const items = db ? await listPortalNewsItems(db) : [];
+const allRequests = db ? await listArbRequestsByHousehold(db, session.email) : [];
+const draftCount = allRequests.filter((r) => r.status === 'pending').length;
+
+function formatDate(s: string | null): string {
+  if (!s) return '—';
+  try {
+    return new Date(s).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  } catch {
+    return s;
+  }
+}
+---
+
+<PortalLayout title="News & Announcements | Member Portal | Crooked Lake Reserve HOA">
+  <ProtectedPage>
+  <div class="min-h-screen portal-theme-bg font-body">
+    <PortalNav currentPath="/portal/news" draftCount={draftCount} role={effectiveRole} staffRole={session?.role ?? ''} />
+
+    <main class="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+      <h2 class="text-2xl font-heading font-bold text-clr-green mb-2">Board announcements</h2>
+      <p class="text-gray-600 mb-6">All news and announcements from the board that are visible in the portal (members-only items are not on the public site).</p>
+
+      {items.length === 0 ? (
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center text-gray-500">
+          No announcements yet.
+        </div>
+      ) : (
+        <ul class="space-y-6">
+          {items.map((item) => {
+            const imageKeys = getNewsItemImageKeys(item);
+            return (
+            <li class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+              <div class="flex flex-wrap items-start justify-between gap-2 mb-2">
+                <h3 class="text-lg font-heading font-semibold text-clr-green">{item.title}</h3>
+                <span class="text-sm text-gray-500">
+                  {formatDate(item.created_at)}
+                  {item.is_public === 1 ? (
+                    <span class="ml-2 text-clr-green">Public</span>
+                  ) : (
+                    <span class="ml-2 text-amber-600">Members only</span>
+                  )}
+                </span>
+              </div>
+              <div class="prose prose-gray max-w-none text-sm whitespace-pre-wrap font-body">{item.body}</div>
+              {imageKeys.length > 0 && (
+                <div class="mt-3 flex flex-wrap gap-2">
+                  {imageKeys.slice(0, 6).map((key) => (
+                    <img src={`/api/news-file/${key}`} alt="" class="w-20 h-20 object-cover rounded-lg border border-gray-200" loading="lazy" />
+                  ))}
+                  {imageKeys.length > 6 && <span class="text-xs text-gray-500 self-center">+{imageKeys.length - 6} more</span>}
+                </div>
+              )}
+              {item.is_public === 1 && (
+                <p class="mt-3">
+                  <a href={`/news/item/${item.id}`} class="text-clr-orange font-semibold hover:underline text-sm">View on public site →</a>
+                </p>
+              )}
+            </li>
+          );})}
+        </ul>
+      )}
+    </main>
+  </div>
+  </ProtectedPage>
+</PortalLayout>

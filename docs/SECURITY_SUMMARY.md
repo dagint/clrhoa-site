@@ -1,170 +1,91 @@
 # Security Posture Summary
 
-## Current Status: **A- (Excellent)**
+## Current Status: **A (Strong)**
 
 ### Overall Assessment
 
-The Crooked Lake Reserve HOA website has a **strong security posture** for a static site. The architecture is inherently secure due to its static nature, and recent improvements have significantly enhanced the security profile.
+The Crooked Lake Reserve HOA site uses a **hybrid architecture**: a largely static public site plus a **server-rendered member portal and board area** (Astro on Cloudflare with D1, KV, R2). Security is enforced with session auth, role-based access, security headers, rate limiting, and centralized access control. The public side exposes no PII or secrets.
 
 ## Security Score Breakdown
 
 | Category | Score | Status |
 |----------|-------|--------|
-| **Architecture** | 95/100 | ✅ Excellent |
-| **Form Security** | 90/100 | ✅ Excellent |
-| **Privacy Protection** | 95/100 | ✅ Excellent |
-| **Security Headers** | 90/100 | ✅ Excellent |
-| **Dependency Management** | 85/100 | ✅ Good |
-| **Monitoring** | 70/100 | ⚠️ Needs Improvement |
+| **Architecture & deployment** | 92/100 | ✅ Strong |
+| **Authentication & session** | 92/100 | ✅ Strong |
+| **Authorization & access control** | 92/100 | ✅ Strong |
+| **Security headers & CSP** | 90/100 | ✅ Strong |
+| **Input/output safety** | 88/100 | ✅ Good |
+| **Rate limiting & abuse** | 88/100 | ✅ Good |
+| **Privacy & compliance** | 90/100 | ✅ Strong |
+| **Dependency & monitoring** | 82/100 | ✅ Good |
 
-**Overall: 87.5/100 (A-)**
+**Overall: 90/100 (A)**
 
 ## ✅ Implemented Security Measures
 
-### 1. Architecture Security
-- ✅ Static site (no server-side code execution)
-- ✅ No database (no SQL injection risk)
-- ✅ Minimal attack surface
-- ✅ Deployed on Cloudflare Pages (DDoS protection)
+### 1. Architecture & deployment
 
-### 2. Form Security
-- ✅ StaticForms with optional reCAPTCHA bot protection
-- ✅ Honeypot field for spam prevention
-- ✅ Client-side validation with error handling
-- ✅ Form submissions via trusted third-party (StaticForms)
-- ✅ Server-side validation handled by StaticForms
+- **Public**: Static or limited server-rendered pages; only `PUBLIC_*` env and safe DB helpers; no session or secrets.
+- **Portal/board**: Server-rendered with session auth (signed cookies, KV whitelist, D1, R2). Secrets in Cloudflare env only.
+- **Cloudflare**: HTTPS, DDoS mitigation, edge deployment.
 
-### 3. Privacy Protection
-- ✅ No exposed email addresses
-- ✅ Generic approach (no named individuals)
-- ✅ Privacy-friendly analytics (GDPR compliant)
-- ✅ No cookies without consent
+### 2. Authentication & session
 
-### 4. Security Headers (New)
-- ✅ Content Security Policy (CSP)
-- ✅ X-Content-Type-Options: nosniff
-- ✅ X-Frame-Options: DENY
-- ✅ Strict-Transport-Security (HSTS)
-- ✅ Referrer-Policy
-- ✅ Permissions-Policy
+- Signed session cookie (HMAC-SHA256); HttpOnly, Secure, SameSite=Lax; optional inactivity timeout and fingerprint.
+- Login rate-limited and account lockout (KV). Access controlled by KV whitelist.
+- CSRF and origin checks on mutating APIs.
 
-### 5. Security Files (New)
-- ✅ robots.txt configured
-- ✅ security.txt for responsible disclosure
+### 3. Authorization & access control
 
-### 6. Environment Security
-- ✅ Sensitive keys excluded from git
-- ✅ Environment variables properly configured
-- ✅ Public keys only exposed (safe)
+- Middleware: portal requires session (and profile completeness); board requires elevated role.
+- Centralized ARB access: `requireArbRequestAccess` / `requireArbRequestOwner` in `src/lib/access-control.ts`.
+- File access: ARB attachments (owner or elevated); member documents only if key exists in DB.
+- Data access documented in `DATA_ACCESS_CONTROL.md`; directory access logged.
 
-## ⚠️ Recommendations for Further Improvement
+### 4. Security headers (middleware)
 
-### High Priority (Already Implemented)
-1. ✅ Add security headers
-2. ✅ Add robots.txt
-3. ✅ Add security.txt
+- Content-Security-Policy, HSTS, X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Permissions-Policy, X-XSS-Protection.
 
-### Medium Priority
+### 5. Input/output safety
 
-4. **Dependency Management**
-   - Set up Dependabot for automated updates
-   - Regular `npm audit` checks
-   - Document update process
+- Centralized sanitization (`src/lib/sanitize.ts`). Parameterized DB queries. Path traversal rejected; member-doc keys validated against DB.
 
-5. **Monitoring & Alerts**
-   - Set up security monitoring
-   - Alert on dependency vulnerabilities
-   - Monitor form submission patterns
+### 6. Rate limiting & abuse
 
-6. **Subresource Integrity (SRI)**
-   - Add SRI hashes for external scripts
-   - Verify script integrity
+- Per-IP rate limits (KV) on login, ARB actions, directory reveal, CSV upload, etc. Login lockout. See `RATE_LIMITING.md`.
+- Contact form: StaticForms with honeypot and optional reCAPTCHA.
 
-### Low Priority
+### 7. Security files & disclosure
 
-7. **Security Testing**
-   - Regular penetration testing
-   - Automated security scanning
-   - Dependency vulnerability scanning
+- robots.txt (dynamic); security.txt at `/.well-known/security.txt`; Dependabot enabled.
 
-8. **Documentation**
-   - Incident response plan
-   - Security update procedures
-   - Backup and recovery procedures
+### 8. Privacy & compliance
 
-## Security Best Practices Followed
+- No PII on public site; portal/board show only what’s needed per role; directory access logged. Privacy-friendly analytics; env split (public vs runtime) documented.
 
-1. ✅ **Defense in Depth** - Multiple layers of security
-2. ✅ **Least Privilege** - Minimal permissions and access
-3. ✅ **Privacy by Design** - Privacy considerations built-in
-4. ✅ **Secure by Default** - Security headers enabled
-5. ✅ **Regular Updates** - Modern dependencies
-6. ✅ **Input Validation** - Client and server-side
-7. ✅ **Output Encoding** - Framework handles automatically
-8. ✅ **HTTPS Everywhere** - Enforced via HSTS
+## ⚠️ Recommendations
 
-## Compliance Status
+- **Monitoring / incident response**: Document runbooks (e.g. in `SECURITY_MONITORING.md`) and incident steps (contact, revoke sessions, rotate secrets, restore).
+- **Dependency cadence**: Run `npm audit` in CI or before release; document in `DEPENDENCY_SECURITY.md`.
+- **Policy page**: Ensure `/security-policy` (referenced in security.txt) exists and describes handling of security issues.
 
-- ✅ **GDPR**: Compliant (privacy-friendly, no cookies without consent)
-- ✅ **CCPA**: Compliant (no personal data collection)
-- ✅ **PECR**: Compliant (UK/EU privacy regulations)
-- ✅ **WCAG**: Good accessibility practices
+## Threat Model (summary)
 
-## Threat Model
+| Threat | Mitigation |
+|--------|------------|
+| XSS | CSP, sanitization, parameterized queries |
+| Clickjacking | X-Frame-Options |
+| Session hijack | Signed cookie, optional fingerprint, HTTPS |
+| Auth bypass | Session + KV whitelist; middleware for portal/board |
+| Unauthorized data access | Role checks, requireArbRequestOwner/Access, member-doc key check |
+| Brute force / abuse | Rate limiting, login lockout |
+| SQL injection | Parameterized D1 queries |
+| Sensitive data on public | Public DB helpers only; no PII in public env |
 
-### Low Risk Threats (Mitigated)
-- ✅ XSS attacks → CSP and input validation
-- ✅ Clickjacking → X-Frame-Options
-- ✅ MIME sniffing → X-Content-Type-Options
-- ✅ Protocol downgrade → HSTS
-- ✅ Form spam → honeypot + optional reCAPTCHA
-- ✅ Information disclosure → No exposed emails
+## Related Docs
 
-### Very Low Risk (Static Site Benefits)
-- ✅ SQL injection → No database
-- ✅ Server-side code execution → No server code
-- ✅ Authentication bypass → No authentication needed
-- ✅ Session hijacking → No sessions
-
-## Security Monitoring
-
-### Current Monitoring
-- Cloudflare provides DDoS protection
-- StaticForms handles form delivery; honeypot and optional reCAPTCHA reduce spam
-
-### Recommended Additional Monitoring
-- Dependency vulnerability alerts (Dependabot)
-- Security header monitoring (securityheaders.com)
-- SSL/TLS certificate monitoring
-- Form submission rate monitoring
-
-## Incident Response
-
-### Current Capabilities
-- Static site = minimal attack surface
-- Cloudflare provides DDoS mitigation
-- StaticForms handles form delivery and abuse mitigation
-
-### Recommended Improvements
-- Document incident response procedures
-- Define security contact (security.txt)
-- Establish communication channels
-- Create backup and recovery plan
-
-## Conclusion
-
-The website has an **excellent security posture** for a static HOA site. The architecture is inherently secure, and recent improvements (security headers, robots.txt, security.txt) have significantly enhanced the security profile.
-
-**Key Strengths:**
-- Static architecture minimizes attack surface
-- Strong form security with multiple layers
-- Excellent privacy protection
-- Comprehensive security headers
-- Good compliance posture
-
-**Areas for Future Enhancement:**
-- Automated dependency management
-- Security monitoring and alerts
-- Regular security audits
-
-The site is **production-ready** from a security perspective and follows industry best practices.
+- `SECURITY_ASSESSMENT.md` — Detailed assessment and risks
+- `SECURITY.md` — Security guide and quick links
+- `DATA_ACCESS_CONTROL.md` — Who can access what; audit logging
+- `RATE_LIMITING.md` — API and login limits
+- `SECURITY_HEADERS.md` — Header configuration

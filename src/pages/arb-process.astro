@@ -125,28 +125,37 @@ import BaseLayout from '../layouts/BaseLayout.astro';
           <div class="flex-1">
             <h3 class="text-xl font-heading font-semibold text-clr-green mb-2">Submit Your Request</h3>
             <p class="text-gray-700 font-body mb-2">
-              Submit your ARB request using one of the following methods:
+              You can submit your ARB request in any of these ways. All are accepted by the ARB.
             </p>
             <div class="bg-clr-beige/30 border border-gray-200 rounded-lg p-4 mb-2">
               <p class="text-gray-700 font-body text-sm mb-2">
-                <strong>Option 1: Contact Form (Recommended)</strong>
+                <strong>Option 1: Member Portal</strong>
               </p>
               <p class="text-gray-700 font-body text-sm mb-3">
-                Use the secure contact form and select "Architectural Review Board (ARB)" as the recipient. Include all required information in your message. The form cannot accept file attachments; if your request requires documents or photos, a member of the ARB will reach out to you to arrange sharing them.
+                Sign in with the email the HOA has on file, then go to <strong>More → New ARB request</strong>. You can attach photos and documents, save drafts, and track your request’s status online.
               </p>
               <a
-                href="/contact?recipient=arb"
+                href="/portal/login"
                 class="inline-flex items-center gap-2 bg-clr-orange hover:brightness-110 text-white px-6 py-3 rounded-xl font-semibold text-sm shadow-lg hover:shadow-xl transition-all font-body"
               >
-                Submit ARB Request →
+                Sign in to Member Portal →
               </a>
+            </div>
+            <div class="bg-clr-beige/30 border border-gray-200 rounded-lg p-4 mb-2">
+              <p class="text-gray-700 font-body text-sm mb-2">
+                <strong>Option 2: Contact form (traditional)</strong>
+              </p>
+              <p class="text-gray-700 font-body text-sm mb-3">
+                If you prefer to send your request directly to the ARB the traditional way, use the contact form and select &quot;Architectural Review Board (ARB)&quot; as the recipient. Describe your project in your message; it will go straight to the ARB. The form doesn’t accept file attachments—if you need to send documents or photos, a member of the ARB will reach out to you to arrange that.
+              </p>
+              <a href="/contact?recipient=arb" class="inline-flex items-center gap-2 bg-clr-orange hover:brightness-110 text-white px-6 py-3 rounded-xl font-semibold text-sm shadow-lg hover:shadow-xl transition-all font-body">Submit via Contact form →</a>
             </div>
             <div class="bg-clr-beige/30 border border-gray-200 rounded-lg p-4">
               <p class="text-gray-700 font-body text-sm mb-2">
-                <strong>Option 2: Mail</strong>
+                <strong>Option 3: Mail</strong>
               </p>
               <p class="text-gray-700 font-body text-sm">
-                Mail your application to the HOA mailing address. Check the <a href="/contact" class="text-clr-orange hover:underline font-semibold">Contact</a> page for the mailing address.
+                Mail your application to the HOA mailing address. Check the <a href="/contact" class="text-clr-orange hover:underline font-semibold">Contact</a> page for the address.
               </p>
             </div>
           </div>
@@ -194,7 +203,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
                 <p class="text-green-800 font-body text-xs">You may proceed with the modification as submitted.</p>
               </div>
               <div class="bg-yellow-50 border-2 border-yellow-200 rounded-lg p-3">
-                <p class="font-heading font-semibold text-yellow-900 text-sm mb-1">⚠ Conditional</p>
+                <p class="font-heading font-semibold text-yellow-900 text-sm mb-1">Warning: Conditional</p>
                 <p class="text-yellow-800 font-body text-xs">Approved with specific conditions or modifications required.</p>
               </div>
               <div class="bg-red-50 border-2 border-red-200 rounded-lg p-3">

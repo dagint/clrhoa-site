@@ -1,0 +1,147 @@
+---
+/**
+ * POST /api/site-feedback — Submit widget feedback (thumbs + comment). Rate limit 3/day per IP.
+ * GET /api/site-feedback — Admin only: list with filters (?thumbs=1|-1, ?from=, ?to=, ?url=), ?export=csv.
+ */
+export const prerender = false;
+
+import { getSessionFromCookie, isElevatedRole, getEffectiveRole } from '../../lib/auth';
+import { checkRateLimit, getRateLimitConfig } from '../../lib/rate-limit';
+import { insertSiteFeedback, listSiteFeedback } from '../../lib/site-feedback-db';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const db = env?.DB;
+const kv = env?.KV;
+const ip =
+  Astro.request.headers.get('cf-connecting-ip') ??
+  Astro.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
+  null;
+
+if (Astro.request.method === 'POST') {
+  if (!db) {
+    return new Response(JSON.stringify({ error: 'Server error' }), {
+      status: 503,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  const endpoint = '/api/site-feedback';
+  const config = getRateLimitConfig(endpoint);
+  if (config && kv) {
+    const rl = await checkRateLimit(kv, endpoint, ip, config.maxRequests, config.windowSeconds);
+    if (!rl.allowed) {
+      return new Response(
+        JSON.stringify({
+          error: 'Rate limit exceeded. You can submit up to 3 feedback responses per day.',
+          retryAfter: rl.resetAt,
+        }),
+        {
+          status: 429,
+          headers: {
+            'Content-Type': 'application/json',
+            'Retry-After': String(Math.max(0, rl.resetAt - Math.floor(Date.now() / 1000))),
+          },
+        }
+      );
+    }
+  }
+
+  let body: { url?: string; viewport?: string; session_id?: string; thumbs?: number; comment?: string };
+  try {
+    body = await Astro.request.json();
+  } catch {
+    return new Response(JSON.stringify({ error: 'Invalid JSON' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  const url = typeof body.url === 'string' ? body.url.trim().slice(0, 2048) : '';
+  const thumbs = body.thumbs === 1 ? 1 : body.thumbs === -1 ? -1 : 0;
+  if (thumbs === 0) {
+    return new Response(JSON.stringify({ error: 'Choose thumbs up or down' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  const id = await insertSiteFeedback(db, {
+    url: url || (Astro.request.headers.get('referer') ?? ''),
+    viewport: typeof body.viewport === 'string' ? body.viewport : null,
+    session_id: typeof body.session_id === 'string' ? body.session_id : null,
+    thumbs,
+    comment: typeof body.comment === 'string' ? body.comment : null,
+  });
+
+  return new Response(JSON.stringify({ success: true, id }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+if (Astro.request.method === 'GET') {
+  const session = await getSessionFromCookie(
+    Astro.request.headers.get('cookie') ?? undefined,
+    env?.SESSION_SECRET
+  );
+  if (!session || !isElevatedRole(getEffectiveRole(session))) {
+    return new Response(JSON.stringify({ error: 'Forbidden' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  if (!db) {
+    return new Response(JSON.stringify({ error: 'Server error' }), {
+      status: 503,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  const u = new URL(Astro.request.url);
+  const thumbsParam = u.searchParams.get('thumbs');
+  const thumbs = thumbsParam === '1' ? 1 : thumbsParam === '-1' ? -1 : null;
+  const from = u.searchParams.get('from') ?? null;
+  const to = u.searchParams.get('to') ?? null;
+  const urlContains = u.searchParams.get('url') ?? null;
+  const exportCsv = u.searchParams.get('export') === 'csv';
+
+  const rows = await listSiteFeedback(db, {
+    thumbs: thumbs ?? undefined,
+    from,
+    to,
+    urlContains,
+    limit: exportCsv ? 10000 : 500,
+  });
+
+  if (exportCsv) {
+    const header = 'id,url,created_at,viewport,session_id,thumbs,comment\n';
+    const escape = (v: string | null) =>
+      v == null ? '' : `"${String(v).replace(/"/g, '""')}"`;
+    const csv =
+      header +
+      rows
+        .map(
+          (r) =>
+            `${escape(r.id)},${escape(r.url)},${escape(r.created_at)},${escape(r.viewport)},${escape(r.session_id)},${r.thumbs},${escape(r.comment)}`
+        )
+        .join('\n');
+    return new Response(csv, {
+      headers: {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': `attachment; filename="site-feedback-${new Date().toISOString().slice(0, 10)}.csv"`,
+      },
+    });
+  }
+
+  return new Response(JSON.stringify({ feedback: rows }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+  status: 405,
+  headers: { 'Content-Type': 'application/json' },
+});
+---

@@ -1,0 +1,308 @@
+---
+export const prerender = false;
+
+import PortalLayout from '../../layouts/PortalLayout.astro';
+import ProtectedPage from '../../components/ProtectedPage.astro';
+import PortalNav from '../../components/PortalNav.astro';
+import { getPortalContext } from '../../lib/portal-context';
+import { listPortalVendors } from '../../lib/vendors-db';
+import { listArbRequestsByHousehold } from '../../lib/arb-db';
+import { listVendorSubmissionsByHousehold } from '../../lib/vendor-submissions-db';
+
+const { env, session, effectiveRole } = await getPortalContext(Astro, { fingerprint: true });
+if (!session) return Astro.redirect('/portal/login');
+
+const db = env?.DB;
+const vendorsList = db ? await listPortalVendors(db) : [];
+const allRequests = db ? await listArbRequestsByHousehold(db, session.email) : [];
+const draftCount = allRequests.filter((r) => r.status === 'pending').length;
+const householdSubmissions = db ? await listVendorSubmissionsByHousehold(db, session.email) : [];
+
+// Group by category
+const byCategory: Record<string, typeof vendorsList> = {};
+for (const v of vendorsList) {
+  const cat = v.category?.trim() || 'Other';
+  if (!byCategory[cat]) byCategory[cat] = [];
+  byCategory[cat].push(v);
+}
+const categories = Object.keys(byCategory).sort();
+const submitted = Astro.url.searchParams.get('submitted') === '1';
+
+function parseFiles(filesJson: string | null): { name: string; key: string }[] {
+  if (!filesJson) return [];
+  try {
+    const arr = JSON.parse(filesJson);
+    if (!Array.isArray(arr)) return [];
+    return arr.filter((f) => f && typeof f === 'object' && f.key).map((f) => ({ name: (f && f.name) ?? 'File', key: f.key }));
+  } catch {
+    return [];
+  }
+}
+---
+
+<PortalLayout title="Vendors | Member Portal | Crooked Lake Reserve HOA">
+  <ProtectedPage>
+  <div class="min-h-screen portal-theme-bg font-body">
+    <PortalNav currentPath="/portal/vendors" draftCount={draftCount} role={effectiveRole} staffRole={session?.role ?? ''} />
+
+    <main class="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+      {submitted && (
+        <div class="mb-6 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-green-800 text-sm" role="status">
+          Your suggestion has been submitted. A board or committee member will review it before it appears on the vendor list.
+        </div>
+      )}
+      <h2 class="text-2xl font-heading font-bold text-clr-green mb-2">Recommended Vendors</h2>
+      <p class="text-gray-600 mb-6">
+        Board-recommended service providers. Contact info and optional documents are listed below.
+        You can suggest a vendor for the list; board or committee members will review before it is published.
+      </p>
+
+      <details class="mb-8 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <summary class="px-4 py-3 cursor-pointer font-medium text-clr-green hover:bg-gray-50">
+          Suggest a vendor
+        </summary>
+        <div class="px-4 pb-4 pt-2 border-t border-gray-100">
+          <form id="suggest-vendor-form" method="post" action="/api/vendor-submissions" enctype="multipart/form-data" class="space-y-3 max-w-xl">
+            <input type="hidden" name="csrf_token" id="suggest-csrf" value={session.csrfToken ?? ''} />
+            <div>
+              <label for="suggest-name" class="block text-sm font-medium text-gray-700">Vendor name *</label>
+              <input type="text" id="suggest-name" name="name" required class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2" />
+            </div>
+            <div>
+              <label for="suggest-category-select" class="block text-sm font-medium text-gray-700">Category</label>
+              <p class="text-xs text-gray-500 mt-0.5 mb-1">Choose an existing category or add a new one to avoid duplicates.</p>
+              <select id="suggest-category-select" class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2 bg-white" aria-label="Choose existing category or add new">
+                <option value="">— Choose a category —</option>
+                {categories.map((cat) => (
+                  <option value={cat}>{cat}</option>
+                ))}
+                <option value="__new__">— Add new category —</option>
+              </select>
+              <div id="suggest-category-new-wrap" class="mt-2 hidden">
+                <label for="suggest-category-new" class="block text-xs font-medium text-gray-600 mb-0.5">New category name</label>
+                <input type="text" id="suggest-category-new" list="category-datalist" placeholder="e.g. Landscaping, Plumbing" class="block w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" aria-label="Type a new category (suggestions will appear as you type)" />
+                <datalist id="category-datalist">
+                  {categories.map((cat) => (
+                    <option value={cat} />
+                  ))}
+                </datalist>
+              </div>
+              <input type="hidden" name="category" id="suggest-category-value" value="" />
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label for="suggest-phone" class="block text-sm font-medium text-gray-700">Phone</label>
+                <input type="text" id="suggest-phone" name="phone" class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2" />
+              </div>
+              <div>
+                <label for="suggest-email" class="block text-sm font-medium text-gray-700">Email</label>
+                <input type="email" id="suggest-email" name="email" class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2" />
+              </div>
+            </div>
+            <div>
+              <label for="suggest-website" class="block text-sm font-medium text-gray-700">Website (optional)</label>
+              <input type="url" id="suggest-website" name="website" placeholder="https://example.com" class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2" />
+            </div>
+            <div>
+              <label for="suggest-notes" class="block text-sm font-medium text-gray-700">Notes (optional)</label>
+              <textarea id="suggest-notes" name="notes" rows={2} class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2"></textarea>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700">Attachments (optional)</label>
+              <input type="file" id="suggest-files" name="file_0" multiple class="mt-1 block w-full text-sm text-gray-500 file:mr-2 file:rounded file:border-0 file:bg-clr-green file:px-3 file:py-1.5 file:text-white file:text-sm" />
+            </div>
+            <div class="flex items-center gap-3">
+              <button type="submit" id="suggest-submit" class="px-4 py-2 bg-clr-green text-white rounded-lg font-medium hover:brightness-110 text-sm">Submit suggestion</button>
+              <span id="suggest-message" class="text-sm text-gray-500"></span>
+            </div>
+          </form>
+        </div>
+      </details>
+
+      {householdSubmissions.length > 0 && (
+        <section class="mb-10" aria-labelledby="household-recommendations-heading">
+          <h3 id="household-recommendations-heading" class="text-lg font-heading font-semibold text-clr-green mb-3">Household recommendations</h3>
+          <p class="text-sm text-gray-600 mb-4">Vendor suggestions from anyone at your address. All household members can see and submit recommendations.</p>
+          <ul class="space-y-3">
+            {householdSubmissions.map((sub) => {
+              const statusLabel = sub.status === 'pending' ? 'Pending review' : sub.status === 'approved' ? 'Approved' : 'Not approved';
+              const statusClass = sub.status === 'pending' ? 'bg-amber-100 text-amber-800' : sub.status === 'approved' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-700';
+              return (
+                <li class="bg-white rounded-xl border border-gray-100 p-4 shadow-sm flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <span class="font-medium text-gray-900">{sub.name ?? 'Unnamed'}</span>
+                    {sub.category && <span class="ml-2 text-sm text-gray-500">({sub.category})</span>}
+                    {sub.submitted_by && (
+                      <p class="text-xs text-gray-500 mt-1">Submitted by {sub.submitted_by}</p>
+                    )}
+                    {sub.submitted_at && (
+                      <p class="text-xs text-gray-400">
+                        {new Date(sub.submitted_at).toLocaleDateString(undefined, { dateStyle: 'medium' })}
+                      </p>
+                    )}
+                  </div>
+                  <span class={`text-xs font-medium px-2 py-1 rounded ${statusClass}`}>{statusLabel}</span>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+
+      {vendorsList.length === 0 ? (
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center text-gray-500">
+          No vendors listed yet. The board can add recommendations from Board: Vendors.
+        </div>
+      ) : (
+        <div class="space-y-8">
+          {categories.map((cat) => (
+            <section>
+              <h3 class="text-lg font-heading font-semibold text-clr-green mb-3 capitalize">{cat}</h3>
+              <div class="space-y-4">
+                {byCategory[cat].map((v) => {
+                  const files = parseFiles(v.files);
+                  return (
+                    <div class="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
+                      <div class="font-medium text-gray-900">{v.name ?? '-'}</div>
+                      <div class="mt-2 text-sm text-gray-600 space-y-1">
+                        {v.phone && <div>Phone: {v.phone}</div>}
+                        {v.email && <div>Email: <a href={`mailto:${v.email}`} class="text-clr-green hover:underline">{v.email}</a></div>}
+                        {v.website && (
+                          <div>Website: <a href={v.website.startsWith('http') ? v.website : `https://${v.website}`} target="_blank" rel="noopener noreferrer" class="text-clr-green hover:underline">{v.website}</a></div>
+                        )}
+                      </div>
+                      {v.notes && (
+                        <p class="mt-2 text-sm text-gray-500">{v.notes}</p>
+                      )}
+                      {files.length > 0 && (
+                        <div class="mt-3 flex flex-wrap gap-2">
+                          {files.map((f) => (
+                            <a
+                              href={`/api/portal/file/${encodeURIComponent(f.key)}`}
+                              class="text-sm text-clr-green hover:underline"
+                            >
+                              {f.name}
+                            </a>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          ))}
+        </div>
+      )}
+    </main>
+  </div>
+
+  <script is:inline>
+    (function () {
+      var form = document.getElementById('suggest-vendor-form');
+      var submitBtn = document.getElementById('suggest-submit');
+      var messageEl = document.getElementById('suggest-message');
+      var csrfInput = document.getElementById('suggest-csrf');
+      var fileInput = document.getElementById('suggest-files');
+      var categorySelect = document.getElementById('suggest-category-select');
+      var categoryNewWrap = document.getElementById('suggest-category-new-wrap');
+      var categoryNewInput = document.getElementById('suggest-category-new');
+      var categoryValue = document.getElementById('suggest-category-value');
+      if (!form) return;
+
+      function syncCategoryValue() {
+        if (!categoryValue) return;
+        if (categorySelect && categorySelect.value === '__new__') {
+          categoryValue.value = (categoryNewInput && categoryNewInput.value) ? categoryNewInput.value.trim() : '';
+        } else if (categorySelect) {
+          categoryValue.value = categorySelect.value || '';
+        }
+      }
+
+      if (categorySelect) {
+        categorySelect.addEventListener('change', function () {
+          if (this.value === '__new__') {
+            if (categoryNewWrap) categoryNewWrap.classList.remove('hidden');
+            if (categoryNewInput) { categoryNewInput.value = ''; categoryNewInput.focus(); }
+            categoryValue.value = '';
+          } else {
+            if (categoryNewWrap) categoryNewWrap.classList.add('hidden');
+            if (categoryNewInput) categoryNewInput.value = '';
+            categoryValue.value = this.value || '';
+          }
+        });
+      }
+      if (categoryNewInput) {
+        categoryNewInput.addEventListener('input', syncCategoryValue);
+        categoryNewInput.addEventListener('change', syncCategoryValue);
+      }
+
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        syncCategoryValue();
+        if (categorySelect && categorySelect.value === '__new__' && categoryNewInput) {
+          categoryValue.value = categoryNewInput.value.trim();
+        }
+        if (!messageEl) return;
+        messageEl.textContent = '';
+        var token = (csrfInput && csrfInput.value) || '';
+        var formData = new FormData(form);
+        formData.set('csrf_token', token);
+        if (fileInput && fileInput.files && fileInput.files.length) {
+          for (var i = 0; i < fileInput.files.length; i++) {
+            formData.set('file_' + i, fileInput.files[i]);
+          }
+        }
+        submitBtn.disabled = true;
+        fetch('/api/vendor-submissions', {
+          method: 'POST',
+          body: formData,
+          headers: { Accept: 'application/json' }
+        })
+          .then(function (res) {
+            if (res.redirected && res.url && res.url.indexOf('submitted=1') !== -1) {
+              return { redirected: true };
+            }
+            return res.json().then(function (data) { return { res: res, data: data }; });
+          })
+          .then(function (out) {
+            if (out.redirected) {
+              var target = '/portal/vendors?submitted=1';
+              if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                if (window.location.protocol === 'https:') {
+                  target = 'http://' + window.location.host + target;
+                }
+              }
+              window.location.href = target;
+              return;
+            }
+            var res = out.res, data = out.data;
+            if (res && res.ok && data && data.success) {
+              messageEl.textContent = data.message || 'Submitted. A reviewer will approve it before it appears on the list.';
+              messageEl.className = 'text-sm text-clr-green';
+              form.reset();
+              if (fileInput) fileInput.value = '';
+              if (categoryValue) categoryValue.value = '';
+              if (categorySelect) categorySelect.value = '';
+              if (categoryNewWrap) categoryNewWrap.classList.add('hidden');
+              if (categoryNewInput) categoryNewInput.value = '';
+              var target = '/portal/vendors?submitted=1';
+              if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                if (window.location.protocol === 'https:') target = 'http://' + window.location.host + target;
+              }
+              setTimeout(function () { window.location.href = target; }, 800);
+            } else {
+              messageEl.textContent = (data && data.error) || 'Submission failed.';
+              messageEl.className = 'text-sm text-red-600';
+            }
+          })
+          .catch(function () {
+            messageEl.textContent = 'Network error. Try again.';
+            messageEl.className = 'text-sm text-red-600';
+          })
+          .then(function () { submitBtn.disabled = false; });
+      });
+    })();
+  </script>
+  </ProtectedPage>
+</PortalLayout>

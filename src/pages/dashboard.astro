@@ -1,0 +1,28 @@
+---
+/**
+ * Usage dashboard moved to /portal/usage (portal-only, elevated roles).
+ * Redirect so old links and login return URLs still work.
+ */
+export const prerender = false;
+
+import { getSessionFromCookie, isElevatedRole } from '../lib/auth';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const secret = env?.SESSION_SECRET;
+
+const session = secret
+  ? await getSessionFromCookie(
+      Astro.request.headers.get('cookie') ?? undefined,
+      secret,
+      Astro.request.headers.get('user-agent') ?? undefined,
+      (Astro.clientAddress || Astro.request.headers.get('cf-connecting-ip')) ?? undefined
+    )
+  : null;
+
+// If logged in, redirect to portal usage; otherwise to login with return to portal/usage
+if (session && isElevatedRole(session.role)) {
+  return Astro.redirect('/portal/usage');
+}
+return Astro.redirect('/portal/login?return=' + encodeURIComponent('/portal/usage'));
+---

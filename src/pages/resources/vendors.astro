@@ -1,74 +1,29 @@
 ---
+export const prerender = false;
+
 import ResourcesLayout from '../../layouts/ResourcesLayout.astro';
+import { listPublicVendors } from '../../lib/vendors-db';
 
-// Vendor list - can be easily updated by the board
-// Structure: name, category, website (optional). No phone numbers are displayed.
-// If no website, a "Request Contact Info" link will appear.
-// See docs/VENDOR_LIST.md for complete instructions
-const vendors = [
-  // Security & Alarm
-  { name: 'ADT Security - David Moore', category: 'Security & Alarm', website: 'https://www.adt.com/local/fl' },
-  // Cabinets & Countertops
-  { name: 'Sunbright Designs', category: 'Cabinets & Countertops', website: 'https://www.sunbrightdesigns.com' },
-  { name: 'Duncan Stone', category: 'Cabinets & Countertops', website: 'https://duncanstoneinc.com' },
-  // Flooring & Tile
-  { name: 'Great Lakes Carpet/Tile', category: 'Flooring & Tile', website: 'https://greatlakescarpet.com' },
-  { name: 'Tripp Rohm', category: 'Flooring & Tile', website: null },
-  // Closet Systems & Insulation
-  { name: 'Suncoast Insulators', category: 'Closet Systems & Insulation', website: 'https://www.suncoastinsulators.com' },
-  // Electrical
-  { name: "Jimmy's Electric", category: 'Electrical Services', website: 'https://www.jimmys-electric.com' },
-  { name: 'Marathon Electrical Svc', category: 'Electrical Services', website: 'https://www.marathonelectricalservices.com' },
-  // Fencing
-  { name: 'Mossy Oak', category: 'Fencing', website: 'https://www.mossyoakfences.com' },
-  { name: 'Allstar Fence', category: 'Fencing', website: 'https://www.allstarfenceflorida.com' },
-  { name: 'Superior Fence and Rail (Debbie)', category: 'Fencing', website: 'https://superiorfenceandrail.com' },
-  // Glass & Mirror
-  { name: 'Tri City Glass & Mirror', category: 'Glass & Mirror', website: 'https://www.jessestricityglassinc.com' },
-  // Handyman
-  { name: "Jonathan's Handyman Svc", category: 'General Contractors', website: 'https://jonathanshandyman.com' },
-  // HVAC & Plumbing
-  { name: 'Rapture Air', category: 'HVAC & Plumbing', website: 'https://raptureair.com' },
-  { name: 'Blue Sky Plumbers', category: 'HVAC & Plumbing', website: 'https://blueskyplumbingfl.com' },
-  { name: 'Dunstan Plumbing', category: 'HVAC & Plumbing', website: 'https://dunstansplumbing.com' },
-  // Landscaping & Lawn Care
-  { name: 'Yard Stop/Jessie', category: 'Landscaping & Lawn Care', website: 'https://yardstopgardencenter.com' },
-  { name: 'DJL Landscape', category: 'Landscaping & Lawn Care', website: 'https://www.djl-inc.com' },
-  { name: "Benny's Irrigation", category: 'Landscaping & Lawn Care', website: null },
-  { name: "Eddie's Lawn Svc", category: 'Landscaping & Lawn Care', website: null },
-  { name: 'Randle Faber', category: 'Landscaping & Lawn Care', website: null },
-  { name: 'Triple D Services', category: 'Landscaping & Lawn Care', website: 'https://tripledtreeservices.com' },
-  // Painting & Pressure Washing
-  { name: 'Jeff Buckner', category: 'Painting & Pressure Washing', website: null },
-  { name: 'Rian Miller', category: 'Painting & Pressure Washing', website: null },
-  { name: "Eddie's Pressure Washing", category: 'Painting & Pressure Washing', website: null },
-  // Patio & Outdoor
-  { name: 'Corals Casual Patio', category: 'Patio & Outdoor', website: 'https://coralscasualpatio.com' },
-  // Pool
-  { name: "Aaron's Leak Detection (pool)", category: 'Pool Services', website: 'https://aaronsleakdetection.com' },
-  // Physical Therapy
-  { name: 'Mt Dora Physical Therapy', category: 'Other Services', website: 'https://mdpts.com' },
-  // Roofing & Exterior
-  { name: "Farmer's Roofing & Gutters", category: 'Roofing & Exterior', website: 'https://farmersroofs.com' },
-  { name: 'Danzig Prof. Finishes', category: 'Roofing & Exterior', website: null },
-  // Propane
-  { name: 'TD Propane', category: 'Other Services', website: 'https://tdpropane.com' },
-  // Well Drilling
-  { name: "Allen's Well Drilling", category: 'Well Drilling', website: 'https://allenswelldrilling.com' },
-  { name: 'Wiggins Bros Well Drilling', category: 'Well Drilling', website: 'https://wigginswell.com' },
-];
+// Public page shows same vendor list as portal (from DB); only name, category, website (or Request contact).
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const db = env?.DB;
+const vendorsList = db ? await listPublicVendors(db) : [];
 
-// Group vendors by category
-const vendorsByCategory = vendors.reduce((acc, vendor) => {
-  if (!acc[vendor.category]) {
-    acc[vendor.category] = [];
-  }
-  acc[vendor.category].push(vendor);
-  return acc;
-}, {} as Record<string, typeof vendors>);
+// Group by category (public display: name, category, website only)
+const vendorsByCategory: Record<string, { name: string; category: string; website: string | null }[]> = {};
+for (const v of vendorsList) {
+  const cat = v.category?.trim() || 'Other';
+  if (!vendorsByCategory[cat]) vendorsByCategory[cat] = [];
+  vendorsByCategory[cat].push({
+    name: v.name ?? '-',
+    category: cat,
+    website: v.website?.trim() || null,
+  });
+}
 
-// Category order for display
-const categoryOrder = [
+// Category order: known categories first, then any others alphabetically
+const preferredOrder = [
   'Landscaping & Lawn Care',
   'Roofing & Exterior',
   'HVAC & Plumbing',
@@ -85,9 +40,13 @@ const categoryOrder = [
   'Patio & Outdoor',
   'Pool Services',
   'Other Services',
+  'Other',
+];
+const categoryOrder = [
+  ...preferredOrder.filter((c) => vendorsByCategory[c]?.length),
+  ...Object.keys(vendorsByCategory).filter((c) => !preferredOrder.includes(c)).sort(),
 ];
 
-// Contact form URL with vendor request pre-filled
 const contactFormUrl = '/contact';
 ---
 
@@ -117,7 +76,7 @@ const contactFormUrl = '/contact';
           </div>
         </div>
 
-        {vendors.length === 0 ? (
+        {vendorsList.length === 0 ? (
           <!-- Empty State -->
           <div class="bg-clr-beige/30 border border-gray-200 rounded-lg p-8 text-center">
             <p class="text-gray-700 font-body mb-4">
@@ -149,7 +108,7 @@ const contactFormUrl = '/contact';
                         <div class="flex items-center gap-3">
                           {vendor.website ? (
                             <a
-                              href={vendor.website}
+                              href={vendor.website.startsWith('http') ? vendor.website : `https://${vendor.website}`}
                               target="_blank"
                               rel="noopener noreferrer"
                               class="inline-flex items-center gap-2 text-clr-orange hover:underline font-semibold text-sm font-body"

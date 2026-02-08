@@ -33,18 +33,23 @@ A modern, static website for the Crooked Lake Reserve Homeowners Association bui
 
 ```
 clrhoa-site/
-├── public/              # Static assets (images, PDFs, etc.)
+├── public/              # Static assets; .well-known/security.txt
 ├── src/
-│   ├── content/        # Content collections (Markdown files)
-│   │   ├── news/       # News articles
-│   │   └── documents/  # Document metadata
-│   ├── layouts/        # Layout components
-│   ├── pages/          # Page routes
-│   └── styles/         # Global styles
-├── astro.config.mjs    # Astro configuration
-├── tailwind.config.mjs # Tailwind configuration
+│   ├── components/     # Reusable UI (PortalNav, ProtectedPage, etc.)
+│   ├── content/        # Content collections (news, documents)
+│   ├── layouts/        # BaseLayout, PortalLayout, BoardLayout
+│   ├── lib/            # Auth, API helpers, portal context, access control, DB helpers, sanitize, rate-limit
+│   ├── middleware.ts   # Portal/board auth gates + security headers
+│   ├── pages/          # Routes (public, /portal/*, /board/*, /api/*)
+│   └── styles/         # Global CSS
+├── docs/               # Documentation (security, deployment, architecture)
+├── scripts/            # DB migrations, build helpers
+├── tests/              # Unit tests (Vitest)
+├── astro.config.mjs
 └── package.json
 ```
+
+See **docs/ARCHITECTURE.md** for public vs portal vs board and key libs.
 
 ## 📝 Content Management
 
@@ -74,25 +79,21 @@ See **[Deployment Guide](docs/DEPLOYMENT.md)** for complete deployment instructi
 
 ## 🔒 Security
 
-- This is a static site with no server-side code
-- Privacy-friendly analytics available (opt-in via environment variables)
-- Board-only area has been removed for now; can be re-added with authentication later
-- All content is public
+- **Public site**: Largely static; only non-PII data and `PUBLIC_*` env; no session or secrets on the client.
+- **Member portal & board**: Server-rendered with session auth (signed cookies, KV whitelist), role-based access, and rate limiting. Data and file access are documented and enforced via centralized helpers.
 
 ### Security Features
 
-- ✅ Security headers (CSP, HSTS, X-Frame-Options, etc.)
+- ✅ Security headers (CSP, HSTS, X-Frame-Options, etc.) in middleware
+- ✅ Session auth with optional fingerprint; login rate limit and account lockout
+- ✅ CSRF and origin checks on mutating APIs; centralized ARB access control
 - ✅ StaticForms contact form with honeypot and optional reCAPTCHA
-- ✅ Honeypot spam prevention
-- ✅ Client-side form validation
-- ✅ No exposed email addresses or personal information
-- ✅ robots.txt and security.txt configured
-- ✅ HTTPS/SSL enforced via Cloudflare
-- ✅ Dependabot for automated security updates
-- ✅ Subresource Integrity (SRI) for external scripts
-- ✅ Security monitoring documentation
+- ✅ Input sanitization; parameterized DB queries; member-doc file keys validated
+- ✅ robots.txt and security.txt; Dependabot for dependency updates
+- ✅ HTTPS/SSL via Cloudflare; SRI for external scripts where applicable
+- ✅ Security and data-access documentation (see docs)
 
-See **[Security Guide](docs/SECURITY.md)** for complete security documentation.
+See **[Security Guide](docs/SECURITY.md)** and **[Security Assessment](docs/SECURITY_ASSESSMENT.md)** for full documentation.
 
 ## 📊 Analytics (Optional)
 

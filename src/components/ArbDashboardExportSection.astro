@@ -1,0 +1,77 @@
+---
+/** Export / report section for ARB dashboard: CSV and HTML report with optional date/status filters. */
+---
+<section class="mb-8 p-4 rounded-xl bg-gray-50 border border-gray-200" aria-labelledby="arb-export-heading">
+  <h2 id="arb-export-heading" class="text-lg font-heading font-semibold text-clr-green mb-3">Export / report</h2>
+  <p class="text-sm text-gray-600 mb-3">
+    Download all ARB requests as a report (CSV) or as a print-friendly report you can save as PDF. Optionally filter by date range or status.
+  </p>
+  <form id="arb-export-form" class="flex flex-wrap items-end gap-3 mb-3">
+    <div>
+      <label for="export-from-date" class="block text-xs font-medium text-gray-600 mb-0.5">From date</label>
+      <input type="date" id="export-from-date" name="from_date" class="rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+    </div>
+    <div>
+      <label for="export-to-date" class="block text-xs font-medium text-gray-600 mb-0.5">To date</label>
+      <input type="date" id="export-to-date" name="to_date" class="rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+    </div>
+    <div>
+      <label for="export-status" class="block text-xs font-medium text-gray-600 mb-0.5">Status</label>
+      <select id="export-status" name="status" class="rounded-lg border border-gray-300 px-3 py-2 text-sm">
+        <option value="">All</option>
+        <option value="pending">Pending</option>
+        <option value="in_review">In review</option>
+        <option value="approved">Approved</option>
+        <option value="rejected">Rejected</option>
+        <option value="cancelled">Cancelled</option>
+      </select>
+    </div>
+    <div class="flex gap-2">
+      <a id="export-csv-link" href="/api/arb-export?format=csv" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-clr-green hover:brightness-110 text-white text-sm font-semibold">
+        Download report (CSV)
+      </a>
+      <a id="export-html-link" href="/api/arb-export?format=html" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-clr-green text-clr-green hover:bg-clr-green/10 text-sm font-semibold">
+        Report (HTML — print to PDF)
+      </a>
+    </div>
+  </form>
+  <p class="text-xs text-gray-500">Leave dates blank for all. Use the HTML report in a new tab, then Print → Save as PDF.</p>
+</section>
+
+<script>
+  (function () {
+    var form = document.getElementById('arb-export-form');
+    /** @type {HTMLAnchorElement | null} */
+    var csvLink = document.getElementById('export-csv-link');
+    /** @type {HTMLAnchorElement | null} */
+    var htmlLink = document.getElementById('export-html-link');
+    /** @type {HTMLInputElement | null} */
+    var fromInput = document.getElementById('export-from-date');
+    /** @type {HTMLInputElement | null} */
+    var toInput = document.getElementById('export-to-date');
+    /** @type {HTMLSelectElement | null} */
+    var statusSelect = document.getElementById('export-status');
+    function updateExportLinks() {
+      var params = new URLSearchParams();
+      params.set('format', 'csv');
+      if (fromInput && fromInput.value) params.set('from_date', fromInput.value);
+      if (toInput && toInput.value) params.set('to_date', toInput.value);
+      if (statusSelect && statusSelect.value) params.set('status', statusSelect.value);
+      var qs = params.toString();
+      var base = '/api/arb-export';
+      if (csvLink) csvLink.href = base + (qs ? '?' + qs : '');
+      if (htmlLink) {
+        var htmlParams = new URLSearchParams(params);
+        htmlParams.set('format', 'html');
+        htmlLink.href = base + '?' + htmlParams.toString();
+      }
+    }
+    if (form) {
+      [fromInput, toInput, statusSelect].forEach(function (el) {
+        if (el) el.addEventListener('change', updateExportLinks);
+        if (el) el.addEventListener('input', updateExportLinks);
+      });
+      updateExportLinks();
+    }
+  })();
+</script>
