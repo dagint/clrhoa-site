@@ -59,7 +59,7 @@ function daysInReview(submittedAt: string | null | undefined): number | null {
 
 function timelineLabel(row: ArbAuditLogRow): string {
   const action = (row.action ?? '').replace(/_/g, ' ');
-  const by = row.changed_by_email ?? row.changed_by_role ?? 'System';
+  const by = row.changed_by_role ?? '—';
   const when = formatDateTime(row.created);
   if (row.action === 'create') return `Created · ${when}`;
   if (row.action === 'submit_for_review') return `Submitted for review · ${when}`;
