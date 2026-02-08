@@ -415,13 +415,15 @@ const resourcesByCategory = {
       <slot />
     </main>
 
-    <script>
+    <script is:inline>
       (function () {
         const menuButton = document.getElementById('mobile-menu-button');
         const mobileMenu = document.getElementById('mobile-menu');
         if (!menuButton || !mobileMenu) return;
+        const btn = menuButton;
+        const menu = mobileMenu;
 
-        const menuLinks = mobileMenu.querySelectorAll('a');
+        const menuLinks = menu.querySelectorAll('a');
         const firstLink = menuLinks[0];
         const lastLink = menuLinks[menuLinks.length - 1];
 
@@ -429,9 +431,9 @@ const resourcesByCategory = {
         const menuCloseIcon = document.getElementById('mobile-menu-close-icon');
         
         function toggleMenu() {
-          const isOpen = !mobileMenu.classList.contains('hidden');
-          mobileMenu.classList.toggle('hidden');
-          menuButton.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
+          const isOpen = !menu.classList.contains('hidden');
+          menu.classList.toggle('hidden');
+          btn.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
           
           // Toggle icon visibility
           if (menuIcon && menuCloseIcon) {
@@ -452,28 +454,28 @@ const resourcesByCategory = {
         }
 
         function closeMenu() {
-          mobileMenu.classList.add('hidden');
-          menuButton.setAttribute('aria-expanded', 'false');
+          menu.classList.add('hidden');
+          btn.setAttribute('aria-expanded', 'false');
           if (menuIcon && menuCloseIcon) {
             menuIcon.classList.remove('hidden');
             menuCloseIcon.classList.add('hidden');
           }
-          menuButton.focus();
+          btn.focus();
         }
 
         // Toggle on button click
-        menuButton.addEventListener('click', toggleMenu);
+        btn.addEventListener('click', toggleMenu);
 
         // Close on Escape key
-        document.addEventListener('keydown', (e) => {
-          if (e.key === 'Escape' && !mobileMenu.classList.contains('hidden')) {
+        document.addEventListener('keydown', function (e) {
+          if (e.key === 'Escape' && !menu.classList.contains('hidden')) {
             closeMenu();
           }
         });
 
         // Focus trap when menu is open
         function handleTabKey(e) {
-          if (mobileMenu.classList.contains('hidden')) return;
+          if (menu.classList.contains('hidden')) return;
 
           if (e.key === 'Tab') {
             if (e.shiftKey) {
@@ -495,10 +497,11 @@ const resourcesByCategory = {
         document.addEventListener('keydown', handleTabKey);
 
         // Close menu when clicking outside
-        document.addEventListener('click', (e) => {
-          if (!mobileMenu.classList.contains('hidden') && 
-              !mobileMenu.contains(e.target) && 
-              !menuButton.contains(e.target)) {
+        document.addEventListener('click', function (e) {
+          var target = e.target;
+          if (!menu.classList.contains('hidden') && target &&
+              !menu.contains(target) &&
+              !btn.contains(target)) {
             closeMenu();
           }
         });
@@ -556,8 +559,8 @@ const resourcesByCategory = {
           });
 
           // Close dropdown when clicking outside
-          document.addEventListener('click', (e) => {
-            const target = e.target;
+          document.addEventListener('click', function (e) {
+            var target = e.target;
             if (!target || !resourcesDropdown.contains(target)) {
               dropdownMenu?.classList.add('opacity-0', 'invisible');
               dropdownMenu?.classList.remove('opacity-100', 'visible');
@@ -566,7 +569,7 @@ const resourcesByCategory = {
           });
 
           // Close dropdown when pointer leaves after a short delay (roll up when focus moves away)
-          let closeTimer = null;
+          var closeTimer = null;
           const closeDelayMs = 400;
           resourcesDropdown.addEventListener('pointerleave', () => {
             closeTimer = window.setTimeout(() => {
@@ -576,8 +579,8 @@ const resourcesByCategory = {
               closeTimer = null;
             }, closeDelayMs);
           });
-          resourcesDropdown.addEventListener('pointerenter', () => {
-            if (closeTimer) {
+          resourcesDropdown.addEventListener('pointerenter', function () {
+            if (closeTimer != null) {
               window.clearTimeout(closeTimer);
               closeTimer = null;
             }

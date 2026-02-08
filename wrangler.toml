@@ -6,6 +6,7 @@
 # Local dev: add SESSION_SECRET to .dev.vars
 
 name = "clrhoa-site"
+pages_build_output_dir = "./dist"
 compatibility_date = "2025-02-01"
 compatibility_flags = ["nodejs_compat"]
 
@@ -36,23 +37,3 @@ id = "9249762b4c7b483a9785097db451f8e6"
 [[r2_buckets]]
 binding = "CLOURHOA_FILES"
 bucket_name = "clrhoa-files"
-
-# SESSION_SECRET: set via wrangler secret put SESSION_SECRET (and .dev.vars for local)
-
-# Backup: for Board "Download backup" and backup Worker. Set CLOUDFLARE_API_TOKEN via wrangler secret put.
-# Optional Google Drive: set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, BACKUP_ENCRYPTION_KEY via wrangler secret put.
-# CLOUDFLARE_ACCOUNT_ID = your Cloudflare account id (dashboard URL or API)
-
-# Phase 3.5: Notifications — email (Resend or MailChannels) + Twilio. Change emails without code.
-# Email: set RESEND_API_KEY (recommended, free tier) or MAILCHANNELS_API_KEY via wrangler secret put.
-# Twilio: set TWILIO_* vars for SMS. See docs/EMAIL_PROVIDER_OPTIONS.md and docs/PHASE35_NOTIFICATIONS_SETUP.md.
-[vars]
-NOTIFY_BOARD_EMAIL = "your_personal@gmail.com"
-NOTIFY_ARB_EMAIL = "your_personal@gmail.com"
-NOTIFY_NOREPLY_EMAIL = "noreply@clrhoa.com"
-# RESEND_API_KEY = "re_..."   # preferred; set via wrangler secret put
-# MAILCHANNELS_API_KEY = "your_key"   # used only when RESEND_API_KEY is not set
-MAILCHANNELS_API_KEY = "your_key"
-TWILIO_ACCOUNT_SID = "your_sid"
-TWILIO_AUTH_TOKEN = "your_token"
-TWILIO_PHONE_NUMBER = "+15551234567"

@@ -5,10 +5,6 @@
 import { describe, it, expect } from 'vitest';
 import { jsonResponse, requireDb } from '../src/lib/api-helpers';
 
-/** Minimal type for D1 mock in tests (no Cloudflare globals in vitest). */
-interface D1Database {
-  prepare?: unknown;
-}
 
 describe('jsonResponse', () => {
   it('returns Response with JSON body and Content-Type', async () => {
@@ -34,7 +30,7 @@ describe('requireDb', () => {
     expect('response' in noDb).toBe(true);
   });
   it('returns { db } when DB is present', () => {
-    const mockDb = {} as D1Database;
+    const mockDb = {} as unknown as D1Database;
     const out = requireDb({ DB: mockDb });
     expect('db' in out).toBe(true);
     if ('db' in out) expect(out.db).toBe(mockDb);

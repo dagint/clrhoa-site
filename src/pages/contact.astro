@@ -211,40 +211,35 @@ const prefillMessage = vendorParam
       {recaptchaSiteKey && (
         <script src="https://www.google.com/recaptcha/api.js" async defer></script>
       )}
-      <script>
+      <script lang="ts">
         (function () {
-          const form = document.getElementById('contact-form');
+          const form = document.getElementById('contact-form') as HTMLFormElement | null;
           if (!form) return;
 
-          const recipient = document.getElementById('recipient');
-          const name = document.getElementById('name');
-          const email = document.getElementById('email');
-          const message = document.getElementById('message');
+          const recipient = document.getElementById('recipient') as HTMLSelectElement | null;
+          const name = document.getElementById('name') as HTMLInputElement | null;
+          const email = document.getElementById('email') as HTMLInputElement | null;
+          const message = document.getElementById('message') as HTMLTextAreaElement | null;
           const formError = document.getElementById('form-error');
           const formSubmitError = document.getElementById('form-submit-error');
+          if (!recipient || !name || !email || !message || !formError || !formSubmitError) return;
 
-          // Pre-fill form from URL parameters
           const urlParams = new URLSearchParams(window.location.search);
           const recipientParam = urlParams.get('recipient');
           const vendorParam = urlParams.get('vendor');
-          
-          if (recipientParam && recipient) {
-            recipient.value = recipientParam;
-          }
-          
-          if (vendorParam && message) {
-            message.value = `I would like to request contact information for: ${vendorParam}`;
-          }
 
-          function showError(field, errorElement, message) {
+          if (recipientParam) recipient.value = recipientParam;
+          if (vendorParam) message.value = `I would like to request contact information for: ${vendorParam}`;
+
+          function showError(field: HTMLElement, errorElement: HTMLElement, msg: string) {
             field.setAttribute('aria-invalid', 'true');
             field.classList.add('border-red-500');
             field.classList.remove('border-gray-300');
-            errorElement.textContent = message;
+            errorElement.textContent = msg;
             errorElement.classList.remove('hidden');
           }
 
-          function clearError(field, errorElement) {
+          function clearError(field: HTMLElement, errorElement: HTMLElement) {
             field.setAttribute('aria-invalid', 'false');
             field.classList.remove('border-red-500');
             field.classList.add('border-gray-300');
@@ -254,6 +249,7 @@ const prefillMessage = vendorParam
 
           function validateRecipient() {
             const errorElement = document.getElementById('recipient-error');
+            if (!errorElement) return false;
             if (!recipient.value) {
               showError(recipient, errorElement, 'Please select a recipient.');
               return false;
@@ -264,9 +260,10 @@ const prefillMessage = vendorParam
 
           function validateName() {
             const errorElement = document.getElementById('name-error');
+            if (!errorElement) return false;
             const value = name.value.trim();
             if (!value) {
-              showError(name, errorElement, 'Name is required.');
+              showError(name, errorElement as HTMLElement, 'Name is required.');
               return false;
             }
             if (value.length < 2) {
@@ -283,6 +280,7 @@ const prefillMessage = vendorParam
 
           function validateEmail() {
             const errorElement = document.getElementById('email-error');
+            if (!errorElement) return false;
             const value = email.value.trim();
             const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
             if (!value) {
@@ -299,6 +297,7 @@ const prefillMessage = vendorParam
 
           function validateMessage() {
             const errorElement = document.getElementById('message-error');
+            if (!errorElement) return false;
             const value = message.value.trim();
             if (!value) {
               showError(message, errorElement, 'Message is required.');
@@ -347,7 +346,7 @@ const prefillMessage = vendorParam
               formError.classList.remove('hidden');
               formError.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
               const firstInvalid = form.querySelector('[aria-invalid="true"]');
-              if (firstInvalid) firstInvalid.focus();
+              if (firstInvalid) (firstInvalid as HTMLElement).focus();
               return;
             }
             formError.classList.add('hidden');
@@ -356,9 +355,13 @@ const prefillMessage = vendorParam
             try {
               const res = await fetch(form.action, { method: 'POST', body: new FormData(form) });
               if (res.ok) {
-                const redirectTo = form.dataset.redirectTo || form.querySelector('[name="redirectTo"]')?.value;
+                const redirectEl = form.querySelector('[name="redirectTo"]') as HTMLInputElement | null;
+                const redirectTo = form.dataset.redirectTo || redirectEl?.value;
                 if (redirectTo) window.location.href = redirectTo;
-                else if (formSubmitError) formSubmitError.querySelector('p').textContent = 'Message sent. You will be redirected shortly.';
+                else {
+                  const p = formSubmitError?.querySelector('p');
+                  if (p) p.textContent = 'Message sent. You will be redirected shortly.';
+                }
               } else {
                 if (formSubmitError) { formSubmitError.classList.remove('hidden'); formSubmitError.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
               }

@@ -147,7 +147,7 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
         });
-        const data = await res.json().catch(() => ({}));
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
         if (res.status === 429) {
           showMessage(
             data.error ?? 'You can submit up to 3 feedback responses per day. Try again tomorrow.',

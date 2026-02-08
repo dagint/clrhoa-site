@@ -6,14 +6,20 @@
 import type { SessionPayload } from './auth';
 import { getSessionFromCookie, isElevatedRole, getEffectiveRole } from './auth';
 
+/** Env shape for board pages (after SESSION_SECRET guard). */
+export interface BoardEnv {
+  SESSION_SECRET?: string;
+  DB?: D1Database;
+}
+
 /** Minimal Astro-like context for board pages. */
 export interface BoardContextAstro {
   request: Request;
-  locals: { runtime?: { env?: { SESSION_SECRET?: string; DB?: D1Database } } };
+  locals: { runtime?: { env?: BoardEnv } };
 }
 
 export interface BoardContextResult {
-  env: BoardContextAstro['locals']['runtime'] extends { env: infer E } ? E : undefined;
+  env: BoardEnv;
   session: SessionPayload;
   effectiveRole: string;
 }

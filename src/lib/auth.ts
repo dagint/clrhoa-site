@@ -382,7 +382,7 @@ export async function createSessionWithElevation(
     lastActivity: Math.floor(Date.now() / 1000),
     elevated_until: elevated_until ?? undefined,
   };
-  if (elevated_until == null) delete (updated as Record<string, unknown>).elevated_until;
+  if (elevated_until == null) delete (updated as unknown as Record<string, unknown>).elevated_until;
 
   return signPayload(updated, secret!);
 }
@@ -419,9 +419,9 @@ export async function createSessionWithAssumedRole(
     assumed_until: assumed_role ? now + ASSUMED_ROLE_TTL_MS : undefined,
   };
   if (assumed_role == null) {
-    delete (updated as Record<string, unknown>).assumed_role;
-    delete (updated as Record<string, unknown>).assumed_at;
-    delete (updated as Record<string, unknown>).assumed_until;
+    delete (updated as unknown as Record<string, unknown>).assumed_role;
+    delete (updated as unknown as Record<string, unknown>).assumed_at;
+    delete (updated as unknown as Record<string, unknown>).assumed_until;
   }
 
   return signPayload(updated, secret!);
@@ -430,7 +430,7 @@ export async function createSessionWithAssumedRole(
 /** True if the current effective role is due to admin or arb_board assuming Board or ARB (for audit logging). */
 export function isAdminActingAs(session: SessionPayload | null): boolean {
   const r = session?.role?.toLowerCase();
-  return (r === 'admin' || r === 'arb_board') && Boolean(session.assumed_role);
+  return (r === 'admin' || r === 'arb_board') && Boolean(session?.assumed_role);
 }
 
 /**
