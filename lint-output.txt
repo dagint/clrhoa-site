@@ -1,0 +1,2752 @@
+﻿
+> clrhoa-site@1.0.0 lint
+> astro check
+
+16:04:42 [@astrojs/cloudflare] Enabling sessions with Cloudflare KV with the "SESSION" KV binding.
+16:04:42 [@astrojs/cloudflare] If you see the error "Invalid binding `SESSION`" in your build output, you need to add the binding to your wrangler config file.
+16:04:42 [vite] Re-optimizing dependencies because vite config has changed
+16:04:42 [content] Syncing content
+16:04:42 [content] Synced content
+16:04:42 [types] Generated 537ms
+16:04:42 [check] Getting diagnostics for Astro files in C:\Users\dagin\Documents\code\clrhoa-site...
+[96mscripts/apply-retention-policies.ts[0m:[93m8[0m:[93m1[0m - [93mwarning[0m[90m ts(6192): [0mAll imports in import declaration are unused.
+
+[7m8[0m import { applyRetentionPolicies, softDeleteOldAuditLogs, permanentlyDeleteOldRecords } from '../src/lib/data-retention';
+[7m [0m [93m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+
+[96mscripts/generate-sri.js[0m:[93m68[0m:[93m15[0m - [93mwarning[0m[90m ts(6387): [0mThe signature '(): void' of 'request.abort' is deprecated.
+
+[7m68[0m       request.abort();
+[7m  [0m [93m              ~~~~~[0m
+
+[96msrc/components/Analytics.astro[0m:[93m17[0m:[93m5[0m - [93mwarning[0m[90m astro(4000): [0mThis script will be treated as if it has the `is:inline` directive because it contains an attribute. Therefore, features that require processing (e.g. using TypeScript or npm packages in the script) are unavailable.
+
+See docs for more details: https://docs.astro.build/en/guides/client-side-scripts/#script-processing.
+
+Add the `is:inline` directive explicitly to silence this hint.
+
+[7m17[0m     defer
+[7m  [0m [93m    ~~~~~[0m
+
+[96msrc/components/ArbDashboardCard.astro[0m:[93m42[0m:[93m10[0m - [93mwarning[0m[90m ts(6133): [0m'getAllFileUrls' is declared but its value is never read.
+
+[7m42[0m function getAllFileUrls(files: ArbFile[]): string[] {
+[7m  [0m [93m         ~~~~~~~~~~~~~~[0m
+
+[96msrc/components/ArbDashboardExportSection.astro[0m:[93m61[0m:[93m18[0m - [91merror[0m[90m ts(2339): [0mProperty 'href' does not exist on type 'HTMLElement'.
+
+[7m61[0m         htmlLink.href = base + '?' + htmlParams.toString();
+[7m  [0m [91m                 ~~~~[0m
+[96msrc/components/ArbDashboardExportSection.astro[0m:[93m57[0m:[93m28[0m - [91merror[0m[90m ts(2339): [0mProperty 'href' does not exist on type 'HTMLElement'.
+
+[7m57[0m       if (csvLink) csvLink.href = base + (qs ? '?' + qs : '');
+[7m  [0m [91m                           ~~~~[0m
+[96msrc/components/ArbDashboardExportSection.astro[0m:[93m54[0m:[93m81[0m - [91merror[0m[90m ts(2339): [0mProperty 'value' does not exist on type 'HTMLElement'.
+
+[7m54[0m       if (statusSelect && statusSelect.value) params.set('status', statusSelect.value);
+[7m  [0m [91m                                                                                ~~~~~[0m
+[96msrc/components/ArbDashboardExportSection.astro[0m:[93m54[0m:[93m40[0m - [91merror[0m[90m ts(2339): [0mProperty 'value' does not exist on type 'HTMLElement'.
+
+[7m54[0m       if (statusSelect && statusSelect.value) params.set('status', statusSelect.value);
+[7m  [0m [91m                                       ~~~~~[0m
+[96msrc/components/ArbDashboardExportSection.astro[0m:[93m53[0m:[93m67[0m - [91merror[0m[90m ts(2339): [0mProperty 'value' does not exist on type 'HTMLElement'.
+
+[7m53[0m       if (toInput && toInput.value) params.set('to_date', toInput.value);
+[7m  [0m [91m                                                                  ~~~~~[0m
+[96msrc/components/ArbDashboardExportSection.astro[0m:[93m53[0m:[93m30[0m - [91merror[0m[90m ts(2339): [0mProperty 'value' does not exist on type 'HTMLElement'.
+
+[7m53[0m       if (toInput && toInput.value) params.set('to_date', toInput.value);
+[7m  [0m [91m                             ~~~~~[0m
+[96msrc/components/ArbDashboardExportSection.astro[0m:[93m52[0m:[93m75[0m - [91merror[0m[90m ts(2339): [0mProperty 'value' does not exist on type 'HTMLElement'.
+
+[7m52[0m       if (fromInput && fromInput.value) params.set('from_date', fromInput.value);
+[7m  [0m [91m                                                                          ~~~~~[0m
+[96msrc/components/ArbDashboardExportSection.astro[0m:[93m52[0m:[93m34[0m - [91merror[0m[90m ts(2339): [0mProperty 'value' does not exist on type 'HTMLElement'.
+
+[7m52[0m       if (fromInput && fromInput.value) params.set('from_date', fromInput.value);
+[7m  [0m [91m                                 ~~~~~[0m
+
+[96msrc/components/Breadcrumbs.astro[0m:[93m24[0m:[93m43[0m - [91merror[0m[90m ts(2322): [0mType '{ children: any[]; class: string; key: string; }' is not assignable to type 'LiHTMLAttributes'.
+  Property 'key' does not exist on type 'LiHTMLAttributes'.
+
+[7m24[0m       <li class="flex items-center gap-2" key={item.href}>
+[7m  [0m [91m                                          ~~~[0m
+[96msrc/components/Breadcrumbs.astro[0m:[93m20[0m:[93m9[0m - [93mwarning[0m[90m astro(4000): [0mThis script will be treated as if it has the `is:inline` directive because it contains an attribute. Therefore, features that require processing (e.g. using TypeScript or npm packages in the script) are unavailable.
+
+See docs for more details: https://docs.astro.build/en/guides/client-side-scripts/#script-processing.
+
+Add the `is:inline` directive explicitly to silence this hint.
+
+[7m20[0m <script type="application/ld+json" set:html={JSON.stringify(breadcrumbList)} />
+[7m  [0m [93m        ~~~~[0m
+
+[96msrc/components/PWAInstallPrompt.astro[0m:[93m31[0m:[93m9[0m - [93mwarning[0m[90m astro(4000): [0mThis script will be treated as if it has the `is:inline` directive because it contains an attribute. Therefore, features that require processing (e.g. using TypeScript or npm packages in the script) are unavailable.
+
+See docs for more details: https://docs.astro.build/en/guides/client-side-scripts/#script-processing.
+
+Add the `is:inline` directive explicitly to silence this hint.
+
+[7m31[0m <script define:vars={{}}>
+[7m  [0m [93m        ~~~~~~~~~~~[0m
+
+[96msrc/layouts/BaseLayout.astro[0m:[93m578[0m:[93m17[0m - [91merror[0m[90m ts(7005): [0mVariable 'closeTimer' implicitly has an 'any' type.
+
+[7m578[0m             if (closeTimer) {
+[7m   [0m [91m                ~~~~~~~~~~[0m
+[96msrc/layouts/BaseLayout.astro[0m:[93m567[0m:[93m15[0m - [91merror[0m[90m ts(7034): [0mVariable 'closeTimer' implicitly has type 'any' in some locations where its type cannot be determined.
+
+[7m567[0m           let closeTimer = null;
+[7m   [0m [91m              ~~~~~~~~~~[0m
+[96msrc/layouts/BaseLayout.astro[0m:[93m559[0m:[93m56[0m - [91merror[0m[90m ts(2345): [0mArgument of type 'EventTarget' is not assignable to parameter of type 'Node'.
+  Type 'EventTarget' is missing the following properties from type 'Node': baseURI, childNodes, firstChild, isConnected, and 43 more.
+
+[7m559[0m             if (!target || !resourcesDropdown.contains(target)) {
+[7m   [0m [91m                                                       ~~~~~~[0m
+[96msrc/layouts/BaseLayout.astro[0m:[93m499[0m:[93m36[0m - [91merror[0m[90m ts(2345): [0mArgument of type 'EventTarget | null' is not assignable to parameter of type 'Node | null'.
+  Type 'EventTarget' is missing the following properties from type 'Node': baseURI, childNodes, firstChild, isConnected, and 43 more.
+
+[7m499[0m               !menuButton.contains(e.target)) {
+[7m   [0m [91m                                   ~~~~~~~~[0m
+[96msrc/layouts/BaseLayout.astro[0m:[93m498[0m:[93m36[0m - [91merror[0m[90m ts(2345): [0mArgument of type 'EventTarget | null' is not assignable to parameter of type 'Node | null'.
+  Type 'EventTarget' is missing the following properties from type 'Node': baseURI, childNodes, firstChild, isConnected, and 43 more.
+
+[7m498[0m               !mobileMenu.contains(e.target) &&
+[7m   [0m [91m                                   ~~~~~~~~[0m
+[96msrc/layouts/BaseLayout.astro[0m:[93m474[0m:[93m15[0m - [91merror[0m[90m ts(18047): [0m'mobileMenu' is possibly 'null'.
+
+[7m474[0m           if (mobileMenu.classList.contains('hidden')) return;
+[7m   [0m [91m              ~~~~~~~~~~[0m
+[96msrc/layouts/BaseLayout.astro[0m:[93m473[0m:[93m31[0m - [91merror[0m[90m ts(7006): [0mParameter 'e' implicitly has an 'any' type.
+
+[7m473[0m         function handleTabKey(e) {
+[7m   [0m [91m                              ~[0m
+[96msrc/layouts/BaseLayout.astro[0m:[93m459[0m:[93m11[0m - [91merror[0m[90m ts(18047): [0m'menuButton' is possibly 'null'.
+
+[7m459[0m           menuButton.focus();
+[7m   [0m [91m          ~~~~~~~~~~[0m
+[96msrc/layouts/BaseLayout.astro[0m:[93m454[0m:[93m11[0m - [91merror[0m[90m ts(18047): [0m'menuButton' is possibly 'null'.
+
+[7m454[0m           menuButton.setAttribute('aria-expanded', 'false');
+[7m   [0m [91m          ~~~~~~~~~~[0m
+[96msrc/layouts/BaseLayout.astro[0m:[93m453[0m:[93m11[0m - [91merror[0m[90m ts(18047): [0m'mobileMenu' is possibly 'null'.
+
+[7m453[0m           mobileMenu.classList.add('hidden');
+[7m   [0m [91m          ~~~~~~~~~~[0m
+[96msrc/layouts/BaseLayout.astro[0m:[93m432[0m:[93m11[0m - [91merror[0m[90m ts(18047): [0m'menuButton' is possibly 'null'.
+
+[7m432[0m           menuButton.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
+[7m   [0m [91m          ~~~~~~~~~~[0m
+[96msrc/layouts/BaseLayout.astro[0m:[93m431[0m:[93m11[0m - [91merror[0m[90m ts(18047): [0m'mobileMenu' is possibly 'null'.
+
+[7m431[0m           mobileMenu.classList.toggle('hidden');
+[7m   [0m [91m          ~~~~~~~~~~[0m
+[96msrc/layouts/BaseLayout.astro[0m:[93m430[0m:[93m27[0m - [91merror[0m[90m ts(18047): [0m'mobileMenu' is possibly 'null'.
+
+[7m430[0m           const isOpen = !mobileMenu.classList.contains('hidden');
+[7m   [0m [91m                          ~~~~~~~~~~[0m
+[96msrc/layouts/BaseLayout.astro[0m:[93m114[0m:[93m13[0m - [93mwarning[0m[90m astro(4000): [0mThis script will be treated as if it has the `is:inline` directive because it contains an attribute. Therefore, features that require processing (e.g. using TypeScript or npm packages in the script) are unavailable.
+
+See docs for more details: https://docs.astro.build/en/guides/client-side-scripts/#script-processing.
+
+Add the `is:inline` directive explicitly to silence this hint.
+
+[7m114[0m     <script type="application/ld+json" set:html={JSON.stringify({
+[7m   [0m [93m            ~~~~[0m
+
+[96msrc/lib/access-control.ts[0m:[93m36[0m:[93m7[0m - [91merror[0m[90m ts(2552): [0mCannot find name 'D1Database'. Did you mean 'IDBDatabase'?
+
+[7m36[0m   db: D1Database,
+[7m  [0m [91m      ~~~~~~~~~~[0m
+[96msrc/lib/access-control.ts[0m:[93m17[0m:[93m7[0m - [91merror[0m[90m ts(2552): [0mCannot find name 'D1Database'. Did you mean 'IDBDatabase'?
+
+[7m17[0m   db: D1Database,
+[7m  [0m [91m      ~~~~~~~~~~[0m
+
+[96msrc/lib/api-helpers.ts[0m:[93m51[0m:[93m10[0m - [91merror[0m[90m ts(2552): [0mCannot find name 'D1Database'. Did you mean 'IDBDatabase'?
+
+[7m51[0m ): { db: D1Database } | { response: Response } {
+[7m  [0m [91m         ~~~~~~~~~~[0m
+[96msrc/lib/api-helpers.ts[0m:[93m50[0m:[93m15[0m - [91merror[0m[90m ts(2552): [0mCannot find name 'D1Database'. Did you mean 'IDBDatabase'?
+
+[7m50[0m   env: { DB?: D1Database } | undefined
+[7m  [0m [91m              ~~~~~~~~~~[0m
+
+[96msrc/lib/arb-dashboard.ts[0m:[93m99[0m:[93m7[0m - [91merror[0m[90m ts(2552): [0mCannot find name 'D1Database'. Did you mean 'IDBDatabase'?
+
+[7m99[0m   db: D1Database,
+[7m  [0m [91m      ~~~~~~~~~~[0m
+
+[96msrc/lib/arb-db.ts[0m:[93m509[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m509[0m   db: D1Database,
+[7m   [0m [91m      ~~~~~~~~~~[0m
+[96msrc/lib/arb-db.ts[0m:[93m470[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m470[0m   db: D1Database,
+[7m   [0m [91m      ~~~~~~~~~~[0m
+[96msrc/lib/arb-db.ts[0m:[93m460[0m:[93m54[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m460[0m export async function deleteAllArbFilesByRequest(db: D1Database, requestId: string): Promise<number> {
+[7m   [0m [91m                                                     ~~~~~~~~~~[0m
+[96msrc/lib/arb-db.ts[0m:[93m451[0m:[93m41[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m451[0m export async function deleteArbFile(db: D1Database, fileId: string, requestId: string): Promise<boolean> {
+[7m   [0m [91m                                        ~~~~~~~~~~[0m
+[96msrc/lib/arb-db.ts[0m:[93m440[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m440[0m   db: D1Database,
+[7m   [0m [91m      ~~~~~~~~~~[0m
+[96msrc/lib/arb-db.ts[0m:[93m421[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m421[0m   db: D1Database,
+[7m   [0m [91m      ~~~~~~~~~~[0m
+[96msrc/lib/arb-db.ts[0m:[93m406[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m406[0m   db: D1Database,
+[7m   [0m [91m      ~~~~~~~~~~[0m
+[96msrc/lib/arb-db.ts[0m:[93m394[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m394[0m   db: D1Database,
+[7m   [0m [91m      ~~~~~~~~~~[0m
+[96msrc/lib/arb-db.ts[0m:[93m376[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m376[0m   db: D1Database,
+[7m   [0m [91m      ~~~~~~~~~~[0m
+[96msrc/lib/arb-db.ts[0m:[93m370[0m:[93m86[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'ownerNotes'.
+
+[7m370[0m     .bind(applicantName, phone, propertyAddress, applicationType, description ?? '', ownerNotes, id, ownerEmail.trim().toLowerCase())
+[7m   [0m [91m                                                                                     ~~~~~~~~~~[0m
+[96msrc/lib/arb-db.ts[0m:[93m349[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m349[0m   db: D1Database,
+[7m   [0m [91m      ~~~~~~~~~~[0m
+[96msrc/lib/arb-db.ts[0m:[93m312[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m312[0m   db: D1Database,
+[7m   [0m [91m      ~~~~~~~~~~[0m
+[96msrc/lib/arb-db.ts[0m:[93m278[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m278[0m   db: D1Database,
+[7m   [0m [91m      ~~~~~~~~~~[0m
+[96msrc/lib/arb-db.ts[0m:[93m238[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m238[0m   db: D1Database,
+[7m   [0m [91m      ~~~~~~~~~~[0m
+[96msrc/lib/arb-db.ts[0m:[93m225[0m:[93m55[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m225[0m export async function getArbRequestCountsByStatus(db: D1Database): Promise<{ pending: number; in_review: number; approved: number; rejected: number; cancelled: number }> {
+[7m   [0m [91m                                                      ~~~~~~~~~~[0m
+[96msrc/lib/arb-db.ts[0m:[93m215[0m:[93m30[0m - [91merror[0m[90m ts(7006): [0mParameter 'row' implicitly has an 'any' type.
+
+[7m215[0m   return (results ?? []).map(row => ({
+[7m   [0m [91m                             ~~~[0m
+[96msrc/lib/arb-db.ts[0m:[93m191[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m191[0m   db: D1Database,
+[7m   [0m [91m      ~~~~~~~~~~[0m
+[96msrc/lib/arb-db.ts[0m:[93m171[0m:[93m30[0m - [91merror[0m[90m ts(7006): [0mParameter 'row' implicitly has an 'any' type.
+
+[7m171[0m   return (results ?? []).map(row => ({
+[7m   [0m [91m                             ~~~[0m
+[96msrc/lib/arb-db.ts[0m:[93m165[0m:[93m46[0m - [91merror[0m[90m ts(2552): [0mCannot find name 'D1Database'. Did you mean 'IDBDatabase'?
+
+[7m165[0m export async function listAllArbRequests(db: D1Database): Promise<ArbRequest[]> {
+[7m   [0m [91m                                             ~~~~~~~~~~[0m
+[96msrc/lib/arb-db.ts[0m:[93m156[0m:[93m30[0m - [91merror[0m[90m ts(7006): [0mParameter 'row' implicitly has an 'any' type.
+
+[7m156[0m   return (results ?? []).map(row => ({
+[7m   [0m [91m                             ~~~[0m
+[96msrc/lib/arb-db.ts[0m:[93m147[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m147[0m   db: D1Database,
+[7m   [0m [91m      ~~~~~~~~~~[0m
+[96msrc/lib/arb-db.ts[0m:[93m127[0m:[93m7[0m - [91merror[0m[90m ts(2552): [0mCannot find name 'D1Database'. Did you mean 'IDBDatabase'?
+
+[7m127[0m   db: D1Database,
+[7m   [0m [91m      ~~~~~~~~~~[0m
+[96msrc/lib/arb-db.ts[0m:[93m88[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m88[0m   db: D1Database,
+[7m  [0m [91m      ~~~~~~~~~~[0m
+[96msrc/lib/arb-db.ts[0m:[93m63[0m:[93m47[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m63[0m export async function getNextArbRequestId(db: D1Database): Promise<string> {
+[7m  [0m [91m                                              ~~~~~~~~~~[0m
+[96msrc/lib/arb-db.ts[0m:[93m365[0m:[93m9[0m - [93mwarning[0m[90m ts(6133): [0m'email' is declared but its value is never read.
+
+[7m365[0m   const email = ownerEmail.trim().toLowerCase();
+[7m   [0m [93m        ~~~~~[0m
+
+[96msrc/lib/assessments-db.ts[0m:[93m221[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m221[0m   db: D1Database,
+[7m   [0m [91m      ~~~~~~~~~~[0m
+[96msrc/lib/assessments-db.ts[0m:[93m196[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m196[0m   db: D1Database,
+[7m   [0m [91m      ~~~~~~~~~~[0m
+[96msrc/lib/assessments-db.ts[0m:[93m180[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m180[0m   db: D1Database,
+[7m   [0m [91m      ~~~~~~~~~~[0m
+[96msrc/lib/assessments-db.ts[0m:[93m142[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m142[0m   db: D1Database,
+[7m   [0m [91m      ~~~~~~~~~~[0m
+[96msrc/lib/assessments-db.ts[0m:[93m114[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m114[0m   db: D1Database,
+[7m   [0m [91m      ~~~~~~~~~~[0m
+[96msrc/lib/assessments-db.ts[0m:[93m98[0m:[93m45[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m98[0m export async function getPaymentHistory(db: D1Database, ownerEmail: string): Promise<AssessmentPayment[]> {
+[7m  [0m [91m                                            ~~~~~~~~~~[0m
+[96msrc/lib/assessments-db.ts[0m:[93m85[0m:[93m58[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m85[0m export async function listAssessmentPaymentsForAudit(db: D1Database, limit: number): Promise<AssessmentPayment[]> {
+[7m  [0m [91m                                                         ~~~~~~~~~~[0m
+[96msrc/lib/assessments-db.ts[0m:[93m75[0m:[93m53[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m75[0m export async function listAllSpecialAssessments(db: D1Database): Promise<SpecialAssessment[]> {
+[7m  [0m [91m                                                    ~~~~~~~~~~[0m
+[96msrc/lib/assessments-db.ts[0m:[93m65[0m:[93m46[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m65[0m export async function listAllAssessments(db: D1Database): Promise<Assessment[]> {
+[7m  [0m [91m                                             ~~~~~~~~~~[0m
+[96msrc/lib/assessments-db.ts[0m:[93m53[0m:[93m48[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m53[0m export async function getAssessmentByOwner(db: D1Database, ownerEmail: string): Promise<Assessment | null> {
+[7m  [0m [91m                                               ~~~~~~~~~~[0m
+
+[96msrc/lib/auth.ts[0m:[93m450[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'KVNamespace'.
+
+[7m450[0m   kv: KVNamespace | undefined,
+[7m   [0m [91m      ~~~~~~~~~~~[0m
+[96msrc/lib/auth.ts[0m:[93m401[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'KVNamespace'.
+
+[7m401[0m   kv: KVNamespace | undefined,
+[7m   [0m [91m      ~~~~~~~~~~~[0m
+[96msrc/lib/auth.ts[0m:[93m380[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'KVNamespace'.
+
+[7m380[0m   kv: KVNamespace | undefined,
+[7m   [0m [91m      ~~~~~~~~~~~[0m
+[96msrc/lib/auth.ts[0m:[93m129[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'KVNamespace'.
+
+[7m129[0m   kv: KVNamespace | undefined,
+[7m   [0m [91m      ~~~~~~~~~~~[0m
+[96msrc/lib/auth.ts[0m:[93m106[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'KVNamespace'.
+
+[7m106[0m   kv: KVNamespace | undefined,
+[7m   [0m [91m      ~~~~~~~~~~~[0m
+[96msrc/lib/auth.ts[0m:[93m85[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'KVNamespace'.
+
+[7m85[0m   kv: KVNamespace | undefined,
+[7m  [0m [91m      ~~~~~~~~~~~[0m
+[96msrc/lib/auth.ts[0m:[93m70[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'KVNamespace'.
+
+[7m70[0m   kv: KVNamespace | undefined,
+[7m  [0m [91m      ~~~~~~~~~~~[0m
+[96msrc/lib/auth.ts[0m:[93m53[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'KVNamespace'.
+
+[7m53[0m   kv: KVNamespace | undefined,
+[7m  [0m [91m      ~~~~~~~~~~~[0m
+[96msrc/lib/auth.ts[0m:[93m31[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'KVNamespace'.
+
+[7m31[0m   kv: KVNamespace | undefined,
+[7m  [0m [91m      ~~~~~~~~~~~[0m
+[96msrc/lib/auth.ts[0m:[93m24[0m:[93m8[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'KVNamespace'.
+
+[7m24[0m   KV?: KVNamespace; // For rate limiting and lockout tracking
+[7m  [0m [91m       ~~~~~~~~~~~[0m
+[96msrc/lib/auth.ts[0m:[93m22[0m:[93m20[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'KVNamespace'.
+
+[7m22[0m   CLOURHOA_USERS?: KVNamespace;
+[7m  [0m [91m                   ~~~~~~~~~~~[0m
+
+[96msrc/lib/board-context.ts[0m:[93m46[0m:[93m12[0m - [91merror[0m[90m ts(2322): [0mType '{ SESSION_SECRET?: string | undefined; DB?: any; }' is not assignable to type 'undefined'.
+
+[7m46[0m   return { env, session };
+[7m  [0m [91m           ~~~[0m
+[96msrc/lib/board-context.ts[0m:[93m12[0m:[93m63[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m12[0m   locals: { runtime?: { env?: { SESSION_SECRET?: string; DB?: D1Database } } };
+[7m  [0m [91m                                                              ~~~~~~~~~~[0m
+
+[96msrc/lib/data-retention.ts[0m:[93m110[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m110[0m   db: D1Database,
+[7m   [0m [91m      ~~~~~~~~~~[0m
+[96msrc/lib/data-retention.ts[0m:[93m73[0m:[93m50[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m73[0m export async function applyRetentionPolicies(db: D1Database): Promise<{ deleted: number; errors: number }> {
+[7m  [0m [91m                                                 ~~~~~~~~~~[0m
+[96msrc/lib/data-retention.ts[0m:[93m50[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m50[0m   db: D1Database,
+[7m  [0m [91m      ~~~~~~~~~~[0m
+[96msrc/lib/data-retention.ts[0m:[93m31[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m31[0m   db: D1Database,
+[7m  [0m [91m      ~~~~~~~~~~[0m
+
+[96msrc/lib/db.ts[0m:[93m116[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m116[0m   db: D1Database,
+[7m   [0m [91m      ~~~~~~~~~~[0m
+[96msrc/lib/db.ts[0m:[93m74[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m74[0m   db: D1Database,
+[7m  [0m [91m      ~~~~~~~~~~[0m
+[96msrc/lib/db.ts[0m:[93m48[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m48[0m   db: D1Database,
+[7m  [0m [91m      ~~~~~~~~~~[0m
+[96msrc/lib/db.ts[0m:[93m30[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m30[0m   db: D1Database,
+[7m  [0m [91m      ~~~~~~~~~~[0m
+[96msrc/lib/db.ts[0m:[93m22[0m:[93m20[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'R2Bucket'.
+
+[7m22[0m   CLOURHOA_FILES?: R2Bucket;
+[7m  [0m [91m                   ~~~~~~~~[0m
+[96msrc/lib/db.ts[0m:[93m21[0m:[93m20[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'KVNamespace'.
+
+[7m21[0m   CLOURHOA_USERS?: KVNamespace;
+[7m  [0m [91m                   ~~~~~~~~~~~[0m
+[96msrc/lib/db.ts[0m:[93m20[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m20[0m   DB: D1Database;
+[7m  [0m [91m      ~~~~~~~~~~[0m
+
+[96msrc/lib/directory-db.ts[0m:[93m509[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m509[0m   db: D1Database,
+[7m   [0m [91m      ~~~~~~~~~~[0m
+[96msrc/lib/directory-db.ts[0m:[93m480[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m480[0m   db: D1Database,
+[7m   [0m [91m      ~~~~~~~~~~[0m
+[96msrc/lib/directory-db.ts[0m:[93m467[0m:[93m40[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m467[0m export async function deleteOwners(db: D1Database, ids: string[]): Promise<number> {
+[7m   [0m [91m                                       ~~~~~~~~~~[0m
+[96msrc/lib/directory-db.ts[0m:[93m461[0m:[93m39[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m461[0m export async function deleteOwner(db: D1Database, id: string): Promise<boolean> {
+[7m   [0m [91m                                      ~~~~~~~~~~[0m
+[96msrc/lib/directory-db.ts[0m:[93m421[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m421[0m   db: D1Database,
+[7m   [0m [91m      ~~~~~~~~~~[0m
+[96msrc/lib/directory-db.ts[0m:[93m377[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m377[0m   db: D1Database,
+[7m   [0m [91m      ~~~~~~~~~~[0m
+[96msrc/lib/directory-db.ts[0m:[93m349[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m349[0m   db: D1Database,
+[7m   [0m [91m      ~~~~~~~~~~[0m
+[96msrc/lib/directory-db.ts[0m:[93m294[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m294[0m   db: D1Database,
+[7m   [0m [91m      ~~~~~~~~~~[0m
+[96msrc/lib/directory-db.ts[0m:[93m285[0m:[93m35[0m - [91merror[0m[90m ts(7006): [0mParameter 'r' implicitly has an 'any' type.
+
+[7m285[0m       return (results ?? []).map((r) => ({ ...r, viewer_role: null }));
+[7m   [0m [91m                                  ~[0m
+[96msrc/lib/directory-db.ts[0m:[93m266[0m:[93m45[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m266[0m export async function listDirectoryLogs(db: D1Database, limit: number): Promise<DirectoryLogRow[]> {
+[7m   [0m [91m                                            ~~~~~~~~~~[0m
+[96msrc/lib/directory-db.ts[0m:[93m258[0m:[93m35[0m - [91merror[0m[90m ts(7006): [0mParameter 'r' implicitly has an 'any' type.
+
+[7m258[0m       return (results ?? []).map((r) => ({ ...r, viewer_role: null }));
+[7m   [0m [91m                                  ~[0m
+[96msrc/lib/directory-db.ts[0m:[93m235[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m235[0m   db: D1Database,
+[7m   [0m [91m      ~~~~~~~~~~[0m
+[96msrc/lib/directory-db.ts[0m:[93m215[0m:[93m43[0m - [91merror[0m[90m ts(2552): [0mCannot find name 'D1Database'. Did you mean 'IDBDatabase'?
+
+[7m215[0m export async function getOwnerByEmail(db: D1Database, email: string): Promise<Owner | null> {
+[7m   [0m [91m                                          ~~~~~~~~~~[0m
+[96msrc/lib/directory-db.ts[0m:[93m196[0m:[93m42[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m196[0m export async function getOwnersByIds(db: D1Database, ids: string[]): Promise<Owner[]> {
+[7m   [0m [91m                                         ~~~~~~~~~~[0m
+[96msrc/lib/directory-db.ts[0m:[93m182[0m:[93m40[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m182[0m export async function getOwnerById(db: D1Database, id: string): Promise<Owner | null> {
+[7m   [0m [91m                                       ~~~~~~~~~~[0m
+[96msrc/lib/directory-db.ts[0m:[93m168[0m:[93m48[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m168[0m export async function getRecentOwnersCount(db: D1Database, days: number): Promise<number> {
+[7m   [0m [91m                                               ~~~~~~~~~~[0m
+[96msrc/lib/directory-db.ts[0m:[93m152[0m:[93m50[0m - [91merror[0m[90m ts(7006): [0mParameter 'r' implicitly has an 'any' type.
+
+[7m152[0m   const hasLogin = new Set((userRows ?? []).map((r) => r.email?.toLowerCase()).filter(Boolean));
+[7m   [0m [91m                                                 ~[0m
+[96msrc/lib/directory-db.ts[0m:[93m132[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m132[0m   db: D1Database,
+[7m   [0m [91m      ~~~~~~~~~~[0m
+[96msrc/lib/directory-db.ts[0m:[93m112[0m:[93m58[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m112[0m export async function getPrimaryOwnerEmailForAddress(db: D1Database, address: string | null | undefined): Promise<string | null> {
+[7m   [0m [91m                                                         ~~~~~~~~~~[0m
+[96msrc/lib/directory-db.ts[0m:[93m94[0m:[93m54[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m94[0m export async function listPrimaryOwnersByAddress(db: D1Database): Promise<Owner[]> {
+[7m  [0m [91m                                                     ~~~~~~~~~~[0m
+[96msrc/lib/directory-db.ts[0m:[93m84[0m:[93m35[0m - [91merror[0m[90m ts(7006): [0mParameter 'o' implicitly has an 'any' type.
+
+[7m84[0m       return (results ?? []).map((o) => ({ ...o, updated_by: null, updated_at: null }));
+[7m  [0m [91m                                  ~[0m
+[96msrc/lib/directory-db.ts[0m:[93m78[0m:[93m35[0m - [91merror[0m[90m ts(7006): [0mParameter 'o' implicitly has an 'any' type.
+
+[7m78[0m       return (results ?? []).map((o) => ({ ...o, updated_by: null, updated_at: null }));
+[7m  [0m [91m                                  ~[0m
+[96msrc/lib/directory-db.ts[0m:[93m65[0m:[93m38[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m65[0m export async function listOwners(db: D1Database): Promise<Owner[]> {
+[7m  [0m [91m                                     ~~~~~~~~~~[0m
+[96msrc/lib/directory-db.ts[0m:[93m490[0m:[93m9[0m - [93mwarning[0m[90m ts(6133): [0m'phone' is declared but its value is never read.
+
+[7m490[0m   const phone = existing.phone;
+[7m   [0m [93m        ~~~~~[0m
+
+[96msrc/lib/feedback-db.ts[0m:[93m201[0m:[93m45[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m201[0m export async function deleteFeedbackDoc(db: D1Database, id: string): Promise<boolean> {
+[7m   [0m [91m                                            ~~~~~~~~~~[0m
+[96msrc/lib/feedback-db.ts[0m:[93m174[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m174[0m   db: D1Database,
+[7m   [0m [91m      ~~~~~~~~~~[0m
+[96msrc/lib/feedback-db.ts[0m:[93m152[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m152[0m   db: D1Database,
+[7m   [0m [91m      ~~~~~~~~~~[0m
+[96msrc/lib/feedback-db.ts[0m:[93m138[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m138[0m   db: D1Database,
+[7m   [0m [91m      ~~~~~~~~~~[0m
+[96msrc/lib/feedback-db.ts[0m:[93m113[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m113[0m   db: D1Database,
+[7m   [0m [91m      ~~~~~~~~~~[0m
+[96msrc/lib/feedback-db.ts[0m:[93m88[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m88[0m   db: D1Database,
+[7m  [0m [91m      ~~~~~~~~~~[0m
+[96msrc/lib/feedback-db.ts[0m:[93m73[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m73[0m   db: D1Database,
+[7m  [0m [91m      ~~~~~~~~~~[0m
+[96msrc/lib/feedback-db.ts[0m:[93m62[0m:[93m46[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m62[0m export async function getFeedbackDocById(db: D1Database, id: string): Promise<FeedbackDoc | null> {
+[7m  [0m [91m                                             ~~~~~~~~~~[0m
+[96msrc/lib/feedback-db.ts[0m:[93m52[0m:[93m47[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m52[0m export async function listAllFeedbackDocs(db: D1Database): Promise<FeedbackDoc[]> {
+[7m  [0m [91m                                              ~~~~~~~~~~[0m
+[96msrc/lib/feedback-db.ts[0m:[93m39[0m:[93m50[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m39[0m export async function listActiveFeedbackDocs(db: D1Database): Promise<FeedbackDoc[]> {
+[7m  [0m [91m                                                 ~~~~~~~~~~[0m
+
+[96msrc/lib/login-history-db.ts[0m:[93m49[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m49[0m   db: D1Database,
+[7m  [0m [91m      ~~~~~~~~~~[0m
+[96msrc/lib/login-history-db.ts[0m:[93m30[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m30[0m   db: D1Database,
+[7m  [0m [91m      ~~~~~~~~~~[0m
+
+[96msrc/lib/maintenance-db.ts[0m:[93m102[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m102[0m   db: D1Database,
+[7m   [0m [91m      ~~~~~~~~~~[0m
+[96msrc/lib/maintenance-db.ts[0m:[93m84[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m84[0m   db: D1Database,
+[7m  [0m [91m      ~~~~~~~~~~[0m
+[96msrc/lib/maintenance-db.ts[0m:[93m72[0m:[93m46[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m72[0m export async function getMaintenanceById(db: D1Database, id: string): Promise<MaintenanceRequest | null> {
+[7m  [0m [91m                                             ~~~~~~~~~~[0m
+[96msrc/lib/maintenance-db.ts[0m:[93m49[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m49[0m   db: D1Database,
+[7m  [0m [91m      ~~~~~~~~~~[0m
+[96msrc/lib/maintenance-db.ts[0m:[93m36[0m:[93m50[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m36[0m export async function listMaintenanceByOwner(db: D1Database, ownerEmail: string): Promise<MaintenanceRequest[]> {
+[7m  [0m [91m                                                 ~~~~~~~~~~[0m
+
+[96msrc/lib/meetings-db.ts[0m:[93m251[0m:[93m41[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m251[0m export async function deleteMeeting(db: D1Database, id: string): Promise<boolean> {
+[7m   [0m [91m                                        ~~~~~~~~~~[0m
+[96msrc/lib/meetings-db.ts[0m:[93m211[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m211[0m   db: D1Database,
+[7m   [0m [91m      ~~~~~~~~~~[0m
+[96msrc/lib/meetings-db.ts[0m:[93m178[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m178[0m   db: D1Database,
+[7m   [0m [91m      ~~~~~~~~~~[0m
+[96msrc/lib/meetings-db.ts[0m:[93m159[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m159[0m   db: D1Database,
+[7m   [0m [91m      ~~~~~~~~~~[0m
+[96msrc/lib/meetings-db.ts[0m:[93m146[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m146[0m   db: D1Database,
+[7m   [0m [91m      ~~~~~~~~~~[0m
+[96msrc/lib/meetings-db.ts[0m:[93m125[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m125[0m   db: D1Database,
+[7m   [0m [91m      ~~~~~~~~~~[0m
+[96msrc/lib/meetings-db.ts[0m:[93m114[0m:[93m48[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m114[0m export async function getPublicMeetingById(db: D1Database, id: string): Promise<Meeting | null> {
+[7m   [0m [91m                                               ~~~~~~~~~~[0m
+[96msrc/lib/meetings-db.ts[0m:[93m104[0m:[93m53[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m104[0m export async function listMeetingsForPublicNews(db: D1Database): Promise<Meeting[]> {
+[7m   [0m [91m                                                    ~~~~~~~~~~[0m
+[96msrc/lib/meetings-db.ts[0m:[93m94[0m:[93m42[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m94[0m export async function getMeetingById(db: D1Database, id: string): Promise<Meeting | null> {
+[7m  [0m [91m                                         ~~~~~~~~~~[0m
+[96msrc/lib/meetings-db.ts[0m:[93m84[0m:[93m43[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m84[0m export async function listAllMeetings(db: D1Database): Promise<Meeting[]> {
+[7m  [0m [91m                                          ~~~~~~~~~~[0m
+[96msrc/lib/meetings-db.ts[0m:[93m64[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m64[0m   db: D1Database,
+[7m  [0m [91m      ~~~~~~~~~~[0m
+[96msrc/lib/meetings-db.ts[0m:[93m51[0m:[93m48[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m51[0m export async function listUpcomingMeetings(db: D1Database): Promise<Meeting[]> {
+[7m  [0m [91m                                               ~~~~~~~~~~[0m
+
+[96msrc/lib/member-documents-db.ts[0m:[93m85[0m:[93m48[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m85[0m export async function deleteMemberDocument(db: D1Database, id: number): Promise<boolean> {
+[7m  [0m [91m                                               ~~~~~~~~~~[0m
+[96msrc/lib/member-documents-db.ts[0m:[93m67[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m67[0m   db: D1Database,
+[7m  [0m [91m      ~~~~~~~~~~[0m
+[96msrc/lib/member-documents-db.ts[0m:[93m53[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m53[0m   db: D1Database,
+[7m  [0m [91m      ~~~~~~~~~~[0m
+[96msrc/lib/member-documents-db.ts[0m:[93m41[0m:[93m45[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m41[0m export async function getMemberDocument(db: D1Database, id: number): Promise<MemberDocumentRow | null> {
+[7m  [0m [91m                                            ~~~~~~~~~~[0m
+[96msrc/lib/member-documents-db.ts[0m:[93m30[0m:[93m47[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m30[0m export async function listMemberDocuments(db: D1Database): Promise<MemberDocumentRow[]> {
+[7m  [0m [91m                                              ~~~~~~~~~~[0m
+
+[96msrc/lib/portal-context.ts[0m:[93m54[0m:[93m5[0m - [91merror[0m[90m ts(2322): [0mType '{ SESSION_SECRET?: string | undefined; DB?: any; } | undefined' is not assignable to type 'undefined'.
+  Type '{ SESSION_SECRET?: string | undefined; DB?: any; }' is not assignable to type 'undefined'.
+
+[7m54[0m     env,
+[7m  [0m [91m    ~~~[0m
+[96msrc/lib/portal-context.ts[0m:[93m12[0m:[93m63[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m12[0m   locals: { runtime?: { env?: { SESSION_SECRET?: string; DB?: D1Database } } };
+[7m  [0m [91m                                                              ~~~~~~~~~~[0m
+
+[96msrc/lib/preapproval-db.ts[0m:[93m167[0m:[93m49[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m167[0m export async function deletePreapprovalItem(db: D1Database, id: string): Promise<boolean> {
+[7m   [0m [91m                                                ~~~~~~~~~~[0m
+[96msrc/lib/preapproval-db.ts[0m:[93m132[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m132[0m   db: D1Database,
+[7m   [0m [91m      ~~~~~~~~~~[0m
+[96msrc/lib/preapproval-db.ts[0m:[93m102[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m102[0m   db: D1Database,
+[7m   [0m [91m      ~~~~~~~~~~[0m
+[96msrc/lib/preapproval-db.ts[0m:[93m86[0m:[93m50[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m86[0m export async function searchPreapprovalItems(db: D1Database, like: string, limit = 20): Promise<PreapprovalItem[]> {
+[7m  [0m [91m                                                 ~~~~~~~~~~[0m
+[96msrc/lib/preapproval-db.ts[0m:[93m76[0m:[93m46[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m76[0m export async function getPreapprovalById(db: D1Database, id: string): Promise<PreapprovalItem | null> {
+[7m  [0m [91m                                             ~~~~~~~~~~[0m
+[96msrc/lib/preapproval-db.ts[0m:[93m72[0m:[93m31[0m - [91merror[0m[90m ts(7006): [0mParameter 'r' implicitly has an 'any' type.
+
+[7m72[0m   return (results ?? []).map((r) => r.category);
+[7m  [0m [91m                              ~[0m
+[96msrc/lib/preapproval-db.ts[0m:[93m68[0m:[93m53[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m68[0m export async function listPreapprovalCategories(db: D1Database): Promise<string[]> {
+[7m  [0m [91m                                                    ~~~~~~~~~~[0m
+[96msrc/lib/preapproval-db.ts[0m:[93m47[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m47[0m   db: D1Database,
+[7m  [0m [91m      ~~~~~~~~~~[0m
+
+[96msrc/lib/public-documents-db.ts[0m:[93m58[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m58[0m   db: D1Database,
+[7m  [0m [91m      ~~~~~~~~~~[0m
+[96msrc/lib/public-documents-db.ts[0m:[93m46[0m:[93m45[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m46[0m export async function getPublicDocument(db: D1Database, slug: string): Promise<PublicDocumentRow | null> {
+[7m  [0m [91m                                            ~~~~~~~~~~[0m
+[96msrc/lib/public-documents-db.ts[0m:[93m33[0m:[93m47[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m33[0m export async function listPublicDocuments(db: D1Database): Promise<PublicDocumentRow[]> {
+[7m  [0m [91m                                              ~~~~~~~~~~[0m
+
+[96msrc/lib/rate-limit.ts[0m:[93m17[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'KVNamespace'.
+
+[7m17[0m   kv: KVNamespace | undefined,
+[7m  [0m [91m      ~~~~~~~~~~~[0m
+
+[96msrc/lib/search.ts[0m:[93m59[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m59[0m   db: D1Database,
+[7m  [0m [91m      ~~~~~~~~~~[0m
+
+[96msrc/lib/vendor-submissions-db.ts[0m:[93m115[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m115[0m   db: D1Database,
+[7m   [0m [91m      ~~~~~~~~~~[0m
+[96msrc/lib/vendor-submissions-db.ts[0m:[93m81[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m81[0m   db: D1Database,
+[7m  [0m [91m      ~~~~~~~~~~[0m
+[96msrc/lib/vendor-submissions-db.ts[0m:[93m70[0m:[93m45[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m70[0m export async function getSubmissionById(db: D1Database, id: string): Promise<VendorSubmission | null> {
+[7m  [0m [91m                                            ~~~~~~~~~~[0m
+[96msrc/lib/vendor-submissions-db.ts[0m:[93m50[0m:[93m43[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m50[0m export async function listSubmissions(db: D1Database, options?: { status?: string }): Promise<VendorSubmission[]> {
+[7m  [0m [91m                                          ~~~~~~~~~~[0m
+[96msrc/lib/vendor-submissions-db.ts[0m:[93m40[0m:[93m50[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m40[0m export async function listPendingSubmissions(db: D1Database): Promise<VendorSubmission[]> {
+[7m  [0m [91m                                                 ~~~~~~~~~~[0m
+
+[96msrc/lib/vendors-db.ts[0m:[93m182[0m:[93m46[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m182[0m export async function listVendorAuditLog(db: D1Database, limit: number): Promise<VendorAuditLogRow[]> {
+[7m   [0m [91m                                             ~~~~~~~~~~[0m
+[96msrc/lib/vendors-db.ts[0m:[93m162[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m162[0m   db: D1Database,
+[7m   [0m [91m      ~~~~~~~~~~[0m
+[96msrc/lib/vendors-db.ts[0m:[93m147[0m:[93m40[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m147[0m export async function deleteVendor(db: D1Database, id: string): Promise<boolean> {
+[7m   [0m [91m                                       ~~~~~~~~~~[0m
+[96msrc/lib/vendors-db.ts[0m:[93m111[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m111[0m   db: D1Database,
+[7m   [0m [91m      ~~~~~~~~~~[0m
+[96msrc/lib/vendors-db.ts[0m:[93m77[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m77[0m   db: D1Database,
+[7m  [0m [91m      ~~~~~~~~~~[0m
+[96msrc/lib/vendors-db.ts[0m:[93m69[0m:[93m41[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m69[0m export async function getVendorById(db: D1Database, id: string): Promise<Vendor | null> {
+[7m  [0m [91m                                        ~~~~~~~~~~[0m
+[96msrc/lib/vendors-db.ts[0m:[93m59[0m:[93m49[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m59[0m export async function getRecentVendorsCount(db: D1Database, days: number): Promise<number> {
+[7m  [0m [91m                                                ~~~~~~~~~~[0m
+[96msrc/lib/vendors-db.ts[0m:[93m49[0m:[93m45[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m49[0m export async function listPublicVendors(db: D1Database): Promise<Vendor[]> {
+[7m  [0m [91m                                            ~~~~~~~~~~[0m
+[96msrc/lib/vendors-db.ts[0m:[93m41[0m:[93m39[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m41[0m export async function listVendors(db: D1Database): Promise<Vendor[]> {
+[7m  [0m [91m                                      ~~~~~~~~~~[0m
+
+[96msrc/pages/contact.astro[0m:[93m362[0m:[93m43[0m - [91merror[0m[90m ts(2531): [0mObject is possibly 'null'.
+
+[7m362[0m                 else if (formSubmitError) formSubmitError.querySelector('p').textContent = 'Message sent. You will be redirected shortly.';
+[7m   [0m [91m                                          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+[96msrc/pages/contact.astro[0m:[93m360[0m:[93m106[0m - [91merror[0m[90m ts(2339): [0mProperty 'value' does not exist on type 'Element'.
+
+[7m360[0m                 const redirectTo = form.dataset.redirectTo || form.querySelector('[name="redirectTo"]')?.value;
+[7m   [0m [91m                                                                                                         ~~~~~[0m
+[96msrc/pages/contact.astro[0m:[93m358[0m:[93m89[0m - [91merror[0m[90m ts(2345): [0mArgument of type 'HTMLElement' is not assignable to parameter of type 'HTMLFormElement'.
+  Type 'HTMLElement' is missing the following properties from type 'HTMLFormElement': acceptCharset, action, autocomplete, elements, and 15 more.
+
+[7m358[0m               const res = await fetch(form.action, { method: 'POST', body: new FormData(form) });
+[7m   [0m [91m                                                                                        ~~~~[0m
+[96msrc/pages/contact.astro[0m:[93m358[0m:[93m44[0m - [91merror[0m[90m ts(2339): [0mProperty 'action' does not exist on type 'HTMLElement'.
+
+[7m358[0m               const res = await fetch(form.action, { method: 'POST', body: new FormData(form) });
+[7m   [0m [91m                                           ~~~~~~[0m
+[96msrc/pages/contact.astro[0m:[93m354[0m:[93m13[0m - [91merror[0m[90m ts(18047): [0m'formError' is possibly 'null'.
+
+[7m354[0m             formError.classList.add('hidden');
+[7m   [0m [91m            ~~~~~~~~~[0m
+[96msrc/pages/contact.astro[0m:[93m351[0m:[93m46[0m - [91merror[0m[90m ts(2339): [0mProperty 'focus' does not exist on type 'Element'.
+
+[7m351[0m               if (firstInvalid) firstInvalid.focus();
+[7m   [0m [91m                                             ~~~~~[0m
+[96msrc/pages/contact.astro[0m:[93m349[0m:[93m15[0m - [91merror[0m[90m ts(18047): [0m'formError' is possibly 'null'.
+
+[7m349[0m               formError.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+[7m   [0m [91m              ~~~~~~~~~[0m
+[96msrc/pages/contact.astro[0m:[93m348[0m:[93m15[0m - [91merror[0m[90m ts(18047): [0m'formError' is possibly 'null'.
+
+[7m348[0m               formError.classList.remove('hidden');
+[7m   [0m [91m              ~~~~~~~~~[0m
+[96msrc/pages/contact.astro[0m:[93m337[0m:[93m17[0m - [91merror[0m[90m ts(18047): [0m'message' is possibly 'null'.
+
+[7m337[0m             if (message.getAttribute('aria-invalid') === 'true') {
+[7m   [0m [91m                ~~~~~~~[0m
+[96msrc/pages/contact.astro[0m:[93m336[0m:[93m11[0m - [91merror[0m[90m ts(18047): [0m'message' is possibly 'null'.
+
+[7m336[0m           message.addEventListener('input', function() {
+[7m   [0m [91m          ~~~~~~~[0m
+[96msrc/pages/contact.astro[0m:[93m335[0m:[93m11[0m - [91merror[0m[90m ts(18047): [0m'message' is possibly 'null'.
+
+[7m335[0m           message.addEventListener('blur', validateMessage);
+[7m   [0m [91m          ~~~~~~~[0m
+[96msrc/pages/contact.astro[0m:[93m331[0m:[93m17[0m - [91merror[0m[90m ts(18047): [0m'email' is possibly 'null'.
+
+[7m331[0m             if (email.getAttribute('aria-invalid') === 'true') {
+[7m   [0m [91m                ~~~~~[0m
+[96msrc/pages/contact.astro[0m:[93m330[0m:[93m11[0m - [91merror[0m[90m ts(18047): [0m'email' is possibly 'null'.
+
+[7m330[0m           email.addEventListener('input', function() {
+[7m   [0m [91m          ~~~~~[0m
+[96msrc/pages/contact.astro[0m:[93m329[0m:[93m11[0m - [91merror[0m[90m ts(18047): [0m'email' is possibly 'null'.
+
+[7m329[0m           email.addEventListener('blur', validateEmail);
+[7m   [0m [91m          ~~~~~[0m
+[96msrc/pages/contact.astro[0m:[93m325[0m:[93m17[0m - [91merror[0m[90m ts(18047): [0m'name' is possibly 'null'.
+
+[7m325[0m             if (name.getAttribute('aria-invalid') === 'true') {
+[7m   [0m [91m                ~~~~[0m
+[96msrc/pages/contact.astro[0m:[93m324[0m:[93m11[0m - [91merror[0m[90m ts(18047): [0m'name' is possibly 'null'.
+
+[7m324[0m           name.addEventListener('input', function() {
+[7m   [0m [91m          ~~~~[0m
+[96msrc/pages/contact.astro[0m:[93m323[0m:[93m11[0m - [91merror[0m[90m ts(18047): [0m'name' is possibly 'null'.
+
+[7m323[0m           name.addEventListener('blur', validateName);
+[7m   [0m [91m          ~~~~[0m
+[96msrc/pages/contact.astro[0m:[93m322[0m:[93m11[0m - [91merror[0m[90m ts(18047): [0m'recipient' is possibly 'null'.
+
+[7m322[0m           recipient.addEventListener('change', validateRecipient);
+[7m   [0m [91m          ~~~~~~~~~[0m
+[96msrc/pages/contact.astro[0m:[93m321[0m:[93m11[0m - [91merror[0m[90m ts(18047): [0m'recipient' is possibly 'null'.
+
+[7m321[0m           recipient.addEventListener('blur', validateRecipient);
+[7m   [0m [91m          ~~~~~~~~~[0m
+[96msrc/pages/contact.astro[0m:[93m303[0m:[93m35[0m - [91merror[0m[90m ts(2339): [0mProperty 'value' does not exist on type 'HTMLElement'.
+
+[7m303[0m             const value = message.value.trim();
+[7m   [0m [91m                                  ~~~~~[0m
+[96msrc/pages/contact.astro[0m:[93m303[0m:[93m27[0m - [91merror[0m[90m ts(18047): [0m'message' is possibly 'null'.
+
+[7m303[0m             const value = message.value.trim();
+[7m   [0m [91m                          ~~~~~~~[0m
+[96msrc/pages/contact.astro[0m:[93m287[0m:[93m33[0m - [91merror[0m[90m ts(2339): [0mProperty 'value' does not exist on type 'HTMLElement'.
+
+[7m287[0m             const value = email.value.trim();
+[7m   [0m [91m                                ~~~~~[0m
+[96msrc/pages/contact.astro[0m:[93m287[0m:[93m27[0m - [91merror[0m[90m ts(18047): [0m'email' is possibly 'null'.
+
+[7m287[0m             const value = email.value.trim();
+[7m   [0m [91m                          ~~~~~[0m
+[96msrc/pages/contact.astro[0m:[93m268[0m:[93m32[0m - [91merror[0m[90m ts(2339): [0mProperty 'value' does not exist on type 'HTMLElement'.
+
+[7m268[0m             const value = name.value.trim();
+[7m   [0m [91m                               ~~~~~[0m
+[96msrc/pages/contact.astro[0m:[93m268[0m:[93m27[0m - [91merror[0m[90m ts(18047): [0m'name' is possibly 'null'.
+
+[7m268[0m             const value = name.value.trim();
+[7m   [0m [91m                          ~~~~[0m
+[96msrc/pages/contact.astro[0m:[93m258[0m:[93m28[0m - [91merror[0m[90m ts(2339): [0mProperty 'value' does not exist on type 'HTMLElement'.
+
+[7m258[0m             if (!recipient.value) {
+[7m   [0m [91m                           ~~~~~[0m
+[96msrc/pages/contact.astro[0m:[93m258[0m:[93m18[0m - [91merror[0m[90m ts(18047): [0m'recipient' is possibly 'null'.
+
+[7m258[0m             if (!recipient.value) {
+[7m   [0m [91m                 ~~~~~~~~~[0m
+[96msrc/pages/contact.astro[0m:[93m248[0m:[93m38[0m - [91merror[0m[90m ts(7006): [0mParameter 'errorElement' implicitly has an 'any' type.
+
+[7m248[0m           function clearError(field, errorElement) {
+[7m   [0m [91m                                     ~~~~~~~~~~~~[0m
+[96msrc/pages/contact.astro[0m:[93m248[0m:[93m31[0m - [91merror[0m[90m ts(7006): [0mParameter 'field' implicitly has an 'any' type.
+
+[7m248[0m           function clearError(field, errorElement) {
+[7m   [0m [91m                              ~~~~~[0m
+[96msrc/pages/contact.astro[0m:[93m240[0m:[93m51[0m - [91merror[0m[90m ts(7006): [0mParameter 'message' implicitly has an 'any' type.
+
+[7m240[0m           function showError(field, errorElement, message) {
+[7m   [0m [91m                                                  ~~~~~~~[0m
+[96msrc/pages/contact.astro[0m:[93m240[0m:[93m37[0m - [91merror[0m[90m ts(7006): [0mParameter 'errorElement' implicitly has an 'any' type.
+
+[7m240[0m           function showError(field, errorElement, message) {
+[7m   [0m [91m                                    ~~~~~~~~~~~~[0m
+[96msrc/pages/contact.astro[0m:[93m240[0m:[93m30[0m - [91merror[0m[90m ts(7006): [0mParameter 'field' implicitly has an 'any' type.
+
+[7m240[0m           function showError(field, errorElement, message) {
+[7m   [0m [91m                             ~~~~~[0m
+[96msrc/pages/contact.astro[0m:[93m237[0m:[93m21[0m - [91merror[0m[90m ts(2339): [0mProperty 'value' does not exist on type 'HTMLElement'.
+
+[7m237[0m             message.value = `I would like to request contact information for: ${vendorParam}`;
+[7m   [0m [91m                    ~~~~~[0m
+[96msrc/pages/contact.astro[0m:[93m233[0m:[93m23[0m - [91merror[0m[90m ts(2339): [0mProperty 'value' does not exist on type 'HTMLElement'.
+
+[7m233[0m             recipient.value = recipientParam;
+[7m   [0m [91m                      ~~~~~[0m
+[96msrc/pages/contact.astro[0m:[93m213[0m:[93m17[0m - [93mwarning[0m[90m astro(4000): [0mThis script will be treated as if it has the `is:inline` directive because it contains an attribute. Therefore, features that require processing (e.g. using TypeScript or npm packages in the script) are unavailable.
+
+See docs for more details: https://docs.astro.build/en/guides/client-side-scripts/#script-processing.
+
+Add the `is:inline` directive explicitly to silence this hint.
+
+[7m213[0m         <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+[7m   [0m [93m                ~~~[0m
+
+[96msrc/pages/index.astro[0m:[93m7[0m:[93m7[0m - [93mwarning[0m[90m ts(6133): [0m'siteURL' is declared but its value is never read.
+
+[7m7[0m const siteURL = import.meta.env.SITE || 'https://clrhoa.com';
+[7m [0m [93m      ~~~~~~~[0m
+[96msrc/pages/index.astro[0m:[93m76[0m:[93m42[0m - [91merror[0m[90m ts(7006): [0mParameter 'slide' implicitly has an 'any' type.
+
+[7m76[0m           function ensureSlideBackground(slide) {
+[7m  [0m [91m                                         ~~~~~[0m
+
+[96msrc/pages/news.astro[0m:[93m154[0m:[93m13[0m - [93mwarning[0m[90m astro(4000): [0mThis script will be treated as if it has the `is:inline` directive because it contains an attribute. Therefore, features that require processing (e.g. using TypeScript or npm packages in the script) are unavailable.
+
+See docs for more details: https://docs.astro.build/en/guides/client-side-scripts/#script-processing.
+
+Add the `is:inline` directive explicitly to silence this hint.
+
+[7m154[0m     <script define:vars={{ dueDateIso: nextDue.dueDate.toISOString().slice(0, 10) }}>
+[7m   [0m [93m            ~~~~~~~~~~~[0m
+
+[96msrc/pages/api/arb-add-files.astro[0m:[93m223[0m:[93m55[0m - [91merror[0m[90m ts(2345): [0mArgument of type 'Blob' is not assignable to parameter of type 'File'.
+  Type 'Blob' is missing the following properties from type 'File': lastModified, name, webkitRelativePath
+
+[7m223[0m     const isValidArchive = await validateFileMimeType(f.archive);
+[7m   [0m [91m                                                      ~~~~~~~~~[0m
+[96msrc/pages/api/arb-add-files.astro[0m:[93m212[0m:[93m54[0m - [91merror[0m[90m ts(2345): [0mArgument of type 'Blob' is not assignable to parameter of type 'File'.
+  Type 'Blob' is missing the following properties from type 'File': lastModified, name, webkitRelativePath
+
+[7m212[0m     const isValidReview = await validateFileMimeType(f.review);
+[7m   [0m [91m                                                     ~~~~~~~~[0m
+[96msrc/pages/api/arb-add-files.astro[0m:[93m200[0m:[93m50[0m - [91merror[0m[90m ts(2345): [0mArgument of type 'Blob' is not assignable to parameter of type 'File'.
+  Type 'Blob' is missing the following properties from type 'File': lastModified, name, webkitRelativePath
+
+[7m200[0m   const isValidMime = await validateFileMimeType(f.original);
+[7m   [0m [91m                                                 ~~~~~~~~~~[0m
+[96msrc/pages/api/arb-add-files.astro[0m:[93m11[0m:[93m1[0m - [93mwarning[0m[90m ts(6133): [0m'getSecurityMonitor' is declared but its value is never read.
+
+[7m11[0m import { getSecurityMonitor } from '../../lib/monitoring';
+[7m  [0m [93m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+[96msrc/pages/api/arb-add-files.astro[0m:[93m10[0m:[93m1[0m - [93mwarning[0m[90m ts(6192): [0mAll imports in import declaration are unused.
+
+[7m10[0m import { checkRateLimit, getRateLimitConfig } from '../../lib/rate-limit';
+[7m  [0m [93m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+
+[96msrc/pages/api/arb-approve.astro[0m:[93m110[0m:[93m5[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'logger'.
+
+[7m110[0m     logger.warn('Unsigned request for high-value operation', { action: body.action, requestId: body.requestId });
+[7m   [0m [91m    ~~~~~~[0m
+[96msrc/pages/api/arb-approve.astro[0m:[93m102[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'logger'.
+
+[7m102[0m       logger.warn('Invalid request signature for approve/reject', { requestId: body.requestId, action: body.action });
+[7m   [0m [91m      ~~~~~~[0m
+[96msrc/pages/api/arb-approve.astro[0m:[93m101[0m:[93m82[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'ipAddress'.
+
+[7m101[0m       securityMonitor.trackUnauthorizedAccess('/api/arb-approve', session.email, ipAddress, 'Invalid request signature');
+[7m   [0m [91m                                                                                 ~~~~~~~~~[0m
+[96msrc/pages/api/arb-approve.astro[0m:[93m101[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'securityMonitor'.
+
+[7m101[0m       securityMonitor.trackUnauthorizedAccess('/api/arb-approve', session.email, ipAddress, 'Invalid request signature');
+[7m   [0m [91m      ~~~~~~~~~~~~~~~[0m
+[96msrc/pages/api/arb-approve.astro[0m:[93m13[0m:[93m1[0m - [93mwarning[0m[90m ts(6133): [0m'createLogger' is declared but its value is never read.
+
+[7m13[0m import { createLogger } from '../../lib/logging';
+[7m  [0m [93m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+[96msrc/pages/api/arb-approve.astro[0m:[93m10[0m:[93m1[0m - [93mwarning[0m[90m ts(6133): [0m'getSecurityMonitor' is declared but its value is never read.
+
+[7m10[0m import { getSecurityMonitor } from '../../lib/monitoring';
+[7m  [0m [93m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+[96msrc/pages/api/arb-approve.astro[0m:[93m9[0m:[93m1[0m - [93mwarning[0m[90m ts(6192): [0mAll imports in import declaration are unused.
+
+[7m9[0m import { checkRateLimit, getRateLimitConfig } from '../../lib/rate-limit';
+[7m [0m [93m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+
+[96msrc/pages/api/arb-auto-save.astro[0m:[93m221[0m:[93m43[0m - [91merror[0m[90m ts(18047): [0m'session' is possibly 'null'.
+
+[7m221[0m     await insertArbRequest(db, requestId, session.email, description, {
+[7m   [0m [91m                                          ~~~~~~~[0m
+[96msrc/pages/api/arb-auto-save.astro[0m:[93m182[0m:[93m9[0m - [91merror[0m[90m ts(2554): [0mExpected 4 arguments, but got 5.
+
+[7m182[0m         {
+[7m   [0m [91m        ~[0m
+[7m183[0m           applicantName,
+[7m   [0m [91m~~~~~~~~~~~~~~~~~~~~~~~~[0m
+[7m...[0m 
+[7m186[0m           applicationType,
+[7m   [0m [91m~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+[7m187[0m         }
+[7m   [0m [91m~~~~~~~~~[0m
+[96msrc/pages/api/arb-auto-save.astro[0m:[93m180[0m:[93m9[0m - [91merror[0m[90m ts(18047): [0m'session' is possibly 'null'.
+
+[7m180[0m         session.email,
+[7m   [0m [91m        ~~~~~~~[0m
+[96msrc/pages/api/arb-auto-save.astro[0m:[93m173[0m:[93m50[0m - [91merror[0m[90m ts(18047): [0m'session' is possibly 'null'.
+
+[7m173[0m   if (existingReq && existingReq.owner_email === session.email.toLowerCase() && existingReq.status === 'pending') {
+[7m   [0m [91m                                                 ~~~~~~~[0m
+[96msrc/pages/api/arb-auto-save.astro[0m:[93m116[0m:[93m35[0m - [91merror[0m[90m ts(2345): [0mArgument of type 'SessionPayload' is not assignable to parameter of type 'string'.
+
+[7m116[0m       await updateSessionActivity(session, env.SESSION_SECRET);
+[7m   [0m [91m                                  ~~~~~~~[0m
+[96msrc/pages/api/arb-auto-save.astro[0m:[93m229[0m:[93m11[0m - [93mwarning[0m[90m ts(6133): [0m'newReq' is declared but its value is never read.
+
+[7m229[0m     const newReq = await getArbRequest(db, requestId);
+[7m   [0m [93m          ~~~~~~[0m
+[96msrc/pages/api/arb-auto-save.astro[0m:[93m191[0m:[93m15[0m - [93mwarning[0m[90m ts(6133): [0m'updatedReq' is declared but its value is never read.
+
+[7m191[0m         const updatedReq = await getArbRequest(db, requestId);
+[7m   [0m [93m              ~~~~~~~~~~[0m
+[96msrc/pages/api/arb-auto-save.astro[0m:[93m87[0m:[93m7[0m - [93mwarning[0m[90m ts(6133): [0m'r2' is declared but its value is never read.
+
+[7m87[0m const r2 = env?.CLOURHOA_FILES;
+[7m  [0m [93m      ~~[0m
+[96msrc/pages/api/arb-auto-save.astro[0m:[93m33[0m:[93m10[0m - [93mwarning[0m[90m ts(6133): [0m'isAllowedType' is declared but its value is never read.
+
+[7m33[0m function isAllowedType(t: string): boolean {
+[7m  [0m [93m         ~~~~~~~~~~~~~[0m
+[96msrc/pages/api/arb-auto-save.astro[0m:[93m23[0m:[93m7[0m - [93mwarning[0m[90m ts(6133): [0m'MAX_TOTAL_BYTES' is declared but its value is never read.
+
+[7m23[0m const MAX_TOTAL_BYTES = 25 * 1024 * 1024;
+[7m  [0m [93m      ~~~~~~~~~~~~~~~[0m
+[96msrc/pages/api/arb-auto-save.astro[0m:[93m22[0m:[93m7[0m - [93mwarning[0m[90m ts(6133): [0m'MAX_FILE_BYTES' is declared but its value is never read.
+
+[7m22[0m const MAX_FILE_BYTES = 5 * 1024 * 1024;
+[7m  [0m [93m      ~~~~~~~~~~~~~~[0m
+[96msrc/pages/api/arb-auto-save.astro[0m:[93m19[0m:[93m3[0m - [93mwarning[0m[90m ts(6133): [0m'listArbFilesByRequest' is declared but its value is never read.
+
+[7m19[0m   listArbFilesByRequest,
+[7m  [0m [93m  ~~~~~~~~~~~~~~~~~~~~~[0m
+[96msrc/pages/api/arb-auto-save.astro[0m:[93m16[0m:[93m3[0m - [93mwarning[0m[90m ts(6133): [0m'insertArbFile' is declared but its value is never read.
+
+[7m16[0m   insertArbFile,
+[7m  [0m [93m  ~~~~~~~~~~~~~[0m
+[96msrc/pages/api/arb-auto-save.astro[0m:[93m14[0m:[93m3[0m - [93mwarning[0m[90m ts(6133): [0m'createArbFileId' is declared but its value is never read.
+
+[7m14[0m   createArbFileId,
+[7m  [0m [93m  ~~~~~~~~~~~~~~~[0m
+[96msrc/pages/api/arb-auto-save.astro[0m:[93m10[0m:[93m24[0m - [93mwarning[0m[90m ts(6133): [0m'maskRequestId' is declared but its value is never read.
+
+[7m10[0m import { createLogger, maskRequestId } from '../../lib/logging';
+[7m  [0m [93m                       ~~~~~~~~~~~~~[0m
+[96msrc/pages/api/arb-auto-save.astro[0m:[93m9[0m:[93m86[0m - [93mwarning[0m[90m ts(6133): [0m'SESSION_COOKIE_NAME' is declared but its value is never read.
+
+[7m9[0m import { getSessionFromCookie, verifyCsrfToken, verifyOrigin, updateSessionActivity, SESSION_COOKIE_NAME } from '../../lib/auth';
+[7m [0m [93m                                                                                     ~~~~~~~~~~~~~~~~~~~[0m
+
+[96msrc/pages/api/arb-cancel.astro[0m:[93m18[0m:[93m29[0m - [91merror[0m[90m ts(2345): [0mArgument of type 'string' is not assignable to parameter of type 'Record<string, any>'.
+
+[7m18[0m const logger = createLogger('arb-cancel');
+[7m  [0m [91m                            ~~~~~~~~~~~~[0m
+[96msrc/pages/api/arb-cancel.astro[0m:[93m84[0m:[93m7[0m - [93mwarning[0m[90m ts(6133): [0m'req' is declared but its value is never read.
+
+[7m84[0m const req = ownerCheck.request;
+[7m  [0m [93m      ~~~[0m
+[96msrc/pages/api/arb-cancel.astro[0m:[93m13[0m:[93m1[0m - [93mwarning[0m[90m ts(6133): [0m'getSecurityMonitor' is declared but its value is never read.
+
+[7m13[0m import { getSecurityMonitor } from '../../lib/monitoring';
+[7m  [0m [93m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+[96msrc/pages/api/arb-cancel.astro[0m:[93m12[0m:[93m1[0m - [93mwarning[0m[90m ts(6192): [0mAll imports in import declaration are unused.
+
+[7m12[0m import { checkRateLimit, getRateLimitConfig } from '../../lib/rate-limit';
+[7m  [0m [93m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+
+[96msrc/pages/api/arb-copy.astro[0m:[93m114[0m:[93m9[0m - [93mwarning[0m[90m ts(6133): [0m'status' is declared but its value is never read.
+
+[7m114[0m   const status = msg.includes('not found') || msg.includes('do not own') ? 404 : msg.includes('Only approved') ? 400 : 500;
+[7m   [0m [93m        ~~~~~~[0m
+[96msrc/pages/api/arb-copy.astro[0m:[93m103[0m:[93m9[0m - [93mwarning[0m[90m ts(6133): [0m'newId' is declared but its value is never read.
+
+[7m103[0m   const newId = await copyArbRequest(db, requestId, session.email);
+[7m   [0m [93m        ~~~~~[0m
+
+[96msrc/pages/api/arb-deadline.astro[0m:[93m9[0m:[93m1[0m - [93mwarning[0m[90m ts(6133): [0m'getSecurityMonitor' is declared but its value is never read.
+
+[7m9[0m import { getSecurityMonitor } from '../../lib/monitoring';
+[7m [0m [93m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+[96msrc/pages/api/arb-deadline.astro[0m:[93m8[0m:[93m1[0m - [93mwarning[0m[90m ts(6192): [0mAll imports in import declaration are unused.
+
+[7m8[0m import { checkRateLimit, getRateLimitConfig } from '../../lib/rate-limit';
+[7m [0m [93m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+[96msrc/pages/api/arb-deadline.astro[0m:[93m7[0m:[93m49[0m - [93mwarning[0m[90m ts(6133): [0m'verifyOrigin' is declared but its value is never read.
+
+[7m7[0m import { getSessionFromCookie, verifyCsrfToken, verifyOrigin } from '../../lib/auth';
+[7m [0m [93m                                                ~~~~~~~~~~~~[0m
+
+[96msrc/pages/api/arb-export-data.astro[0m:[93m94[0m:[93m27[0m - [91merror[0m[90m ts(2339): [0mProperty 'uploaded_at' does not exist on type 'ArbFile'.
+
+[7m94[0m             uploadedAt: f.uploaded_at,
+[7m  [0m [91m                          ~~~~~~~~~~~[0m
+[96msrc/pages/api/arb-export-data.astro[0m:[93m67[0m:[93m9[0m - [93mwarning[0m[90m ts(6133): [0m'exportData' is declared but its value is never read.
+
+[7m67[0m   const exportData = {
+[7m  [0m [93m        ~~~~~~~~~~[0m
+
+[96msrc/pages/api/arb-export.astro[0m:[93m147[0m:[93m7[0m - [93mwarning[0m[90m ts(6133): [0m'htmlFilename' is declared but its value is never read.
+
+[7m147[0m const htmlFilename = `arb-requests-${fromDate || 'start'}-${toDate || 'end'}.html`.replace(/\s/g, '-');
+[7m   [0m [93m      ~~~~~~~~~~~~[0m
+[96msrc/pages/api/arb-export.astro[0m:[93m86[0m:[93m7[0m - [93mwarning[0m[90m ts(6133): [0m'html' is declared but its value is never read.
+
+[7m86[0m const html = `<!DOCTYPE html>
+[7m  [0m [93m      ~~~~[0m
+[96msrc/pages/api/arb-export.astro[0m:[93m74[0m:[93m9[0m - [93mwarning[0m[90m ts(6133): [0m'filename' is declared but its value is never read.
+
+[7m74[0m   const filename = `arb-requests-${fromDate || 'start'}-${toDate || 'end'}.csv`.replace(/\s/g, '-');
+[7m  [0m [93m        ~~~~~~~~[0m
+[96msrc/pages/api/arb-export.astro[0m:[93m73[0m:[93m9[0m - [93mwarning[0m[90m ts(6133): [0m'csv' is declared but its value is never read.
+
+[7m73[0m   const csv = [headers.map(escapeCsv).join(','), ...rows.map((row) => row.map(escapeCsv).join(','))].join('\n');
+[7m  [0m [93m        ~~~[0m
+
+[96msrc/pages/api/arb-notes.astro[0m:[93m10[0m:[93m1[0m - [93mwarning[0m[90m ts(6133): [0m'getSecurityMonitor' is declared but its value is never read.
+
+[7m10[0m import { getSecurityMonitor } from '../../lib/monitoring';
+[7m  [0m [93m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+[96msrc/pages/api/arb-notes.astro[0m:[93m9[0m:[93m1[0m - [93mwarning[0m[90m ts(6192): [0mAll imports in import declaration are unused.
+
+[7m9[0m import { checkRateLimit, getRateLimitConfig } from '../../lib/rate-limit';
+[7m [0m [93m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+
+[96msrc/pages/api/arb-remove-file.astro[0m:[93m114[0m:[93m5[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'logger'.
+
+[7m114[0m     logger.warn('R2 delete failed for file', { fileId, requestId, error: String(e) });
+[7m   [0m [91m    ~~~~~~[0m
+[96msrc/pages/api/arb-remove-file.astro[0m:[93m107[0m:[93m7[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'logger'.
+
+[7m107[0m       logger.info('Secure file deletion completed', {
+[7m   [0m [91m      ~~~~~~[0m
+[96msrc/pages/api/arb-remove-file.astro[0m:[93m102[0m:[93m9[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'logger'.
+
+[7m102[0m         logger.warn('R2 delete failed for key', { key, requestId, fileId, error: String(e) });
+[7m   [0m [91m        ~~~~~~[0m
+[96msrc/pages/api/arb-remove-file.astro[0m:[93m97[0m:[93m11[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'logger'.
+
+[7m97[0m           logger.warn('File still exists after delete attempt', { key, requestId, fileId });
+[7m  [0m [91m          ~~~~~~[0m
+[96msrc/pages/api/arb-remove-file.astro[0m:[93m12[0m:[93m1[0m - [93mwarning[0m[90m ts(6133): [0m'getSecurityMonitor' is declared but its value is never read.
+
+[7m12[0m import { getSecurityMonitor } from '../../lib/monitoring';
+[7m  [0m [93m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+[96msrc/pages/api/arb-remove-file.astro[0m:[93m11[0m:[93m1[0m - [93mwarning[0m[90m ts(6192): [0mAll imports in import declaration are unused.
+
+[7m11[0m import { checkRateLimit, getRateLimitConfig } from '../../lib/rate-limit';
+[7m  [0m [93m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+[96msrc/pages/api/arb-remove-file.astro[0m:[93m10[0m:[93m1[0m - [93mwarning[0m[90m ts(6133): [0m'createLogger' is declared but its value is never read.
+
+[7m10[0m import { createLogger } from '../../lib/logging';
+[7m  [0m [93m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+
+[96msrc/pages/api/arb-resubmit.astro[0m:[93m10[0m:[93m1[0m - [93mwarning[0m[90m ts(6133): [0m'getSecurityMonitor' is declared but its value is never read.
+
+[7m10[0m import { getSecurityMonitor } from '../../lib/monitoring';
+[7m  [0m [93m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+[96msrc/pages/api/arb-resubmit.astro[0m:[93m9[0m:[93m1[0m - [93mwarning[0m[90m ts(6192): [0mAll imports in import declaration are unused.
+
+[7m9[0m import { checkRateLimit, getRateLimitConfig } from '../../lib/rate-limit';
+[7m [0m [93m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+
+[96msrc/pages/api/arb-update.astro[0m:[93m122[0m:[93m5[0m - [91merror[0m[90m ts(2353): [0mObject literal may only specify known properties, and 'ownerNotes' does not exist in type '{ applicantName?: string | null | undefined; phone?: string | null | undefined; propertyAddress?: string | null | undefined; applicationType?: string | null | undefined; description?: string | undefined; }'.
+
+[7m122[0m     ownerNotes,
+[7m   [0m [91m    ~~~~~~~~~~[0m
+[96msrc/pages/api/arb-update.astro[0m:[93m16[0m:[93m29[0m - [91merror[0m[90m ts(2345): [0mArgument of type 'string' is not assignable to parameter of type 'Record<string, any>'.
+
+[7m16[0m const logger = createLogger('arb-update');
+[7m  [0m [91m                            ~~~~~~~~~~~~[0m
+[96msrc/pages/api/arb-update.astro[0m:[93m11[0m:[93m1[0m - [93mwarning[0m[90m ts(6133): [0m'getSecurityMonitor' is declared but its value is never read.
+
+[7m11[0m import { getSecurityMonitor } from '../../lib/monitoring';
+[7m  [0m [93m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+[96msrc/pages/api/arb-update.astro[0m:[93m10[0m:[93m1[0m - [93mwarning[0m[90m ts(6192): [0mAll imports in import declaration are unused.
+
+[7m10[0m import { checkRateLimit, getRateLimitConfig } from '../../lib/rate-limit';
+[7m  [0m [93m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+[96msrc/pages/api/arb-update.astro[0m:[93m9[0m:[93m24[0m - [93mwarning[0m[90m ts(6133): [0m'maskRequestId' is declared but its value is never read.
+
+[7m9[0m import { createLogger, maskRequestId } from '../../lib/logging';
+[7m [0m [93m                       ~~~~~~~~~~~~~[0m
+
+[96msrc/pages/api/arb-upload.astro[0m:[93m454[0m:[93m63[0m - [91merror[0m[90m ts(7006): [0mParameter 'w' implicitly has an 'any' type.
+
+[7m454[0m     const reqWords = new Set(reqDescLower.split(/\s+/).filter(w => w.length > 3));
+[7m   [0m [91m                                                              ~[0m
+[96msrc/pages/api/arb-upload.astro[0m:[93m406[0m:[93m55[0m - [91merror[0m[90m ts(2345): [0mArgument of type 'Blob' is not assignable to parameter of type 'File'.
+  Type 'Blob' is missing the following properties from type 'File': lastModified, name, webkitRelativePath
+
+[7m406[0m     const isValidArchive = await validateFileMimeType(f.archive);
+[7m   [0m [91m                                                      ~~~~~~~~~[0m
+[96msrc/pages/api/arb-upload.astro[0m:[93m395[0m:[93m54[0m - [91merror[0m[90m ts(2345): [0mArgument of type 'Blob' is not assignable to parameter of type 'File'.
+  Type 'Blob' is missing the following properties from type 'File': lastModified, name, webkitRelativePath
+
+[7m395[0m     const isValidReview = await validateFileMimeType(f.review);
+[7m   [0m [91m                                                     ~~~~~~~~[0m
+[96msrc/pages/api/arb-upload.astro[0m:[93m383[0m:[93m50[0m - [91merror[0m[90m ts(2345): [0mArgument of type 'Blob' is not assignable to parameter of type 'File'.
+  Type 'Blob' is missing the following properties from type 'File': lastModified, name, webkitRelativePath
+
+[7m383[0m   const isValidMime = await validateFileMimeType(f.original);
+[7m   [0m [91m                                                 ~~~~~~~~~~[0m
+[96msrc/pages/api/arb-upload.astro[0m:[93m308[0m:[93m17[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'action'.
+
+[7m308[0m const isDraft = action === 'draft';
+[7m   [0m [91m                ~~~~~~[0m
+[96msrc/pages/api/arb-upload.astro[0m:[93m307[0m:[93m18[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'action'.
+
+[7m307[0m const isSubmit = action === 'submit';
+[7m   [0m [91m                 ~~~~~~[0m
+[96msrc/pages/api/arb-upload.astro[0m:[93m217[0m:[93m9[0m - [93mwarning[0m[90m ts(6133): [0m'action' is declared but its value is never read.
+
+[7m217[0m   const action = (formData.get('action') as string)?.trim() || 'submit'; // 'draft' or 'submit', default to 'submit' for backward compatibility
+[7m   [0m [93m        ~~~~~~[0m
+[96msrc/pages/api/arb-upload.astro[0m:[93m12[0m:[93m1[0m - [93mwarning[0m[90m ts(6192): [0mAll imports in import declaration are unused.
+
+[7m12[0m import { checkRateLimit, getRateLimitConfig } from '../../lib/rate-limit';
+[7m  [0m [93m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+[96msrc/pages/api/arb-upload.astro[0m:[93m10[0m:[93m35[0m - [93mwarning[0m[90m ts(6133): [0m'maskRequestId' is declared but its value is never read.
+
+[7m10[0m import { createLogger, maskEmail, maskRequestId } from '../../lib/logging';
+[7m  [0m [93m                                  ~~~~~~~~~~~~~[0m
+[96msrc/pages/api/arb-upload.astro[0m:[93m10[0m:[93m24[0m - [93mwarning[0m[90m ts(6133): [0m'maskEmail' is declared but its value is never read.
+
+[7m10[0m import { createLogger, maskEmail, maskRequestId } from '../../lib/logging';
+[7m  [0m [93m                       ~~~~~~~~~[0m
+
+[96msrc/pages/api/directory-export.astro[0m:[93m64[0m:[93m7[0m - [93mwarning[0m[90m ts(6133): [0m'filename' is declared but its value is never read.
+
+[7m64[0m const filename = `directory-export-${new Date().toISOString().slice(0, 10)}.csv`;
+[7m  [0m [93m      ~~~~~~~~[0m
+[96msrc/pages/api/directory-export.astro[0m:[93m59[0m:[93m7[0m - [93mwarning[0m[90m ts(6133): [0m'csv' is declared but its value is never read.
+
+[7m59[0m const csv = header + rows.join('\n');
+[7m  [0m [93m      ~~~[0m
+
+[96msrc/pages/api/feedback-upload.astro[0m:[93m12[0m:[93m9[0m - [91merror[0m[90m ts(2339): [0mProperty 'session' does not exist on type '{ session: SessionPayload; } | { response: Response; }'.
+
+[7m12[0m const { session } = auth;
+[7m  [0m [91m        ~~~~~~~[0m
+[96msrc/pages/api/feedback-upload.astro[0m:[93m11[0m:[93m10[0m - [91merror[0m[90m ts(2339): [0mProperty 'response' does not exist on type '{ session: SessionPayload; } | { response: Response; }'.
+  Property 'response' does not exist on type '{ session: SessionPayload; }'.
+
+[7m11[0m if (auth.response) return auth.response;
+[7m  [0m [91m         ~~~~~~~~[0m
+[96msrc/pages/api/feedback-upload.astro[0m:[93m8[0m:[93m26[0m - [93mwarning[0m[90m ts(6133): [0m'jsonResponse' is declared but its value is never read.
+
+[7m8[0m import { requireSession, jsonResponse } from '../../lib/api-helpers';
+[7m [0m [93m                         ~~~~~~~~~~~~[0m
+
+[96msrc/pages/api/feedback.astro[0m:[93m189[0m:[93m27[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'env'.
+
+[7m189[0m           await sendEmail(env, to.trim(), subject, bodyHtml);
+[7m   [0m [91m                          ~~~[0m
+[96msrc/pages/api/feedback.astro[0m:[93m169[0m:[93m9[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'env'.
+
+[7m169[0m     if (env?.NOTIFY_NOREPLY_EMAIL && ownerEmails.length > 0) {
+[7m   [0m [91m        ~~~[0m
+[96msrc/pages/api/feedback.astro[0m:[93m143[0m:[93m11[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'env'.
+
+[7m143[0m           env,
+[7m   [0m [91m          ~~~[0m
+[96msrc/pages/api/feedback.astro[0m:[93m131[0m:[93m9[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'env'.
+
+[7m131[0m     if (env?.NOTIFY_NOREPLY_EMAIL) {
+[7m   [0m [91m        ~~~[0m
+[96msrc/pages/api/feedback.astro[0m:[93m34[0m:[93m9[0m - [91merror[0m[90m ts(2339): [0mProperty 'db' does not exist on type '{ db: D1Database; } | { response: Response; }'.
+
+[7m34[0m const { db } = dbResult;
+[7m  [0m [91m        ~~[0m
+[96msrc/pages/api/feedback.astro[0m:[93m33[0m:[93m14[0m - [91merror[0m[90m ts(2339): [0mProperty 'response' does not exist on type '{ db: D1Database; } | { response: Response; }'.
+  Property 'response' does not exist on type '{ db: D1Database; }'.
+
+[7m33[0m if (dbResult.response) return dbResult.response;
+[7m  [0m [91m             ~~~~~~~~[0m
+[96msrc/pages/api/feedback.astro[0m:[93m30[0m:[93m9[0m - [91merror[0m[90m ts(2339): [0mProperty 'session' does not exist on type '{ session: SessionPayload; } | { response: Response; }'.
+
+[7m30[0m const { session } = auth;
+[7m  [0m [91m        ~~~~~~~[0m
+[96msrc/pages/api/feedback.astro[0m:[93m29[0m:[93m10[0m - [91merror[0m[90m ts(2339): [0mProperty 'response' does not exist on type '{ session: SessionPayload; } | { response: Response; }'.
+  Property 'response' does not exist on type '{ session: SessionPayload; }'.
+
+[7m29[0m if (auth.response) return auth.response;
+[7m  [0m [91m         ~~~~~~~~[0m
+[96msrc/pages/api/feedback.astro[0m:[93m88[0m:[93m9[0m - [93mwarning[0m[90m ts(6133): [0m'withResponses' is declared but its value is never read.
+
+[7m88[0m   const withResponses = await Promise.all(
+[7m  [0m [93m        ~~~~~~~~~~~~~[0m
+[96msrc/pages/api/feedback.astro[0m:[93m84[0m:[93m11[0m - [93mwarning[0m[90m ts(6133): [0m'docs' is declared but its value is never read.
+
+[7m84[0m     const docs = await listAllFeedbackDocs(db);
+[7m  [0m [93m          ~~~~[0m
+[96msrc/pages/api/feedback.astro[0m:[93m60[0m:[93m11[0m - [93mwarning[0m[90m ts(6133): [0m'myResponse' is declared but its value is never read.
+
+[7m60[0m     const myResponse = await getFeedbackResponse(db, id, session.email);
+[7m  [0m [93m          ~~~~~~~~~~[0m
+[96msrc/pages/api/feedback.astro[0m:[93m59[0m:[93m11[0m - [93mwarning[0m[90m ts(6133): [0m'counts' is declared but its value is never read.
+
+[7m59[0m     const counts = await getFeedbackResponseCounts(db, id);
+[7m  [0m [93m          ~~~~~~[0m
+[96msrc/pages/api/feedback.astro[0m:[93m47[0m:[93m11[0m - [93mwarning[0m[90m ts(6133): [0m'csv' is declared but its value is never read.
+
+[7m47[0m     const csv = header + rows.map((r) => `${r.owner_email},${r.acknowledged ? 'Yes' : 'No'},${r.approved === 1 ? 'Yes' : r.approved === 0 ? 'No' : ''},"${(r.comments ?? '').replace(/"/g, '""')}",${r.responded}`).join('\n');
+[7m  [0m [93m          ~~~[0m
+[96msrc/pages/api/feedback.astro[0m:[93m10[0m:[93m37[0m - [93mwarning[0m[90m ts(6133): [0m'jsonResponse' is declared but its value is never read.
+
+[7m10[0m import { requireSession, requireDb, jsonResponse } from '../../lib/api-helpers';
+[7m  [0m [93m                                    ~~~~~~~~~~~~[0m
+
+[96msrc/pages/api/login.astro[0m:[93m60[0m:[93m13[0m - [93mwarning[0m[90m ts(6133): [0m'minutesRemaining' is declared but its value is never read.
+
+[7m60[0m       const minutesRemaining = Math.ceil((lockoutUntil - Date.now() / 1000) / 60);
+[7m  [0m [93m            ~~~~~~~~~~~~~~~~[0m
+
+[96msrc/pages/api/logout-all-devices.astro[0m:[93m92[0m:[93m7[0m - [93mwarning[0m[90m ts(6133): [0m'response' is declared but its value is never read.
+
+[7m92[0m const response = new Response(
+[7m  [0m [93m      ~~~~~~~~[0m
+
+[96msrc/pages/api/maintenance-submit.astro[0m:[93m94[0m:[93m24[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'env'.
+
+[7m94[0m   await sendEmail(env, env.NOTIFY_BOARD_EMAIL, `New Maintenance Request #${id}`, body);
+[7m  [0m [91m                       ~~~[0m
+[96msrc/pages/api/maintenance-submit.astro[0m:[93m94[0m:[93m19[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'env'.
+
+[7m94[0m   await sendEmail(env, env.NOTIFY_BOARD_EMAIL, `New Maintenance Request #${id}`, body);
+[7m  [0m [91m                  ~~~[0m
+[96msrc/pages/api/maintenance-submit.astro[0m:[93m90[0m:[93m5[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'env'.
+
+[7m90[0m if (env?.NOTIFY_BOARD_EMAIL) {
+[7m  [0m [91m    ~~~[0m
+[96msrc/pages/api/maintenance-submit.astro[0m:[93m22[0m:[93m9[0m - [91merror[0m[90m ts(2339): [0mProperty 'db' does not exist on type '{ db: D1Database; } | { response: Response; }'.
+
+[7m22[0m const { db } = dbResult;
+[7m  [0m [91m        ~~[0m
+[96msrc/pages/api/maintenance-submit.astro[0m:[93m21[0m:[93m14[0m - [91merror[0m[90m ts(2339): [0mProperty 'response' does not exist on type '{ db: D1Database; } | { response: Response; }'.
+  Property 'response' does not exist on type '{ db: D1Database; }'.
+
+[7m21[0m if (dbResult.response) return dbResult.response;
+[7m  [0m [91m             ~~~~~~~~[0m
+[96msrc/pages/api/maintenance-submit.astro[0m:[93m18[0m:[93m9[0m - [91merror[0m[90m ts(2339): [0mProperty 'session' does not exist on type '{ session: SessionPayload; } | { response: Response; }'.
+
+[7m18[0m const { session } = auth;
+[7m  [0m [91m        ~~~~~~~[0m
+[96msrc/pages/api/maintenance-submit.astro[0m:[93m17[0m:[93m10[0m - [91merror[0m[90m ts(2339): [0mProperty 'response' does not exist on type '{ session: SessionPayload; } | { response: Response; }'.
+  Property 'response' does not exist on type '{ session: SessionPayload; }'.
+
+[7m17[0m if (auth.response) return auth.response;
+[7m  [0m [91m         ~~~~~~~~[0m
+[96msrc/pages/api/maintenance-submit.astro[0m:[93m9[0m:[93m37[0m - [93mwarning[0m[90m ts(6133): [0m'jsonResponse' is declared but its value is never read.
+
+[7m9[0m import { requireSession, requireDb, jsonResponse } from '../../lib/api-helpers';
+[7m [0m [93m                                    ~~~~~~~~~~~~[0m
+
+[96msrc/pages/api/maintenance-update.astro[0m:[93m20[0m:[93m9[0m - [91merror[0m[90m ts(2339): [0mProperty 'db' does not exist on type '{ db: D1Database; } | { response: Response; }'.
+
+[7m20[0m const { db } = dbResult;
+[7m  [0m [91m        ~~[0m
+[96msrc/pages/api/maintenance-update.astro[0m:[93m19[0m:[93m14[0m - [91merror[0m[90m ts(2339): [0mProperty 'response' does not exist on type '{ db: D1Database; } | { response: Response; }'.
+  Property 'response' does not exist on type '{ db: D1Database; }'.
+
+[7m19[0m if (dbResult.response) return dbResult.response;
+[7m  [0m [91m             ~~~~~~~~[0m
+[96msrc/pages/api/maintenance-update.astro[0m:[93m13[0m:[93m9[0m - [91merror[0m[90m ts(2339): [0mProperty 'session' does not exist on type '{ session: SessionPayload; } | { response: Response; }'.
+
+[7m13[0m const { session } = auth;
+[7m  [0m [91m        ~~~~~~~[0m
+[96msrc/pages/api/maintenance-update.astro[0m:[93m12[0m:[93m10[0m - [91merror[0m[90m ts(2339): [0mProperty 'response' does not exist on type '{ session: SessionPayload; } | { response: Response; }'.
+  Property 'response' does not exist on type '{ session: SessionPayload; }'.
+
+[7m12[0m if (auth.response) return auth.response;
+[7m  [0m [91m         ~~~~~~~~[0m
+[96msrc/pages/api/maintenance-update.astro[0m:[93m8[0m:[93m37[0m - [93mwarning[0m[90m ts(6133): [0m'jsonResponse' is declared but its value is never read.
+
+[7m8[0m import { requireSession, requireDb, jsonResponse } from '../../lib/api-helpers';
+[7m [0m [93m                                    ~~~~~~~~~~~~[0m
+
+[96msrc/pages/api/meeting-agenda-upload.astro[0m:[93m12[0m:[93m9[0m - [91merror[0m[90m ts(2339): [0mProperty 'session' does not exist on type '{ session: SessionPayload; } | { response: Response; }'.
+
+[7m12[0m const { session } = auth;
+[7m  [0m [91m        ~~~~~~~[0m
+[96msrc/pages/api/meeting-agenda-upload.astro[0m:[93m11[0m:[93m10[0m - [91merror[0m[90m ts(2339): [0mProperty 'response' does not exist on type '{ session: SessionPayload; } | { response: Response; }'.
+  Property 'response' does not exist on type '{ session: SessionPayload; }'.
+
+[7m11[0m if (auth.response) return auth.response;
+[7m  [0m [91m         ~~~~~~~~[0m
+[96msrc/pages/api/meeting-agenda-upload.astro[0m:[93m8[0m:[93m26[0m - [93mwarning[0m[90m ts(6133): [0m'jsonResponse' is declared but its value is never read.
+
+[7m8[0m import { requireSession, jsonResponse } from '../../lib/api-helpers';
+[7m [0m [93m                         ~~~~~~~~~~~~[0m
+
+[96msrc/pages/api/meeting-rsvp.astro[0m:[93m17[0m:[93m9[0m - [91merror[0m[90m ts(2339): [0mProperty 'db' does not exist on type '{ db: D1Database; } | { response: Response; }'.
+
+[7m17[0m const { db } = dbResult;
+[7m  [0m [91m        ~~[0m
+[96msrc/pages/api/meeting-rsvp.astro[0m:[93m16[0m:[93m14[0m - [91merror[0m[90m ts(2339): [0mProperty 'response' does not exist on type '{ db: D1Database; } | { response: Response; }'.
+  Property 'response' does not exist on type '{ db: D1Database; }'.
+
+[7m16[0m if (dbResult.response) return dbResult.response;
+[7m  [0m [91m             ~~~~~~~~[0m
+[96msrc/pages/api/meeting-rsvp.astro[0m:[93m13[0m:[93m9[0m - [91merror[0m[90m ts(2339): [0mProperty 'session' does not exist on type '{ session: SessionPayload; } | { response: Response; }'.
+
+[7m13[0m const { session } = auth;
+[7m  [0m [91m        ~~~~~~~[0m
+[96msrc/pages/api/meeting-rsvp.astro[0m:[93m12[0m:[93m10[0m - [91merror[0m[90m ts(2339): [0mProperty 'response' does not exist on type '{ session: SessionPayload; } | { response: Response; }'.
+  Property 'response' does not exist on type '{ session: SessionPayload; }'.
+
+[7m12[0m if (auth.response) return auth.response;
+[7m  [0m [91m         ~~~~~~~~[0m
+[96msrc/pages/api/meeting-rsvp.astro[0m:[93m8[0m:[93m37[0m - [93mwarning[0m[90m ts(6133): [0m'jsonResponse' is declared but its value is never read.
+
+[7m8[0m import { requireSession, requireDb, jsonResponse } from '../../lib/api-helpers';
+[7m [0m [93m                                    ~~~~~~~~~~~~[0m
+
+[96msrc/pages/api/meetings.astro[0m:[93m28[0m:[93m9[0m - [91merror[0m[90m ts(2339): [0mProperty 'db' does not exist on type '{ db: D1Database; } | { response: Response; }'.
+
+[7m28[0m const { db } = dbResult;
+[7m  [0m [91m        ~~[0m
+[96msrc/pages/api/meetings.astro[0m:[93m27[0m:[93m14[0m - [91merror[0m[90m ts(2339): [0mProperty 'response' does not exist on type '{ db: D1Database; } | { response: Response; }'.
+  Property 'response' does not exist on type '{ db: D1Database; }'.
+
+[7m27[0m if (dbResult.response) return dbResult.response;
+[7m  [0m [91m             ~~~~~~~~[0m
+[96msrc/pages/api/meetings.astro[0m:[93m24[0m:[93m9[0m - [91merror[0m[90m ts(2339): [0mProperty 'session' does not exist on type '{ session: SessionPayload; } | { response: Response; }'.
+
+[7m24[0m const { session } = auth;
+[7m  [0m [91m        ~~~~~~~[0m
+[96msrc/pages/api/meetings.astro[0m:[93m23[0m:[93m10[0m - [91merror[0m[90m ts(2339): [0mProperty 'response' does not exist on type '{ session: SessionPayload; } | { response: Response; }'.
+  Property 'response' does not exist on type '{ session: SessionPayload; }'.
+
+[7m23[0m if (auth.response) return auth.response;
+[7m  [0m [91m         ~~~~~~~~[0m
+[96msrc/pages/api/meetings.astro[0m:[93m33[0m:[93m9[0m - [93mwarning[0m[90m ts(6133): [0m'meetings' is declared but its value is never read.
+
+[7m33[0m   const meetings = isBoard ? await listAllMeetings(db) : await listUpcomingMeetings(db);
+[7m  [0m [93m        ~~~~~~~~[0m
+[96msrc/pages/api/meetings.astro[0m:[93m11[0m:[93m37[0m - [93mwarning[0m[90m ts(6133): [0m'jsonResponse' is declared but its value is never read.
+
+[7m11[0m import { requireSession, requireDb, jsonResponse } from '../../lib/api-helpers';
+[7m  [0m [93m                                    ~~~~~~~~~~~~[0m
+
+[96msrc/pages/api/member-document-upload.astro[0m:[93m54[0m:[93m22[0m - [91merror[0m[90m ts(2345): [0mArgument of type 'string | undefined' is not assignable to parameter of type 'SessionPayload | null'.
+  Type 'undefined' is not assignable to type 'SessionPayload | null'.
+
+[7m54[0m if (!verifyCsrfToken(csrf, session)) {
+[7m  [0m [91m                     ~~~~[0m
+[96msrc/pages/api/member-document-upload.astro[0m:[93m107[0m:[93m7[0m - [93mwarning[0m[90m ts(6133): [0m'id' is declared but its value is never read.
+
+[7m107[0m const id = await insertMemberDocument(db, category, title, fileKey, file.type, session.email);
+[7m   [0m [93m      ~~[0m
+
+[96msrc/pages/api/member-document.astro[0m:[93m53[0m:[93m22[0m - [91merror[0m[90m ts(2345): [0mArgument of type 'string | undefined' is not assignable to parameter of type 'SessionPayload | null'.
+  Type 'undefined' is not assignable to type 'SessionPayload | null'.
+
+[7m53[0m if (!verifyCsrfToken(body.csrf_token, session)) {
+[7m  [0m [91m                     ~~~~~~~~~~~~~~~[0m
+
+[96msrc/pages/api/owners.astro[0m:[93m160[0m:[93m5[0m - [91merror[0m[90m ts(2322): [0mType 'boolean | undefined' is not assignable to type 'number | null | undefined'.
+  Type 'boolean' is not assignable to type 'number'.
+
+[7m160[0m     is_primary: body.is_primary,
+[7m   [0m [91m    ~~~~~~~~~~[0m
+[96msrc/pages/api/owners.astro[0m:[93m225[0m:[93m9[0m - [93mwarning[0m[90m ts(6133): [0m'deleted' is declared but its value is never read.
+
+[7m225[0m   const deleted = await deleteOwners(db, trimmed);
+[7m   [0m [93m        ~~~~~~~[0m
+[96msrc/pages/api/owners.astro[0m:[93m104[0m:[93m9[0m - [93mwarning[0m[90m ts(6133): [0m'id' is declared but its value is never read.
+
+[7m104[0m   const id = await insertOwner(
+[7m   [0m [93m        ~~[0m
+[96msrc/pages/api/owners.astro[0m:[93m65[0m:[93m9[0m - [93mwarning[0m[90m ts(6133): [0m'owners' is declared but its value is never read.
+
+[7m65[0m   const owners = await listOwners(db);
+[7m  [0m [93m        ~~~~~~[0m
+[96msrc/pages/api/owners.astro[0m:[93m9[0m:[93m76[0m - [93mwarning[0m[90m ts(6133): [0m'getOwnerByEmail' is declared but its value is never read.
+
+[7m9[0m import { listOwners, getOwnerById, insertOwner, updateOwner, deleteOwners, getOwnerByEmail, getOwnersByIds } from '../../lib/directory-db';
+[7m [0m [93m                                                                           ~~~~~~~~~~~~~~~[0m
+
+[96msrc/pages/api/preapproval.astro[0m:[93m30[0m:[93m9[0m - [91merror[0m[90m ts(2339): [0mProperty 'db' does not exist on type '{ db: D1Database; } | { response: Response; }'.
+
+[7m30[0m const { db } = dbResult;
+[7m  [0m [91m        ~~[0m
+[96msrc/pages/api/preapproval.astro[0m:[93m29[0m:[93m14[0m - [91merror[0m[90m ts(2339): [0mProperty 'response' does not exist on type '{ db: D1Database; } | { response: Response; }'.
+  Property 'response' does not exist on type '{ db: D1Database; }'.
+
+[7m29[0m if (dbResult.response) return dbResult.response;
+[7m  [0m [91m             ~~~~~~~~[0m
+[96msrc/pages/api/preapproval.astro[0m:[93m26[0m:[93m9[0m - [91merror[0m[90m ts(2339): [0mProperty 'session' does not exist on type '{ session: SessionPayload; } | { response: Response; }'.
+
+[7m26[0m const { session } = auth;
+[7m  [0m [91m        ~~~~~~~[0m
+[96msrc/pages/api/preapproval.astro[0m:[93m25[0m:[93m10[0m - [91merror[0m[90m ts(2339): [0mProperty 'response' does not exist on type '{ session: SessionPayload; } | { response: Response; }'.
+  Property 'response' does not exist on type '{ session: SessionPayload; }'.
+
+[7m25[0m if (auth.response) return auth.response;
+[7m  [0m [91m         ~~~~~~~~[0m
+[96msrc/pages/api/preapproval.astro[0m:[93m46[0m:[93m9[0m - [93mwarning[0m[90m ts(6133): [0m'items' is declared but its value is never read.
+
+[7m46[0m   const items = await listPreapprovalItems(db, { category: category || undefined });
+[7m  [0m [93m        ~~~~~[0m
+[96msrc/pages/api/preapproval.astro[0m:[93m20[0m:[93m3[0m - [93mwarning[0m[90m ts(6133): [0m'parsePhotos' is declared but its value is never read.
+
+[7m20[0m   parsePhotos,
+[7m  [0m [93m  ~~~~~~~~~~~[0m
+[96msrc/pages/api/preapproval.astro[0m:[93m12[0m:[93m37[0m - [93mwarning[0m[90m ts(6133): [0m'jsonResponse' is declared but its value is never read.
+
+[7m12[0m import { requireSession, requireDb, jsonResponse } from '../../lib/api-helpers';
+[7m  [0m [93m                                    ~~~~~~~~~~~~[0m
+
+[96msrc/pages/api/preferences.astro[0m:[93m88[0m:[93m32[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'env'.
+
+[7m88[0m   const result = await sendSMS(env, phone, 'Crooked Lake Reserve HOA: You are opted in to SMS alerts. Reply STOP to opt out.');
+[7m  [0m [91m                               ~~~[0m
+[96msrc/pages/api/preferences.astro[0m:[93m87[0m:[93m29[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'env'.
+
+[7m87[0m if (sendTestSms && phone && env) {
+[7m  [0m [91m                            ~~~[0m
+[96msrc/pages/api/preferences.astro[0m:[93m19[0m:[93m9[0m - [91merror[0m[90m ts(2339): [0mProperty 'db' does not exist on type '{ db: D1Database; } | { response: Response; }'.
+
+[7m19[0m const { db } = dbResult;
+[7m  [0m [91m        ~~[0m
+[96msrc/pages/api/preferences.astro[0m:[93m18[0m:[93m14[0m - [91merror[0m[90m ts(2339): [0mProperty 'response' does not exist on type '{ db: D1Database; } | { response: Response; }'.
+  Property 'response' does not exist on type '{ db: D1Database; }'.
+
+[7m18[0m if (dbResult.response) return dbResult.response;
+[7m  [0m [91m             ~~~~~~~~[0m
+[96msrc/pages/api/preferences.astro[0m:[93m15[0m:[93m9[0m - [91merror[0m[90m ts(2339): [0mProperty 'session' does not exist on type '{ session: SessionPayload; } | { response: Response; }'.
+
+[7m15[0m const { session } = auth;
+[7m  [0m [91m        ~~~~~~~[0m
+[96msrc/pages/api/preferences.astro[0m:[93m14[0m:[93m10[0m - [91merror[0m[90m ts(2339): [0mProperty 'response' does not exist on type '{ session: SessionPayload; } | { response: Response; }'.
+  Property 'response' does not exist on type '{ session: SessionPayload; }'.
+
+[7m14[0m if (auth.response) return auth.response;
+[7m  [0m [91m         ~~~~~~~~[0m
+[96msrc/pages/api/preferences.astro[0m:[93m34[0m:[93m9[0m - [93mwarning[0m[90m ts(6133): [0m'share_contact_with_members' is declared but its value is never read.
+
+[7m34[0m   const share_contact_with_members = owner?.share_contact_with_members !== 0;
+[7m  [0m [93m        ~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+[96msrc/pages/api/preferences.astro[0m:[93m25[0m:[93m7[0m - [93mwarning[0m[90m ts(6133): [0m'notification_preferences' is declared but its value is never read.
+
+[7m25[0m   let notification_preferences: NotificationPreferences = {};
+[7m  [0m [93m      ~~~~~~~~~~~~~~~~~~~~~~~~[0m
+[96msrc/pages/api/preferences.astro[0m:[93m24[0m:[93m9[0m - [93mwarning[0m[90m ts(6133): [0m'sms_optin' is declared but its value is never read.
+
+[7m24[0m   const sms_optin = user.sms_optin === 1 || user.sms_optin === true;
+[7m  [0m [93m        ~~~~~~~~~[0m
+[96msrc/pages/api/preferences.astro[0m:[93m8[0m:[93m37[0m - [93mwarning[0m[90m ts(6133): [0m'jsonResponse' is declared but its value is never read.
+
+[7m8[0m import { requireSession, requireDb, jsonResponse } from '../../lib/api-helpers';
+[7m [0m [93m                                    ~~~~~~~~~~~~[0m
+
+[96msrc/pages/api/public-document-upload.astro[0m:[93m54[0m:[93m22[0m - [91merror[0m[90m ts(2345): [0mArgument of type 'string | undefined' is not assignable to parameter of type 'SessionPayload | null'.
+  Type 'undefined' is not assignable to type 'SessionPayload | null'.
+
+[7m54[0m if (!verifyCsrfToken(csrf, session)) {
+[7m  [0m [91m                     ~~~~[0m
+[96msrc/pages/api/public-document-upload.astro[0m:[93m17[0m:[93m1[0m - [93mwarning[0m[90m ts(6133): [0m'sanitizeFileName' is declared but its value is never read.
+
+[7m17[0m import { sanitizeFileName } from '../../lib/sanitize';
+[7m  [0m [93m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+[96msrc/pages/api/public-document-upload.astro[0m:[93m15[0m:[93m3[0m - [93mwarning[0m[90m ts(6133): [0m'getPublicDocument' is declared but its value is never read.
+
+[7m15[0m   getPublicDocument,
+[7m  [0m [93m  ~~~~~~~~~~~~~~~~~[0m
+
+[96msrc/pages/api/search.astro[0m:[93m16[0m:[93m9[0m - [91merror[0m[90m ts(2339): [0mProperty 'db' does not exist on type '{ db: D1Database; } | { response: Response; }'.
+
+[7m16[0m const { db } = dbResult;
+[7m  [0m [91m        ~~[0m
+[96msrc/pages/api/search.astro[0m:[93m15[0m:[93m14[0m - [91merror[0m[90m ts(2339): [0mProperty 'response' does not exist on type '{ db: D1Database; } | { response: Response; }'.
+  Property 'response' does not exist on type '{ db: D1Database; }'.
+
+[7m15[0m if (dbResult.response) return dbResult.response;
+[7m  [0m [91m             ~~~~~~~~[0m
+[96msrc/pages/api/search.astro[0m:[93m12[0m:[93m9[0m - [91merror[0m[90m ts(2339): [0mProperty 'session' does not exist on type '{ session: SessionPayload; } | { response: Response; }'.
+
+[7m12[0m const { session } = auth;
+[7m  [0m [91m        ~~~~~~~[0m
+[96msrc/pages/api/search.astro[0m:[93m11[0m:[93m10[0m - [91merror[0m[90m ts(2339): [0mProperty 'response' does not exist on type '{ session: SessionPayload; } | { response: Response; }'.
+  Property 'response' does not exist on type '{ session: SessionPayload; }'.
+
+[7m11[0m if (auth.response) return auth.response;
+[7m  [0m [91m         ~~~~~~~~[0m
+[96msrc/pages/api/search.astro[0m:[93m20[0m:[93m7[0m - [93mwarning[0m[90m ts(6133): [0m'result' is declared but its value is never read.
+
+[7m20[0m const result = await runPortalSearch(db, q, { email: session.email, role: session.role });
+[7m  [0m [93m      ~~~~~~[0m
+[96msrc/pages/api/search.astro[0m:[93m7[0m:[93m37[0m - [93mwarning[0m[90m ts(6133): [0m'jsonResponse' is declared but its value is never read.
+
+[7m7[0m import { requireSession, requireDb, jsonResponse } from '../../lib/api-helpers';
+[7m [0m [93m                                    ~~~~~~~~~~~~[0m
+
+[96msrc/pages/api/vendor-submissions.astro[0m:[93m101[0m:[93m9[0m - [93mwarning[0m[90m ts(6133): [0m'submissions' is declared but its value is never read.
+
+[7m101[0m   const submissions = status
+[7m   [0m [93m        ~~~~~~~~~~~[0m
+[96msrc/pages/api/vendor-submissions.astro[0m:[93m17[0m:[93m8[0m - [93mwarning[0m[90m ts(6133): [0m'VendorSubmission' is declared but its value is never read.
+
+[7m17[0m   type VendorSubmission,
+[7m  [0m [93m       ~~~~~~~~~~~~~~~~[0m
+
+[96msrc/pages/api/vendors.astro[0m:[93m177[0m:[93m24[0m - [91merror[0m[90m ts(2367): [0mThis comparison appears to be unintentional because the types 'FormDataEntryValue | null' and 'boolean' have no overlap.
+
+[7m177[0m const show_on_public = showOnPublicRaw === true || showOnPublicRaw === '1' || showOnPublicRaw === 'on' ? 1 : 0;
+[7m   [0m [91m                       ~~~~~~~~~~~~~~~~~~~~~~~~[0m
+[96msrc/pages/api/vendors.astro[0m:[93m82[0m:[93m9[0m - [93mwarning[0m[90m ts(6133): [0m'vendors' is declared but its value is never read.
+
+[7m82[0m   const vendors = await listVendors(db);
+[7m  [0m [93m        ~~~~~~~[0m
+
+[96msrc/pages/api/assessments/record-payment.astro[0m:[93m67[0m:[93m9[0m - [93mwarning[0m[90m ts(6133): [0m'paymentId' is declared but its value is never read.
+
+[7m67[0m   const { paymentId } = await recordPayment(db, owner_email, {
+[7m  [0m [93m        ~~~~~~~~~~~~~[0m
+[96msrc/pages/api/assessments/record-payment.astro[0m:[93m11[0m:[93m10[0m - [93mwarning[0m[90m ts(6133): [0m'json' is declared but its value is never read.
+
+[7m11[0m function json(data: object, status = 200) {
+[7m  [0m [93m         ~~~~[0m
+
+[96msrc/pages/api/assessments/special.astro[0m:[93m60[0m:[93m11[0m - [93mwarning[0m[90m ts(6133): [0m'id' is declared but its value is never read.
+
+[7m60[0m     const { id } = await addSpecialAssessment(db, {
+[7m  [0m [93m          ~~~~~~[0m
+[96msrc/pages/api/assessments/special.astro[0m:[93m36[0m:[93m9[0m - [93mwarning[0m[90m ts(6133): [0m'list' is declared but its value is never read.
+
+[7m36[0m   const list = await listSpecialAssessmentsByOwner(db, owner_email);
+[7m  [0m [93m        ~~~~[0m
+[96msrc/pages/api/assessments/special.astro[0m:[93m11[0m:[93m10[0m - [93mwarning[0m[90m ts(6133): [0m'json' is declared but its value is never read.
+
+[7m11[0m function json(data: object, status = 200) {
+[7m  [0m [93m         ~~~~[0m
+
+[96msrc/pages/api/board/backup-config.astro[0m:[93m43[0m:[93m9[0m - [93mwarning[0m[90m ts(6133): [0m'config' is declared but its value is never read.
+
+[7m43[0m   const config = row ? {
+[7m  [0m [93m        ~~~~~~[0m
+
+[96msrc/pages/api/board/backup-download.astro[0m:[93m12[0m:[93m36[0m - [91merror[0m[90m ts(2306): [0mFile 'C:/Users/dagin/Documents/code/clrhoa-site/src/env.d.ts' is not a module.
+
+[7m12[0m const env = runtime?.env as import('../../../env.d').Env & {
+[7m  [0m [91m                                   ~~~~~~~~~~~~~~~~[0m
+[96msrc/pages/api/board/backup-download.astro[0m:[93m108[0m:[93m11[0m - [93mwarning[0m[90m ts(6133): [0m'zip' is declared but its value is never read.
+
+[7m108[0m     const zip = buildZip([
+[7m   [0m [93m          ~~~[0m
+[96msrc/pages/api/board/backup-download.astro[0m:[93m63[0m:[93m9[0m - [93mwarning[0m[90m ts(6133): [0m't' is declared but its value is never read.
+
+[7m63[0m   const t = await res.text();
+[7m  [0m [93m        ~[0m
+
+[96msrc/pages/api/board/google-drive-auth.astro[0m:[93m11[0m:[93m36[0m - [91merror[0m[90m ts(2306): [0mFile 'C:/Users/dagin/Documents/code/clrhoa-site/src/env.d.ts' is not a module.
+
+[7m11[0m const env = runtime?.env as import('../../../env.d').Env & { GOOGLE_CLIENT_ID?: string };
+[7m  [0m [91m                                   ~~~~~~~~~~~~~~~~[0m
+[96msrc/pages/api/board/google-drive-auth.astro[0m:[93m28[0m:[93m7[0m - [93mwarning[0m[90m ts(6133): [0m'authUrl' is declared but its value is never read.
+
+[7m28[0m const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${new URLSearchParams({
+[7m  [0m [93m      ~~~~~~~[0m
+
+[96msrc/pages/api/board/google-drive-callback.astro[0m:[93m11[0m:[93m36[0m - [91merror[0m[90m ts(2306): [0mFile 'C:/Users/dagin/Documents/code/clrhoa-site/src/env.d.ts' is not a module.
+
+[7m11[0m const env = runtime?.env as import('../../../env.d').Env & {
+[7m  [0m [91m                                   ~~~~~~~~~~~~~~~~[0m
+[96msrc/pages/api/board/google-drive-callback.astro[0m:[93m55[0m:[93m9[0m - [93mwarning[0m[90m ts(6133): [0m't' is declared but its value is never read.
+
+[7m55[0m   const t = await res.text();
+[7m  [0m [93m        ~[0m
+
+[96msrc/pages/api/owners/me.astro[0m:[93m119[0m:[93m7[0m - [93mwarning[0m[90m ts(6133): [0m'result' is declared but its value is never read.
+
+[7m119[0m const result = await upsertOwnerByEmail(db, email, { name, address, phones: phonesJson });
+[7m   [0m [93m      ~~~~~~[0m
+[96msrc/pages/api/owners/me.astro[0m:[93m66[0m:[93m9[0m - [93mwarning[0m[90m ts(6133): [0m'phones' is declared but its value is never read.
+
+[7m66[0m   const phones = owner.phones ? (() => {
+[7m  [0m [93m        ~~~~~~[0m
+
+[96msrc/pages/api/portal/file-view.astro[0m:[93m33[0m:[93m7[0m - [93mwarning[0m[90m ts(6133): [0m'html' is declared but its value is never read.
+
+[7m33[0m const html = `<!DOCTYPE html>
+[7m  [0m [93m      ~~~~[0m
+
+[96msrc/pages/board/assessments.astro[0m:[93m17[0m:[93m14[0m - [91merror[0m[90m ts(2339): [0mProperty 'session' does not exist on type 'GetBoardContextResult'.
+
+[7m17[0m const { env, session } = ctx;
+[7m  [0m [91m             ~~~~~~~[0m
+[96msrc/pages/board/assessments.astro[0m:[93m17[0m:[93m9[0m - [91merror[0m[90m ts(2339): [0mProperty 'env' does not exist on type 'GetBoardContextResult'.
+
+[7m17[0m const { env, session } = ctx;
+[7m  [0m [91m        ~~~[0m
+[96msrc/pages/board/assessments.astro[0m:[93m16[0m:[93m9[0m - [91merror[0m[90m ts(2339): [0mProperty 'redirect' does not exist on type 'GetBoardContextResult'.
+  Property 'redirect' does not exist on type 'BoardContextResult'.
+
+[7m16[0m if (ctx.redirect) return Astro.redirect(ctx.redirect);
+[7m  [0m [91m        ~~~~~~~~[0m
+[96msrc/pages/board/assessments.astro[0m:[93m9[0m:[93m3[0m - [93mwarning[0m[90m ts(6133): [0m'getAssessmentByOwner' is declared but its value is never read.
+
+[7m9[0m   getAssessmentByOwner,
+[7m [0m [93m  ~~~~~~~~~~~~~~~~~~~~[0m
+[96msrc/pages/board/assessments.astro[0m:[93m180[0m:[93m9[0m - [93mwarning[0m[90m astro(4000): [0mThis script will be treated as if it has the `is:inline` directive because it contains an attribute. Therefore, features that require processing (e.g. using TypeScript or npm packages in the script) are unavailable.
+
+See docs for more details: https://docs.astro.build/en/guides/client-side-scripts/#script-processing.
+
+Add the `is:inline` directive explicitly to silence this hint.
+
+[7m180[0m <script define:vars={{ today: today, currentYear: currentYear, csrfToken: session?.csrfToken ?? '' }}>
+[7m   [0m [93m        ~~~~~~~~~~~[0m
+
+[96msrc/pages/board/audit-logs.astro[0m:[93m151[0m:[93m71[0m - [91merror[0m[90m ts(2345): [0mArgument of type 'string | null | undefined' is not assignable to parameter of type 'string | null'.
+  Type 'undefined' is not assignable to type 'string | null'.
+
+[7m151[0m                       <td class="py-2 px-3 text-gray-600">{formatDate(o.updated_at)}</td>
+[7m   [0m [91m                                                                      ~~~~~~~~~~~~[0m
+[96msrc/pages/board/audit-logs.astro[0m:[93m19[0m:[93m14[0m - [91merror[0m[90m ts(2339): [0mProperty 'session' does not exist on type 'GetBoardContextResult'.
+
+[7m19[0m const { env, session } = ctx;
+[7m  [0m [91m             ~~~~~~~[0m
+[96msrc/pages/board/audit-logs.astro[0m:[93m19[0m:[93m9[0m - [91merror[0m[90m ts(2339): [0mProperty 'env' does not exist on type 'GetBoardContextResult'.
+
+[7m19[0m const { env, session } = ctx;
+[7m  [0m [91m        ~~~[0m
+[96msrc/pages/board/audit-logs.astro[0m:[93m18[0m:[93m9[0m - [91merror[0m[90m ts(2339): [0mProperty 'redirect' does not exist on type 'GetBoardContextResult'.
+  Property 'redirect' does not exist on type 'BoardContextResult'.
+
+[7m18[0m if (ctx.redirect) return Astro.redirect(ctx.redirect);
+[7m  [0m [91m        ~~~~~~~~[0m
+
+[96msrc/pages/board/backups.astro[0m:[93m10[0m:[93m14[0m - [91merror[0m[90m ts(2339): [0mProperty 'session' does not exist on type 'GetBoardContextResult'.
+
+[7m10[0m const { env, session } = ctx;
+[7m  [0m [91m             ~~~~~~~[0m
+[96msrc/pages/board/backups.astro[0m:[93m10[0m:[93m9[0m - [91merror[0m[90m ts(2339): [0mProperty 'env' does not exist on type 'GetBoardContextResult'.
+
+[7m10[0m const { env, session } = ctx;
+[7m  [0m [91m        ~~~[0m
+[96msrc/pages/board/backups.astro[0m:[93m9[0m:[93m9[0m - [91merror[0m[90m ts(2339): [0mProperty 'redirect' does not exist on type 'GetBoardContextResult'.
+  Property 'redirect' does not exist on type 'BoardContextResult'.
+
+[7m9[0m if (ctx.redirect) return Astro.redirect(ctx.redirect);
+[7m [0m [91m        ~~~~~~~~[0m
+[96msrc/pages/board/backups.astro[0m:[93m143[0m:[93m50[0m - [91merror[0m[90m ts(8016): [0mType assertion expressions can only be used in TypeScript files.
+
+[7m143[0m           schedule_day_of_week: parseInt((day as HTMLInputElement)?.value ?? '0', 10),
+[7m   [0m [91m                                                 ~~~~~~~~~~~~~~~~[0m
+[96msrc/pages/board/backups.astro[0m:[93m142[0m:[93m48[0m - [91merror[0m[90m ts(8016): [0mType assertion expressions can only be used in TypeScript files.
+
+[7m142[0m           schedule_hour_utc: parseInt((hour as HTMLInputElement)?.value ?? '2', 10),
+[7m   [0m [91m                                               ~~~~~~~~~~~~~~~~[0m
+[96msrc/pages/board/backups.astro[0m:[93m141[0m:[93m43[0m - [91merror[0m[90m ts(8016): [0mType assertion expressions can only be used in TypeScript files.
+
+[7m141[0m           schedule_type: (scheduleType as HTMLSelectElement)?.value ?? 'daily',
+[7m   [0m [91m                                          ~~~~~~~~~~~~~~~~~[0m
+[96msrc/pages/board/backups.astro[0m:[93m140[0m:[93m48[0m - [91merror[0m[90m ts(8016): [0mType assertion expressions can only be used in TypeScript files.
+
+[7m140[0m           google_drive_folder_id: (folderId as HTMLInputElement)?.value ?? '',
+[7m   [0m [91m                                               ~~~~~~~~~~~~~~~~[0m
+[96msrc/pages/board/backups.astro[0m:[93m104[0m:[93m11[0m - [93mwarning[0m[90m astro(4000): [0mThis script will be treated as if it has the `is:inline` directive because it contains an attribute. Therefore, features that require processing (e.g. using TypeScript or npm packages in the script) are unavailable.
+
+See docs for more details: https://docs.astro.build/en/guides/client-side-scripts/#script-processing.
+
+Add the `is:inline` directive explicitly to silence this hint.
+
+[7m104[0m   <script define:vars={{}}>
+[7m   [0m [93m          ~~~~~~~~~~~[0m
+
+[96msrc/pages/board/directory.astro[0m:[93m12[0m:[93m14[0m - [91merror[0m[90m ts(2339): [0mProperty 'session' does not exist on type 'GetBoardContextResult'.
+
+[7m12[0m const { env, session } = ctx;
+[7m  [0m [91m             ~~~~~~~[0m
+[96msrc/pages/board/directory.astro[0m:[93m12[0m:[93m9[0m - [91merror[0m[90m ts(2339): [0mProperty 'env' does not exist on type 'GetBoardContextResult'.
+
+[7m12[0m const { env, session } = ctx;
+[7m  [0m [91m        ~~~[0m
+[96msrc/pages/board/directory.astro[0m:[93m11[0m:[93m9[0m - [91merror[0m[90m ts(2339): [0mProperty 'redirect' does not exist on type 'GetBoardContextResult'.
+  Property 'redirect' does not exist on type 'BoardContextResult'.
+
+[7m11[0m if (ctx.redirect) return Astro.redirect(ctx.redirect);
+[7m  [0m [91m        ~~~~~~~~[0m
+[96msrc/pages/board/directory.astro[0m:[93m150[0m:[93m11[0m - [93mwarning[0m[90m astro(4000): [0mThis script will be treated as if it has the `is:inline` directive because it contains an attribute. Therefore, features that require processing (e.g. using TypeScript or npm packages in the script) are unavailable.
+
+See docs for more details: https://docs.astro.build/en/guides/client-side-scripts/#script-processing.
+
+Add the `is:inline` directive explicitly to silence this hint.
+
+[7m150[0m   <script define:vars={{ csrfToken: session.csrfToken ?? '' }}>
+[7m   [0m [93m          ~~~~~~~~~~~[0m
+
+[96msrc/pages/board/feedback.astro[0m:[93m12[0m:[93m14[0m - [91merror[0m[90m ts(2339): [0mProperty 'session' does not exist on type 'GetBoardContextResult'.
+
+[7m12[0m const { env, session } = ctx;
+[7m  [0m [91m             ~~~~~~~[0m
+[96msrc/pages/board/feedback.astro[0m:[93m12[0m:[93m9[0m - [91merror[0m[90m ts(2339): [0mProperty 'env' does not exist on type 'GetBoardContextResult'.
+
+[7m12[0m const { env, session } = ctx;
+[7m  [0m [91m        ~~~[0m
+[96msrc/pages/board/feedback.astro[0m:[93m11[0m:[93m9[0m - [91merror[0m[90m ts(2339): [0mProperty 'redirect' does not exist on type 'GetBoardContextResult'.
+  Property 'redirect' does not exist on type 'BoardContextResult'.
+
+[7m11[0m if (ctx.redirect) return Astro.redirect(ctx.redirect);
+[7m  [0m [91m        ~~~~~~~~[0m
+
+[96msrc/pages/board/library.astro[0m:[93m11[0m:[93m14[0m - [91merror[0m[90m ts(2339): [0mProperty 'session' does not exist on type 'GetBoardContextResult'.
+
+[7m11[0m const { env, session } = ctx;
+[7m  [0m [91m             ~~~~~~~[0m
+[96msrc/pages/board/library.astro[0m:[93m11[0m:[93m9[0m - [91merror[0m[90m ts(2339): [0mProperty 'env' does not exist on type 'GetBoardContextResult'.
+
+[7m11[0m const { env, session } = ctx;
+[7m  [0m [91m        ~~~[0m
+[96msrc/pages/board/library.astro[0m:[93m10[0m:[93m9[0m - [91merror[0m[90m ts(2339): [0mProperty 'redirect' does not exist on type 'GetBoardContextResult'.
+  Property 'redirect' does not exist on type 'BoardContextResult'.
+
+[7m10[0m if (ctx.redirect) return Astro.redirect(ctx.redirect);
+[7m  [0m [91m        ~~~~~~~~[0m
+[96msrc/pages/board/library.astro[0m:[93m162[0m:[93m17[0m - [93mwarning[0m[90m ts(80006): [0mThis may be converted to an async function.
+
+[7m162[0m           .then(function (r) { return r.json().then(function (data) { return { ok: r.ok, data: data }; }); })
+[7m   [0m [93m                ~~~~~~~~[0m
+[96msrc/pages/board/library.astro[0m:[93m144[0m:[93m19[0m - [93mwarning[0m[90m ts(80006): [0mThis may be converted to an async function.
+
+[7m144[0m             .then(function (r) { return r.json().then(function (data) { return { ok: r.ok, data: data }; }); })
+[7m   [0m [93m                  ~~~~~~~~[0m
+
+[96msrc/pages/board/maintenance.astro[0m:[93m11[0m:[93m14[0m - [91merror[0m[90m ts(2339): [0mProperty 'session' does not exist on type 'GetBoardContextResult'.
+
+[7m11[0m const { env, session } = ctx;
+[7m  [0m [91m             ~~~~~~~[0m
+[96msrc/pages/board/maintenance.astro[0m:[93m11[0m:[93m9[0m - [91merror[0m[90m ts(2339): [0mProperty 'env' does not exist on type 'GetBoardContextResult'.
+
+[7m11[0m const { env, session } = ctx;
+[7m  [0m [91m        ~~~[0m
+[96msrc/pages/board/maintenance.astro[0m:[93m10[0m:[93m9[0m - [91merror[0m[90m ts(2339): [0mProperty 'redirect' does not exist on type 'GetBoardContextResult'.
+  Property 'redirect' does not exist on type 'BoardContextResult'.
+
+[7m10[0m if (ctx.redirect) return Astro.redirect(ctx.redirect);
+[7m  [0m [91m        ~~~~~~~~[0m
+
+[96msrc/pages/board/meetings.astro[0m:[93m11[0m:[93m14[0m - [91merror[0m[90m ts(2339): [0mProperty 'session' does not exist on type 'GetBoardContextResult'.
+
+[7m11[0m const { env, session } = ctx;
+[7m  [0m [91m             ~~~~~~~[0m
+[96msrc/pages/board/meetings.astro[0m:[93m11[0m:[93m9[0m - [91merror[0m[90m ts(2339): [0mProperty 'env' does not exist on type 'GetBoardContextResult'.
+
+[7m11[0m const { env, session } = ctx;
+[7m  [0m [91m        ~~~[0m
+[96msrc/pages/board/meetings.astro[0m:[93m10[0m:[93m9[0m - [91merror[0m[90m ts(2339): [0mProperty 'redirect' does not exist on type 'GetBoardContextResult'.
+  Property 'redirect' does not exist on type 'BoardContextResult'.
+
+[7m10[0m if (ctx.redirect) return Astro.redirect(ctx.redirect);
+[7m  [0m [91m        ~~~~~~~~[0m
+
+[96msrc/pages/board/member-documents.astro[0m:[93m13[0m:[93m14[0m - [91merror[0m[90m ts(2339): [0mProperty 'session' does not exist on type 'GetBoardContextResult'.
+
+[7m13[0m const { env, session } = ctx;
+[7m  [0m [91m             ~~~~~~~[0m
+[96msrc/pages/board/member-documents.astro[0m:[93m13[0m:[93m9[0m - [91merror[0m[90m ts(2339): [0mProperty 'env' does not exist on type 'GetBoardContextResult'.
+
+[7m13[0m const { env, session } = ctx;
+[7m  [0m [91m        ~~~[0m
+[96msrc/pages/board/member-documents.astro[0m:[93m12[0m:[93m9[0m - [91merror[0m[90m ts(2339): [0mProperty 'redirect' does not exist on type 'GetBoardContextResult'.
+  Property 'redirect' does not exist on type 'BoardContextResult'.
+
+[7m12[0m if (ctx.redirect) return Astro.redirect(ctx.redirect);
+[7m  [0m [91m        ~~~~~~~~[0m
+[96msrc/pages/board/member-documents.astro[0m:[93m79[0m:[93m34[0m - [93mwarning[0m[90m ts(6133): [0m'category' is declared but its value is never read.
+
+[7m79[0m           {docsByCategory.map(({ category, label, docs: catDocs }) => (
+[7m  [0m [93m                                 ~~~~~~~~[0m
+[96msrc/pages/board/member-documents.astro[0m:[93m105[0m:[93m9[0m - [93mwarning[0m[90m astro(4000): [0mThis script will be treated as if it has the `is:inline` directive because it contains an attribute. Therefore, features that require processing (e.g. using TypeScript or npm packages in the script) are unavailable.
+
+See docs for more details: https://docs.astro.build/en/guides/client-side-scripts/#script-processing.
+
+Add the `is:inline` directive explicitly to silence this hint.
+
+[7m105[0m <script define:vars={{ csrfToken: sanitizeForScriptInjection(session?.csrfToken ?? '') }}>
+[7m   [0m [93m        ~~~~~~~~~~~[0m
+
+[96msrc/pages/board/public-documents.astro[0m:[93m13[0m:[93m14[0m - [91merror[0m[90m ts(2339): [0mProperty 'session' does not exist on type 'GetBoardContextResult'.
+
+[7m13[0m const { env, session } = ctx;
+[7m  [0m [91m             ~~~~~~~[0m
+[96msrc/pages/board/public-documents.astro[0m:[93m13[0m:[93m9[0m - [91merror[0m[90m ts(2339): [0mProperty 'env' does not exist on type 'GetBoardContextResult'.
+
+[7m13[0m const { env, session } = ctx;
+[7m  [0m [91m        ~~~[0m
+[96msrc/pages/board/public-documents.astro[0m:[93m12[0m:[93m9[0m - [91merror[0m[90m ts(2339): [0mProperty 'redirect' does not exist on type 'GetBoardContextResult'.
+  Property 'redirect' does not exist on type 'BoardContextResult'.
+
+[7m12[0m if (ctx.redirect) return Astro.redirect(ctx.redirect);
+[7m  [0m [91m        ~~~~~~~~[0m
+[96msrc/pages/board/public-documents.astro[0m:[93m91[0m:[93m9[0m - [93mwarning[0m[90m astro(4000): [0mThis script will be treated as if it has the `is:inline` directive because it contains an attribute. Therefore, features that require processing (e.g. using TypeScript or npm packages in the script) are unavailable.
+
+See docs for more details: https://docs.astro.build/en/guides/client-side-scripts/#script-processing.
+
+Add the `is:inline` directive explicitly to silence this hint.
+
+[7m91[0m <script define:vars={{ csrfToken: sanitizeForScriptInjection(session?.csrfToken ?? '') }}>
+[7m  [0m [93m        ~~~~~~~~~~~[0m
+
+[96msrc/pages/board/vendors.astro[0m:[93m13[0m:[93m14[0m - [91merror[0m[90m ts(2339): [0mProperty 'session' does not exist on type 'GetBoardContextResult'.
+
+[7m13[0m const { env, session } = ctx;
+[7m  [0m [91m             ~~~~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m13[0m:[93m9[0m - [91merror[0m[90m ts(2339): [0mProperty 'env' does not exist on type 'GetBoardContextResult'.
+
+[7m13[0m const { env, session } = ctx;
+[7m  [0m [91m        ~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m12[0m:[93m9[0m - [91merror[0m[90m ts(2339): [0mProperty 'redirect' does not exist on type 'GetBoardContextResult'.
+  Property 'redirect' does not exist on type 'BoardContextResult'.
+
+[7m12[0m if (ctx.redirect) return Astro.redirect(ctx.redirect);
+[7m  [0m [91m        ~~~~~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m368[0m:[93m11[0m - [91merror[0m[90m ts(18047): [0m'submitBtn' is possibly 'null'.
+
+[7m368[0m           submitBtn.removeAttribute('aria-busy');
+[7m   [0m [91m          ~~~~~~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m367[0m:[93m21[0m - [91merror[0m[90m ts(2339): [0mProperty 'disabled' does not exist on type 'HTMLElement'.
+
+[7m367[0m           submitBtn.disabled = false;
+[7m   [0m [91m                    ~~~~~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m367[0m:[93m11[0m - [91merror[0m[90m ts(18047): [0m'submitBtn' is possibly 'null'.
+
+[7m367[0m           submitBtn.disabled = false;
+[7m   [0m [91m          ~~~~~~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m359[0m:[93m44[0m - [91merror[0m[90m ts(2339): [0mProperty 'value' does not exist on type 'HTMLElement'.
+
+[7m359[0m             showVendorsMessage(actionInput.value === 'update' ? 'Vendor updated.' : 'Vendor added.', false);
+[7m   [0m [91m                                           ~~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m359[0m:[93m32[0m - [91merror[0m[90m ts(18047): [0m'actionInput' is possibly 'null'.
+
+[7m359[0m             showVendorsMessage(actionInput.value === 'update' ? 'Vendor updated.' : 'Vendor added.', false);
+[7m   [0m [91m                               ~~~~~~~~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m354[0m:[93m9[0m - [91merror[0m[90m ts(18047): [0m'submitBtn' is possibly 'null'.
+
+[7m354[0m         submitBtn.setAttribute('aria-busy', 'true');
+[7m   [0m [91m        ~~~~~~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m353[0m:[93m19[0m - [91merror[0m[90m ts(2339): [0mProperty 'disabled' does not exist on type 'HTMLElement'.
+
+[7m353[0m         submitBtn.disabled = true;
+[7m   [0m [91m                  ~~~~~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m353[0m:[93m9[0m - [91merror[0m[90m ts(18047): [0m'submitBtn' is possibly 'null'.
+
+[7m353[0m         submitBtn.disabled = true;
+[7m   [0m [91m        ~~~~~~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m352[0m:[93m36[0m - [91merror[0m[90m ts(2339): [0mProperty 'value' does not exist on type 'HTMLElement'.
+
+[7m352[0m         const method = actionInput.value === 'update' ? 'PUT' : 'POST';
+[7m   [0m [91m                                   ~~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m352[0m:[93m24[0m - [91merror[0m[90m ts(18047): [0m'actionInput' is possibly 'null'.
+
+[7m352[0m         const method = actionInput.value === 'update' ? 'PUT' : 'POST';
+[7m   [0m [91m                       ~~~~~~~~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m349[0m:[93m49[0m - [91merror[0m[90m ts(2339): [0mProperty 'files' does not exist on type 'HTMLElement'.
+
+[7m349[0m             formData.set('file_' + i, fileInput.files[i]!);
+[7m   [0m [91m                                                ~~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m348[0m:[93m41[0m - [91merror[0m[90m ts(2339): [0mProperty 'files' does not exist on type 'HTMLElement'.
+
+[7m348[0m           for (let i = 0; i < fileInput.files.length; i++) {
+[7m   [0m [91m                                        ~~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m347[0m:[93m24[0m - [91merror[0m[90m ts(2339): [0mProperty 'files' does not exist on type 'HTMLElement'.
+
+[7m347[0m         if (fileInput?.files?.length) {
+[7m   [0m [91m                       ~~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m344[0m:[93m38[0m - [91merror[0m[90m ts(2339): [0mProperty 'value' does not exist on type 'HTMLElement'.
+
+[7m344[0m           formData.set('id', idInput.value);
+[7m   [0m [91m                                     ~~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m344[0m:[93m30[0m - [91merror[0m[90m ts(18047): [0m'idInput' is possibly 'null'.
+
+[7m344[0m           formData.set('id', idInput.value);
+[7m   [0m [91m                             ~~~~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m343[0m:[93m55[0m - [91merror[0m[90m ts(2339): [0mProperty 'value' does not exist on type 'HTMLElement'.
+
+[7m343[0m         if (actionInput.value === 'update' && idInput.value) {
+[7m   [0m [91m                                                      ~~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m343[0m:[93m47[0m - [91merror[0m[90m ts(18047): [0m'idInput' is possibly 'null'.
+
+[7m343[0m         if (actionInput.value === 'update' && idInput.value) {
+[7m   [0m [91m                                              ~~~~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m343[0m:[93m25[0m - [91merror[0m[90m ts(2339): [0mProperty 'value' does not exist on type 'HTMLElement'.
+
+[7m343[0m         if (actionInput.value === 'update' && idInput.value) {
+[7m   [0m [91m                        ~~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m343[0m:[93m13[0m - [91merror[0m[90m ts(18047): [0m'actionInput' is possibly 'null'.
+
+[7m343[0m         if (actionInput.value === 'update' && idInput.value) {
+[7m   [0m [91m            ~~~~~~~~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m341[0m:[93m39[0m - [91merror[0m[90m ts(2345): [0mArgument of type 'HTMLElement' is not assignable to parameter of type 'HTMLFormElement'.
+  Type 'HTMLElement' is missing the following properties from type 'HTMLFormElement': acceptCharset, action, autocomplete, elements, and 15 more.
+
+[7m341[0m         const formData = new FormData(form);
+[7m   [0m [91m                                      ~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m340[0m:[93m47[0m - [91merror[0m[90m ts(2339): [0mProperty 'value' does not exist on type 'HTMLElement'.
+
+[7m340[0m         const token = (csrfInput && csrfInput.value) || csrfToken || '';
+[7m   [0m [91m                                              ~~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m316[0m:[93m70[0m - [91merror[0m[90m ts(2339): [0mProperty 'value' does not exist on type 'Element'.
+
+[7m316[0m             const reviewNotes = (notesEl && notesEl.value) ? notesEl.value.trim() : null;
+[7m   [0m [91m                                                                     ~~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m316[0m:[93m53[0m - [91merror[0m[90m ts(2339): [0mProperty 'value' does not exist on type 'Element'.
+
+[7m316[0m             const reviewNotes = (notesEl && notesEl.value) ? notesEl.value.trim() : null;
+[7m   [0m [91m                                                    ~~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m312[0m:[93m21[0m - [91merror[0m[90m ts(2683): [0m'this' implicitly has type 'any' because it does not have a type annotation.
+
+[7m312[0m           const b = this; b.disabled = true; b.setAttribute('aria-busy', 'true');
+[7m   [0m [91m                    ~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m309[0m:[93m22[0m - [91merror[0m[90m ts(2683): [0m'this' implicitly has type 'any' because it does not have a type annotation.
+
+[7m309[0m           const id = this.getAttribute('data-id');
+[7m   [0m [91m                     ~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m301[0m:[93m22[0m - [91merror[0m[90m ts(2683): [0m'this' implicitly has type 'any' because it does not have a type annotation.
+
+[7m301[0m           const id = this.getAttribute('data-id');
+[7m   [0m [91m                     ~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m278[0m:[93m21[0m - [91merror[0m[90m ts(2683): [0m'this' implicitly has type 'any' because it does not have a type annotation.
+
+[7m278[0m           const b = this; b.disabled = true; b.setAttribute('aria-busy', 'true');
+[7m   [0m [91m                    ~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m275[0m:[93m22[0m - [91merror[0m[90m ts(2683): [0m'this' implicitly has type 'any' because it does not have a type annotation.
+
+[7m275[0m           const id = this.getAttribute('data-id');
+[7m   [0m [91m                     ~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m272[0m:[93m45[0m - [91merror[0m[90m ts(2339): [0mProperty 'value' does not exist on type 'HTMLElement'.
+
+[7m272[0m       const token = (csrfInput && csrfInput.value) || csrfToken || '';
+[7m   [0m [91m                                            ~~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m250[0m:[93m21[0m - [91merror[0m[90m ts(2683): [0m'this' implicitly has type 'any' because it does not have a type annotation.
+
+[7m250[0m           const b = this; b.disabled = true; b.setAttribute('aria-busy', 'true');
+[7m   [0m [91m                    ~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m249[0m:[93m49[0m - [91merror[0m[90m ts(2339): [0mProperty 'value' does not exist on type 'HTMLElement'.
+
+[7m249[0m           const token = (csrfInput && csrfInput.value) || csrfToken || '';
+[7m   [0m [91m                                                ~~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m246[0m:[93m22[0m - [91merror[0m[90m ts(2683): [0m'this' implicitly has type 'any' because it does not have a type annotation.
+
+[7m246[0m           const id = this.getAttribute('data-id');
+[7m   [0m [91m                     ~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m236[0m:[93m41[0m - [91merror[0m[90m ts(7006): [0mParameter 'isError' implicitly has an 'any' type.
+
+[7m236[0m       function showVendorsMessage(text, isError) {
+[7m   [0m [91m                                        ~~~~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m236[0m:[93m35[0m - [91merror[0m[90m ts(7006): [0mParameter 'text' implicitly has an 'any' type.
+
+[7m236[0m       function showVendorsMessage(text, isError) {
+[7m   [0m [91m                                  ~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m227[0m:[93m11[0m - [91merror[0m[90m ts(18047): [0m'cancelBtn' is possibly 'null'.
+
+[7m227[0m           cancelBtn.classList.remove('hidden');
+[7m   [0m [91m          ~~~~~~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m226[0m:[93m11[0m - [91merror[0m[90m ts(18047): [0m'submitBtn' is possibly 'null'.
+
+[7m226[0m           submitBtn.textContent = 'Update vendor';
+[7m   [0m [91m          ~~~~~~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m224[0m:[93m22[0m - [91merror[0m[90m ts(2339): [0mProperty 'value' does not exist on type 'HTMLElement'.
+
+[7m224[0m           notesInput.value = notes;
+[7m   [0m [91m                     ~~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m224[0m:[93m11[0m - [91merror[0m[90m ts(18047): [0m'notesInput' is possibly 'null'.
+
+[7m224[0m           notesInput.value = notes;
+[7m   [0m [91m          ~~~~~~~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m223[0m:[93m42[0m - [91merror[0m[90m ts(2339): [0mProperty 'value' does not exist on type 'HTMLElement'.
+
+[7m223[0m           if (websiteInput) websiteInput.value = website;
+[7m   [0m [91m                                         ~~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m222[0m:[93m22[0m - [91merror[0m[90m ts(2339): [0mProperty 'value' does not exist on type 'HTMLElement'.
+
+[7m222[0m           emailInput.value = email;
+[7m   [0m [91m                     ~~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m222[0m:[93m11[0m - [91merror[0m[90m ts(18047): [0m'emailInput' is possibly 'null'.
+
+[7m222[0m           emailInput.value = email;
+[7m   [0m [91m          ~~~~~~~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m221[0m:[93m22[0m - [91merror[0m[90m ts(2339): [0mProperty 'value' does not exist on type 'HTMLElement'.
+
+[7m221[0m           phoneInput.value = phone;
+[7m   [0m [91m                     ~~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m221[0m:[93m11[0m - [91merror[0m[90m ts(18047): [0m'phoneInput' is possibly 'null'.
+
+[7m221[0m           phoneInput.value = phone;
+[7m   [0m [91m          ~~~~~~~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m220[0m:[93m25[0m - [91merror[0m[90m ts(2339): [0mProperty 'value' does not exist on type 'HTMLElement'.
+
+[7m220[0m           categoryInput.value = category;
+[7m   [0m [91m                        ~~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m220[0m:[93m11[0m - [91merror[0m[90m ts(18047): [0m'categoryInput' is possibly 'null'.
+
+[7m220[0m           categoryInput.value = category;
+[7m   [0m [91m          ~~~~~~~~~~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m219[0m:[93m21[0m - [91merror[0m[90m ts(2339): [0mProperty 'value' does not exist on type 'HTMLElement'.
+
+[7m219[0m           nameInput.value = name;
+[7m   [0m [91m                    ~~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m219[0m:[93m11[0m - [91merror[0m[90m ts(18047): [0m'nameInput' is possibly 'null'.
+
+[7m219[0m           nameInput.value = name;
+[7m   [0m [91m          ~~~~~~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m218[0m:[93m19[0m - [91merror[0m[90m ts(2339): [0mProperty 'value' does not exist on type 'HTMLElement'.
+
+[7m218[0m           idInput.value = id || '';
+[7m   [0m [91m                  ~~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m218[0m:[93m11[0m - [91merror[0m[90m ts(18047): [0m'idInput' is possibly 'null'.
+
+[7m218[0m           idInput.value = id || '';
+[7m   [0m [91m          ~~~~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m217[0m:[93m23[0m - [91merror[0m[90m ts(2339): [0mProperty 'value' does not exist on type 'HTMLElement'.
+
+[7m217[0m           actionInput.value = 'update';
+[7m   [0m [91m                      ~~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m217[0m:[93m11[0m - [91merror[0m[90m ts(18047): [0m'actionInput' is possibly 'null'.
+
+[7m217[0m           actionInput.value = 'update';
+[7m   [0m [91m          ~~~~~~~~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m216[0m:[93m32[0m - [91merror[0m[90m ts(2683): [0m'this' implicitly has type 'any' because it does not have a type annotation.
+
+[7m216[0m           const showOnPublic = this.getAttribute('data-show-on-public') === '1';
+[7m   [0m [91m                               ~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m215[0m:[93m25[0m - [91merror[0m[90m ts(2683): [0m'this' implicitly has type 'any' because it does not have a type annotation.
+
+[7m215[0m           const notes = this.getAttribute('data-notes') ?? '';
+[7m   [0m [91m                        ~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m214[0m:[93m27[0m - [91merror[0m[90m ts(2683): [0m'this' implicitly has type 'any' because it does not have a type annotation.
+
+[7m214[0m           const website = this.getAttribute('data-website') ?? '';
+[7m   [0m [91m                          ~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m213[0m:[93m25[0m - [91merror[0m[90m ts(2683): [0m'this' implicitly has type 'any' because it does not have a type annotation.
+
+[7m213[0m           const email = this.getAttribute('data-email') ?? '';
+[7m   [0m [91m                        ~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m212[0m:[93m25[0m - [91merror[0m[90m ts(2683): [0m'this' implicitly has type 'any' because it does not have a type annotation.
+
+[7m212[0m           const phone = this.getAttribute('data-phone') ?? '';
+[7m   [0m [91m                        ~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m211[0m:[93m28[0m - [91merror[0m[90m ts(2683): [0m'this' implicitly has type 'any' because it does not have a type annotation.
+
+[7m211[0m           const category = this.getAttribute('data-category') ?? '';
+[7m   [0m [91m                           ~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m210[0m:[93m24[0m - [91merror[0m[90m ts(2683): [0m'this' implicitly has type 'any' because it does not have a type annotation.
+
+[7m210[0m           const name = this.getAttribute('data-name') ?? '';
+[7m   [0m [91m                       ~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m209[0m:[93m22[0m - [91merror[0m[90m ts(2683): [0m'this' implicitly has type 'any' because it does not have a type annotation.
+
+[7m209[0m           const id = this.getAttribute('data-id');
+[7m   [0m [91m                     ~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m204[0m:[93m9[0m - [91merror[0m[90m ts(18047): [0m'cancelBtn' is possibly 'null'.
+
+[7m204[0m         cancelBtn.classList.add('hidden');
+[7m   [0m [91m        ~~~~~~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m203[0m:[93m9[0m - [91merror[0m[90m ts(18047): [0m'submitBtn' is possibly 'null'.
+
+[7m203[0m         submitBtn.textContent = 'Create vendor';
+[7m   [0m [91m        ~~~~~~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m202[0m:[93m34[0m - [91merror[0m[90m ts(2339): [0mProperty 'value' does not exist on type 'HTMLElement'.
+
+[7m202[0m         if (fileInput) fileInput.value = '';
+[7m   [0m [91m                                 ~~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m200[0m:[93m20[0m - [91merror[0m[90m ts(2339): [0mProperty 'value' does not exist on type 'HTMLElement'.
+
+[7m200[0m         notesInput.value = '';
+[7m   [0m [91m                   ~~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m200[0m:[93m9[0m - [91merror[0m[90m ts(18047): [0m'notesInput' is possibly 'null'.
+
+[7m200[0m         notesInput.value = '';
+[7m   [0m [91m        ~~~~~~~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m199[0m:[93m40[0m - [91merror[0m[90m ts(2339): [0mProperty 'value' does not exist on type 'HTMLElement'.
+
+[7m199[0m         if (websiteInput) websiteInput.value = '';
+[7m   [0m [91m                                       ~~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m198[0m:[93m20[0m - [91merror[0m[90m ts(2339): [0mProperty 'value' does not exist on type 'HTMLElement'.
+
+[7m198[0m         emailInput.value = '';
+[7m   [0m [91m                   ~~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m198[0m:[93m9[0m - [91merror[0m[90m ts(18047): [0m'emailInput' is possibly 'null'.
+
+[7m198[0m         emailInput.value = '';
+[7m   [0m [91m        ~~~~~~~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m197[0m:[93m20[0m - [91merror[0m[90m ts(2339): [0mProperty 'value' does not exist on type 'HTMLElement'.
+
+[7m197[0m         phoneInput.value = '';
+[7m   [0m [91m                   ~~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m197[0m:[93m9[0m - [91merror[0m[90m ts(18047): [0m'phoneInput' is possibly 'null'.
+
+[7m197[0m         phoneInput.value = '';
+[7m   [0m [91m        ~~~~~~~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m196[0m:[93m23[0m - [91merror[0m[90m ts(2339): [0mProperty 'value' does not exist on type 'HTMLElement'.
+
+[7m196[0m         categoryInput.value = '';
+[7m   [0m [91m                      ~~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m196[0m:[93m9[0m - [91merror[0m[90m ts(18047): [0m'categoryInput' is possibly 'null'.
+
+[7m196[0m         categoryInput.value = '';
+[7m   [0m [91m        ~~~~~~~~~~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m195[0m:[93m19[0m - [91merror[0m[90m ts(2339): [0mProperty 'value' does not exist on type 'HTMLElement'.
+
+[7m195[0m         nameInput.value = '';
+[7m   [0m [91m                  ~~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m195[0m:[93m9[0m - [91merror[0m[90m ts(18047): [0m'nameInput' is possibly 'null'.
+
+[7m195[0m         nameInput.value = '';
+[7m   [0m [91m        ~~~~~~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m194[0m:[93m17[0m - [91merror[0m[90m ts(2339): [0mProperty 'value' does not exist on type 'HTMLElement'.
+
+[7m194[0m         idInput.value = '';
+[7m   [0m [91m                ~~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m194[0m:[93m9[0m - [91merror[0m[90m ts(18047): [0m'idInput' is possibly 'null'.
+
+[7m194[0m         idInput.value = '';
+[7m   [0m [91m        ~~~~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m193[0m:[93m21[0m - [91merror[0m[90m ts(2339): [0mProperty 'value' does not exist on type 'HTMLElement'.
+
+[7m193[0m         actionInput.value = 'create';
+[7m   [0m [91m                    ~~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m193[0m:[93m9[0m - [91merror[0m[90m ts(18047): [0m'actionInput' is possibly 'null'.
+
+[7m193[0m         actionInput.value = 'create';
+[7m   [0m [91m        ~~~~~~~~~~~[0m
+[96msrc/pages/board/vendors.astro[0m:[93m175[0m:[93m14[0m - [91merror[0m[90m ts(2339): [0mProperty 'csrfToken' does not exist on type 'Window & typeof globalThis'.
+
+[7m175[0m       window.csrfToken = csrfToken;
+[7m   [0m [91m             ~~~~~~~~~[0m
+
+[96msrc/pages/portal/arb-dashboard.astro[0m:[93m30[0m:[93m17[0m - [91merror[0m[90m ts(2339): [0mProperty 'DB' does not exist on type 'never'.
+
+[7m30[0m const db = env?.DB;
+[7m  [0m [91m                ~~[0m
+[96msrc/pages/portal/arb-dashboard.astro[0m:[93m12[0m:[93m1[0m - [93mwarning[0m[90m ts(6133): [0m'updateSessionActivity' is declared but its value is never read.
+
+[7m12[0m import { updateSessionActivity } from '../../lib/auth';
+[7m  [0m [93m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+[96msrc/pages/portal/arb-dashboard.astro[0m:[93m349[0m:[93m11[0m - [93mwarning[0m[90m astro(4000): [0mThis script will be treated as if it has the `is:inline` directive because it contains an attribute. Therefore, features that require processing (e.g. using TypeScript or npm packages in the script) are unavailable.
+
+See docs for more details: https://docs.astro.build/en/guides/client-side-scripts/#script-processing.
+
+Add the `is:inline` directive explicitly to silence this hint.
+
+[7m349[0m   <script define:vars={{ csrfToken: session.csrfToken ?? '', suggestedArbEsign: suggestedArbEsign }}>
+[7m   [0m [93m          ~~~~~~~~~~~[0m
+[96msrc/pages/portal/arb-dashboard.astro[0m:[93m348[0m:[93m11[0m - [93mwarning[0m[90m astro(4000): [0mThis script will be treated as if it has the `is:inline` directive because it contains an attribute. Therefore, features that require processing (e.g. using TypeScript or npm packages in the script) are unavailable.
+
+See docs for more details: https://docs.astro.build/en/guides/client-side-scripts/#script-processing.
+
+Add the `is:inline` directive explicitly to silence this hint.
+
+[7m348[0m   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" integrity="sha512-XMVd28F1oH/O71fzwBnV7HucLxVwtxf26XV8P4wPk26EDxuGZ91N8bsOttmnomcCD3CS5ZMRL50H0GgOHvegtg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+[7m   [0m [93m          ~~~[0m
+
+[96msrc/pages/portal/arb-request.astro[0m:[93m70[0m:[93m17[0m - [91merror[0m[90m ts(2339): [0mProperty 'DB' does not exist on type 'never'.
+
+[7m70[0m const db = env?.DB;
+[7m  [0m [91m                ~~[0m
+[96msrc/pages/portal/arb-request.astro[0m:[93m38[0m:[93m24[0m - [91merror[0m[90m ts(2339): [0mProperty 'SESSION_SECRET' does not exist on type 'never'.
+
+[7m38[0m     encoder.encode(env.SESSION_SECRET),
+[7m  [0m [91m                       ~~~~~~~~~~~~~~[0m
+[96msrc/pages/portal/arb-request.astro[0m:[93m19[0m:[93m32[0m - [91merror[0m[90m ts(2339): [0mProperty 'SESSION_SECRET' does not exist on type 'never'.
+
+[7m19[0m if (!session.csrfToken && env?.SESSION_SECRET) {
+[7m  [0m [91m                               ~~~~~~~~~~~~~~[0m
+[96msrc/pages/portal/arb-request.astro[0m:[93m476[0m:[93m17[0m - [93mwarning[0m[90m ts(6133): [0m'isDraft' is declared but its value is never read.
+
+[7m476[0m           const isDraft = action === 'draft';
+[7m   [0m [93m                ~~~~~~~[0m
+[96msrc/pages/portal/arb-request.astro[0m:[93m339[0m:[93m16[0m - [93mwarning[0m[90m ts(6133): [0m'formatBytes' is declared but its value is never read.
+
+[7m339[0m       function formatBytes(bytes) {
+[7m   [0m [93m               ~~~~~~~~~~~[0m
+[96msrc/pages/portal/arb-request.astro[0m:[93m292[0m:[93m11[0m - [93mwarning[0m[90m ts(6133): [0m'lastSaveTime' is declared but its value is never read.
+
+[7m292[0m       let lastSaveTime = null;
+[7m   [0m [93m          ~~~~~~~~~~~~[0m
+[96msrc/pages/portal/arb-request.astro[0m:[93m637[0m:[93m11[0m - [93mwarning[0m[90m astro(4000): [0mThis script will be treated as if it has the `is:inline` directive because it contains an attribute. Therefore, features that require processing (e.g. using TypeScript or npm packages in the script) are unavailable.
+
+See docs for more details: https://docs.astro.build/en/guides/client-side-scripts/#script-processing.
+
+Add the `is:inline` directive explicitly to silence this hint.
+
+[7m637[0m   <script define:vars={{ csrfToken: session.csrfToken ?? '' }}>
+[7m   [0m [93m          ~~~~~~~~~~~[0m
+[96msrc/pages/portal/arb-request.astro[0m:[93m276[0m:[93m11[0m - [93mwarning[0m[90m astro(4000): [0mThis script will be treated as if it has the `is:inline` directive because it contains an attribute. Therefore, features that require processing (e.g. using TypeScript or npm packages in the script) are unavailable.
+
+See docs for more details: https://docs.astro.build/en/guides/client-side-scripts/#script-processing.
+
+Add the `is:inline` directive explicitly to silence this hint.
+
+[7m276[0m   <script define:vars={{ maxFileBytes: 5 * 1024 * 1024, maxTotalBytes: 25 * 1024 * 1024, reviewMaxWidth: 2000, archiveMaxWidth: 1200 }}>
+[7m   [0m [93m          ~~~~~~~~~~~[0m
+
+[96msrc/pages/portal/assessments.astro[0m:[93m15[0m:[93m17[0m - [91merror[0m[90m ts(2339): [0mProperty 'DB' does not exist on type 'never'.
+
+[7m15[0m const db = env?.DB;
+[7m  [0m [91m                ~~[0m
+[96msrc/pages/portal/assessments.astro[0m:[93m30[0m:[93m7[0m - [93mwarning[0m[90m ts(6133): [0m'lateFeeDays' is declared but its value is never read.
+
+[7m30[0m const lateFeeDays = typeof import.meta.env.PUBLIC_LATE_FEE_DAYS !== 'undefined' ? Number(import.meta.env.PUBLIC_LATE_FEE_DAYS) : 3;
+[7m  [0m [93m      ~~~~~~~~~~~[0m
+
+[96msrc/pages/portal/board.astro[0m:[93m18[0m:[93m17[0m - [91merror[0m[90m ts(2339): [0mProperty 'DB' does not exist on type 'never'.
+
+[7m18[0m const db = env?.DB;
+[7m  [0m [91m                ~~[0m
+
+[96msrc/pages/portal/dashboard.astro[0m:[93m22[0m:[93m17[0m - [91merror[0m[90m ts(2339): [0mProperty 'DB' does not exist on type 'never'.
+
+[7m22[0m const db = env?.DB;
+[7m  [0m [91m                ~~[0m
+
+[96msrc/pages/portal/directory.astro[0m:[93m17[0m:[93m49[0m - [91merror[0m[90m ts(2339): [0mProperty 'CLOURHOA_USERS' does not exist on type 'never'.
+
+[7m17[0m const ownerRoles = await getRolesForEmails(env?.CLOURHOA_USERS, owners.map((o) => o.email));
+[7m  [0m [91m                                                ~~~~~~~~~~~~~~[0m
+[96msrc/pages/portal/directory.astro[0m:[93m15[0m:[93m17[0m - [91merror[0m[90m ts(2339): [0mProperty 'DB' does not exist on type 'never'.
+
+[7m15[0m const db = env?.DB;
+[7m  [0m [91m                ~~[0m
+[96msrc/pages/portal/directory.astro[0m:[93m134[0m:[93m11[0m - [93mwarning[0m[90m astro(4000): [0mThis script will be treated as if it has the `is:inline` directive because it contains an attribute. Therefore, features that require processing (e.g. using TypeScript or npm packages in the script) are unavailable.
+
+See docs for more details: https://docs.astro.build/en/guides/client-side-scripts/#script-processing.
+
+Add the `is:inline` directive explicitly to silence this hint.
+
+[7m134[0m   <script define:vars={{ owners: owners, csrfToken: session.csrfToken ?? '' }}>
+[7m   [0m [93m          ~~~~~~~~~~~[0m
+
+[96msrc/pages/portal/docs.astro[0m:[93m14[0m:[93m17[0m - [91merror[0m[90m ts(2339): [0mProperty 'DB' does not exist on type 'never'.
+
+[7m14[0m const db = env?.DB;
+[7m  [0m [91m                ~~[0m
+
+[96msrc/pages/portal/documents.astro[0m:[93m15[0m:[93m17[0m - [91merror[0m[90m ts(2339): [0mProperty 'DB' does not exist on type 'never'.
+
+[7m15[0m const db = env?.DB;
+[7m  [0m [91m                ~~[0m
+[96msrc/pages/portal/documents.astro[0m:[93m55[0m:[93m34[0m - [93mwarning[0m[90m ts(6133): [0m'category' is declared but its value is never read.
+
+[7m55[0m           {docsByCategory.map(({ category, label, docs: catDocs }) => (
+[7m  [0m [93m                                 ~~~~~~~~[0m
+
+[96msrc/pages/portal/faq.astro[0m:[93m14[0m:[93m17[0m - [91merror[0m[90m ts(2339): [0mProperty 'DB' does not exist on type 'never'.
+
+[7m14[0m const db = env?.DB;
+[7m  [0m [91m                ~~[0m
+
+[96msrc/pages/portal/feedback.astro[0m:[93m15[0m:[93m17[0m - [91merror[0m[90m ts(2339): [0mProperty 'DB' does not exist on type 'never'.
+
+[7m15[0m const db = env?.DB;
+[7m  [0m [91m                ~~[0m
+
+[96msrc/pages/portal/library.astro[0m:[93m15[0m:[93m17[0m - [91merror[0m[90m ts(2339): [0mProperty 'DB' does not exist on type 'never'.
+
+[7m15[0m const db = env?.DB;
+[7m  [0m [91m                ~~[0m
+
+[96msrc/pages/portal/maintenance.astro[0m:[93m14[0m:[93m17[0m - [91merror[0m[90m ts(2339): [0mProperty 'DB' does not exist on type 'never'.
+
+[7m14[0m const db = env?.DB;
+[7m  [0m [91m                ~~[0m
+
+[96msrc/pages/portal/meetings.astro[0m:[93m14[0m:[93m17[0m - [91merror[0m[90m ts(2339): [0mProperty 'DB' does not exist on type 'never'.
+
+[7m14[0m const db = env?.DB;
+[7m  [0m [91m                ~~[0m
+[96msrc/pages/portal/meetings.astro[0m:[93m139[0m:[93m28[0m - [91merror[0m[90m ts(2339): [0mProperty 'dataset' does not exist on type 'Element'.
+
+[7m139[0m       const response = btn.dataset.response;
+[7m   [0m [91m                           ~~~~~~~[0m
+[96msrc/pages/portal/meetings.astro[0m:[93m138[0m:[93m29[0m - [91merror[0m[90m ts(2339): [0mProperty 'dataset' does not exist on type 'Element'.
+
+[7m138[0m       const meetingId = btn.dataset.meetingId;
+[7m   [0m [91m                            ~~~~~~~[0m
+
+[96msrc/pages/portal/my-activity.astro[0m:[93m14[0m:[93m17[0m - [91merror[0m[90m ts(2339): [0mProperty 'DB' does not exist on type 'never'.
+
+[7m14[0m const db = env?.DB;
+[7m  [0m [91m                ~~[0m
+
+[96msrc/pages/portal/my-requests.astro[0m:[93m15[0m:[93m17[0m - [91merror[0m[90m ts(2339): [0mProperty 'DB' does not exist on type 'never'.
+
+[7m15[0m const db = env?.DB;
+[7m  [0m [91m                ~~[0m
+[96msrc/pages/portal/my-requests.astro[0m:[93m612[0m:[93m11[0m - [91merror[0m[90m ts(2683): [0m'this' implicitly has type 'any' because it does not have a type annotation.
+
+[7m612[0m           this.textContent = 'Copy request (includes attachments)';
+[7m   [0m [91m          ~~~~[0m
+[96msrc/pages/portal/my-requests.astro[0m:[93m611[0m:[93m11[0m - [91merror[0m[90m ts(2683): [0m'this' implicitly has type 'any' because it does not have a type annotation.
+
+[7m611[0m           this.disabled = false;
+[7m   [0m [91m          ~~~~[0m
+[96msrc/pages/portal/my-requests.astro[0m:[93m607[0m:[93m13[0m - [91merror[0m[90m ts(2683): [0m'this' implicitly has type 'any' because it does not have a type annotation.
+
+[7m607[0m             this.textContent = 'Copy request (includes attachments)';
+[7m   [0m [91m            ~~~~[0m
+[96msrc/pages/portal/my-requests.astro[0m:[93m606[0m:[93m13[0m - [91merror[0m[90m ts(2683): [0m'this' implicitly has type 'any' because it does not have a type annotation.
+
+[7m606[0m             this.disabled = false;
+[7m   [0m [91m            ~~~~[0m
+[96msrc/pages/portal/my-requests.astro[0m:[93m599[0m:[93m99[0m - [91merror[0m[90m ts(2339): [0mProperty 'csrfToken' does not exist on type 'Window & typeof globalThis'.
+
+[7m599[0m             body: JSON.stringify({ requestId, csrfToken: (typeof window !== 'undefined' && window.csrfToken) || '' }),
+[7m   [0m [91m                                                                                                  ~~~~~~~~~[0m
+[96msrc/pages/portal/my-requests.astro[0m:[93m594[0m:[93m9[0m - [91merror[0m[90m ts(2683): [0m'this' implicitly has type 'any' because it does not have a type annotation.
+
+[7m594[0m         this.textContent = 'CopyingΓÇª';
+[7m   [0m [91m        ~~~~[0m
+[96msrc/pages/portal/my-requests.astro[0m:[93m593[0m:[93m9[0m - [91merror[0m[90m ts(2683): [0m'this' implicitly has type 'any' because it does not have a type annotation.
+
+[7m593[0m         this.disabled = true;
+[7m   [0m [91m        ~~~~[0m
+[96msrc/pages/portal/my-requests.astro[0m:[93m590[0m:[93m27[0m - [91merror[0m[90m ts(2683): [0m'this' implicitly has type 'any' because it does not have a type annotation.
+
+[7m590[0m         const requestId = this.getAttribute('data-request-id');
+[7m   [0m [91m                          ~~~~[0m
+[96msrc/pages/portal/my-requests.astro[0m:[93m580[0m:[93m16[0m - [91merror[0m[90m ts(2339): [0mProperty 'disabled' does not exist on type 'HTMLElement'.
+
+[7m580[0m           this.disabled = originalDisabled;
+[7m   [0m [91m               ~~~~~~~~[0m
+[96msrc/pages/portal/my-requests.astro[0m:[93m573[0m:[93m18[0m - [91merror[0m[90m ts(2339): [0mProperty 'disabled' does not exist on type 'HTMLElement'.
+
+[7m573[0m             this.disabled = originalDisabled;
+[7m   [0m [91m                 ~~~~~~~~[0m
+[96msrc/pages/portal/my-requests.astro[0m:[93m540[0m:[93m18[0m - [91merror[0m[90m ts(2339): [0mProperty 'disabled' does not exist on type 'HTMLElement'.
+
+[7m540[0m             this.disabled = originalDisabled;
+[7m   [0m [91m                 ~~~~~~~~[0m
+[96msrc/pages/portal/my-requests.astro[0m:[93m537[0m:[93m70[0m - [91merror[0m[90m ts(2339): [0mProperty 'csrfToken' does not exist on type 'Window & typeof globalThis'.
+
+[7m537[0m           const csrfToken = (typeof window !== 'undefined' && window.csrfToken) || '';
+[7m   [0m [91m                                                                     ~~~~~~~~~[0m
+[96msrc/pages/portal/my-requests.astro[0m:[93m533[0m:[93m14[0m - [91merror[0m[90m ts(2339): [0mProperty 'disabled' does not exist on type 'HTMLElement'.
+
+[7m533[0m         this.disabled = true;
+[7m   [0m [91m             ~~~~~~~~[0m
+[96msrc/pages/portal/my-requests.astro[0m:[93m532[0m:[93m39[0m - [91merror[0m[90m ts(2339): [0mProperty 'disabled' does not exist on type 'HTMLElement'.
+
+[7m532[0m         const originalDisabled = this.disabled;
+[7m   [0m [91m                                      ~~~~~~~~[0m
+[96msrc/pages/portal/my-requests.astro[0m:[93m528[0m:[93m65[0m - [91merror[0m[90m ts(2339): [0mProperty 'value' does not exist on type 'Element'.
+
+[7m528[0m         const requestIds = checked.map(function(cb) { return cb.value; });
+[7m   [0m [91m                                                                ~~~~~[0m
+[96msrc/pages/portal/my-requests.astro[0m:[93m525[0m:[93m35[0m - [91merror[0m[90m ts(2339): [0mProperty 'dataset' does not exist on type 'Element'.
+
+[7m525[0m           return cb.checked && cb.dataset.status === 'pending';
+[7m   [0m [91m                                  ~~~~~~~[0m
+[96msrc/pages/portal/my-requests.astro[0m:[93m525[0m:[93m21[0m - [91merror[0m[90m ts(2339): [0mProperty 'checked' does not exist on type 'Element'.
+
+[7m525[0m           return cb.checked && cb.dataset.status === 'pending';
+[7m   [0m [91m                    ~~~~~~~[0m
+[96msrc/pages/portal/my-requests.astro[0m:[93m512[0m:[93m14[0m - [91merror[0m[90m ts(2339): [0mProperty 'checked' does not exist on type 'Element'.
+
+[7m512[0m           cb.checked = checked;
+[7m   [0m [91m             ~~~~~~~[0m
+[96msrc/pages/portal/my-requests.astro[0m:[93m510[0m:[93m30[0m - [91merror[0m[90m ts(2339): [0mProperty 'checked' does not exist on type 'HTMLElement'.
+
+[7m510[0m         const checked = this.checked;
+[7m   [0m [91m                             ~~~~~~~[0m
+[96msrc/pages/portal/my-requests.astro[0m:[93m503[0m:[93m23[0m - [91merror[0m[90m ts(2339): [0mProperty 'disabled' does not exist on type 'HTMLElement'.
+
+[7m503[0m         bulkCancelBtn.disabled = count === 0;
+[7m   [0m [91m                      ~~~~~~~~[0m
+[96msrc/pages/portal/my-requests.astro[0m:[93m499[0m:[93m33[0m - [91merror[0m[90m ts(2339): [0mProperty 'dataset' does not exist on type 'Element'.
+
+[7m499[0m         return cb.checked && cb.dataset.status === 'pending';
+[7m   [0m [91m                                ~~~~~~~[0m
+[96msrc/pages/portal/my-requests.astro[0m:[93m499[0m:[93m19[0m - [91merror[0m[90m ts(2339): [0mProperty 'checked' does not exist on type 'Element'.
+
+[7m499[0m         return cb.checked && cb.dataset.status === 'pending';
+[7m   [0m [91m                  ~~~~~~~[0m
+[96msrc/pages/portal/my-requests.astro[0m:[93m487[0m:[93m11[0m - [91merror[0m[90m ts(2683): [0m'this' implicitly has type 'any' because it does not have a type annotation.
+
+[7m487[0m           this.textContent = originalText;
+[7m   [0m [91m          ~~~~[0m
+[96msrc/pages/portal/my-requests.astro[0m:[93m486[0m:[93m11[0m - [91merror[0m[90m ts(2683): [0m'this' implicitly has type 'any' because it does not have a type annotation.
+
+[7m486[0m           this.disabled = originalDisabled;
+[7m   [0m [91m          ~~~~[0m
+[96msrc/pages/portal/my-requests.astro[0m:[93m480[0m:[93m13[0m - [91merror[0m[90m ts(2683): [0m'this' implicitly has type 'any' because it does not have a type annotation.
+
+[7m480[0m             this.textContent = originalText;
+[7m   [0m [91m            ~~~~[0m
+[96msrc/pages/portal/my-requests.astro[0m:[93m479[0m:[93m13[0m - [91merror[0m[90m ts(2683): [0m'this' implicitly has type 'any' because it does not have a type annotation.
+
+[7m479[0m             this.disabled = originalDisabled;
+[7m   [0m [91m            ~~~~[0m
+[96msrc/pages/portal/my-requests.astro[0m:[93m458[0m:[93m13[0m - [91merror[0m[90m ts(2683): [0m'this' implicitly has type 'any' because it does not have a type annotation.
+
+[7m458[0m             this.textContent = originalText;
+[7m   [0m [91m            ~~~~[0m
+[96msrc/pages/portal/my-requests.astro[0m:[93m457[0m:[93m13[0m - [91merror[0m[90m ts(2683): [0m'this' implicitly has type 'any' because it does not have a type annotation.
+
+[7m457[0m             this.disabled = originalDisabled;
+[7m   [0m [91m            ~~~~[0m
+[96msrc/pages/portal/my-requests.astro[0m:[93m454[0m:[93m70[0m - [91merror[0m[90m ts(2339): [0mProperty 'csrfToken' does not exist on type 'Window & typeof globalThis'.
+
+[7m454[0m           const csrfToken = (typeof window !== 'undefined' && window.csrfToken) || '';
+[7m   [0m [91m                                                                     ~~~~~~~~~[0m
+[96msrc/pages/portal/my-requests.astro[0m:[93m451[0m:[93m9[0m - [91merror[0m[90m ts(2683): [0m'this' implicitly has type 'any' because it does not have a type annotation.
+
+[7m451[0m         this.textContent = 'CancellingΓÇª';
+[7m   [0m [91m        ~~~~[0m
+[96msrc/pages/portal/my-requests.astro[0m:[93m450[0m:[93m9[0m - [91merror[0m[90m ts(2683): [0m'this' implicitly has type 'any' because it does not have a type annotation.
+
+[7m450[0m         this.disabled = true;
+[7m   [0m [91m        ~~~~[0m
+[96msrc/pages/portal/my-requests.astro[0m:[93m449[0m:[93m34[0m - [91merror[0m[90m ts(2683): [0m'this' implicitly has type 'any' because it does not have a type annotation.
+
+[7m449[0m         const originalDisabled = this.disabled;
+[7m   [0m [91m                                 ~~~~[0m
+[96msrc/pages/portal/my-requests.astro[0m:[93m448[0m:[93m30[0m - [91merror[0m[90m ts(2683): [0m'this' implicitly has type 'any' because it does not have a type annotation.
+
+[7m448[0m         const originalText = this.textContent;
+[7m   [0m [91m                             ~~~~[0m
+[96msrc/pages/portal/my-requests.astro[0m:[93m444[0m:[93m27[0m - [91merror[0m[90m ts(2683): [0m'this' implicitly has type 'any' because it does not have a type annotation.
+
+[7m444[0m         const requestId = this.getAttribute('data-request-id');
+[7m   [0m [91m                          ~~~~[0m
+[96msrc/pages/portal/my-requests.astro[0m:[93m435[0m:[93m11[0m - [91merror[0m[90m ts(2683): [0m'this' implicitly has type 'any' because it does not have a type annotation.
+
+[7m435[0m           this.textContent = 'Submit for review';
+[7m   [0m [91m          ~~~~[0m
+[96msrc/pages/portal/my-requests.astro[0m:[93m434[0m:[93m11[0m - [91merror[0m[90m ts(2683): [0m'this' implicitly has type 'any' because it does not have a type annotation.
+
+[7m434[0m           this.disabled = false;
+[7m   [0m [91m          ~~~~[0m
+[96msrc/pages/portal/my-requests.astro[0m:[93m430[0m:[93m13[0m - [91merror[0m[90m ts(2683): [0m'this' implicitly has type 'any' because it does not have a type annotation.
+
+[7m430[0m             this.textContent = 'Submit for review';
+[7m   [0m [91m            ~~~~[0m
+[96msrc/pages/portal/my-requests.astro[0m:[93m429[0m:[93m13[0m - [91merror[0m[90m ts(2683): [0m'this' implicitly has type 'any' because it does not have a type annotation.
+
+[7m429[0m             this.disabled = false;
+[7m   [0m [91m            ~~~~[0m
+[96msrc/pages/portal/my-requests.astro[0m:[93m422[0m:[93m99[0m - [91merror[0m[90m ts(2339): [0mProperty 'csrfToken' does not exist on type 'Window & typeof globalThis'.
+
+[7m422[0m             body: JSON.stringify({ requestId, csrfToken: (typeof window !== 'undefined' && window.csrfToken) || '' }),
+[7m   [0m [91m                                                                                                  ~~~~~~~~~[0m
+[96msrc/pages/portal/my-requests.astro[0m:[93m417[0m:[93m9[0m - [91merror[0m[90m ts(2683): [0m'this' implicitly has type 'any' because it does not have a type annotation.
+
+[7m417[0m         this.textContent = 'SubmittingΓÇª';
+[7m   [0m [91m        ~~~~[0m
+[96msrc/pages/portal/my-requests.astro[0m:[93m416[0m:[93m9[0m - [91merror[0m[90m ts(2683): [0m'this' implicitly has type 'any' because it does not have a type annotation.
+
+[7m416[0m         this.disabled = true;
+[7m   [0m [91m        ~~~~[0m
+[96msrc/pages/portal/my-requests.astro[0m:[93m414[0m:[93m27[0m - [91merror[0m[90m ts(2683): [0m'this' implicitly has type 'any' because it does not have a type annotation.
+
+[7m414[0m         const requestId = this.getAttribute('data-request-id');
+[7m   [0m [91m                          ~~~~[0m
+[96msrc/pages/portal/my-requests.astro[0m:[93m396[0m:[93m22[0m - [91merror[0m[90m ts(2683): [0m'this' implicitly has type 'any' because it does not have a type annotation.
+
+[7m396[0m         const card = this.closest('li');
+[7m   [0m [91m                     ~~~~[0m
+[96msrc/pages/portal/my-requests.astro[0m:[93m389[0m:[93m9[0m - [91merror[0m[90m ts(2683): [0m'this' implicitly has type 'any' because it does not have a type annotation.
+
+[7m389[0m         this.setAttribute('aria-expanded', isExpanded ? 'false' : 'true');
+[7m   [0m [91m        ~~~~[0m
+[96msrc/pages/portal/my-requests.astro[0m:[93m385[0m:[93m25[0m - [91merror[0m[90m ts(2683): [0m'this' implicitly has type 'any' because it does not have a type annotation.
+
+[7m385[0m         const chevron = this.querySelector('.request-chevron');
+[7m   [0m [91m                        ~~~~[0m
+[96msrc/pages/portal/my-requests.astro[0m:[93m383[0m:[93m20[0m - [91merror[0m[90m ts(2683): [0m'this' implicitly has type 'any' because it does not have a type annotation.
+
+[7m383[0m         const id = this.getAttribute('data-request-id');
+[7m   [0m [91m                   ~~~~[0m
+[96msrc/pages/portal/my-requests.astro[0m:[93m553[0m:[93m61[0m - [93mwarning[0m[90m ts(80006): [0mThis may be converted to an async function.
+
+[7m553[0m           const resultsData = await Promise.all(results.map(function(r) {
+[7m   [0m [93m                                                            ~~~~~~~~[0m
+[96msrc/pages/portal/my-requests.astro[0m:[93m617[0m:[93m11[0m - [93mwarning[0m[90m astro(4000): [0mThis script will be treated as if it has the `is:inline` directive because it contains an attribute. Therefore, features that require processing (e.g. using TypeScript or npm packages in the script) are unavailable.
+
+See docs for more details: https://docs.astro.build/en/guides/client-side-scripts/#script-processing.
+
+Add the `is:inline` directive explicitly to silence this hint.
+
+[7m617[0m   <script define:vars={{ csrfToken: session.csrfToken ?? '' }}>
+[7m   [0m [93m          ~~~~~~~~~~~[0m
+
+[96msrc/pages/portal/profile.astro[0m:[93m17[0m:[93m17[0m - [91merror[0m[90m ts(2339): [0mProperty 'DB' does not exist on type 'never'.
+
+[7m17[0m const db = env?.DB;
+[7m  [0m [91m                ~~[0m
+[96msrc/pages/portal/profile.astro[0m:[93m425[0m:[93m15[0m - [93mwarning[0m[90m ts(6133): [0m'token' is declared but its value is never read.
+
+[7m425[0m         const token = (csrfEl && csrfEl.value) || '';
+[7m   [0m [93m              ~~~~~[0m
+
+[96msrc/pages/portal/search.astro[0m:[93m16[0m:[93m17[0m - [91merror[0m[90m ts(2339): [0mProperty 'DB' does not exist on type 'never'.
+
+[7m16[0m const db = env?.DB;
+[7m  [0m [91m                ~~[0m
+
+[96msrc/pages/portal/vendors.astro[0m:[93m14[0m:[93m17[0m - [91merror[0m[90m ts(2339): [0mProperty 'DB' does not exist on type 'never'.
+
+[7m14[0m const db = env?.DB;
+[7m  [0m [91m                ~~[0m
+[96msrc/pages/portal/vendors.astro[0m:[93m174[0m:[93m17[0m - [93mwarning[0m[90m ts(80006): [0mThis may be converted to an async function.
+
+[7m174[0m           .then(function (res) { return res.json().then(function (data) { return { res: res, data: data }; }); })
+[7m   [0m [93m                ~~~~~~~~[0m
+
+[96msrc/pages/portal/arb-request/edit/[id].astro[0m:[93m71[0m:[93m17[0m - [91merror[0m[90m ts(2339): [0mProperty 'DB' does not exist on type 'never'.
+
+[7m71[0m const db = env?.DB;
+[7m  [0m [91m                ~~[0m
+[96msrc/pages/portal/arb-request/edit/[id].astro[0m:[93m39[0m:[93m24[0m - [91merror[0m[90m ts(2339): [0mProperty 'SESSION_SECRET' does not exist on type 'never'.
+
+[7m39[0m     encoder.encode(env.SESSION_SECRET),
+[7m  [0m [91m                       ~~~~~~~~~~~~~~[0m
+[96msrc/pages/portal/arb-request/edit/[id].astro[0m:[93m19[0m:[93m32[0m - [91merror[0m[90m ts(2339): [0mProperty 'SESSION_SECRET' does not exist on type 'never'.
+
+[7m19[0m if (!session.csrfToken && env?.SESSION_SECRET) {
+[7m  [0m [91m                               ~~~~~~~~~~~~~~[0m
+[96msrc/pages/portal/arb-request/edit/[id].astro[0m:[93m404[0m:[93m11[0m - [93mwarning[0m[90m astro(4000): [0mThis script will be treated as if it has the `is:inline` directive because it contains an attribute. Therefore, features that require processing (e.g. using TypeScript or npm packages in the script) are unavailable.
+
+See docs for more details: https://docs.astro.build/en/guides/client-side-scripts/#script-processing.
+
+Add the `is:inline` directive explicitly to silence this hint.
+
+[7m404[0m   <script define:vars={{ csrfToken: session.csrfToken ?? '' }}>
+[7m   [0m [93m          ~~~~~~~~~~~[0m
+[96msrc/pages/portal/arb-request/edit/[id].astro[0m:[93m231[0m:[93m11[0m - [93mwarning[0m[90m astro(4000): [0mThis script will be treated as if it has the `is:inline` directive because it contains an attribute. Therefore, features that require processing (e.g. using TypeScript or npm packages in the script) are unavailable.
+
+See docs for more details: https://docs.astro.build/en/guides/client-side-scripts/#script-processing.
+
+Add the `is:inline` directive explicitly to silence this hint.
+
+[7m231[0m   <script define:vars={{ requestId: req.id, reviewMaxWidth: 2000, archiveMaxWidth: 1200, maxFileBytes: 5 * 1024 * 1024, maxTotalBytes: 25 * 1024 * 1024 }}>
+[7m   [0m [93m          ~~~~~~~~~~~[0m
+
+[96msrc/pages/resources/flood-insurance.astro[0m:[93m5[0m:[93m7[0m - [93mwarning[0m[90m ts(6133): [0m'addressState' is declared but its value is never read.
+
+[7m5[0m const addressState = import.meta.env.PUBLIC_PHYSICAL_ADDRESS_STATE ?? 'FL';
+[7m [0m [93m      ~~~~~~~~~~~~[0m
+[96msrc/pages/resources/flood-insurance.astro[0m:[93m4[0m:[93m7[0m - [93mwarning[0m[90m ts(6133): [0m'addressCity' is declared but its value is never read.
+
+[7m4[0m const addressCity = import.meta.env.PUBLIC_PHYSICAL_ADDRESS_CITY ?? 'Eustis';
+[7m [0m [93m      ~~~~~~~~~~~[0m
+
+[96msrc/pages/resources/local-resources.astro[0m:[93m16[0m:[93m7[0m - [93mwarning[0m[90m ts(6133): [0m'wasteManagementPhone' is declared but its value is never read.
+
+[7m16[0m const wasteManagementPhone = import.meta.env.PUBLIC_WASTE_MANAGEMENT_PHONE ?? '';
+[7m  [0m [93m      ~~~~~~~~~~~~~~~~~~~~[0m
+
+[96msrc/pages/resources/wildlife-safety.astro[0m:[93m5[0m:[93m7[0m - [93mwarning[0m[90m ts(6133): [0m'addressState' is declared but its value is never read.
+
+[7m5[0m const addressState = import.meta.env.PUBLIC_PHYSICAL_ADDRESS_STATE ?? 'FL';
+[7m [0m [93m      ~~~~~~~~~~~~[0m
+[96msrc/pages/resources/wildlife-safety.astro[0m:[93m4[0m:[93m7[0m - [93mwarning[0m[90m ts(6133): [0m'addressCity' is declared but its value is never read.
+
+[7m4[0m const addressCity = import.meta.env.PUBLIC_PHYSICAL_ADDRESS_CITY ?? 'Eustis';
+[7m [0m [93m      ~~~~~~~~~~~[0m
+
+[96mtests/access-control.test.ts[0m:[93m13[0m:[93m22[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m13[0m const mockDb = {} as D1Database;
+[7m  [0m [91m                     ~~~~~~~~~~[0m
+
+[96mtests/api-helpers.test.ts[0m:[93m32[0m:[93m26[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m32[0m     const mockDb = {} as D1Database;
+[7m  [0m [91m                         ~~~~~~~~~~[0m
+
+[96mtests/portal-context.test.ts[0m:[93m66[0m:[93m24[0m - [91merror[0m[90m ts(2339): [0mProperty 'SESSION_SECRET' does not exist on type 'never'.
+
+[7m66[0m     expect(result.env?.SESSION_SECRET).toBe('secret');
+[7m  [0m [91m                       ~~~~~~~~~~~~~~[0m
+[96mtests/portal-context.test.ts[0m:[93m45[0m:[93m24[0m - [91merror[0m[90m ts(2339): [0mProperty 'SESSION_SECRET' does not exist on type 'never'.
+
+[7m45[0m     expect(result.env?.SESSION_SECRET).toBe('secret');
+[7m  [0m [91m                       ~~~~~~~~~~~~~~[0m
+
+[96mworkers/backup/src/index.ts[0m:[93m138[0m:[93m36[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'KVNamespace'.
+
+[7m138[0m async function dumpWhitelistKV(kv: KVNamespace): Promise<Record<string, string>> {
+[7m   [0m [91m                                   ~~~~~~~~~~~[0m
+[96mworkers/backup/src/index.ts[0m:[93m133[0m:[93m28[0m - [91merror[0m[90m ts(2322): [0mType 'Uint8Array<ArrayBufferLike>' is not assignable to type 'BlobPart'.
+  Type 'Uint8Array<ArrayBufferLike>' is not assignable to type 'ArrayBufferView<ArrayBuffer>'.
+    Types of property 'buffer' are incompatible.
+      Type 'ArrayBufferLike' is not assignable to type 'ArrayBuffer'.
+        Type 'SharedArrayBuffer' is missing the following properties from type 'ArrayBuffer': resizable, resize, detached, transfer, transferToFixedLength
+
+[7m133[0m   const stream = new Blob([data]).stream().pipeThrough(new CompressionStream("gzip"));
+[7m   [0m [91m                           ~~~~[0m
+[96mworkers/backup/src/index.ts[0m:[93m42[0m:[93m48[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'ExecutionContext'.
+
+[7m42[0m   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+[7m  [0m [91m                                               ~~~~~~~~~~~~~~~~[0m
+[96mworkers/backup/src/index.ts[0m:[93m28[0m:[93m57[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'ExecutionContext'.
+
+[7m28[0m   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
+[7m  [0m [91m                                                        ~~~~~~~~~~~~~~~~[0m
+[96mworkers/backup/src/index.ts[0m:[93m28[0m:[93m26[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'ScheduledEvent'.
+
+[7m28[0m   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
+[7m  [0m [91m                         ~~~~~~~~~~~~~~[0m
+[96mworkers/backup/src/index.ts[0m:[93m15[0m:[93m8[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'D1Database'.
+
+[7m15[0m   DB?: D1Database; // Phase 3: read backup_config
+[7m  [0m [91m       ~~~~~~~~~~[0m
+[96mworkers/backup/src/index.ts[0m:[93m14[0m:[93m14[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'R2Bucket'.
+
+[7m14[0m   BACKUP_R2: R2Bucket;
+[7m  [0m [91m             ~~~~~~~~[0m
+[96mworkers/backup/src/index.ts[0m:[93m13[0m:[93m19[0m - [91merror[0m[90m ts(2304): [0mCannot find name 'KVNamespace'.
+
+[7m13[0m   CLOURHOA_USERS: KVNamespace;
+[7m  [0m [91m                  ~~~~~~~~~~~[0m
+[96mworkers/backup/src/index.ts[0m:[93m42[0m:[93m43[0m - [93mwarning[0m[90m ts(6133): [0m'ctx' is declared but its value is never read.
+
+[7m42[0m   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+[7m  [0m [93m                                          ~~~[0m
+[96mworkers/backup/src/index.ts[0m:[93m28[0m:[93m52[0m - [93mwarning[0m[90m ts(6133): [0m'ctx' is declared but its value is never read.
+
+[7m28[0m   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
+[7m  [0m [93m                                                   ~~~[0m
+[96mworkers/backup/src/index.ts[0m:[93m28[0m:[93m19[0m - [93mwarning[0m[90m ts(6133): [0m'event' is declared but its value is never read.
+
+[7m28[0m   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
+[7m  [0m [93m                  ~~~~~[0m
+
+Result (184 files): 
+- 485 errors
+- 0 warnings
+- 138 hints
+
