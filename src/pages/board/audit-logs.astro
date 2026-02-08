@@ -84,6 +84,8 @@ if (db && showAdminAssumeRoleAudit) {
 }
 
 const BLANK = '-';
+/** Shown in place of emails and phone numbers in audit views to avoid exposing PII. */
+const REDACTED = '—';
 
 function formatDate(s: string | null): string {
   if (!s) return BLANK;
@@ -98,7 +100,7 @@ function formatDate(s: string | null): string {
 
 <BoardLayout title="Audit logs" subtitle="Transparency for elevated access (Board, ARB, Admin)" draftCount={draftCount} role={effectiveRole} session={session} elevatedUntil={session.elevated_until} mainWide showRoleBanner={false}>
   <p class="text-gray-600 mb-4">
-        Full audit logs for transparency: PIM elevated access requests, directory (contact reveals, who added/updated owners), assessment payments recorded, vendor list changes and vendor submission approvals/rejections, member document uploads, special assessments, preapproval library, feedback docs, meetings, and ARB status changes.
+        Full audit logs for transparency: PIM elevated access requests, directory (contact reveals, who added/updated owners), assessment payments recorded, vendor list changes and vendor submission approvals/rejections, member document uploads, special assessments, preapproval library, feedback docs, meetings, and ARB status changes. <strong>Emails and phone numbers are redacted in the display for privacy.</strong>
   </p>
   <div class="flex flex-wrap items-center gap-2 mb-8">
     <label for="audit-per-page" class="text-sm text-gray-600">Per page:</label>
@@ -148,7 +150,7 @@ function formatDate(s: string | null): string {
             {adminAssumedRoleLog.map((row) => (
               <tr class="border-b border-gray-100 hover:bg-gray-50/50">
                 <td class="py-2 px-3 text-gray-600">{formatDate(row.created)}</td>
-                <td class="py-2 px-3">{row.admin_email ?? BLANK}</td>
+                <td class="py-2 px-3">{REDACTED}</td>
                 <td class="py-2 px-3">{row.actor_role ?? '—'}</td>
                 <td class="py-2 px-3">{row.action === 'assume' ? 'Assume' : row.action === 'clear' ? 'Clear' : 'Action'}</td>
                 <td class="py-2 px-3">{row.role_assumed ?? '—'}</td>
@@ -193,7 +195,7 @@ function formatDate(s: string | null): string {
               {pimElevationLog.map((row) => (
                 <tr class="border-b border-gray-100 hover:bg-gray-50/50">
                   <td class="py-2 px-3 text-gray-600">{formatDate(row.elevated_at)}</td>
-                  <td class="py-2 px-3">{row.email ?? BLANK}</td>
+                  <td class="py-2 px-3">{REDACTED}</td>
                   <td class="py-2 px-3">{row.role ?? BLANK}</td>
                   <td class="py-2 px-3">{row.action === 'elevate' ? 'Elevated' : 'Dropped'}</td>
                   <td class="py-2 px-3 text-gray-600">{row.expires_at ? formatDate(row.expires_at) : '—'}</td>
@@ -228,7 +230,7 @@ function formatDate(s: string | null): string {
                 <thead class="bg-gray-50 border-b border-gray-200">
                   <tr>
                     <th class="text-left py-2 px-3 font-medium text-gray-700">When</th>
-                    <th class="text-left py-2 px-3 font-medium text-gray-700">Viewer (who looked)</th>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">Viewer</th>
                     <th class="text-left py-2 px-3 font-medium text-gray-700">Viewer role</th>
                     <th class="text-left py-2 px-3 font-medium text-gray-700">Target (whose info was revealed)</th>
                     <th class="text-left py-2 px-3 font-medium text-gray-700">Phone</th>
@@ -240,11 +242,11 @@ function formatDate(s: string | null): string {
                   {directoryLogs.map((row) => (
                     <tr class="border-b border-gray-100 hover:bg-gray-50/50">
                       <td class="py-2 px-3 text-gray-600">{formatDate(row.timestamp)}</td>
-                      <td class="py-2 px-3">{row.viewer_email ?? BLANK}</td>
+                      <td class="py-2 px-3">{REDACTED}</td>
                       <td class="py-2 px-3">{row.viewer_role ?? BLANK}</td>
                       <td class="py-2 px-3">{row.target_name ?? BLANK}</td>
-                      <td class="py-2 px-3 font-mono text-gray-700">{row.target_phone ?? BLANK}</td>
-                      <td class="py-2 px-3 font-mono text-gray-700">{row.target_email ?? BLANK}</td>
+                      <td class="py-2 px-3 font-mono text-gray-500">{REDACTED}</td>
+                      <td class="py-2 px-3 font-mono text-gray-500">{REDACTED}</td>
                       <td class="py-2 px-3 text-gray-500 text-xs">{row.ip_address ?? BLANK}</td>
                     </tr>
                   ))}
@@ -283,8 +285,8 @@ function formatDate(s: string | null): string {
                 <tbody>
                   {ownersWithCreator.map((o) => (
                     <tr class="border-b border-gray-100 hover:bg-gray-50/50">
-                      <td class="py-2 px-3">{o.name ?? BLANK} / {o.email ?? BLANK}</td>
-                      <td class="py-2 px-3">{o.created_by_email ?? BLANK}</td>
+                      <td class="py-2 px-3">{o.name ?? BLANK} / {REDACTED}</td>
+                      <td class="py-2 px-3">{REDACTED}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -315,8 +317,8 @@ function formatDate(s: string | null): string {
                   {ownersWithUpdater.slice(0, 300).map((o) => (
                     <tr class="border-b border-gray-100 hover:bg-gray-50/50">
                       <td class="py-2 px-3 text-gray-600">{formatDate(o.updated_at)}</td>
-                      <td class="py-2 px-3">{o.name ?? BLANK} / {o.email ?? BLANK}</td>
-                      <td class="py-2 px-3">{o.updated_by ?? BLANK}</td>
+                      <td class="py-2 px-3">{o.name ?? BLANK} / {REDACTED}</td>
+                      <td class="py-2 px-3">{REDACTED}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -339,7 +341,7 @@ function formatDate(s: string | null): string {
                 <thead class="bg-gray-50 border-b border-gray-200">
                   <tr>
                     <th class="text-left py-2 px-3 font-medium text-gray-700">When</th>
-                    <th class="text-left py-2 px-3 font-medium text-gray-700">Owner (email)</th>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">Owner</th>
                     <th class="text-left py-2 px-3 font-medium text-gray-700">Paid at</th>
                     <th class="text-left py-2 px-3 font-medium text-gray-700">Amount</th>
                     <th class="text-left py-2 px-3 font-medium text-gray-700">Method</th>
@@ -351,12 +353,12 @@ function formatDate(s: string | null): string {
                   {paymentAudit.map((row) => (
                     <tr class="border-b border-gray-100 hover:bg-gray-50/50">
                       <td class="py-2 px-3 text-gray-600">{formatDate(row.created)}</td>
-                      <td class="py-2 px-3">{row.owner_email ?? BLANK}</td>
+                      <td class="py-2 px-3">{REDACTED}</td>
                       <td class="py-2 px-3">{row.paid_at ?? BLANK}</td>
                       <td class="py-2 px-3">{row.amount != null ? `$${Number(row.amount).toFixed(2)}` : BLANK}</td>
                       <td class="py-2 px-3">{row.payment_method === 'electronic_transfer' ? 'E-transfer' : row.payment_method === 'check' ? 'Check' : row.payment_method === 'cash' ? 'Cash' : row.payment_method ?? BLANK}</td>
                       <td class="py-2 px-3">{row.check_number ?? BLANK}</td>
-                      <td class="py-2 px-3">{row.recorded_by ?? BLANK}</td>
+                      <td class="py-2 px-3">{REDACTED}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -402,7 +404,7 @@ function formatDate(s: string | null): string {
                       <td class="py-2 px-3">{row.action}</td>
                       <td class="py-2 px-3">{row.vendor_name ?? BLANK}</td>
                       <td class="py-2 px-3 font-mono text-gray-600">{row.vendor_id ?? BLANK}</td>
-                      <td class="py-2 px-3">{row.done_by_email ?? BLANK}</td>
+                      <td class="py-2 px-3">{REDACTED}</td>
                       <td class="py-2 px-3 text-gray-500 text-xs">{row.ip_address ?? BLANK}</td>
                     </tr>
                   ))}
@@ -447,8 +449,8 @@ function formatDate(s: string | null): string {
                       <td class="py-2 px-3 text-gray-600">{formatDate(row.reviewed_at)}</td>
                       <td class="py-2 px-3">{row.name ?? BLANK}</td>
                       <td class="py-2 px-3">{row.status ?? BLANK}</td>
-                      <td class="py-2 px-3">{row.reviewed_by ?? BLANK}</td>
-                      <td class="py-2 px-3">{row.submitted_by ?? BLANK}</td>
+                      <td class="py-2 px-3">{REDACTED}</td>
+                      <td class="py-2 px-3">{REDACTED}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -482,7 +484,7 @@ function formatDate(s: string | null): string {
                       <td class="py-2 px-3">{row.category ?? BLANK}</td>
                       <td class="py-2 px-3">{row.title ?? BLANK}</td>
                       <td class="py-2 px-3 text-gray-600">{formatDate(row.uploaded_at)}</td>
-                      <td class="py-2 px-3">{row.uploaded_by_email ?? BLANK}</td>
+                      <td class="py-2 px-3">{REDACTED}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -515,10 +517,10 @@ function formatDate(s: string | null): string {
                   {specialAssessmentsAudit.map((row) => (
                     <tr class="border-b border-gray-100 hover:bg-gray-50/50">
                       <td class="py-2 px-3 text-gray-600">{formatDate(row.created)}</td>
-                      <td class="py-2 px-3">{row.owner_email ?? BLANK}</td>
+                      <td class="py-2 px-3">{REDACTED}</td>
                       <td class="py-2 px-3 max-w-xs truncate" title={row.description ?? undefined}>{row.description ?? BLANK}</td>
                       <td class="py-2 px-3">{row.amount != null ? `$${Number(row.amount).toFixed(2)}` : BLANK}</td>
-                      <td class="py-2 px-3">{row.created_by ?? BLANK}</td>
+                      <td class="py-2 px-3">{REDACTED}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -552,7 +554,7 @@ function formatDate(s: string | null): string {
                       <td class="py-2 px-3 text-gray-600">{formatDate(row.created)}</td>
                       <td class="py-2 px-3">{row.category ?? BLANK}</td>
                       <td class="py-2 px-3 max-w-xs truncate" title={row.title ?? undefined}>{row.title ?? BLANK}</td>
-                      <td class="py-2 px-3">{row.created_by ?? BLANK}</td>
+                      <td class="py-2 px-3">{REDACTED}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -586,7 +588,7 @@ function formatDate(s: string | null): string {
                       <td class="py-2 px-3 text-gray-600">{formatDate(row.created)}</td>
                       <td class="py-2 px-3 max-w-xs truncate" title={row.title ?? undefined}>{row.title ?? BLANK}</td>
                       <td class="py-2 px-3">{row.deadline ?? BLANK}</td>
-                      <td class="py-2 px-3">{row.created_by ?? BLANK}</td>
+                      <td class="py-2 px-3">{REDACTED}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -620,7 +622,7 @@ function formatDate(s: string | null): string {
                       <td class="py-2 px-3 text-gray-600">{formatDate(row.created)}</td>
                       <td class="py-2 px-3 max-w-xs truncate" title={row.title ?? undefined}>{row.title ?? BLANK}</td>
                       <td class="py-2 px-3">{row.datetime ?? BLANK}</td>
-                      <td class="py-2 px-3">{row.created_by ?? BLANK}</td>
+                      <td class="py-2 px-3">{REDACTED}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -646,7 +648,7 @@ function formatDate(s: string | null): string {
                     <th class="text-left py-2 px-3 font-medium text-gray-700">Request</th>
                     <th class="text-left py-2 px-3 font-medium text-gray-700">Action</th>
                     <th class="text-left py-2 px-3 font-medium text-gray-700">Old &rarr; New status</th>
-                    <th class="text-left py-2 px-3 font-medium text-gray-700">By (email / role)</th>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">By (role)</th>
                     <th class="text-left py-2 px-3 font-medium text-gray-700">Notes</th>
                     <th class="text-left py-2 px-3 font-medium text-gray-700">IP</th>
                   </tr>
@@ -658,7 +660,7 @@ function formatDate(s: string | null): string {
                       <td class="py-2 px-3 font-mono">{row.request_id}</td>
                       <td class="py-2 px-3">{row.action}</td>
                       <td class="py-2 px-3">{row.old_status ?? BLANK} &rarr; {row.new_status ?? BLANK}</td>
-                      <td class="py-2 px-3">{row.changed_by_email ?? BLANK} ({row.changed_by_role ?? BLANK})</td>
+                      <td class="py-2 px-3">{REDACTED} ({row.changed_by_role ?? BLANK})</td>
                       <td class="py-2 px-3 text-gray-600 max-w-xs truncate" title={row.notes ?? undefined}>{row.notes ?? BLANK}</td>
                       <td class="py-2 px-3 text-gray-500 text-xs">{row.ip_address ?? BLANK}</td>
                     </tr>

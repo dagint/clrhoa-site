@@ -160,7 +160,7 @@ function revealType(row: { target_name: string | null; target_phone: string | nu
                       </td>
                       <td class="py-2 px-3">{row.action}</td>
                       <td class="py-2 px-3">{row.old_status ?? BLANK} → {row.new_status ?? BLANK}</td>
-                      <td class="py-2 px-3">{row.changed_by_email ?? BLANK}{row.changed_by_role ? ` (${row.changed_by_role})` : ''}</td>
+                      <td class="py-2 px-3">—{row.changed_by_role ? ` (${row.changed_by_role})` : ''}</td>
                       <td class="py-2 px-3 text-gray-600 max-w-xs truncate" title={row.notes ?? undefined}>{row.notes ?? BLANK}</td>
                     </tr>
                   ))}
