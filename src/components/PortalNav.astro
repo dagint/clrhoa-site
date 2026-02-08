@@ -27,7 +27,6 @@ const linkClass = (href: string) =>
 const isElevated = role === 'board' || role === 'admin' || role === 'arb' || role === 'arb_board';
 /** User has a staff whitelist role (can request elevation). Show Board/ARB links; when not elevated, they go to request-elevated-access. */
 const isStaffFromWhitelist = staffRole === 'board' || staffRole === 'admin' || staffRole === 'arb' || staffRole === 'arb_board';
-const isStaff = isElevated;
 ---
 
 <header class="bg-white portal-theme-header portal-header-accent shadow-sm" role="banner">

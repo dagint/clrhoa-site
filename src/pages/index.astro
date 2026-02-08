@@ -4,7 +4,6 @@ import { heroRotate, heroImages } from '../config/hero';
 
 const showRotation = heroRotate && heroImages.length > 1;
 const heroImage = heroImages[0];
-const siteURL = import.meta.env.SITE || 'https://clrhoa.com';
 const meetingLocation = import.meta.env.PUBLIC_MEETING_LOCATION ?? 'Eustis Community Center';
 const meetingRoom = import.meta.env.PUBLIC_MEETING_ROOM ?? '';
 const meetingLocationDisplay = meetingRoom ? `${meetingLocation}, ${meetingRoom}` : meetingLocation;

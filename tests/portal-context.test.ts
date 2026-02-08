@@ -30,7 +30,7 @@ describe('getPortalContext', () => {
   it('returns env and null session when no SESSION_SECRET', async () => {
     const astro = {
       request: mockRequest(),
-      locals: { runtime: { env: { DB: {} } } },
+      locals: { runtime: { env: { DB: {} as unknown as D1Database } } },
     };
     const result = await getPortalContext(astro);
     expect(result.session).toBeNull();

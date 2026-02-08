@@ -94,11 +94,11 @@ export async function runPortalSearch(
   ]);
 
   return {
-    arb: (arbRes.results ?? []) as SearchArbItem[],
-    meetings: (mtgRes.results ?? []) as SearchMeetingItem[],
-    vendors: (venRes.results ?? []) as SearchVendorItem[],
-    owners: (ownRes.results ?? []) as SearchOwnerItem[],
-    feedback_docs: (feedbackRes.results ?? []) as SearchFeedbackDocItem[],
-    preapproval: (preapprovalRes?.results ?? []) as SearchPreapprovalItem[],
+    arb: (arbRes.results ?? []) as unknown as SearchArbItem[],
+    meetings: (mtgRes.results ?? []) as unknown as SearchMeetingItem[],
+    vendors: (venRes.results ?? []) as unknown as SearchVendorItem[],
+    owners: (ownRes.results ?? []) as unknown as SearchOwnerItem[],
+    feedback_docs: (feedbackRes.results ?? []) as unknown as SearchFeedbackDocItem[],
+    preapproval: (preapprovalRes?.results ?? []) as unknown as SearchPreapprovalItem[],
   };
 }

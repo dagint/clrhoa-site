@@ -1,4 +1,5 @@
 /// <reference types="astro/client" />
+/// <reference types="@cloudflare/workers-types" />
 
 /**
  * Cloudflare bindings and secrets used by the app.
@@ -96,4 +97,13 @@ interface ImportMetaEnv {
 
 interface ImportMeta {
   readonly env: ImportMetaEnv;
+}
+
+// Allow key on <li> in Astro .map() for list identity (not in DOM LiHTMLAttributes)
+declare namespace astroHTML {
+  namespace JSX {
+    interface LiHTMLAttributes {
+      key?: string | number;
+    }
+  }
 }

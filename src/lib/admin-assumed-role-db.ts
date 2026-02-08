@@ -58,5 +58,5 @@ export async function listAdminAssumedRoleAudit(
     )
     .bind(limit, safeOffset)
     .all();
-  return (results ?? []) as AdminAssumedRoleAuditRow[];
+  return (results ?? []) as unknown as AdminAssumedRoleAuditRow[];
 }

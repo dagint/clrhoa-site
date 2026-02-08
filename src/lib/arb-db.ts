@@ -404,6 +404,7 @@ export async function updateArbRequestByOwner(
     propertyAddress?: string | null;
     applicationType?: string | null;
     description?: string;
+    ownerNotes?: string | null;
   }
 ): Promise<boolean> {
   const applicantName = data.applicantName?.trim() ?? null;
@@ -411,7 +412,7 @@ export async function updateArbRequestByOwner(
   const propertyAddress = data.propertyAddress?.trim() ?? null;
   const applicationType = data.applicationType?.trim() ?? null;
   const description = data.description?.trim();
-  const email = ownerEmail.trim().toLowerCase();
+  const ownerNotes = data.ownerNotes?.trim() ?? null;
   const result = await db
     .prepare(
       `UPDATE arb_requests SET applicant_name = ?, phone = ?, property_address = ?, application_type = ?, description = ?, owner_notes = ?, updated_at = datetime('now') WHERE id = ? AND owner_email = ? AND status = 'pending'`

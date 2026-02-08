@@ -164,7 +164,7 @@ const label = role === 'admin' ? 'Administrator' : role === 'arb_board' ? 'ARB +
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ role, csrf_token: token }),
               });
-              const data = await res.json();
+              const data = (await res.json()) as { success?: boolean; assumed_role?: 'board' | 'arb' | null; assumed_until?: number | null; error?: string };
               if (res.ok && data.success) {
                 const newRole = data.assumed_role ?? null;
                 if (newRole === 'arb') {

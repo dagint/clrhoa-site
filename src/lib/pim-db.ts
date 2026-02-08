@@ -27,7 +27,7 @@ export async function listPimElevationLog(
     )
     .bind(limit, safeOffset)
     .all();
-  return (results ?? []) as PimElevationLogRow[];
+  return (results ?? []) as unknown as PimElevationLogRow[];
 }
 
 export async function insertPimElevationLog(

@@ -38,18 +38,13 @@
   <p class="text-xs text-gray-500">Leave dates blank for all. Use the HTML report in a new tab, then Print → Save as PDF.</p>
 </section>
 
-<script>
+<script is:inline>
   (function () {
     var form = document.getElementById('arb-export-form');
-    /** @type {HTMLAnchorElement | null} */
     var csvLink = document.getElementById('export-csv-link');
-    /** @type {HTMLAnchorElement | null} */
     var htmlLink = document.getElementById('export-html-link');
-    /** @type {HTMLInputElement | null} */
     var fromInput = document.getElementById('export-from-date');
-    /** @type {HTMLInputElement | null} */
     var toInput = document.getElementById('export-to-date');
-    /** @type {HTMLSelectElement | null} */
     var statusSelect = document.getElementById('export-status');
     function updateExportLinks() {
       var params = new URLSearchParams();
@@ -68,8 +63,10 @@
     }
     if (form) {
       [fromInput, toInput, statusSelect].forEach(function (el) {
-        if (el) el.addEventListener('change', updateExportLinks);
-        if (el) el.addEventListener('input', updateExportLinks);
+        if (el) {
+          el.addEventListener('change', updateExportLinks);
+          el.addEventListener('input', updateExportLinks);
+        }
       });
       updateExportLinks();
     }
