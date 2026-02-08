@@ -259,14 +259,14 @@ function formatCurrency(n: number): string {
       const rows = table.querySelectorAll('tbody tr[data-missing-this-quarter]');
       rows.forEach((tr) => {
         const missing = tr.getAttribute('data-missing-this-quarter') === 'true';
-        (tr as HTMLElement).style.display = showOnlyMissing && !missing ? 'none' : '';
+        tr.style.display = showOnlyMissing && !missing ? 'none' : '';
       });
       if (countEl) countEl.textContent = showOnlyMissing ? `(${missingCount} of ${totalCount} households)` : `(all ${totalCount} households)`;
     }
 
     document.querySelectorAll('input[name="assessments-filter"]').forEach((radio) => {
       radio.addEventListener('change', function () {
-        applyFilter((this as HTMLInputElement).value === 'missing');
+        applyFilter(this.value === 'missing');
       });
     });
     applyFilter(true);
@@ -275,7 +275,7 @@ function formatCurrency(n: number): string {
       const wrap = row?.querySelector('.record-check-wrap');
       const methodSelect = row?.querySelector('.record-method');
       if (!wrap || !methodSelect) return;
-      const isCheck = (methodSelect as HTMLSelectElement).value === 'check';
+      const isCheck = methodSelect.value === 'check';
       wrap.classList.toggle('hidden', !isCheck);
     }
     table?.querySelectorAll('tbody tr').forEach((tr) => {
@@ -306,11 +306,11 @@ function formatCurrency(n: number): string {
         showMsg('Select a payment date.', true);
         return;
       }
-      const payment_method = (methodSelect as HTMLSelectElement)?.value ?? 'electronic_transfer';
-      const check_number = payment_method === 'check' && checkInput ? (checkInput as HTMLInputElement).value?.trim() || null : null;
-      const quarters_to_apply = (fullYearCb && (fullYearCb as HTMLInputElement).checked)
+      const payment_method = methodSelect?.value ?? 'electronic_transfer';
+      const check_number = payment_method === 'check' && checkInput ? checkInput.value?.trim() || null : null;
+      const quarters_to_apply = (fullYearCb && fullYearCb.checked)
         ? 4
-        : Math.min(4, Math.max(1, parseInt((quartersSelect as HTMLSelectElement)?.value ?? '1', 10) || 1));
+        : Math.min(4, Math.max(1, parseInt(quartersSelect?.value ?? '1', 10) || 1));
       btn.disabled = true;
       btn.setAttribute('aria-busy', 'true');
       try {

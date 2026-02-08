@@ -45,6 +45,13 @@ export const MAINTENANCE_METADATA_RETENTION_DAYS = 7 * 365; // 7 years (0 = neve
 /** @deprecated Use MAINTENANCE_PHOTOS_RETENTION_DAYS for photo purge; MAINTENANCE_METADATA_RETENTION_DAYS for row delete. */
 export const MAINTENANCE_COMPLETED_RETENTION_DAYS = MAINTENANCE_PHOTOS_RETENTION_DAYS;
 
+/**
+ * Recommended retention for granular page_views (usage analytics).
+ * Raw rows can be deleted after this period; daily/weekly aggregates (if stored) may be kept longer.
+ * Set to 0 to keep page views indefinitely. Use with usage-db.deletePageViewsOlderThan() in a scheduled job.
+ */
+export const PAGE_VIEWS_RETENTION_DAYS = 90;
+
 /** R2 bucket–like interface for deleting object keys (avoids hard dependency on Cloudflare types). */
 export interface R2BucketLike {
   delete(key: string): Promise<void>;

@@ -153,11 +153,11 @@ function formatDate(s: string | null): string {
 
       form?.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const title = (form.querySelector('#news-title') as HTMLInputElement)?.value?.trim();
-        const body = (form.querySelector('#news-body') as HTMLTextAreaElement)?.value?.trim();
-        const showOnPublic = (form.querySelector('#news-public') as HTMLInputElement)?.checked ?? false;
-        const showOnPortal = (form.querySelector('#news-portal') as HTMLInputElement)?.checked ?? true;
-        const fileInput = form.querySelector('#news-photos') as HTMLInputElement;
+        const title = form.querySelector('#news-title')?.value?.trim();
+        const body = form.querySelector('#news-body')?.value?.trim();
+        const showOnPublic = form.querySelector('#news-public')?.checked ?? false;
+        const showOnPortal = form.querySelector('#news-portal')?.checked ?? true;
+        const fileInput = form.querySelector('#news-photos');
         let files = fileInput?.files ? Array.from(fileInput.files).filter((f) => f.size > 0) : [];
 
         if (!title || !body) {

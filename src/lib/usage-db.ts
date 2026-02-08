@@ -52,21 +52,26 @@ export interface DailyStat {
   date: string;
   views: number;
   uniqueSessions: number;
+  /** Distinct logged-in users (user_id not null) per day. */
+  uniqueUsers: number;
 }
 
 export interface WeeklyStat {
   weekStart: string;
   views: number;
   uniqueSessions: number;
+  /** Distinct logged-in users per week. */
+  uniqueUsers: number;
 }
 
-/** Last N days: views and unique sessions per day. Date format YYYY-MM-DD. */
+/** Last N days: views, unique sessions, and unique logged-in users per day. Date format YYYY-MM-DD. */
 export async function getDailyStats(db: D1Database, days = 30): Promise<DailyStat[]> {
   const { results } = await db
     .prepare(
       `SELECT date(created_at) as date,
               COUNT(*) as views,
-              COUNT(DISTINCT session_id) as uniqueSessions
+              COUNT(DISTINCT session_id) as uniqueSessions,
+              COUNT(DISTINCT CASE WHEN user_id IS NOT NULL THEN user_id END) as uniqueUsers
        FROM page_views
        WHERE created_at >= date('now', ?)
        GROUP BY date(created_at)
@@ -78,13 +83,14 @@ export async function getDailyStats(db: D1Database, days = 30): Promise<DailySta
   return results ?? [];
 }
 
-/** Last N weeks: views and unique sessions per week (week start = Sunday). */
+/** Last N weeks: views, unique sessions, and unique logged-in users per week (week start = Sunday). */
 export async function getWeeklyStats(db: D1Database, weeks = 12): Promise<WeeklyStat[]> {
   const { results } = await db
     .prepare(
       `SELECT date(created_at, 'weekday 0', '-6 days') as weekStart,
               COUNT(*) as views,
-              COUNT(DISTINCT session_id) as uniqueSessions
+              COUNT(DISTINCT session_id) as uniqueSessions,
+              COUNT(DISTINCT CASE WHEN user_id IS NOT NULL THEN user_id END) as uniqueUsers
        FROM page_views
        WHERE created_at >= date('now', ?)
        GROUP BY weekStart
@@ -102,21 +108,117 @@ export interface AdminPageViewRow {
   created_at: string;
 }
 
-/** Admin: recent page views with user_id (or null for anon), path, timestamp. */
+export interface AdminPageViewFilters {
+  /** Filter by user_id (partial match; empty = all). */
+  user?: string | null;
+  /** Limit to last N days (7, 30, 90); null/0 = all time. */
+  periodDays?: number | null;
+}
+
+/** Admin: recent page views with optional filters. Paginated. */
 export async function getAdminPageViews(
   db: D1Database,
-  limit = 500
+  limit = 500,
+  offset = 0,
+  filters?: AdminPageViewFilters
 ): Promise<AdminPageViewRow[]> {
   const cap = Math.min(Math.max(limit, 1), 5000);
-  const { results } = await db
-    .prepare(
-      `SELECT user_id, path, created_at
-       FROM page_views
+  const safeOffset = Math.max(0, offset);
+  const userTrim = filters?.user?.trim();
+  const periodDays = filters?.periodDays ?? 0;
+  const conditions: string[] = [];
+  const bindings: (string | number)[] = [];
+
+  if (userTrim) {
+    conditions.push('user_id LIKE ?');
+    bindings.push('%' + userTrim + '%');
+  }
+  if (periodDays > 0) {
+    conditions.push("created_at >= date('now', ?)");
+    bindings.push('-' + periodDays + ' days');
+  }
+
+  const where = conditions.length ? ' WHERE ' + conditions.join(' AND ') : '';
+  const sql = `SELECT user_id, path, created_at
+       FROM page_views${where}
        ORDER BY created_at DESC
-       LIMIT ?`
-    )
-    .bind(cap)
+       LIMIT ? OFFSET ?`;
+  const { results } = await db
+    .prepare(sql)
+    .bind(...bindings, cap, safeOffset)
     .all<AdminPageViewRow>();
 
   return results ?? [];
+}
+
+/** Count page views matching the same filters (for pagination). */
+export async function getAdminPageViewsCount(
+  db: D1Database,
+  filters?: AdminPageViewFilters
+): Promise<number> {
+  const userTrim = filters?.user?.trim();
+  const periodDays = filters?.periodDays ?? 0;
+  const conditions: string[] = [];
+  const bindings: (string | number)[] = [];
+
+  if (userTrim) {
+    conditions.push('user_id LIKE ?');
+    bindings.push('%' + userTrim + '%');
+  }
+  if (periodDays > 0) {
+    conditions.push("created_at >= date('now', ?)");
+    bindings.push('-' + periodDays + ' days');
+  }
+
+  const where = conditions.length ? ' WHERE ' + conditions.join(' AND ') : '';
+  const row = await db
+    .prepare(`SELECT COUNT(*) as cnt FROM page_views${where}`)
+    .bind(...bindings)
+    .first<{ cnt: number }>();
+  return row?.cnt ?? 0;
+}
+
+export interface TopPageStat {
+  path: string;
+  views: number;
+  uniqueSessions: number;
+}
+
+/** Top N paths by total views (last 90 days). For admin usage chart. */
+export async function getTopPagesByViews(
+  db: D1Database,
+  limit = 10
+): Promise<TopPageStat[]> {
+  const cap = Math.min(Math.max(limit, 1), 50);
+  const { results } = await db
+    .prepare(
+      `SELECT path,
+              COUNT(*) as views,
+              COUNT(DISTINCT session_id) as uniqueSessions
+       FROM page_views
+       WHERE created_at >= date('now', '-90 days')
+       GROUP BY path
+       ORDER BY views DESC
+       LIMIT ?`
+    )
+    .bind(cap)
+    .all<{ path: string; views: number; uniqueSessions: number }>();
+
+  return (results ?? []) as TopPageStat[];
+}
+
+/**
+ * Delete page_views older than the given number of days. Use for retention (e.g. with PAGE_VIEWS_RETENTION_DAYS).
+ * Returns the number of rows deleted.
+ */
+export async function deletePageViewsOlderThan(
+  db: D1Database,
+  days: number
+): Promise<number> {
+  if (days < 1) return 0;
+  const result = await db
+    .prepare("DELETE FROM page_views WHERE created_at < date('now', ?)")
+    .bind('-' + days + ' days')
+    .run();
+  return result.meta.changes ?? 0;
 }

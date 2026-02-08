@@ -11,6 +11,8 @@ export interface PreapprovalItem {
   photos: string | null;
   created_by: string | null;
   created: string;
+  /** 0 = pending (ARB-added, needs board approval), 1 = approved (visible in portal library). */
+  approved?: number;
 }
 
 export interface PreapprovalPhoto {
@@ -42,23 +44,45 @@ export function parsePhotos(json: string | null): PreapprovalPhoto[] {
   }
 }
 
-/** List all items, optionally by category, newest first. */
+const PREAPPROVAL_SELECT = 'id, category, title, description, rules, photos, created_by, created, COALESCE(approved, 1) AS approved';
+
+/** List items, optionally by category and/or approved-only. Newest first. */
 export async function listPreapprovalItems(
   db: D1Database,
-  options?: { category?: string | null }
+  options?: { category?: string | null; approvedOnly?: boolean }
 ): Promise<PreapprovalItem[]> {
-  if (options?.category != null && options.category !== '') {
+  const approvedOnly = options?.approvedOnly === true;
+  const category = options?.category != null && options.category !== '' ? options.category : null;
+
+  if (category && approvedOnly) {
     const { results } = await db
       .prepare(
-        'SELECT id, category, title, description, rules, photos, created_by, created FROM preapproval_items WHERE category = ? ORDER BY created DESC'
+        `SELECT ${PREAPPROVAL_SELECT} FROM preapproval_items WHERE category = ? AND COALESCE(approved, 1) = 1 ORDER BY created DESC`
       )
-      .bind(options.category)
+      .bind(category)
+      .all<PreapprovalItem>();
+    return results ?? [];
+  }
+  if (category) {
+    const { results } = await db
+      .prepare(
+        `SELECT ${PREAPPROVAL_SELECT} FROM preapproval_items WHERE category = ? ORDER BY created DESC`
+      )
+      .bind(category)
+      .all<PreapprovalItem>();
+    return results ?? [];
+  }
+  if (approvedOnly) {
+    const { results } = await db
+      .prepare(
+        `SELECT ${PREAPPROVAL_SELECT} FROM preapproval_items WHERE COALESCE(approved, 1) = 1 ORDER BY created DESC`
+      )
       .all<PreapprovalItem>();
     return results ?? [];
   }
   const { results } = await db
     .prepare(
-      'SELECT id, category, title, description, rules, photos, created_by, created FROM preapproval_items ORDER BY created DESC'
+      `SELECT ${PREAPPROVAL_SELECT} FROM preapproval_items ORDER BY created DESC`
     )
     .all<PreapprovalItem>();
   return results ?? [];
@@ -76,20 +100,26 @@ export async function listPreapprovalCategories(db: D1Database): Promise<string[
 export async function getPreapprovalById(db: D1Database, id: string): Promise<PreapprovalItem | null> {
   return db
     .prepare(
-      'SELECT id, category, title, description, rules, photos, created_by, created FROM preapproval_items WHERE id = ? LIMIT 1'
+      `SELECT ${PREAPPROVAL_SELECT} FROM preapproval_items WHERE id = ? LIMIT 1`
     )
     .bind(id)
     .first<PreapprovalItem>();
 }
 
-/** Search items by title, description, rules, category (for smart search). */
-export async function searchPreapprovalItems(db: D1Database, like: string, limit = 20): Promise<PreapprovalItem[]> {
+/** Search items by title, description, rules, category (for smart search). Optionally approved only. */
+export async function searchPreapprovalItems(
+  db: D1Database,
+  like: string,
+  limit = 20,
+  approvedOnly = true
+): Promise<PreapprovalItem[]> {
   const pattern = `%${like}%`;
+  const whereApproved = approvedOnly ? ' AND COALESCE(approved, 1) = 1' : '';
   const { results } = await db
     .prepare(
-      `SELECT id, category, title, description, rules, photos, created_by, created
+      `SELECT ${PREAPPROVAL_SELECT}
        FROM preapproval_items
-       WHERE title LIKE ? OR description LIKE ? OR rules LIKE ? OR category LIKE ?
+       WHERE (title LIKE ? OR description LIKE ? OR rules LIKE ? OR category LIKE ?)${whereApproved}
        ORDER BY created DESC LIMIT ?`
     )
     .bind(pattern, pattern, pattern, pattern, limit)
@@ -97,7 +127,7 @@ export async function searchPreapprovalItems(db: D1Database, like: string, limit
   return results ?? [];
 }
 
-/** Insert preapproval item. */
+/** Insert preapproval item. New items are pending (approved=0) until a board member approves. */
 export async function insertPreapprovalItem(
   db: D1Database,
   id: string,
@@ -112,8 +142,8 @@ export async function insertPreapprovalItem(
 ): Promise<void> {
   await db
     .prepare(
-      `INSERT INTO preapproval_items (id, category, title, description, rules, photos, created_by, created)
-       VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))`
+      `INSERT INTO preapproval_items (id, category, title, description, rules, photos, created_by, created, approved)
+       VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), 0)`
     )
     .bind(
       id,
@@ -125,6 +155,15 @@ export async function insertPreapprovalItem(
       data.created_by
     )
     .run();
+}
+
+/** Set approved flag (1 = visible in portal library). Board only. */
+export async function setPreapprovalApproved(db: D1Database, id: string, approved: 0 | 1): Promise<boolean> {
+  const r = await db
+    .prepare('UPDATE preapproval_items SET approved = ? WHERE id = ?')
+    .bind(approved, id)
+    .run();
+  return (r.meta.changes ?? 0) > 0;
 }
 
 /** Update preapproval item. */

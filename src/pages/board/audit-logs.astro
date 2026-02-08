@@ -20,16 +20,45 @@ const ctx = await getBoardContext(Astro);
 if (ctx.redirect) return Astro.redirect(ctx.redirect);
 const { env, session, effectiveRole } = ctx;
 
+const AUDIT_PAGE_SIZES = [10, 25, 50, 100] as const;
+const DEFAULT_AUDIT_PAGE_SIZE = 10;
+const url = Astro.url;
+const getPage = (key: string): number => {
+  const p = url.searchParams.get(key);
+  const n = p ? parseInt(p, 10) : 1;
+  return Number.isNaN(n) || n < 1 ? 1 : Math.min(n, 1000);
+};
+const getLimit = (): number => {
+  const p = url.searchParams.get('audit_limit');
+  const n = p ? parseInt(p, 10) : DEFAULT_AUDIT_PAGE_SIZE;
+  return AUDIT_PAGE_SIZES.includes(n as (typeof AUDIT_PAGE_SIZES)[number]) ? n : DEFAULT_AUDIT_PAGE_SIZE;
+};
+const adminPage = getPage('admin_page');
+const pimPage = getPage('pim_page');
+const directoryPage = getPage('directory_page');
+const paymentsPage = getPage('payments_page');
+const vendorPage = getPage('vendor_page');
+const arbPage = getPage('arb_page');
+const pageSize = getLimit();
+
+function auditPageUrl(key: string, value: number): string {
+  const u = new URL(url);
+  if (value <= 1) u.searchParams.delete(key);
+  else u.searchParams.set(key, String(value));
+  if (pageSize !== DEFAULT_AUDIT_PAGE_SIZE) u.searchParams.set('audit_limit', String(pageSize));
+  return u.pathname + u.search;
+}
+
 const db = env?.DB;
-const directoryLogs = db ? await listDirectoryLogs(db, 500) : [];
-const arbLogs = db ? await listArbAuditLog(db, 500) : [];
+const directoryLogs = db ? await listDirectoryLogs(db, pageSize, (directoryPage - 1) * pageSize) : [];
+const arbLogs = db ? await listArbAuditLog(db, pageSize, (arbPage - 1) * pageSize) : [];
 const owners = db ? await listOwners(db) : [];
 const ownersWithCreator = owners.filter((o) => o.created_by_email?.trim());
 const ownersWithUpdater = owners.filter((o) => o.updated_by?.trim()).sort((a, b) => (b.updated_at ?? '').localeCompare(a.updated_at ?? ''));
 const allRequests = db ? await listArbRequestsByHousehold(db, session.email) : [];
 const draftCount = allRequests.filter((r) => r.status === 'pending').length;
 
-const paymentAudit = db ? await listAssessmentPaymentsForAudit(db, 300) : [];
+const paymentAudit = db ? await listAssessmentPaymentsForAudit(db, pageSize, (paymentsPage - 1) * pageSize) : [];
 const vendorApproved = db ? await listSubmissions(db, { status: 'approved' }) : [];
 const vendorRejected = db ? await listSubmissions(db, { status: 'rejected' }) : [];
 const vendorSubmissionsAudit = [...vendorApproved, ...vendorRejected]
@@ -42,14 +71,13 @@ const specialAssessmentsAudit = db
 const preapprovalAudit = db ? await listPreapprovalItems(db) : [];
 const feedbackDocsAudit = db ? await listAllFeedbackDocs(db) : [];
 const meetingsAudit = db ? (await listAllMeetings(db)).slice(0, 200) : [];
-const vendorAuditLog = db ? await listVendorAuditLog(db, 300) : [];
-const pimElevationLog = db ? await listPimElevationLog(db, 500) : [];
-// Admin assume-role audit: only visible to Board and Admin (not ARB or ARB+Board).
+const vendorAuditLog = db ? await listVendorAuditLog(db, pageSize, (vendorPage - 1) * pageSize) : [];
+const pimElevationLog = db ? await listPimElevationLog(db, pageSize, (pimPage - 1) * pageSize) : [];
 const showAdminAssumeRoleAudit = effectiveRole === 'board' || effectiveRole === 'admin';
 let adminAssumedRoleLog: Awaited<ReturnType<typeof listAdminAssumedRoleAudit>> = [];
 if (db && showAdminAssumeRoleAudit) {
   try {
-    adminAssumedRoleLog = await listAdminAssumedRoleAudit(db, 300);
+    adminAssumedRoleLog = await listAdminAssumedRoleAudit(db, pageSize, (adminPage - 1) * pageSize);
   } catch {
     // Table may not exist yet (run schema-admin-assumed-role.sql)
   }
@@ -69,9 +97,33 @@ function formatDate(s: string | null): string {
 ---
 
 <BoardLayout title="Audit logs" subtitle="Transparency for elevated access (Board, ARB, Admin)" draftCount={draftCount} role={effectiveRole} session={session} elevatedUntil={session.elevated_until} mainWide showRoleBanner={false}>
-  <p class="text-gray-600 mb-8">
+  <p class="text-gray-600 mb-4">
         Full audit logs for transparency: PIM elevated access requests, directory (contact reveals, who added/updated owners), assessment payments recorded, vendor list changes and vendor submission approvals/rejections, member document uploads, special assessments, preapproval library, feedback docs, meetings, and ARB status changes.
   </p>
+  <div class="flex flex-wrap items-center gap-2 mb-8">
+    <label for="audit-per-page" class="text-sm text-gray-600">Per page:</label>
+    <select id="audit-per-page" name="audit_limit" class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-700 focus:border-clr-green focus:outline-none focus:ring-1 focus:ring-clr-green" aria-label="Audit log entries per page">
+      {AUDIT_PAGE_SIZES.map((size) => (
+        <option value={size} selected={pageSize === size}>{size}</option>
+      ))}
+    </select>
+    <span class="text-sm text-gray-500">Each paged section shows this many entries. Use Previous and Next at the bottom of a section to browse.</span>
+  </div>
+  <script>
+    document.getElementById('audit-per-page')?.addEventListener('change', function () {
+      const limit = (this as HTMLSelectElement).value;
+      const u = new URL(window.location.href);
+      u.searchParams.set('audit_limit', limit);
+      u.searchParams.delete('admin_page');
+      u.searchParams.delete('pim_page');
+      u.searchParams.delete('directory_page');
+      u.searchParams.delete('payments_page');
+      u.searchParams.delete('vendor_page');
+      u.searchParams.delete('arb_page');
+      if (limit === '10') u.searchParams.delete('audit_limit');
+      window.location.href = u.pathname + u.search;
+    });
+  </script>
 
   <!-- Admin assume role: when admins assumed Board/ARB or cleared (Board and Admin only) -->
   {showAdminAssumeRoleAudit && adminAssumedRoleLog.length > 0 && (
@@ -107,6 +159,13 @@ function formatDate(s: string | null): string {
           </tbody>
         </table>
       </div>
+      <nav class="flex items-center justify-between gap-2 py-2 px-3 border-t border-gray-200 bg-gray-50 text-sm" aria-label="Admin assume role pagination">
+        <span class="text-gray-600">Page {adminPage}</span>
+        <div class="flex gap-2">
+          {adminPage > 1 && <a href={auditPageUrl('admin_page', adminPage - 1)} class="text-clr-green hover:underline font-medium">Previous</a>}
+          {adminAssumedRoleLog.length === pageSize && <a href={auditPageUrl('admin_page', adminPage + 1)} class="text-clr-green hover:underline font-medium">Next</a>}
+        </div>
+      </nav>
     </div>
   </section>
   )}
@@ -144,6 +203,15 @@ function formatDate(s: string | null): string {
           </table>
         </div>
       )}
+      {pimElevationLog.length > 0 && (
+        <nav class="flex items-center justify-between gap-2 py-2 px-3 border-t border-gray-200 bg-gray-50 text-sm" aria-label="PIM elevation pagination">
+          <span class="text-gray-600">Page {pimPage}</span>
+          <div class="flex gap-2">
+            {pimPage > 1 && <a href={auditPageUrl('pim_page', pimPage - 1)} class="text-clr-green hover:underline font-medium">Previous</a>}
+            {pimElevationLog.length === pageSize && <a href={auditPageUrl('pim_page', pimPage + 1)} class="text-clr-green hover:underline font-medium">Next</a>}
+          </div>
+        </nav>
+      )}
     </div>
   </section>
 
@@ -165,6 +233,7 @@ function formatDate(s: string | null): string {
                     <th class="text-left py-2 px-3 font-medium text-gray-700">Target (whose info was revealed)</th>
                     <th class="text-left py-2 px-3 font-medium text-gray-700">Phone</th>
                     <th class="text-left py-2 px-3 font-medium text-gray-700">Email</th>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">IP</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -176,11 +245,21 @@ function formatDate(s: string | null): string {
                       <td class="py-2 px-3">{row.target_name ?? BLANK}</td>
                       <td class="py-2 px-3 font-mono text-gray-700">{row.target_phone ?? BLANK}</td>
                       <td class="py-2 px-3 font-mono text-gray-700">{row.target_email ?? BLANK}</td>
+                      <td class="py-2 px-3 text-gray-500 text-xs">{row.ip_address ?? BLANK}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
+          )}
+          {directoryLogs.length > 0 && (
+            <nav class="flex items-center justify-between gap-2 py-2 px-3 border-t border-gray-200 bg-gray-50 text-sm" aria-label="Directory log pagination">
+              <span class="text-gray-600">Page {directoryPage}</span>
+              <div class="flex gap-2">
+                {directoryPage > 1 && <a href={auditPageUrl('directory_page', directoryPage - 1)} class="text-clr-green hover:underline font-medium">Previous</a>}
+                {directoryLogs.length === pageSize && <a href={auditPageUrl('directory_page', directoryPage + 1)} class="text-clr-green hover:underline font-medium">Next</a>}
+              </div>
+            </nav>
           )}
         </div>
       </section>
@@ -284,6 +363,15 @@ function formatDate(s: string | null): string {
               </table>
             </div>
           )}
+          {paymentAudit.length > 0 && (
+            <nav class="flex items-center justify-between gap-2 py-2 px-3 border-t border-gray-200 bg-gray-50 text-sm" aria-label="Payments pagination">
+              <span class="text-gray-600">Page {paymentsPage}</span>
+              <div class="flex gap-2">
+                {paymentsPage > 1 && <a href={auditPageUrl('payments_page', paymentsPage - 1)} class="text-clr-green hover:underline font-medium">Previous</a>}
+                {paymentAudit.length === pageSize && <a href={auditPageUrl('payments_page', paymentsPage + 1)} class="text-clr-green hover:underline font-medium">Next</a>}
+              </div>
+            </nav>
+          )}
         </div>
       </section>
 
@@ -304,6 +392,7 @@ function formatDate(s: string | null): string {
                     <th class="text-left py-2 px-3 font-medium text-gray-700">Vendor (name)</th>
                     <th class="text-left py-2 px-3 font-medium text-gray-700">Vendor ID</th>
                     <th class="text-left py-2 px-3 font-medium text-gray-700">By</th>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">IP</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -314,11 +403,21 @@ function formatDate(s: string | null): string {
                       <td class="py-2 px-3">{row.vendor_name ?? BLANK}</td>
                       <td class="py-2 px-3 font-mono text-gray-600">{row.vendor_id ?? BLANK}</td>
                       <td class="py-2 px-3">{row.done_by_email ?? BLANK}</td>
+                      <td class="py-2 px-3 text-gray-500 text-xs">{row.ip_address ?? BLANK}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
+          )}
+          {vendorAuditLog.length > 0 && (
+            <nav class="flex items-center justify-between gap-2 py-2 px-3 border-t border-gray-200 bg-gray-50 text-sm" aria-label="Vendor audit pagination">
+              <span class="text-gray-600">Page {vendorPage}</span>
+              <div class="flex gap-2">
+                {vendorPage > 1 && <a href={auditPageUrl('vendor_page', vendorPage - 1)} class="text-clr-green hover:underline font-medium">Previous</a>}
+                {vendorAuditLog.length === pageSize && <a href={auditPageUrl('vendor_page', vendorPage + 1)} class="text-clr-green hover:underline font-medium">Next</a>}
+              </div>
+            </nav>
           )}
         </div>
       </section>
@@ -549,6 +648,7 @@ function formatDate(s: string | null): string {
                     <th class="text-left py-2 px-3 font-medium text-gray-700">Old &rarr; New status</th>
                     <th class="text-left py-2 px-3 font-medium text-gray-700">By (email / role)</th>
                     <th class="text-left py-2 px-3 font-medium text-gray-700">Notes</th>
+                    <th class="text-left py-2 px-3 font-medium text-gray-700">IP</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -560,11 +660,21 @@ function formatDate(s: string | null): string {
                       <td class="py-2 px-3">{row.old_status ?? BLANK} &rarr; {row.new_status ?? BLANK}</td>
                       <td class="py-2 px-3">{row.changed_by_email ?? BLANK} ({row.changed_by_role ?? BLANK})</td>
                       <td class="py-2 px-3 text-gray-600 max-w-xs truncate" title={row.notes ?? undefined}>{row.notes ?? BLANK}</td>
+                      <td class="py-2 px-3 text-gray-500 text-xs">{row.ip_address ?? BLANK}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
+          )}
+          {arbLogs.length > 0 && (
+            <nav class="flex items-center justify-between gap-2 py-2 px-3 border-t border-gray-200 bg-gray-50 text-sm" aria-label="ARB audit pagination">
+              <span class="text-gray-600">Page {arbPage}</span>
+              <div class="flex gap-2">
+                {arbPage > 1 && <a href={auditPageUrl('arb_page', arbPage - 1)} class="text-clr-green hover:underline font-medium">Previous</a>}
+                {arbLogs.length === pageSize && <a href={auditPageUrl('arb_page', arbPage + 1)} class="text-clr-green hover:underline font-medium">Next</a>}
+              </div>
+            </nav>
           )}
         </div>
       </section>

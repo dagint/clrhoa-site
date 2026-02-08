@@ -146,7 +146,8 @@ if (action === 'request_revision' || action === 'request revision') {
       { status: 400, headers: { 'Content-Type': 'application/json' } }
     );
   }
-  const updated = await setArbRequestPendingForRevision(db, requestId, revisionNotes, session.email, effectiveRole);
+  const clientIp = Astro.clientAddress || Astro.request.headers.get('cf-connecting-ip') || null;
+  const updated = await setArbRequestPendingForRevision(db, requestId, revisionNotes, session.email, effectiveRole, clientIp);
   if (!updated) {
     return new Response(JSON.stringify({ error: 'Update failed.' }), {
       status: 500,
@@ -186,7 +187,8 @@ if (request.status !== 'in_review') {
 
 const status = action === 'approve' ? 'approved' : 'rejected';
 const esignRecord = `${status.toUpperCase()} | ${arbEsign} | ${session.email} | ${new Date().toISOString()}`;
-const updated = await updateArbRequestStatus(db, requestId, status, esignRecord, session.email, effectiveRole);
+const clientIp = Astro.clientAddress || Astro.request.headers.get('cf-connecting-ip') || null;
+const updated = await updateArbRequestStatus(db, requestId, status, esignRecord, session.email, effectiveRole, clientIp);
 
 if (!updated) {
   return new Response(JSON.stringify({ error: 'Update failed.' }), {

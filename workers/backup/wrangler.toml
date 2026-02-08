@@ -9,7 +9,7 @@ compatibility_flags = ["nodejs_compat"]
 
 # Run daily at 2:00 AM UTC
 [triggers]
-cron = ["0 2 * * *"]
+crons = ["0 2 * * *"]
 
 # Same D1 as main app (for Phase 3: read backup_config)
 [[d1_databases]]

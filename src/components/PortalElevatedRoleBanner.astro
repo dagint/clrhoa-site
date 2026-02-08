@@ -167,6 +167,18 @@ const label = role === 'admin' ? 'Administrator' : role === 'arb_board' ? 'ARB +
               const data = await res.json();
               if (res.ok && data.success) {
                 const newRole = data.assumed_role ?? null;
+                if (newRole === 'arb') {
+                  window.location.href = '/portal/arb-dashboard';
+                  return;
+                }
+                if (newRole === 'board') {
+                  window.location.href = '/portal/board';
+                  return;
+                }
+                if (newRole === null) {
+                  window.location.href = '/portal/dashboard';
+                  return;
+                }
                 const newUntil = data.assumed_until ?? null;
                 renderStatus(newRole, newUntil);
                 renderFormButtons(newRole);

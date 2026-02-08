@@ -45,16 +45,18 @@ export async function insertAdminAssumedRoleAudit(
 /** List recent assume-role audit entries for Board audit page. Newest first. */
 export async function listAdminAssumedRoleAudit(
   db: D1Database,
-  limit = 200
+  limit = 200,
+  offset = 0
 ): Promise<AdminAssumedRoleAuditRow[]> {
+  const safeOffset = Math.max(0, offset);
   const { results } = await db
     .prepare(
       `SELECT id, admin_email, actor_role, action, role_assumed, action_detail, ip_address, created
        FROM admin_assumed_role_audit
        ORDER BY created DESC
-       LIMIT ?`
+       LIMIT ? OFFSET ?`
     )
-    .bind(limit)
+    .bind(limit, safeOffset)
     .all();
   return (results ?? []) as AdminAssumedRoleAuditRow[];
 }

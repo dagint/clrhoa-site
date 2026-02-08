@@ -164,22 +164,24 @@ export interface VendorAuditLogRow {
   action: string;
   done_by_email: string | null;
   created: string | null;
+  ip_address: string | null;
 }
 
 export async function insertVendorAuditLog(
   db: D1Database,
-  params: { vendor_id: string; vendor_name?: string | null; action: string; done_by_email?: string | null }
+  params: { vendor_id: string; vendor_name?: string | null; action: string; done_by_email?: string | null; ip_address?: string | null }
 ): Promise<void> {
   try {
     await db
       .prepare(
-        `INSERT INTO vendor_audit_log (vendor_id, vendor_name, action, done_by_email) VALUES (?, ?, ?, ?)`
+        `INSERT INTO vendor_audit_log (vendor_id, vendor_name, action, done_by_email, ip_address) VALUES (?, ?, ?, ?, ?)`
       )
       .bind(
         params.vendor_id,
         params.vendor_name?.trim() ?? null,
         params.action,
-        params.done_by_email?.trim()?.toLowerCase() ?? null
+        params.done_by_email?.trim()?.toLowerCase() ?? null,
+        params.ip_address?.trim() ?? null
       )
       .run();
   } catch {
@@ -187,16 +189,18 @@ export async function insertVendorAuditLog(
   }
 }
 
-export async function listVendorAuditLog(db: D1Database, limit: number): Promise<VendorAuditLogRow[]> {
+export async function listVendorAuditLog(db: D1Database, limit: number, offset = 0): Promise<VendorAuditLogRow[]> {
+  const safeLimit = Math.max(1, Math.min(limit, 500));
+  const safeOffset = Math.max(0, offset);
   try {
     const { results } = await db
       .prepare(
-        `SELECT id, vendor_id, vendor_name, action, done_by_email, created
-         FROM vendor_audit_log ORDER BY created DESC LIMIT ?`
+        `SELECT id, vendor_id, vendor_name, action, done_by_email, created, ip_address
+         FROM vendor_audit_log ORDER BY created DESC LIMIT ? OFFSET ?`
       )
-      .bind(Math.max(1, Math.min(limit, 500)))
+      .bind(safeLimit, safeOffset)
       .all<VendorAuditLogRow>();
-    return results ?? [];
+    return (results ?? []).map((r) => ({ ...r, ip_address: r.ip_address ?? null }));
   } catch {
     return [];
   }

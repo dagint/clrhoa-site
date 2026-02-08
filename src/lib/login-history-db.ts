@@ -44,18 +44,33 @@ export async function insertLoginHistory(
     .run();
 }
 
+/** Most recent login time for an email (for "Last logon" display). */
+export async function getLastLogonTime(db: D1Database, email: string): Promise<string | null> {
+  const normalized = email.trim().toLowerCase();
+  const row = await db
+    .prepare(
+      `SELECT logged_at FROM login_history WHERE email = ? ORDER BY logged_at DESC LIMIT 1`
+    )
+    .bind(normalized)
+    .first<{ logged_at: string }>();
+  return row?.logged_at ?? null;
+}
+
 /** List recent logins for an email (newest first). Used for profile "Login activity". */
 export async function listLoginHistoryByEmail(
   db: D1Database,
   email: string,
-  limit: number = 50
+  limit: number = 50,
+  offset = 0
 ): Promise<LoginHistoryRow[]> {
   const normalized = email.trim().toLowerCase();
+  const safeLimit = Math.max(1, Math.min(limit, 200));
+  const safeOffset = Math.max(0, offset);
   const { results } = await db
     .prepare(
-      `SELECT id, email, logged_at, ip_address, user_agent FROM login_history WHERE email = ? ORDER BY logged_at DESC LIMIT ?`
+      `SELECT id, email, logged_at, ip_address, user_agent FROM login_history WHERE email = ? ORDER BY logged_at DESC LIMIT ? OFFSET ?`
     )
-    .bind(normalized, Math.max(1, Math.min(limit, 200)))
+    .bind(normalized, safeLimit, safeOffset)
     .all<LoginHistoryRow>();
   return results ?? [];
 }

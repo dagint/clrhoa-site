@@ -267,63 +267,91 @@ export interface DirectoryLogRow {
   target_phone: string | null;
   target_email: string | null;
   timestamp: string | null;
+  ip_address: string | null;
 }
 
 /** List directory reveal logs for a single viewer (their own actions). For portal "My activity" page. */
 export async function listDirectoryLogsByViewer(
   db: D1Database,
   viewerEmail: string,
-  limit: number
+  limit: number,
+  offset = 0
 ): Promise<DirectoryLogRow[]> {
   const viewer = viewerEmail.trim().toLowerCase();
+  const safeLimit = Math.max(1, Math.min(limit, 500));
+  const safeOffset = Math.max(0, offset);
   try {
     const { results } = await db
       .prepare(
-        `SELECT id, viewer_email, viewer_role, target_name, target_phone, target_email, timestamp
-         FROM directory_logs WHERE viewer_email = ? ORDER BY timestamp DESC LIMIT ?`
+        `SELECT id, viewer_email, viewer_role, target_name, target_phone, target_email, timestamp, ip_address
+         FROM directory_logs WHERE viewer_email = ? ORDER BY timestamp DESC LIMIT ? OFFSET ?`
       )
-      .bind(viewer, Math.max(1, Math.min(limit, 500)))
+      .bind(viewer, safeLimit, safeOffset)
       .all<DirectoryLogRow>();
-    return results ?? [];
+    return (results ?? []).map((r) => ({ ...r, ip_address: r.ip_address ?? null }));
   } catch {
     try {
       const { results } = await db
         .prepare(
-          `SELECT id, viewer_email, target_name, target_phone, target_email, timestamp
-           FROM directory_logs WHERE viewer_email = ? ORDER BY timestamp DESC LIMIT ?`
+          `SELECT id, viewer_email, target_name, target_phone, target_email, timestamp, ip_address
+           FROM directory_logs WHERE viewer_email = ? ORDER BY timestamp DESC LIMIT ? OFFSET ?`
         )
-        .bind(viewer, Math.max(1, Math.min(limit, 500)))
+        .bind(viewer, safeLimit, safeOffset)
         .all<DirectoryLogRow & { viewer_role?: string | null }>();
-      return (results ?? []).map((r) => ({ ...r, viewer_role: null }));
+      return (results ?? []).map((r) => ({ ...r, viewer_role: null, ip_address: r.ip_address ?? null }));
     } catch {
-      return [];
+      try {
+        const { results } = await db
+          .prepare(
+            `SELECT id, viewer_email, target_name, target_phone, target_email, timestamp
+             FROM directory_logs WHERE viewer_email = ? ORDER BY timestamp DESC LIMIT ? OFFSET ?`
+          )
+          .bind(viewer, safeLimit, safeOffset)
+          .all<DirectoryLogRow & { viewer_role?: string | null }>();
+        return (results ?? []).map((r) => ({ ...r, viewer_role: null, ip_address: null }));
+      } catch {
+        return [];
+      }
     }
   }
 }
 
 /** List directory reveal logs (audit). Requires directory_logs table with optional viewer_role column. */
-export async function listDirectoryLogs(db: D1Database, limit: number): Promise<DirectoryLogRow[]> {
+export async function listDirectoryLogs(db: D1Database, limit: number, offset = 0): Promise<DirectoryLogRow[]> {
+  const safeLimit = Math.max(1, Math.min(limit, 2000));
+  const safeOffset = Math.max(0, offset);
   try {
     const { results } = await db
       .prepare(
-        `SELECT id, viewer_email, viewer_role, target_name, target_phone, target_email, timestamp
-         FROM directory_logs ORDER BY timestamp DESC LIMIT ?`
+        `SELECT id, viewer_email, viewer_role, target_name, target_phone, target_email, timestamp, ip_address
+         FROM directory_logs ORDER BY timestamp DESC LIMIT ? OFFSET ?`
       )
-      .bind(Math.max(1, Math.min(limit, 2000)))
+      .bind(safeLimit, safeOffset)
       .all<DirectoryLogRow>();
-    return results ?? [];
+    return (results ?? []).map((r) => ({ ...r, ip_address: r.ip_address ?? null }));
   } catch {
     try {
       const { results } = await db
         .prepare(
-          `SELECT id, viewer_email, target_name, target_phone, target_email, timestamp
-           FROM directory_logs ORDER BY timestamp DESC LIMIT ?`
+          `SELECT id, viewer_email, target_name, target_phone, target_email, timestamp, ip_address
+           FROM directory_logs ORDER BY timestamp DESC LIMIT ? OFFSET ?`
         )
-        .bind(Math.max(1, Math.min(limit, 2000)))
+        .bind(safeLimit, safeOffset)
         .all<DirectoryLogRow & { viewer_role?: string | null }>();
-      return (results ?? []).map((r) => ({ ...r, viewer_role: null }));
+      return (results ?? []).map((r) => ({ ...r, viewer_role: null, ip_address: r.ip_address ?? null }));
     } catch {
-      return [];
+      try {
+        const { results } = await db
+          .prepare(
+            `SELECT id, viewer_email, viewer_role, target_name, target_phone, target_email, timestamp
+             FROM directory_logs ORDER BY timestamp DESC LIMIT ? OFFSET ?`
+          )
+          .bind(safeLimit, safeOffset)
+          .all<DirectoryLogRow>();
+        return (results ?? []).map((r) => ({ ...r, ip_address: null }));
+      } catch {
+        return [];
+      }
     }
   }
 }
@@ -335,31 +363,43 @@ export async function insertDirectoryLog(
   targetName: string | null,
   targetPhone: string | null,
   targetEmail?: string | null,
-  viewerRole?: string | null
+  viewerRole?: string | null,
+  ipAddress?: string | null
 ): Promise<void> {
   const id = generateId();
   const viewer = viewerEmail.trim().toLowerCase();
   const name = targetName ?? '';
   const phone = targetPhone ?? '';
   const role = viewerRole?.trim() ?? null;
+  const ip = ipAddress?.trim() ?? null;
 
   if (targetEmail !== undefined && targetEmail !== null && targetEmail.trim() !== '') {
     try {
       await db
         .prepare(
-          `INSERT INTO directory_logs (id, viewer_email, viewer_role, target_name, target_phone, target_email, timestamp)
-           VALUES (?, ?, ?, ?, ?, ?, datetime('now'))`
+          `INSERT INTO directory_logs (id, viewer_email, viewer_role, target_name, target_phone, target_email, ip_address, timestamp)
+           VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))`
         )
-        .bind(id, viewer, role, name, phone, targetEmail.trim())
+        .bind(id, viewer, role, name, phone, targetEmail.trim(), ip)
         .run();
     } catch {
-      await db
-        .prepare(
-          `INSERT INTO directory_logs (id, viewer_email, target_name, target_phone, target_email, timestamp)
-           VALUES (?, ?, ?, ?, ?, datetime('now'))`
-        )
-        .bind(id, viewer, name, phone, targetEmail.trim())
-        .run();
+      try {
+        await db
+          .prepare(
+            `INSERT INTO directory_logs (id, viewer_email, target_name, target_phone, target_email, ip_address, timestamp)
+             VALUES (?, ?, ?, ?, ?, ?, datetime('now'))`
+          )
+          .bind(id, viewer, name, phone, targetEmail.trim(), ip)
+          .run();
+      } catch {
+        await db
+          .prepare(
+            `INSERT INTO directory_logs (id, viewer_email, target_name, target_phone, target_email, timestamp)
+             VALUES (?, ?, ?, ?, ?, datetime('now'))`
+          )
+          .bind(id, viewer, name, phone, targetEmail.trim())
+          .run();
+      }
     }
     return;
   }
@@ -367,19 +407,29 @@ export async function insertDirectoryLog(
   try {
     await db
       .prepare(
-        `INSERT INTO directory_logs (id, viewer_email, viewer_role, target_name, target_phone, timestamp)
-         VALUES (?, ?, ?, ?, ?, datetime('now'))`
+        `INSERT INTO directory_logs (id, viewer_email, viewer_role, target_name, target_phone, ip_address, timestamp)
+         VALUES (?, ?, ?, ?, ?, ?, datetime('now'))`
       )
-      .bind(id, viewer, role, name, phone)
+      .bind(id, viewer, role, name, phone, ip)
       .run();
   } catch {
-    await db
-      .prepare(
-        `INSERT INTO directory_logs (id, viewer_email, target_name, target_phone, timestamp)
-         VALUES (?, ?, ?, ?, datetime('now'))`
-      )
-      .bind(id, viewer, name, phone)
-      .run();
+    try {
+      await db
+        .prepare(
+          `INSERT INTO directory_logs (id, viewer_email, target_name, target_phone, ip_address, timestamp)
+           VALUES (?, ?, ?, ?, ?, datetime('now'))`
+        )
+        .bind(id, viewer, name, phone, ip)
+        .run();
+    } catch {
+      await db
+        .prepare(
+          `INSERT INTO directory_logs (id, viewer_email, target_name, target_phone, timestamp)
+           VALUES (?, ?, ?, ?, datetime('now'))`
+        )
+        .bind(id, viewer, name, phone)
+        .run();
+    }
   }
 }
 
@@ -387,28 +437,40 @@ export async function insertDirectoryLog(
 export async function insertDirectoryExportLog(
   db: D1Database,
   viewerEmail: string,
-  viewerRole: string | null
+  viewerRole: string | null,
+  ipAddress?: string | null
 ): Promise<void> {
   const id = generateId();
   const viewer = viewerEmail.trim().toLowerCase();
   const role = viewerRole?.trim() ?? null;
+  const ip = ipAddress?.trim() ?? null;
   const sentinel = '(full directory export)';
   try {
     await db
       .prepare(
-        `INSERT INTO directory_logs (id, viewer_email, viewer_role, target_name, target_phone, timestamp)
-         VALUES (?, ?, ?, ?, '', datetime('now'))`
+        `INSERT INTO directory_logs (id, viewer_email, viewer_role, target_name, target_phone, ip_address, timestamp)
+         VALUES (?, ?, ?, ?, ?, ?, datetime('now'))`
       )
-      .bind(id, viewer, role, sentinel)
+      .bind(id, viewer, role, sentinel, '', ip)
       .run();
   } catch {
-    await db
-      .prepare(
-        `INSERT INTO directory_logs (id, viewer_email, target_name, target_phone, timestamp)
-         VALUES (?, ?, ?, '', datetime('now'))`
-      )
-      .bind(id, viewer, sentinel)
-      .run();
+    try {
+      await db
+        .prepare(
+          `INSERT INTO directory_logs (id, viewer_email, target_name, target_phone, ip_address, timestamp)
+           VALUES (?, ?, ?, ?, ?, datetime('now'))`
+        )
+        .bind(id, viewer, sentinel, '', ip)
+        .run();
+    } catch {
+      await db
+        .prepare(
+          `INSERT INTO directory_logs (id, viewer_email, target_name, target_phone, timestamp)
+           VALUES (?, ?, ?, ?, datetime('now'))`
+        )
+        .bind(id, viewer, sentinel, '')
+        .run();
+    }
   }
 }
 

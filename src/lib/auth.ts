@@ -66,12 +66,13 @@ export function canRecordPayments(role: string): boolean {
 }
 
 /**
- * True for effective role 'arb' or 'board'. arb_board must elevate to ARB (or Board) to approve;
- * admin must assume ARB. Ensures one-role-at-a-time for arb_board.
+ * True for effective role 'arb' or 'arb_board' only. Board and admin have view-only access
+ * to the ARB dashboard; only ARB (or ARB+Board when acting as ARB) can approve, reject,
+ * set deadlines, or add ARB notes.
  */
 export function canApproveArb(role: string): boolean {
   const r = role?.toLowerCase();
-  return r === 'arb' || r === 'board';
+  return r === 'arb' || r === 'arb_board';
 }
 
 /**

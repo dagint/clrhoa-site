@@ -65,9 +65,9 @@ if (!kv || !db || !secret) {
 // Directory is the authoritative source for portal access. Exception: admins can log in without being in directory.
 const whitelistRole = await getWhitelistRole(kv, normalized);
 const isAdmin = whitelistRole === 'admin';
-const inDirectory = db ? (await getOwnerByEmail(db, normalized)) != null : false;
-const allowed = isAdmin || inDirectory;
-if (!allowed) {
+const owner = db ? await getOwnerByEmail(db, normalized) : null;
+const inDirectory = isAdmin || owner != null;
+if (!inDirectory) {
   if (rateLimitKv) {
     await recordFailedLoginAttempt(rateLimitKv, normalized, ipAddress);
   }
@@ -77,16 +77,20 @@ if (!allowed) {
 }
 
 // Ensure directory members are on KV for role sync (board/arb/member). Admins already in KV.
-if (inDirectory && kv) {
+if (owner != null && kv) {
   const existing = await kv.get(normalized);
   if (existing == null) await kv.put(normalized, '1'); // member
 }
 let user = await getUserByEmail(db, normalized);
+// Prefer directory (owner) name for "Welcome back, FirstName" in portal; fall back to form name then existing user name
+const nameForSession = (owner?.name?.trim()) || name || (user?.name?.trim()) || null;
 if (!user) {
-  user = await upsertUser(db, normalized, name, whitelistRole);
+  user = await upsertUser(db, normalized, nameForSession, whitelistRole);
 } else if (whitelistRole !== 'member' && user.role === 'member') {
-  // Optionally sync role from KV on login
-  user = await upsertUser(db, normalized, user.name, whitelistRole);
+  user = await upsertUser(db, normalized, nameForSession, whitelistRole);
+} else if (nameForSession !== (user.name ?? null)) {
+  // Refresh name from directory so session and DB stay in sync
+  user = await upsertUser(db, normalized, nameForSession, whitelistRole);
 }
 
 // Clear failed login attempts on successful login
@@ -96,7 +100,7 @@ if (rateLimitKv) {
 
 const userAgent = Astro.request.headers.get('user-agent');
 const cookieValue = await createSessionCookieValue(
-  { email: user.email, role: user.role, name: user.name },
+  { email: user.email, role: user.role, name: nameForSession },
   secret,
   userAgent,
   ipAddress

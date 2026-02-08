@@ -14,5 +14,8 @@
 
 ## Outstanding
 
+### 0. Paging / scalability (optional, as lists grow)
+Already paged: **Board audit logs**, **Portal My activity** (directory + ARB), **Profile login activity** (with per-page dropdown 10/25/50/100). Consider adding the same pattern elsewhere if lists get large: **Board** — directory (owners), news, library (preapproval), maintenance, meetings, feedback, member documents, vendors; **Portal** — library (approved items), news; **Admin** — feedback, sms-requests; **Portal** — elevation-audit (PIM log).
+
 ### 1. Auth + MFA + Password Management ⭐⭐⭐⭐
 Full auth: email/pass login/register. JWT 15min sliding. MFA TOTP toggle (encrypted KV). Roles user/elevated/admin. Admins only assign admins. Password update/reset/forgot with rate limiting. Lucia. Protect admin routes.

@@ -1,0 +1,217 @@
+---
+export const prerender = false;
+
+import PortalLayout from '../../layouts/PortalLayout.astro';
+import ProtectedPage from '../../components/ProtectedPage.astro';
+import PortalNav from '../../components/PortalNav.astro';
+import { getPortalContext } from '../../lib/portal-context';
+import { listArbRequestsByHousehold } from '../../lib/arb-db';
+import { getDailyStats, getWeeklyStats, getAdminPageViews, getAdminPageViewsCount, getTopPagesByViews } from '../../lib/usage-db';
+
+const ctx = await getPortalContext(Astro, { fingerprint: true });
+if (!ctx.session) return Astro.redirect('/portal/login?return=' + encodeURIComponent('/portal/usage'));
+
+const { env, session, effectiveRole } = ctx;
+const isElevated = effectiveRole === 'arb' || effectiveRole === 'board' || effectiveRole === 'admin' || effectiveRole === 'arb_board';
+if (!isElevated) return Astro.redirect('/portal/dashboard');
+
+const db = env?.DB;
+const url = Astro.url;
+
+const VIEWS_PAGE_SIZES = [10, 25, 50, 100] as const;
+const DEFAULT_VIEWS_PAGE_SIZE = 10;
+const VIEWS_PERIOD_OPTIONS = [7, 30, 90] as const; // days; 'all' = no filter
+
+function getPage(param: string): number {
+  const p = url.searchParams.get(param);
+  const n = p ? parseInt(p, 10) : 1;
+  return Number.isNaN(n) || n < 1 ? 1 : Math.min(n, 1000);
+}
+function getLimit(param: string): number {
+  const p = url.searchParams.get(param);
+  const n = p ? parseInt(p, 10) : DEFAULT_VIEWS_PAGE_SIZE;
+  return VIEWS_PAGE_SIZES.includes(n as (typeof VIEWS_PAGE_SIZES)[number]) ? n : DEFAULT_VIEWS_PAGE_SIZE;
+}
+function getViewsUser(): string {
+  return (url.searchParams.get('views_user') ?? '').trim();
+}
+function getViewsPeriod(): number | null {
+  const p = url.searchParams.get('views_period');
+  if (p === 'all' || p === '' || p == null) return null;
+  const n = parseInt(p, 10);
+  return VIEWS_PERIOD_OPTIONS.includes(n as (typeof VIEWS_PERIOD_OPTIONS)[number]) ? n : null;
+}
+
+const viewsPage = getPage('views_page');
+const viewsLimit = getLimit('views_limit');
+const viewsUser = getViewsUser();
+const viewsPeriod = getViewsPeriod();
+
+const filters = (viewsUser || viewsPeriod !== null) ? { user: viewsUser || undefined, periodDays: viewsPeriod ?? undefined } : undefined;
+
+const daily = db ? await getDailyStats(db, 30) : [];
+const weekly = db ? await getWeeklyStats(db, 12) : [];
+const topPages = db ? await getTopPagesByViews(db, 10) : [];
+const adminEvents = db ? await getAdminPageViews(db, viewsLimit, (viewsPage - 1) * viewsLimit, filters) : [];
+const adminViewsTotal = db ? await getAdminPageViewsCount(db, filters) : 0;
+
+const allRequests = db ? await listArbRequestsByHousehold(db, session.email) : [];
+const draftCount = allRequests.filter((r) => r.status === 'pending').length;
+
+function viewsPageUrl(key: string, value: number): string {
+  const u = new URL(url);
+  if (value <= 1) u.searchParams.delete(key);
+  else u.searchParams.set(key, String(value));
+  if (viewsLimit !== DEFAULT_VIEWS_PAGE_SIZE) u.searchParams.set('views_limit', String(viewsLimit));
+  if (viewsUser) u.searchParams.set('views_user', viewsUser);
+  if (viewsPeriod !== null) u.searchParams.set('views_period', String(viewsPeriod));
+  return u.pathname + u.search;
+}
+
+function formatDate(s: string | null): string {
+  if (!s) return '—';
+  try {
+    const d = new Date(s);
+    return Number.isNaN(d.getTime()) ? s : d.toLocaleString();
+  } catch {
+    return s ?? '—';
+  }
+}
+
+const chartData = { daily, weekly, topPages };
+const chartDataJson = JSON.stringify(chartData).replace(/<\/script/gi, '<\\/script');
+---
+
+<PortalLayout title="Site usage | Member Portal | Crooked Lake Reserve HOA">
+  <ProtectedPage>
+  <div class="min-h-screen bg-gray-50 portal-theme-bg font-body" id="portal-root">
+    <PortalNav currentPath="/portal/usage" draftCount={draftCount} role={effectiveRole} staffRole={session.role ?? ''} arbInReviewCount={0} vendorPendingCount={0} />
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
+      <h1 class="text-3xl font-heading font-bold text-clr-green mb-2">Site usage</h1>
+      <p class="text-gray-600 portal-theme-text-muted mb-8">Anonymous totals: page views and unique visitors. Admin-only.</p>
+
+      <section class="mb-12">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div class="bg-white rounded-2xl shadow-sm border border-gray-100 portal-theme-card p-6">
+            <h2 class="text-lg font-heading font-semibold text-clr-green mb-4">Daily (last 30 days)</h2>
+            <div class="relative h-64 md:h-72">
+              <canvas id="chart-daily" aria-label="Daily page views and unique visitors"></canvas>
+            </div>
+          </div>
+          <div class="bg-white rounded-2xl shadow-sm border border-gray-100 portal-theme-card p-6">
+            <h2 class="text-lg font-heading font-semibold text-clr-green mb-4">Weekly (last 12 weeks)</h2>
+            <div class="relative h-64 md:h-72">
+              <canvas id="chart-weekly" aria-label="Weekly page views and unique visitors"></canvas>
+            </div>
+          </div>
+        </div>
+        <div class="mt-6 bg-white rounded-2xl shadow-sm border border-gray-100 portal-theme-card p-6">
+          <h2 class="text-lg font-heading font-semibold text-clr-green mb-4">Active users & page views (last 30 days)</h2>
+          <p class="text-sm text-gray-600 portal-theme-text-muted mb-4">Line chart: page views, unique visitors (sessions), and active users (logged-in members) per day.</p>
+          <div class="relative h-72 md:h-80">
+            <canvas id="chart-active-users" aria-label="Active users and page views over time"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <section class="mb-12">
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 portal-theme-card p-6">
+          <h2 class="text-lg font-heading font-semibold text-clr-green mb-4">Top 10 pages (last 90 days)</h2>
+          <p class="text-sm text-gray-600 portal-theme-text-muted mb-4">Page views vs unique visitors by path.</p>
+          <div class="relative h-64 md:h-80">
+            <canvas id="chart-top-pages" aria-label="Top pages by views and unique visitors"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <section class="mb-12" aria-labelledby="admin-usage-heading">
+        <h2 id="admin-usage-heading" class="text-lg font-heading font-semibold text-clr-green mb-3">Page views: user → path → time</h2>
+        <p class="text-sm text-gray-600 portal-theme-text-muted mb-4">Recent page views by user or anonymous session. Filter by user (email) or time period, then paged.</p>
+        <form method="get" action={url.pathname} class="flex flex-wrap items-end gap-3 mb-4">
+          <input type="hidden" name="views_limit" value={viewsLimit} />
+          <div>
+            <label for="views-user" class="block text-sm text-gray-600 mb-0.5">User (email)</label>
+            <input type="text" id="views-user" name="views_user" value={viewsUser} placeholder="Filter by user email…" class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-700 w-48 max-w-full focus:border-clr-green focus:outline-none focus:ring-1 focus:ring-clr-green" />
+          </div>
+          <div>
+            <label for="views-period" class="block text-sm text-gray-600 mb-0.5">Time period</label>
+            <select id="views-period" name="views_period" class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-700 focus:border-clr-green focus:outline-none focus:ring-1 focus:ring-clr-green" aria-label="Filter by time period">
+              <option value="all" selected={viewsPeriod === null}>All time</option>
+              {VIEWS_PERIOD_OPTIONS.map((d) => (
+                <option value={d} selected={viewsPeriod === d}>Last {d} days</option>
+              ))}
+            </select>
+          </div>
+          <button type="submit" class="rounded bg-clr-green text-white px-3 py-1.5 text-sm font-medium hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-clr-green focus:ring-offset-1">Apply</button>
+          {(viewsUser || viewsPeriod !== null) && (
+            <a href={url.pathname + (viewsLimit !== DEFAULT_VIEWS_PAGE_SIZE ? '?views_limit=' + viewsLimit : '')} class="text-sm text-gray-600 hover:underline">Clear filters</a>
+          )}
+        </form>
+        <div class="flex flex-wrap items-center gap-2 mb-4">
+          <label for="views-per-page" class="text-sm text-gray-600">Per page:</label>
+          <select id="views-per-page" class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-700 focus:border-clr-green focus:outline-none focus:ring-1 focus:ring-clr-green" aria-label="Page views per page">
+            {VIEWS_PAGE_SIZES.map((size) => (
+              <option value={size} selected={viewsLimit === size}>{size}</option>
+            ))}
+          </select>
+        </div>
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 portal-theme-card overflow-hidden">
+          {adminEvents.length === 0 ? (
+            <p class="p-6 text-gray-500">No page view records yet.</p>
+          ) : (
+            <>
+              <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                  <thead class="bg-gray-50 border-b border-gray-200 portal-theme-header">
+                    <tr>
+                      <th class="text-left py-2 px-3 font-medium text-gray-700">User / session</th>
+                      <th class="text-left py-2 px-3 font-medium text-gray-700">Path</th>
+                      <th class="text-left py-2 px-3 font-medium text-gray-700">Time</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {adminEvents.map((row) => (
+                      <tr class="border-b border-gray-100 hover:bg-gray-50/50 portal-theme-text">
+                        <td class="py-2 px-3 text-gray-700">{row.user_id ?? '(anonymous)'}</td>
+                        <td class="py-2 px-3 font-mono text-gray-600 max-w-xs truncate" title={row.path}>{row.path}</td>
+                        <td class="py-2 px-3 text-gray-600 whitespace-nowrap">{formatDate(row.created_at)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <nav class="flex items-center justify-between gap-2 py-2 px-3 border-t border-gray-200 bg-gray-50 text-sm" aria-label="Page views pagination">
+                <span class="text-gray-600">Page {viewsPage} of {Math.max(1, Math.ceil(adminViewsTotal / viewsLimit))}{adminViewsTotal > 0 ? ` (${adminViewsTotal} total)` : ''}</span>
+                <div class="flex gap-2">
+                  {viewsPage > 1 && <a href={viewsPageUrl('views_page', viewsPage - 1)} class="text-clr-green hover:underline font-medium">Previous</a>}
+                  {(viewsPage * viewsLimit) < adminViewsTotal && <a href={viewsPageUrl('views_page', viewsPage + 1)} class="text-clr-green hover:underline font-medium">Next</a>}
+                </div>
+              </nav>
+            </>
+          )}
+        </div>
+        <p class="mt-4 text-xs text-gray-500 portal-theme-text-muted">
+          <strong>Data retention:</strong> Page view rows are stored indefinitely. For privacy and storage, consider keeping only recent granular data (e.g. 90 days) and deleting or aggregating older rows via a scheduled job.
+        </p>
+      </section>
+    </main>
+
+    <script type="application/json" id="usage-chart-data" set:html={chartDataJson} />
+    <script>
+      import '../../scripts/usage-charts';
+    </script>
+    <script is:inline>
+      document.getElementById('views-per-page')?.addEventListener('change', function () {
+        const limit = this.value;
+        const u = new URL(window.location.href);
+        u.searchParams.set('views_limit', limit);
+        u.searchParams.delete('views_page');
+        if (limit === '10') u.searchParams.delete('views_limit');
+        // keep views_user, views_period
+        window.location.href = u.pathname + u.search;
+      });
+    </script>
+  </div>
+  </ProtectedPage>
+</PortalLayout>

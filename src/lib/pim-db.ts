@@ -14,16 +14,18 @@ export interface PimElevationLogRow {
 /** List recent PIM elevation/drop events for audit report. Newest first. */
 export async function listPimElevationLog(
   db: D1Database,
-  limit = 500
+  limit = 500,
+  offset = 0
 ): Promise<PimElevationLogRow[]> {
+  const safeOffset = Math.max(0, offset);
   const { results } = await db
     .prepare(
       `SELECT id, email, role, action, elevated_at, expires_at
        FROM pim_elevation_log
        ORDER BY elevated_at DESC
-       LIMIT ?`
+       LIMIT ? OFFSET ?`
     )
-    .bind(limit)
+    .bind(limit, safeOffset)
     .all();
   return (results ?? []) as PimElevationLogRow[];
 }

@@ -18,7 +18,7 @@ const categoryFilter = url.searchParams.get('category') || '';
 
 const categories = db ? await listPreapprovalCategories(db) : [];
 const items = db
-  ? await listPreapprovalItems(db, categoryFilter ? { category: categoryFilter } : undefined)
+  ? await listPreapprovalItems(db, categoryFilter ? { category: categoryFilter, approvedOnly: true } : { approvedOnly: true })
   : [];
 const allRequests = db ? await listArbRequestsByHousehold(db, session.email) : [];
 const draftCount = allRequests.filter((r) => r.status === 'pending').length;

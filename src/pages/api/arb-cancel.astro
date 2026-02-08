@@ -88,7 +88,8 @@ const req = ownerCheck.request;
 // If we delete files first and status update fails, the request appears "lost"
 
 // Step 1: Update status to cancelled first (most critical operation)
-const updated = await cancelArbRequest(db, requestId, session.email);
+const clientIp = Astro.clientAddress || Astro.request.headers.get('cf-connecting-ip') || null;
+const updated = await cancelArbRequest(db, requestId, session.email, clientIp);
 if (!updated) {
   logger.error('Failed to cancel request - status update failed', { requestId, email: session.email });
   return new Response(JSON.stringify({ error: 'Could not cancel request. Please try again.' }), { 

@@ -59,7 +59,8 @@ const rows = owners.map((o) => {
 const csv = header + rows.join('\n');
 
 // Log once for this export (not per user)
-await insertDirectoryExportLog(db, session.email, getEffectiveRole(session));
+const clientIp = Astro.clientAddress || Astro.request.headers.get('cf-connecting-ip') || null;
+await insertDirectoryExportLog(db, session.email, getEffectiveRole(session), clientIp);
 
 const filename = `directory-export-${new Date().toISOString().slice(0, 10)}.csv`;
 return new Response(csv, {

@@ -222,9 +222,9 @@ if (db && templateId) {
         <div>
           <label class="block text-sm font-semibold text-gray-700 mb-2">
             Attachments <span class="text-gray-400 font-normal">(optional but recommended)</span>
-            <span class="ml-1 text-gray-400 cursor-help" title="Upload supporting documents, photos, plans, or specifications. Images are automatically resized for faster review. PDFs are kept in original quality." aria-label="Help: Attachments">(i)</span>
+            <span class="ml-1 text-gray-400 cursor-help" title="Photos are resized before upload. PDFs stay full quality. By submitting you confirm you have reviewed your attachments." aria-label="Help: Attachments">(i)</span>
           </label>
-          <p class="text-sm text-gray-500 mb-2">Submit as applicable: written description, lot survey, specifications (plans, dimensions, materials, colors), paint/color samples, photos, brochures. Max 5MB per file, 25MB total. Images are resized for review. Allowed: JPEG, PNG, GIF, WebP, HEIC, PDF.</p>
+          <p class="text-sm text-gray-500 mb-2">Submit as applicable: written description, lot survey, specifications (plans, dimensions, materials, colors), paint/color samples, photos, brochures. Max 5MB per file, 25MB total. <strong>Photos are resized before upload</strong> to save space; PDFs are kept as-is. By submitting, you confirm you have reviewed your attachments. Allowed: JPEG, PNG, GIF, WebP, HEIC, PDF.</p>
           <input
             type="file"
             name="files"
@@ -244,7 +244,7 @@ if (db && templateId) {
             class="mt-1 h-4 w-4 rounded border-gray-300 text-clr-green focus:ring-clr-green"
           />
           <label for="esign" class="text-sm text-gray-700">
-            <strong>Electronic signature:</strong> <span id="esign-required" class="text-red-600" aria-label="required">*</span> By checking this box, I certify that the information provided is accurate and complete to the best of my knowledge. I understand this constitutes my electronic signature. <span id="esign-submit-note" class="font-semibold text-gray-600">Required when submitting for review.</span>
+            <strong>Electronic signature:</strong> <span id="esign-required" class="text-red-600" aria-label="required">*</span> By checking this box, I certify that the information provided is accurate and complete to the best of my knowledge and that I have reviewed my attachments. I understand this constitutes my electronic signature. <span id="esign-submit-note" class="font-semibold text-gray-600">Required when submitting for review.</span>
           </label>
         </div>
 
@@ -519,16 +519,22 @@ if (db && templateId) {
           try {
             for (let i = 0; i < files.length; i++) {
               const file = files[i];
-              formData.append('file_' + i, file);
               if (isImageType(file.type)) {
                 try {
                   const reviewFile = await resizeImage(file, reviewMaxWidth, 0.82);
-                  if (reviewFile) formData.append('file_' + i + '_review', reviewFile);
-                  const archiveFile = await resizeImage(file, archiveMaxWidth, 0.70);
-                  if (archiveFile) formData.append('file_' + i + '_archive', archiveFile);
+                  if (reviewFile) {
+                    formData.append('file_' + i, reviewFile);
+                    const archiveFile = await resizeImage(file, archiveMaxWidth, 0.70);
+                    if (archiveFile) formData.append('file_' + i + '_archive', archiveFile);
+                  } else {
+                    formData.append('file_' + i, file);
+                  }
                 } catch (err) {
                   console.warn('Resize failed for ' + file.name, err);
+                  formData.append('file_' + i, file);
                 }
+              } else {
+                formData.append('file_' + i, file);
               }
             }
           } catch (err) {

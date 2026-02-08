@@ -6,6 +6,7 @@ import ProtectedPage from '../../components/ProtectedPage.astro';
 import PortalNav from '../../components/PortalNav.astro';
 import PortalElevatedRoleBanner from '../../components/PortalElevatedRoleBanner.astro';
 import BoardNav from '../../components/BoardNav.astro';
+import ArbNav from '../../components/ArbNav.astro';
 import ArbDashboardCard from '../../components/ArbDashboardCard.astro';
 import ArbDashboardExportSection from '../../components/ArbDashboardExportSection.astro';
 import { getPortalContext } from '../../lib/portal-context';
@@ -57,7 +58,7 @@ const periodOptions = dashboardData?.periodOptions ?? [];
 
     <PortalElevatedRoleBanner role={effectiveRole} session={session} />
 
-    <BoardNav currentPath="/portal/arb-dashboard" />
+    {effectiveRole === 'arb' ? <ArbNav currentPath="/portal/arb-dashboard" /> : <BoardNav currentPath="/portal/arb-dashboard" />}
 
     <main class="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
       {(effectiveRole === 'arb' || effectiveRole === 'arb_board') && (
@@ -78,6 +79,11 @@ const periodOptions = dashboardData?.periodOptions ?? [];
       {!canApprove && (effectiveRole === 'arb_board' || effectiveRole === 'admin') && (
         <div class="mb-6 p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-sm" role="status">
           <strong>View only.</strong> To approve or reject requests, set deadlines, or add ARB notes, use <strong>Act as ARB</strong> in the yellow banner at the top of the page.
+        </div>
+      )}
+      {!canApprove && effectiveRole === 'board' && (
+        <div class="mb-6 p-4 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 text-sm" role="status">
+          <strong>View only.</strong> Board members can view ARB requests here. Only ARB members can approve, reject, set deadlines, or add ARB notes.
         </div>
       )}
 

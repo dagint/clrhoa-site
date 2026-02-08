@@ -32,7 +32,7 @@ const allRequests = db ? await listArbRequestsByHousehold(db, session.email) : [
 const draftCount = allRequests.filter((r) => r.status === 'pending').length;
 
 const returnParam = Astro.url.searchParams.get('return');
-const returnLabel = returnParam && returnParam.startsWith('/board') ? 'Board' : returnParam && returnParam.startsWith('/admin') ? 'Admin' : returnParam ? 'that page' : null;
+const returnLabel = returnParam && returnParam.startsWith('/board') ? 'Board' : returnParam && returnParam.startsWith('/admin') ? 'Admin' : returnParam && returnParam.includes('arb-dashboard') ? 'ARB Dashboard' : returnParam ? 'that page' : null;
 ---
 
 <PortalLayout title="Request elevated access | Member Portal | Crooked Lake Reserve HOA">

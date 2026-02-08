@@ -89,7 +89,7 @@ export async function runPortalSearch(
       `SELECT id, title, description FROM feedback_docs WHERE title LIKE ? OR description LIKE ? ORDER BY created DESC LIMIT 20`
     ).bind(like, like).all(),
     db.prepare(
-      `SELECT id, category, title, description, rules FROM preapproval_items WHERE title LIKE ? OR description LIKE ? OR rules LIKE ? OR category LIKE ? ORDER BY created DESC LIMIT 20`
+      `SELECT id, category, title, description, rules FROM preapproval_items WHERE (title LIKE ? OR description LIKE ? OR rules LIKE ? OR category LIKE ?) AND COALESCE(approved, 1) = 1 ORDER BY created DESC LIMIT 20`
     ).bind(like, like, like, like).all().catch(() => ({ results: [] })),
   ]);
 

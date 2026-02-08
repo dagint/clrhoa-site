@@ -125,7 +125,7 @@ if (Astro.request.method === 'DELETE') {
       headers: { 'Content-Type': 'application/json' },
     });
   }
-  await insertVendorAuditLog(db, { vendor_id: id, vendor_name: existingVendor?.name ?? null, action: 'deleted', done_by_email: session.email });
+  await insertVendorAuditLog(db, { vendor_id: id, vendor_name: existingVendor?.name ?? null, action: 'deleted', done_by_email: session.email, ip_address: ipAddress });
   return new Response(JSON.stringify({ success: true }), {
     status: 200,
     headers: { 'Content-Type': 'application/json' },
@@ -224,7 +224,7 @@ if (Astro.request.method === 'POST' && action === 'create') {
     await updateVendor(db, id, { filesJson: JSON.stringify(uploadedFiles) });
   }
 
-  await insertVendorAuditLog(db, { vendor_id: id, vendor_name: name?.trim() ?? null, action: 'created', done_by_email: session.email });
+  await insertVendorAuditLog(db, { vendor_id: id, vendor_name: name?.trim() ?? null, action: 'created', done_by_email: session.email, ip_address: ipAddress });
 
   return new Response(JSON.stringify({ success: true, id }), {
     status: 200,
@@ -286,7 +286,7 @@ if (Astro.request.method === 'PUT' && action === 'update') {
       headers: { 'Content-Type': 'application/json' },
     });
   }
-  await insertVendorAuditLog(db, { vendor_id: id, vendor_name: existing.name, action: 'updated', done_by_email: session.email });
+  await insertVendorAuditLog(db, { vendor_id: id, vendor_name: existing.name, action: 'updated', done_by_email: session.email, ip_address: ipAddress });
   return new Response(JSON.stringify({ success: true, id }), {
     status: 200,
     headers: { 'Content-Type': 'application/json' },

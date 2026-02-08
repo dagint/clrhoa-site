@@ -5,6 +5,7 @@ import PortalLayout from '../../layouts/PortalLayout.astro';
 import ProtectedPage from '../../components/ProtectedPage.astro';
 import PortalNav from '../../components/PortalNav.astro';
 import BoardNav from '../../components/BoardNav.astro';
+import ArbNav from '../../components/ArbNav.astro';
 import { getPortalContext } from '../../lib/portal-context';
 import { getArbRequestCountsByStatus, listArbRequestsByHousehold } from '../../lib/arb-db';
 import { listPendingSubmissions } from '../../lib/vendor-submissions-db';
@@ -12,8 +13,9 @@ import { listPendingSubmissions } from '../../lib/vendor-submissions-db';
 const { env, session, effectiveRole } = await getPortalContext(Astro, { fingerprint: true });
 if (!session) return Astro.redirect('/portal/login');
 
-const isBoardOrAdmin = effectiveRole === 'board' || effectiveRole === 'admin' || effectiveRole === 'arb_board';
-if (!isBoardOrAdmin) {
+const isBoardOrAdminOrArbBoard = effectiveRole === 'board' || effectiveRole === 'admin' || effectiveRole === 'arb_board';
+const isArbOnly = effectiveRole === 'arb';
+if (!isBoardOrAdminOrArbBoard && !isArbOnly) {
   const returnUrl = encodeURIComponent('/portal/board');
   return Astro.redirect(`/portal/request-elevated-access?return=${returnUrl}`);
 }
@@ -25,100 +27,123 @@ const pendingVendorCount = db ? (await listPendingSubmissions(db)).length : 0;
 const arbCounts = db ? await getArbRequestCountsByStatus(db) : { in_review: 0, pending: 0, approved: 0, rejected: 0, cancelled: 0 };
 ---
 
-<PortalLayout title="Board | Member Portal | Crooked Lake Reserve HOA">
+<PortalLayout title={effectiveRole === 'arb' ? 'ARB | Member Portal | Crooked Lake Reserve HOA' : 'Board | Member Portal | Crooked Lake Reserve HOA'}>
   <ProtectedPage>
   <div class="min-h-screen portal-theme-bg font-body">
     <PortalNav currentPath="/portal/board" draftCount={draftCount} role={effectiveRole} staffRole={session.role ?? ''} arbInReviewCount={arbCounts.in_review} vendorPendingCount={pendingVendorCount} />
 
-    <BoardNav currentPath="/portal/board" />
+    {effectiveRole === 'arb' ? <ArbNav currentPath="/portal/board" /> : <BoardNav currentPath="/portal/board" />}
 
     <main class="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
-      <div class="mb-6">
-        <h2 class="text-2xl font-heading font-bold text-clr-green mb-1">Board</h2>
-        <p class="text-gray-600 text-sm">Manage directory, documents, and operations.</p>
-      </div>
+      {effectiveRole === 'arb' ? (
+        <>
+          <div class="mb-6">
+            <h2 class="text-2xl font-heading font-bold text-clr-green mb-1">ARB</h2>
+            <p class="text-gray-600 text-sm">Review ARB requests and manage the pre-approval library. Board tools (directory, dues, documents) require switching to Act as Board in the banner.</p>
+          </div>
+          <div class="mb-6 flex flex-wrap gap-3">
+            <a href="/portal/arb-dashboard" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-clr-green hover:brightness-110 text-white font-semibold text-sm shadow-sm">
+              ARB Dashboard
+              {arbCounts.in_review > 0 && (
+                <span class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 rounded-full bg-amber-500 text-white text-xs font-bold">{arbCounts.in_review}</span>
+              )}
+            </a>
+            <a href="/board/library" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 border-gray-300 text-gray-700 hover:bg-gray-100 font-semibold text-sm">
+              Pre-approval library
+            </a>
+          </div>
+          <p class="text-sm text-gray-500">Use the banner above to <strong>Act as Board</strong> when you need directory, dues, meetings, or other board-only tools.</p>
+        </>
+      ) : (
+        <>
+          <div class="mb-6">
+            <h2 class="text-2xl font-heading font-bold text-clr-green mb-1">Board</h2>
+            <p class="text-gray-600 text-sm">Manage directory, documents, and operations.</p>
+          </div>
 
-      <div class="mb-6 flex flex-wrap gap-3">
-        <a href="/board/assessments" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-clr-green hover:brightness-110 text-white font-semibold text-sm shadow-sm">
-          Record payment
-        </a>
-        <a href="/board/vendors" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 border-gray-300 text-gray-700 hover:bg-gray-100 font-semibold text-sm">
-          Vendor submissions
-          {pendingVendorCount > 0 && (
-            <span class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 rounded-full bg-amber-500 text-white text-xs font-bold">{pendingVendorCount}</span>
-          )}
-        </a>
-      </div>
+          <div class="mb-6 flex flex-wrap gap-3">
+            <a href="/board/assessments" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-clr-green hover:brightness-110 text-white font-semibold text-sm shadow-sm">
+              Record payment
+            </a>
+            <a href="/board/vendors" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 border-gray-300 text-gray-700 hover:bg-gray-100 font-semibold text-sm">
+              Vendor submissions
+              {pendingVendorCount > 0 && (
+                <span class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 rounded-full bg-amber-500 text-white text-xs font-bold">{pendingVendorCount}</span>
+              )}
+            </a>
+          </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <section class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5" aria-labelledby="board-docs-heading">
-          <h3 id="board-docs-heading" class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Documents</h3>
-          <ul class="space-y-2">
-            <li>
-              <a href="/board/public-documents" class="flex items-center justify-between gap-3 p-3 rounded-xl border border-gray-100 hover:border-clr-green hover:bg-clr-green/5 transition-colors">
-                <span class="font-medium text-clr-green">Public documents</span>
-                <span class="text-xs text-gray-400">Bylaws, covenants, forms</span>
-              </a>
-            </li>
-            <li>
-              <a href="/board/member-documents" class="flex items-center justify-between gap-3 p-3 rounded-xl border border-gray-100 hover:border-clr-green hover:bg-clr-green/5 transition-colors">
-                <span class="font-medium text-clr-green">Member documents</span>
-                <span class="text-xs text-gray-400">Minutes, budgets</span>
-              </a>
-            </li>
-          </ul>
-        </section>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <section class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5" aria-labelledby="board-docs-heading">
+              <h3 id="board-docs-heading" class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Documents</h3>
+              <ul class="space-y-2">
+                <li>
+                  <a href="/board/public-documents" class="flex items-center justify-between gap-3 p-3 rounded-xl border border-gray-100 hover:border-clr-green hover:bg-clr-green/5 transition-colors">
+                    <span class="font-medium text-clr-green">Public documents</span>
+                    <span class="text-xs text-gray-400">Bylaws, covenants, forms</span>
+                  </a>
+                </li>
+                <li>
+                  <a href="/board/member-documents" class="flex items-center justify-between gap-3 p-3 rounded-xl border border-gray-100 hover:border-clr-green hover:bg-clr-green/5 transition-colors">
+                    <span class="font-medium text-clr-green">Member documents</span>
+                    <span class="text-xs text-gray-400">Minutes, budgets</span>
+                  </a>
+                </li>
+              </ul>
+            </section>
 
-        <section class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5" aria-labelledby="board-ops-heading">
-          <h3 id="board-ops-heading" class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Directory &amp; operations</h3>
-          <ul class="space-y-2">
-            <li>
-              <a href="/board/directory" class="flex items-center justify-between gap-3 p-3 rounded-xl border border-gray-100 hover:border-clr-green hover:bg-clr-green/5 transition-colors">
-                <span class="font-medium text-clr-green">Directory</span>
-                <span class="text-xs text-gray-400">Homeowner list</span>
-              </a>
-            </li>
-            <li>
-              <a href="/board/vendors" class="flex items-center justify-between gap-3 p-3 rounded-xl border border-gray-100 hover:border-clr-green hover:bg-clr-green/5 transition-colors">
-                <span class="font-medium text-clr-green">Vendors</span>
-                {pendingVendorCount > 0 ? (
-                  <span class="text-xs font-medium text-amber-600">{pendingVendorCount} pending</span>
-                ) : (
-                  <span class="text-xs text-gray-400">Recommendations</span>
-                )}
-              </a>
-            </li>
-            <li>
-              <a href="/board/meetings" class="flex items-center justify-between gap-3 p-3 rounded-xl border border-gray-100 hover:border-clr-green hover:bg-clr-green/5 transition-colors">
-                <span class="font-medium text-clr-green">Meetings</span>
-                <span class="text-xs text-gray-400">Agendas</span>
-              </a>
-            </li>
-            <li>
-              <a href="/board/maintenance" class="flex items-center justify-between gap-3 p-3 rounded-xl border border-gray-100 hover:border-clr-green hover:bg-clr-green/5 transition-colors">
-                <span class="font-medium text-clr-green">Maintenance</span>
-                <span class="text-xs text-gray-400">Requests</span>
-              </a>
-            </li>
-            <li>
-              <a href="/board/feedback" class="flex items-center justify-between gap-3 p-3 rounded-xl border border-gray-100 hover:border-clr-green hover:bg-clr-green/5 transition-colors">
-                <span class="font-medium text-clr-green">Feedback</span>
-                <span class="text-xs text-gray-400">Surveys</span>
-              </a>
-            </li>
-            <li>
-              <a href="/board/library" class="flex items-center justify-between gap-3 p-3 rounded-xl border border-gray-100 hover:border-clr-green hover:bg-clr-green/5 transition-colors">
-                <span class="font-medium text-clr-green">Pre-approval library</span>
-                <span class="text-xs text-gray-400">Photos</span>
-              </a>
-            </li>
-          </ul>
-        </section>
-      </div>
+            <section class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5" aria-labelledby="board-ops-heading">
+              <h3 id="board-ops-heading" class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Directory &amp; operations</h3>
+              <ul class="space-y-2">
+                <li>
+                  <a href="/board/directory" class="flex items-center justify-between gap-3 p-3 rounded-xl border border-gray-100 hover:border-clr-green hover:bg-clr-green/5 transition-colors">
+                    <span class="font-medium text-clr-green">Directory</span>
+                    <span class="text-xs text-gray-400">Homeowner list</span>
+                  </a>
+                </li>
+                <li>
+                  <a href="/board/vendors" class="flex items-center justify-between gap-3 p-3 rounded-xl border border-gray-100 hover:border-clr-green hover:bg-clr-green/5 transition-colors">
+                    <span class="font-medium text-clr-green">Vendors</span>
+                    {pendingVendorCount > 0 ? (
+                      <span class="text-xs font-medium text-amber-600">{pendingVendorCount} pending</span>
+                    ) : (
+                      <span class="text-xs text-gray-400">Recommendations</span>
+                    )}
+                  </a>
+                </li>
+                <li>
+                  <a href="/board/meetings" class="flex items-center justify-between gap-3 p-3 rounded-xl border border-gray-100 hover:border-clr-green hover:bg-clr-green/5 transition-colors">
+                    <span class="font-medium text-clr-green">Meetings</span>
+                    <span class="text-xs text-gray-400">Agendas</span>
+                  </a>
+                </li>
+                <li>
+                  <a href="/board/maintenance" class="flex items-center justify-between gap-3 p-3 rounded-xl border border-gray-100 hover:border-clr-green hover:bg-clr-green/5 transition-colors">
+                    <span class="font-medium text-clr-green">Maintenance</span>
+                    <span class="text-xs text-gray-400">Requests</span>
+                  </a>
+                </li>
+                <li>
+                  <a href="/board/feedback" class="flex items-center justify-between gap-3 p-3 rounded-xl border border-gray-100 hover:border-clr-green hover:bg-clr-green/5 transition-colors">
+                    <span class="font-medium text-clr-green">Feedback</span>
+                    <span class="text-xs text-gray-400">Surveys</span>
+                  </a>
+                </li>
+                <li>
+                  <a href="/board/library" class="flex items-center justify-between gap-3 p-3 rounded-xl border border-gray-100 hover:border-clr-green hover:bg-clr-green/5 transition-colors">
+                    <span class="font-medium text-clr-green">Pre-approval library</span>
+                    <span class="text-xs text-gray-400">Approve &amp; manage</span>
+                  </a>
+                </li>
+              </ul>
+            </section>
+          </div>
 
-      <p class="mt-6 text-sm text-gray-500">
-        <a href="/board/audit-logs" class="text-clr-green hover:underline">Audit logs</a> for transparency on directory and ARB access.
-      </p>
+          <p class="mt-6 text-sm text-gray-500">
+            <a href="/board/audit-logs" class="text-clr-green hover:underline">Audit logs</a> for transparency on directory and ARB access.
+          </p>
+        </>
+      )}
     </main>
   </div>
   </ProtectedPage>

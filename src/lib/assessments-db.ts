@@ -148,13 +148,15 @@ const PAYMENT_SELECT =
   'id, owner_email, paid_at, amount, balance_after, created, recorded_by, paid_through_after, payment_method, check_number';
 
 /** List recent assessment payments that have recorded_by (for board audit log). Newest first. */
-export async function listAssessmentPaymentsForAudit(db: D1Database, limit: number): Promise<AssessmentPayment[]> {
+export async function listAssessmentPaymentsForAudit(db: D1Database, limit: number, offset = 0): Promise<AssessmentPayment[]> {
+  const safeLimit = Math.max(1, Math.min(limit, 500));
+  const safeOffset = Math.max(0, offset);
   const { results } = await db
     .prepare(
       `SELECT ${PAYMENT_SELECT} FROM assessment_payments WHERE recorded_by IS NOT NULL AND recorded_by != ''
-       ORDER BY created DESC LIMIT ?`
+       ORDER BY created DESC LIMIT ? OFFSET ?`
     )
-    .bind(Math.max(1, Math.min(limit, 500)))
+    .bind(safeLimit, safeOffset)
     .all<AssessmentPayment>();
   return (results ?? []).map((r) => ({ ...r, payment_method: r.payment_method ?? null, check_number: r.check_number ?? null }));
 }

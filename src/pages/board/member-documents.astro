@@ -65,8 +65,8 @@ const docsByCategory = MEMBER_DOC_CATEGORIES.map((cat) => ({
         </div>
         <div>
           <label for="member-doc-file" class="block text-sm font-medium text-gray-700">File *</label>
-          <input type="file" id="member-doc-file" name="file" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" class="mt-1 block w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border file:border-gray-300 file:bg-gray-50 file:text-gray-700 hover:file:bg-gray-100" required />
-          <p class="text-xs text-gray-500 mt-1">PDF or Word (.pdf, .docx, .doc).</p>
+          <input type="file" id="member-doc-file" name="file" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.csv,.xls,.xlsx,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,image/jpeg,image/png,image/gif,image/webp" class="mt-1 block w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border file:border-gray-300 file:bg-gray-50 file:text-gray-700 hover:file:bg-gray-100" required data-accept-minutes=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" data-accept-all=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.csv,.xls,.xlsx,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,image/jpeg,image/png,image/gif,image/webp" />
+          <p class="text-xs text-gray-500 mt-1" id="member-doc-file-hint">Minutes: PDF or Word. Budgets / Other: PDF, Word, CSV, Excel (.xls, .xlsx), or images (resized on upload).</p>
         </div>
         <button type="submit" id="member-doc-submit" class="px-4 py-2 bg-clr-green text-white rounded-lg font-medium hover:brightness-110 disabled:opacity-70 disabled:cursor-not-allowed" aria-busy="false">Upload</button>
   </form>
@@ -108,8 +108,45 @@ const docsByCategory = MEMBER_DOC_CATEGORIES.map((cat) => ({
 
     const form = document.getElementById('member-doc-form');
     const submitBtn = document.getElementById('member-doc-submit');
+    const fileInput = document.getElementById('member-doc-file');
     const csrfInput = form?.querySelector('input[name="csrf_token"]');
     const messageEl = document.getElementById('member-doc-message');
+    const DOC_IMAGE_MAX_WIDTH = 1920;
+    const DOC_IMAGE_JPEG_QUALITY = 0.82;
+
+    function optimizeImageForWeb(file) {
+      var imageTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/heic'];
+      var isImage = file.type && (imageTypes.includes(file.type) || file.type.startsWith('image/'));
+      if (!isImage) return Promise.resolve(file);
+      return new Promise(function (resolve) {
+        var img = new Image();
+        var url = URL.createObjectURL(file);
+        img.onload = function () {
+          URL.revokeObjectURL(url);
+          var w = img.naturalWidth;
+          var h = img.naturalHeight;
+          if (w > DOC_IMAGE_MAX_WIDTH) {
+            h = Math.round((h * DOC_IMAGE_MAX_WIDTH) / w);
+            w = DOC_IMAGE_MAX_WIDTH;
+          }
+          var canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          var ctx = canvas.getContext('2d');
+          if (!ctx) { resolve(file); return; }
+          ctx.drawImage(img, 0, 0, w, h);
+          canvas.toBlob(function (blob) {
+            var name = file.name.replace(/\.[^.]+$/i, '.jpg');
+            resolve(blob ? new File([blob], name, { type: 'image/jpeg' }) : file);
+          }, 'image/jpeg', DOC_IMAGE_JPEG_QUALITY);
+        };
+        img.onerror = function () {
+          URL.revokeObjectURL(url);
+          resolve(file);
+        };
+        img.src = url;
+      });
+    }
 
     function showMessage(text, isError) {
       if (!messageEl) return;
@@ -121,21 +158,44 @@ const docsByCategory = MEMBER_DOC_CATEGORIES.map((cat) => ({
       if (messageEl) messageEl.classList.add('hidden');
     }
 
+    var categorySelect = document.getElementById('member-doc-category');
+    if (categorySelect && fileInput) {
+      var acceptMinutes = fileInput.getAttribute('data-accept-minutes') || '';
+      var acceptAll = fileInput.getAttribute('data-accept-all') || '';
+      categorySelect.addEventListener('change', function () {
+        fileInput.accept = this.value === 'minutes' ? acceptMinutes : acceptAll;
+        fileInput.value = '';
+      });
+      fileInput.accept = categorySelect.value === 'minutes' ? acceptMinutes : acceptAll;
+    }
+
     form?.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const fd = new FormData(form);
-      const file = fd.get('file');
-      if (!file || !(file instanceof File) || file.size === 0) {
+      var rawFile = fileInput?.files?.[0];
+      if (!rawFile || rawFile.size === 0) {
         showMessage('Please select a file.', true);
         return;
       }
       hideMessage();
       const token = csrfInput?.value || csrfToken || '';
-      fd.set('csrf_token', token);
       if (submitBtn) {
         submitBtn.disabled = true;
         submitBtn.setAttribute('aria-busy', 'true');
       }
+      var file = rawFile;
+      if (rawFile.type && rawFile.type.startsWith('image/')) {
+        try {
+          if (submitBtn) submitBtn.textContent = 'Optimizing image…';
+          file = await optimizeImageForWeb(rawFile);
+        } catch (err) {
+          file = rawFile;
+        }
+        if (submitBtn) submitBtn.textContent = 'Upload';
+      }
+      const fd = new FormData(form);
+      fd.set('file', file);
+      fd.set('csrf_token', token);
+      if (submitBtn) submitBtn.textContent = 'Uploading…';
       try {
         const res = await fetch('/api/member-document-upload', { method: 'POST', body: fd, credentials: 'same-origin' });
         const data = await res.json();
@@ -151,6 +211,7 @@ const docsByCategory = MEMBER_DOC_CATEGORIES.map((cat) => ({
         if (submitBtn) {
           submitBtn.disabled = false;
           submitBtn.setAttribute('aria-busy', 'false');
+          submitBtn.textContent = 'Upload';
         }
       }
     });

@@ -9,7 +9,7 @@ import PimElevationBanner from '../../components/PimElevationBanner.astro';
 import { getPortalContext } from '../../lib/portal-context';
 import { getArbRequestCountsByStatus, listArbRequestsByHousehold } from '../../lib/arb-db';
 import { listPendingSubmissions } from '../../lib/vendor-submissions-db';
-import { getRecentOwnersCount, listOwners } from '../../lib/directory-db';
+import { getRecentOwnersCount, listOwners, getOwnerByEmail } from '../../lib/directory-db';
 import { getRecentVendorsCount } from '../../lib/vendors-db';
 import { listMaintenanceByHousehold } from '../../lib/maintenance-db';
 import { listUpcomingWithCountsAndUser, householdHasRsvpd } from '../../lib/meetings-db';
@@ -20,8 +20,14 @@ const { env, session, effectiveRole } = await getPortalContext(Astro, { fingerpr
 if (!session) return Astro.redirect('/portal/login');
 
 const { email, role, name } = session;
-const firstName = name?.trim().split(/\s+/)[0] ?? null;
 const db = env?.DB;
+// Use session name when set; otherwise fall back to directory (owner) name so "Welcome back, Michael" works
+let displayName = name?.trim() || null;
+if (!displayName && db) {
+  const owner = await getOwnerByEmail(db, email);
+  displayName = owner?.name?.trim() || null;
+}
+const firstName = displayName ? displayName.split(/\s+/)[0] ?? null : null;
 let arbCounts: { pending: number; in_review: number } = { pending: 0, in_review: 0 };
 let pendingVendorCount = 0;
 const isStaffRole = effectiveRole === 'arb' || effectiveRole === 'board' || effectiveRole === 'admin' || effectiveRole === 'arb_board';
@@ -97,10 +103,9 @@ const showActionNeededBanner = showActionFeedback || showActionMaintenance || sh
 
       <main class="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
         <div class="bg-white rounded-2xl shadow-sm border border-gray-100 portal-theme-card portal-card-accent p-6 sm:p-8">
-          <h2 class="text-2xl font-heading font-bold text-clr-green mb-1">Welcome back{firstName ? `, ${firstName}` : ''}</h2>
-          <p class="text-gray-600 portal-theme-text-muted mb-6">
-            {name ? `${name} (` : ''}{email}{name ? ')' : ''}
-          </p>
+          <h2 class="text-2xl font-heading font-bold text-clr-green mb-6">
+            Welcome back{firstName ? `, ${firstName}` : ''} ({email})
+          </h2>
 
           {hasStaffWhitelistRole && (
             <div class="mb-6 p-4 rounded-xl bg-amber-50 border border-amber-200" role="region" aria-label="Elevated access">
@@ -110,7 +115,6 @@ const showActionNeededBanner = showActionFeedback || showActionMaintenance || sh
                   <p class="text-sm text-amber-800 mb-2">By default you see the same portal as all members. When you need to use board or ARB tools (directory, dues, meetings, ARB dashboard), click <strong>Request elevated access</strong>. You get 2 hours of access, then you’re back to normal. When you’re done, you can click <strong>Drop access</strong> anytime.</p>
                   <div class="flex flex-wrap items-center gap-3 mt-3">
                     <button type="button" id="pim-elevate-btn" class="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg font-medium text-sm">Request elevated access</button>
-                    <a href="/portal/request-elevated-access" class="text-sm text-amber-800 hover:text-amber-900 underline">Request elevated access (same)</a>
                     <a href="/portal/elevation-audit" class="text-sm text-amber-800 hover:text-amber-900 underline">View elevation audit (read-only)</a>
                   </div>
                 </>

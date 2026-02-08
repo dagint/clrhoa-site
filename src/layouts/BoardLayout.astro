@@ -9,6 +9,7 @@ import ProtectedPage from '../components/ProtectedPage.astro';
 import PortalNav from '../components/PortalNav.astro';
 import PortalElevatedRoleBanner from '../components/PortalElevatedRoleBanner.astro';
 import BoardNav from '../components/BoardNav.astro';
+import ArbNav from '../components/ArbNav.astro';
 import PimElevationBanner from '../components/PimElevationBanner.astro';
 import type { SessionPayload } from '../lib/auth';
 
@@ -37,7 +38,7 @@ const showPimBanner = typeof elevatedUntil === 'number' && elevatedUntil > Date.
       {showPimBanner && <PimElevationBanner elevatedUntil={elevatedUntil!} role={role} />}
       <PortalNav currentPath={currentPath} draftCount={draftCount} role={role} staffRole={role} />
       {showRoleBanner && <PortalElevatedRoleBanner role={role} session={session} />}
-      <BoardNav currentPath={currentPath} />
+      {role === 'arb' ? <ArbNav currentPath={currentPath} /> : <BoardNav currentPath={currentPath} />}
 
       <main class={mainWide ? 'max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-12' : 'max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12'}>
         <div class="mb-6">

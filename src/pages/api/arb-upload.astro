@@ -483,17 +483,19 @@ try {
   );
 }
 
+const clientIp = Astro.clientAddress || Astro.request.headers.get('cf-connecting-ip') || null;
 try {
   await insertArbRequest(db, requestId, session.email, description, {
     applicantName,
     phone,
     propertyAddress,
     applicationType,
+    ip_address: clientIp,
   });
   
   // If submitting for review, update status from 'pending' to 'in_review'
   if (isSubmit) {
-    const submitted = await setArbRequestInReview(db, requestId, session.email);
+    const submitted = await setArbRequestInReview(db, requestId, session.email, clientIp);
     if (!submitted) {
       logger.warn('Failed to update status to in_review', { requestId });
       // Don't fail the request - it's saved as pending, user can resubmit later

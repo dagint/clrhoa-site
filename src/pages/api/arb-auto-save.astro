@@ -218,12 +218,14 @@ if (!isUpdate) {
     );
   }
 
+  const clientIp = Astro.clientAddress || Astro.request.headers.get('cf-connecting-ip') || null;
   try {
     await insertArbRequest(db, requestId, session.email, description, {
       applicantName,
       phone,
       propertyAddress,
       applicationType,
+      ip_address: clientIp,
     });
     
     // Get created timestamp

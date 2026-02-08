@@ -44,6 +44,7 @@ export interface ArbAuditLogRow {
   changed_by_role: string | null;
   notes: string | null;
   created: string | null;
+  ip_address: string | null;
 }
 
 const ID_LEN = 21; // nanoid-like length
@@ -97,6 +98,7 @@ export async function insertArbRequest(
     propertyAddress?: string | null;
     applicationType?: string | null;
     copiedFromId?: string | null;
+    ip_address?: string | null;
   }
 ): Promise<void> {
   const applicantName = options?.applicantName?.trim() || null;
@@ -113,12 +115,13 @@ export async function insertArbRequest(
     .run();
   
   // Log creation to audit table
+  const ipAddress = options?.ip_address?.trim() || null;
   try {
     await db
       .prepare(
-        `INSERT INTO arb_audit_log (request_id, action, old_status, new_status, changed_by_email, changed_by_role) VALUES (?, ?, ?, ?, ?, ?)`
+        `INSERT INTO arb_audit_log (request_id, action, old_status, new_status, changed_by_email, changed_by_role, ip_address) VALUES (?, ?, ?, ?, ?, ?, ?)`
       )
-      .bind(id, 'create', null, 'pending', ownerEmail.trim().toLowerCase(), 'owner')
+      .bind(id, 'create', null, 'pending', ownerEmail.trim().toLowerCase(), 'owner', ipAddress)
       .run();
   } catch (e) {
     console.error('Failed to write audit log:', e);
@@ -283,7 +286,8 @@ export async function updateArbRequestStatus(
   status: 'approved' | 'rejected',
   arbEsign: string,
   changedByEmail?: string,
-  changedByRole?: string
+  changedByRole?: string,
+  ipAddress?: string | null
 ): Promise<boolean> {
   // Get old status for audit log
   const oldReq = await getArbRequest(db, id);
@@ -303,9 +307,9 @@ export async function updateArbRequestStatus(
     try {
       await db
         .prepare(
-          `INSERT INTO arb_audit_log (request_id, action, old_status, new_status, changed_by_email, changed_by_role, notes) VALUES (?, ?, ?, ?, ?, ?, ?)`
+          `INSERT INTO arb_audit_log (request_id, action, old_status, new_status, changed_by_email, changed_by_role, notes, ip_address) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
         )
-        .bind(id, status, oldStatus, status, changedByEmail ?? null, changedByRole ?? null, arbEsign)
+        .bind(id, status, oldStatus, status, changedByEmail ?? null, changedByRole ?? null, arbEsign, ipAddress?.trim() ?? null)
         .run();
     } catch (e) {
       console.error('[arb-db] Failed to write audit log:', e);
@@ -320,7 +324,8 @@ export async function updateArbRequestStatus(
 export async function setArbRequestInReview(
   db: D1Database,
   id: string,
-  ownerEmail: string
+  ownerEmail: string,
+  ipAddress?: string | null
 ): Promise<boolean> {
   const oldReq = await getArbRequest(db, id);
   const oldStatus = oldReq?.status ?? null;
@@ -338,9 +343,9 @@ export async function setArbRequestInReview(
     try {
       await db
         .prepare(
-          `INSERT INTO arb_audit_log (request_id, action, old_status, new_status, changed_by_email, changed_by_role) VALUES (?, ?, ?, ?, ?, ?)`
+          `INSERT INTO arb_audit_log (request_id, action, old_status, new_status, changed_by_email, changed_by_role, ip_address) VALUES (?, ?, ?, ?, ?, ?, ?)`
         )
-        .bind(id, 'submit_for_review', oldStatus, 'in_review', ownerEmail.trim().toLowerCase(), 'owner')
+        .bind(id, 'submit_for_review', oldStatus, 'in_review', ownerEmail.trim().toLowerCase(), 'owner', ipAddress?.trim() ?? null)
         .run();
     } catch (e) {
       console.error('[arb-db] Failed to write audit log:', e);
@@ -356,7 +361,8 @@ export async function setArbRequestPendingForRevision(
   id: string,
   revisionNotes: string | null,
   changedByEmail?: string,
-  changedByRole?: string
+  changedByRole?: string,
+  ipAddress?: string | null
 ): Promise<boolean> {
   const oldReq = await getArbRequest(db, id);
   const oldStatus = oldReq?.status ?? null;
@@ -375,9 +381,9 @@ export async function setArbRequestPendingForRevision(
     try {
       await db
         .prepare(
-          `INSERT INTO arb_audit_log (request_id, action, old_status, new_status, changed_by_email, changed_by_role, notes) VALUES (?, ?, ?, ?, ?, ?, ?)`
+          `INSERT INTO arb_audit_log (request_id, action, old_status, new_status, changed_by_email, changed_by_role, notes, ip_address) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
         )
-        .bind(id, 'request_revision', oldStatus, 'pending', changedByEmail ?? null, changedByRole ?? null, notes)
+        .bind(id, 'request_revision', oldStatus, 'pending', changedByEmail ?? null, changedByRole ?? null, notes, ipAddress?.trim() ?? null)
         .run();
     } catch (e) {
       console.error('[arb-db] Failed to write audit log:', e);
@@ -447,36 +453,42 @@ export async function listArbFilesByRequest(
 /** List ARB audit log entries (newest first) for the board audit-logs page. */
 export async function listArbAuditLog(
   db: D1Database,
-  limit: number = 500
+  limit: number = 500,
+  offset = 0
 ): Promise<ArbAuditLogRow[]> {
+  const safeLimit = Math.max(1, Math.min(limit, 2000));
+  const safeOffset = Math.max(0, offset);
   const { results } = await db
     .prepare(
-      `SELECT id, request_id, action, old_status, new_status, changed_by_email, changed_by_role, notes, created
-       FROM arb_audit_log ORDER BY created DESC LIMIT ?`
+      `SELECT id, request_id, action, old_status, new_status, changed_by_email, changed_by_role, notes, created, ip_address
+       FROM arb_audit_log ORDER BY created DESC LIMIT ? OFFSET ?`
     )
-    .bind(Math.max(1, Math.min(limit, 2000)))
+    .bind(safeLimit, safeOffset)
     .all<ArbAuditLogRow>();
-  return results ?? [];
+  return (results ?? []).map((r) => ({ ...r, ip_address: r.ip_address ?? null }));
 }
 
 /** List ARB audit log entries for requests owned by the given email (activity on my requests). For portal "My activity" page. */
 export async function listArbAuditLogForOwner(
   db: D1Database,
   ownerEmail: string,
-  limit: number = 200
+  limit: number = 200,
+  offset = 0
 ): Promise<ArbAuditLogRow[]> {
   const owner = ownerEmail.trim().toLowerCase();
+  const safeLimit = Math.max(1, Math.min(limit, 500));
+  const safeOffset = Math.max(0, offset);
   const { results } = await db
     .prepare(
-      `SELECT a.id, a.request_id, a.action, a.old_status, a.new_status, a.changed_by_email, a.changed_by_role, a.notes, a.created
+      `SELECT a.id, a.request_id, a.action, a.old_status, a.new_status, a.changed_by_email, a.changed_by_role, a.notes, a.created, a.ip_address
        FROM arb_audit_log a
        INNER JOIN arb_requests r ON r.id = a.request_id AND (r.deleted_at IS NULL OR r.deleted_at = '')
        WHERE r.owner_email = ?
-       ORDER BY a.created DESC LIMIT ?`
+       ORDER BY a.created DESC LIMIT ? OFFSET ?`
     )
-    .bind(owner, Math.max(1, Math.min(limit, 500)))
+    .bind(owner, safeLimit, safeOffset)
     .all<ArbAuditLogRow>();
-  return results ?? [];
+  return (results ?? []).map((r) => ({ ...r, ip_address: r.ip_address ?? null }));
 }
 
 /** List ARB audit log entries for a single request (oldest first, for timeline). */
@@ -486,12 +498,12 @@ export async function listArbAuditLogForRequest(
 ): Promise<ArbAuditLogRow[]> {
   const { results } = await db
     .prepare(
-      `SELECT id, request_id, action, old_status, new_status, changed_by_email, changed_by_role, notes, created
+      `SELECT id, request_id, action, old_status, new_status, changed_by_email, changed_by_role, notes, created, ip_address
        FROM arb_audit_log WHERE request_id = ? ORDER BY created ASC`
     )
     .bind(requestId)
     .all<ArbAuditLogRow>();
-  return results ?? [];
+  return (results ?? []).map((r) => ({ ...r, ip_address: r.ip_address ?? null }));
 }
 
 /** Date when request was first submitted for review (in_review). Used for "days in review" display. */
@@ -543,7 +555,8 @@ export async function deleteAllArbFilesByRequest(db: D1Database, requestId: stri
 export async function cancelArbRequest(
   db: D1Database,
   requestId: string,
-  ownerEmail: string
+  ownerEmail: string,
+  ipAddress?: string | null
 ): Promise<boolean> {
   const oldReq = await getArbRequest(db, requestId);
   const oldStatus = oldReq?.status ?? null;
@@ -561,9 +574,9 @@ export async function cancelArbRequest(
     try {
       await db
         .prepare(
-          `INSERT INTO arb_audit_log (request_id, action, old_status, new_status, changed_by_email, changed_by_role) VALUES (?, ?, ?, ?, ?, ?)`
+          `INSERT INTO arb_audit_log (request_id, action, old_status, new_status, changed_by_email, changed_by_role, ip_address) VALUES (?, ?, ?, ?, ?, ?, ?)`
         )
-        .bind(requestId, 'cancel', oldStatus, 'cancelled', ownerEmail.trim().toLowerCase(), 'owner')
+        .bind(requestId, 'cancel', oldStatus, 'cancelled', ownerEmail.trim().toLowerCase(), 'owner', ipAddress?.trim() ?? null)
         .run();
     } catch (e) {
       console.error('[arb-db] Failed to write audit log:', e);
@@ -582,7 +595,8 @@ export async function cancelArbRequest(
 export async function copyArbRequest(
   db: D1Database,
   sourceRequestId: string,
-  ownerEmail: string
+  ownerEmail: string,
+  ipAddress?: string | null
 ): Promise<string> {
   const source = await getArbRequest(db, sourceRequestId);
   if (!source || source.owner_email !== ownerEmail.trim().toLowerCase()) {
@@ -600,6 +614,7 @@ export async function copyArbRequest(
     propertyAddress: source.property_address,
     applicationType: source.application_type,
     copiedFromId: sourceRequestId,
+    ip_address: ipAddress,
   });
 
   const files = await listArbFilesByRequest(db, sourceRequestId);

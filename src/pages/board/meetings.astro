@@ -66,10 +66,10 @@ function formatDateTime(dt: string): string {
             <textarea id="form-meeting-description" name="description" rows="3" class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2"></textarea>
           </div>
           <div>
-            <label for="form-meeting-agenda" class="block text-sm font-medium text-gray-700">Agenda PDF</label>
-            <input type="file" id="form-meeting-agenda" name="agenda" accept=".pdf,application/pdf" class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-clr-green file:text-white" />
+            <label for="form-meeting-agenda" class="block text-sm font-medium text-gray-700">Agenda (PDF or image)</label>
+            <input type="file" id="form-meeting-agenda" name="agenda" accept=".pdf,application/pdf,image/jpeg,image/png,image/webp,image/gif" class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-clr-green file:text-white" />
             <input type="hidden" name="agenda_r2_key" id="form-agenda-key" value="" />
-            <p class="text-xs text-gray-500 mt-1">Optional. Upload a PDF; it will be stored and linked for owners.</p>
+            <p class="text-xs text-gray-500 mt-1">Optional. PDF or image; images are resized before upload to save space.</p>
           </div>
           <div class="rounded-lg border border-amber-200 bg-amber-50/80 p-4">
             <label class="flex items-start gap-3 cursor-pointer">
@@ -143,20 +143,57 @@ function formatDateTime(dt: string): string {
 <script>
   const formPanel = document.getElementById('form-panel');
   const formTitle = document.getElementById('form-title');
-  const form = document.getElementById('meeting-form') as HTMLFormElement;
-  const formId = document.getElementById('form-id') as HTMLInputElement;
-  const formAgendaKey = document.getElementById('form-agenda-key') as HTMLInputElement;
-  const agendaFileInput = document.getElementById('form-meeting-agenda') as HTMLInputElement;
+  const form = document.getElementById('meeting-form');
+  const formId = document.getElementById('form-id');
+  const formAgendaKey = document.getElementById('form-agenda-key');
+  const agendaFileInput = document.getElementById('form-meeting-agenda');
+
+  const AGENDA_IMAGE_MAX_WIDTH = 1920;
+  const AGENDA_IMAGE_JPEG_QUALITY = 0.82;
+
+  function optimizeImageForWeb(file) {
+    const imageTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/heic'];
+    const isImage = file.type && (imageTypes.includes(file.type) || file.type.startsWith('image/'));
+    if (!isImage) return Promise.resolve(file);
+    return new Promise(function (resolve) {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = function () {
+        URL.revokeObjectURL(url);
+        let w = img.naturalWidth;
+        let h = img.naturalHeight;
+        if (w > AGENDA_IMAGE_MAX_WIDTH) {
+          h = Math.round((h * AGENDA_IMAGE_MAX_WIDTH) / w);
+          w = AGENDA_IMAGE_MAX_WIDTH;
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { resolve(file); return; }
+        ctx.drawImage(img, 0, 0, w, h);
+        canvas.toBlob(function (blob) {
+          const name = file.name.replace(/\.[^.]+$/i, '.jpg');
+          resolve(blob ? new File([blob], name, { type: 'image/jpeg' }) : file);
+        }, 'image/jpeg', AGENDA_IMAGE_JPEG_QUALITY);
+      };
+      img.onerror = function () {
+        URL.revokeObjectURL(url);
+        resolve(file);
+      };
+      img.src = url;
+    });
+  }
 
   document.getElementById('btn-new-meeting')?.addEventListener('click', () => {
     formId.value = '';
-    (document.getElementById('form-meeting-title') as HTMLInputElement).value = '';
-    (document.getElementById('form-meeting-datetime') as HTMLInputElement).value = '';
-    (document.getElementById('form-meeting-location') as HTMLInputElement).value = '';
-    (document.getElementById('form-meeting-description') as HTMLTextAreaElement).value = '';
+    document.getElementById('form-meeting-title').value = '';
+    document.getElementById('form-meeting-datetime').value = '';
+    document.getElementById('form-meeting-location').value = '';
+    document.getElementById('form-meeting-description').value = '';
     formAgendaKey.value = '';
     agendaFileInput.value = '';
-    formTitle!.textContent = 'New meeting';
+    formTitle.textContent = 'New meeting';
     formPanel?.classList.remove('hidden');
   });
 
@@ -166,7 +203,7 @@ function formatDateTime(dt: string): string {
 
   document.querySelectorAll('.edit-meeting').forEach((btn) => {
     btn.addEventListener('click', () => {
-      const el = btn as HTMLElement;
+      const el = btn;
       const id = el.dataset.id;
       const title = el.dataset.title;
       const datetime = el.dataset.datetime;
@@ -175,22 +212,22 @@ function formatDateTime(dt: string): string {
       const agendaKey = el.dataset.agendaKey ?? '';
       const postToPublic = el.dataset.postToPublic === '1';
       formId.value = id ?? '';
-      (document.getElementById('form-meeting-title') as HTMLInputElement).value = title ?? '';
-      (document.getElementById('form-meeting-datetime') as HTMLInputElement).value = datetime?.slice(0, 16) ?? '';
-      (document.getElementById('form-meeting-location') as HTMLInputElement).value = location;
-      (document.getElementById('form-meeting-description') as HTMLTextAreaElement).value = description;
+      document.getElementById('form-meeting-title').value = title ?? '';
+      document.getElementById('form-meeting-datetime').value = datetime?.slice(0, 16) ?? '';
+      document.getElementById('form-meeting-location').value = location;
+      document.getElementById('form-meeting-description').value = description;
       formAgendaKey.value = agendaKey;
-      (document.getElementById('form-post-to-public-news') as HTMLInputElement).checked = postToPublic;
+      document.getElementById('form-post-to-public-news').checked = postToPublic;
       agendaFileInput.value = '';
-      formTitle!.textContent = 'Edit meeting';
+      formTitle.textContent = 'Edit meeting';
       formPanel?.classList.remove('hidden');
     });
   });
 
   document.querySelectorAll('.delete-meeting').forEach((btn) => {
     btn.addEventListener('click', async () => {
-      const id = (btn as HTMLElement).dataset.id;
-      const title = (btn as HTMLElement).dataset.title;
+      const id = btn.dataset.id;
+      const title = btn.dataset.title;
       if (!id || !confirm(`Delete "${title}"? This cannot be undone.`)) return;
       try {
         const res = await fetch(`/api/meetings?id=${encodeURIComponent(id)}`, { method: 'DELETE', credentials: 'same-origin' });
@@ -204,8 +241,11 @@ function formatDateTime(dt: string): string {
   });
 
   agendaFileInput?.addEventListener('change', async () => {
-    const file = agendaFileInput.files?.[0];
-    if (!file) return;
+    const rawFile = agendaFileInput.files?.[0];
+    if (!rawFile) return;
+    const file = rawFile.type && rawFile.type.startsWith('image/')
+      ? await optimizeImageForWeb(rawFile)
+      : rawFile;
     const fd = new FormData();
     fd.set('file', file);
     try {
@@ -221,10 +261,10 @@ function formatDateTime(dt: string): string {
   form?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const id = formId.value.trim();
-    const title = (document.getElementById('form-meeting-title') as HTMLInputElement).value.trim();
-    const datetime = (document.getElementById('form-meeting-datetime') as HTMLInputElement).value.trim();
-    const location = (document.getElementById('form-meeting-location') as HTMLInputElement).value.trim();
-    const description = (document.getElementById('form-meeting-description') as HTMLTextAreaElement).value.trim();
+    const title = document.getElementById('form-meeting-title').value.trim();
+    const datetime = document.getElementById('form-meeting-datetime').value.trim();
+    const location = document.getElementById('form-meeting-location').value.trim();
+    const description = document.getElementById('form-meeting-description').value.trim();
     const agendaKey = formAgendaKey.value.trim();
 
     if (!title || !datetime) {
@@ -232,7 +272,7 @@ function formatDateTime(dt: string): string {
       return;
     }
 
-    const postToPublic = (document.getElementById('form-post-to-public-news') as HTMLInputElement).checked;
+    const postToPublic = document.getElementById('form-post-to-public-news').checked;
     const body: Record<string, string | boolean> = { title, datetime, location, description, agenda_r2_key: agendaKey, post_to_public_news: postToPublic };
     const url = '/api/meetings';
     const method = id ? 'PUT' : 'POST';

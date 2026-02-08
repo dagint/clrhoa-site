@@ -17,7 +17,7 @@ const allRequests = db ? await listArbRequestsByHousehold(db, session.email) : [
 const draftCount = allRequests.filter((r) => r.status === 'pending').length;
 ---
 
-<BoardLayout title="Pre-approval library" subtitle="Add and manage architectural pre-approval items" draftCount={draftCount} role={effectiveRole} session={session} elevatedUntil={session.elevated_until}>
+<BoardLayout title="Pre-approval library" subtitle="ARB can add items; one Board member must approve before they appear in the member library" draftCount={draftCount} role={effectiveRole} session={session} elevatedUntil={session.elevated_until}>
   <h2 class="text-xl font-heading font-bold text-clr-green mb-6">Add pre-approval item</h2>
       <form id="library-form" class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-8 space-y-4">
         <input type="hidden" name="id" id="form-id" value="" />
@@ -46,7 +46,7 @@ const draftCount = allRequests.filter((r) => r.status === 'pending').length;
         <div id="lib-photos-section">
           <label class="block text-sm font-medium text-gray-700">Photos (1-5 images)</label>
           <input type="file" id="lib-files" name="file_0" accept="image/*" multiple class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:rounded file:border-0 file:bg-clr-green file:px-4 file:py-2 file:text-white file:font-medium" />
-          <p class="text-xs text-gray-500 mt-1">First image is used as the card thumbnail. Max 5 images.</p>
+          <p class="text-xs text-gray-500 mt-1">First image is used as the card thumbnail. Max 5 images. Photos are automatically resized and compressed for web to reduce size.</p>
         </div>
         <div class="flex gap-3">
           <button type="submit" id="lib-submit" class="px-4 py-2 bg-clr-green text-white rounded-lg font-medium hover:brightness-110">Add item</button>
@@ -61,6 +61,7 @@ const draftCount = allRequests.filter((r) => r.status === 'pending').length;
         <ul class="space-y-4">
           {items.map((item) => {
             const photos = parsePhotos(item.photos);
+            const isPending = (item.approved ?? 1) === 0;
             return (
               <li class="bg-white rounded-xl border border-gray-100 p-4 shadow-sm flex flex-wrap gap-4 items-start" data-id={item.id}>
                 {photos[0] && (
@@ -71,12 +72,18 @@ const draftCount = allRequests.filter((r) => r.status === 'pending').length;
                 <div class="flex-1 min-w-0">
                   <span class="font-medium text-gray-900">{item.title ?? '-'}</span>
                   {item.category && <span class="ml-2 text-sm text-gray-500">({item.category})</span>}
+                  {isPending && (
+                    <span class="ml-2 inline-block px-2 py-0.5 text-xs font-medium rounded bg-amber-100 text-amber-800">Pending board approval</span>
+                  )}
                   {item.rules && <p class="text-sm text-gray-600 mt-1 line-clamp-2">{item.rules}</p>}
                   {photos.length > 0 && (
                     <p class="text-xs text-gray-500 mt-1">{photos.length} photo(s)</p>
                   )}
                 </div>
-                <div class="flex gap-2 shrink-0">
+                <div class="flex gap-2 shrink-0 flex-wrap">
+                  {effectiveRole === 'board' && isPending && (
+                    <button type="button" class="lib-approve-btn px-3 py-1.5 text-sm bg-clr-green text-white rounded-lg hover:brightness-110" data-id={item.id}>Approve</button>
+                  )}
                   <button type="button" class="lib-edit-btn px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200" data-id={item.id} data-category={item.category ?? ''} data-title={item.title ?? ''} data-description={item.description ?? ''} data-rules={item.rules ?? ''} data-photos={item.photos ?? '[]'}>Edit</button>
                   <button type="button" class="lib-delete-btn px-3 py-1.5 text-sm bg-red-50 text-red-700 rounded-lg hover:bg-red-100" data-id={item.id}>Delete</button>
                 </div>
@@ -99,6 +106,43 @@ const draftCount = allRequests.filter((r) => r.status === 'pending').length;
       var cancelBtn = document.getElementById('lib-cancel');
       var photosSection = document.getElementById('lib-photos-section');
       var csrfInput = document.getElementById('form-csrf');
+
+      var LIBRARY_PHOTO_MAX_WIDTH = 1920;
+      var LIBRARY_PHOTO_JPEG_QUALITY = 0.82;
+
+      function optimizeImageForWeb(file) {
+        var imageTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/heic'];
+        var isImage = file.type && (imageTypes.indexOf(file.type) !== -1 || file.type.indexOf('image/') === 0);
+        if (!isImage) return Promise.resolve(file);
+        return new Promise(function (resolve) {
+          var img = new Image();
+          var url = URL.createObjectURL(file);
+          img.onload = function () {
+            URL.revokeObjectURL(url);
+            var w = img.naturalWidth;
+            var h = img.naturalHeight;
+            if (w > LIBRARY_PHOTO_MAX_WIDTH) {
+              h = Math.round((h * LIBRARY_PHOTO_MAX_WIDTH) / w);
+              w = LIBRARY_PHOTO_MAX_WIDTH;
+            }
+            var canvas = document.createElement('canvas');
+            canvas.width = w;
+            canvas.height = h;
+            var ctx = canvas.getContext('2d');
+            if (!ctx) { resolve(file); return; }
+            ctx.drawImage(img, 0, 0, w, h);
+            canvas.toBlob(function (blob) {
+              var name = file.name.replace(/\.[^.]+$/i, '.jpg');
+              resolve(blob ? new File([blob], name, { type: 'image/jpeg' }) : file);
+            }, 'image/jpeg', LIBRARY_PHOTO_JPEG_QUALITY);
+          };
+          img.onerror = function () {
+            URL.revokeObjectURL(url);
+            resolve(file);
+          };
+          img.src = url;
+        });
+      }
 
       function setFormCreate() {
         idInput.value = '';
@@ -150,16 +194,20 @@ const draftCount = allRequests.filter((r) => r.status === 'pending').length;
           return;
         }
 
-        var formData = new FormData(form);
-        formData.set('csrf_token', token);
-        if (fileInput && fileInput.files && fileInput.files.length) {
-          for (var i = 0; i < Math.min(5, fileInput.files.length); i++) {
-            formData.set('file_' + i, fileInput.files[i]);
-          }
-        }
         submitBtn.disabled = true;
-        fetch('/api/preapproval', { method: 'POST', body: formData })
-          .then(function (r) { return r.json().then(function (data) { return { ok: r.ok, data: data }; }); })
+        var rawFiles = fileInput && fileInput.files && fileInput.files.length
+          ? Array.prototype.slice.call(fileInput.files, 0, 5)
+          : [];
+        Promise.all(rawFiles.map(function (f) { return optimizeImageForWeb(f); }))
+          .then(function (optimizedFiles) {
+            var formData = new FormData(form);
+            formData.set('csrf_token', token);
+            optimizedFiles.forEach(function (f, i) {
+              if (f && f.size > 0) formData.set('file_' + i, f);
+            });
+            return fetch('/api/preapproval', { method: 'POST', body: formData })
+              .then(function (r) { return r.json().then(function (data) { return { ok: r.ok, data: data }; }); });
+          })
           .then(function (_) {
             if (_.ok) { setFormCreate(); window.location.reload(); }
             else alert(_.data.error || 'Create failed');
@@ -198,6 +246,27 @@ const draftCount = allRequests.filter((r) => r.status === 'pending').length;
               else alert(data.error || 'Delete failed');
             })
             .catch(function () { alert('Network error'); });
+        });
+      });
+
+      document.querySelectorAll('.lib-approve-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var id = this.getAttribute('data-id');
+          if (!id) return;
+          var token = (csrfInput && csrfInput.value) || '';
+          var b = this;
+          b.disabled = true;
+          fetch('/api/preapproval', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: id, approved: 1, csrf_token: token })
+          })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+              if (data.success) window.location.reload();
+              else { alert(data.error || 'Approve failed'); b.disabled = false; }
+            })
+            .catch(function () { alert('Network error'); b.disabled = false; });
         });
       });
     })();

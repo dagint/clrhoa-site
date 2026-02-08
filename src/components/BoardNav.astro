@@ -11,6 +11,7 @@ const { currentPath } = Astro.props;
 
 const links: { href: string; label: string }[] = [
   { href: '/portal/board', label: 'Board' },
+  { href: '/portal/arb-dashboard', label: 'ARB Dashboard' },
   { href: '/board/directory', label: 'Directory' },
   { href: '/board/assessments', label: 'Dues' },
   { href: '/board/vendors', label: 'Vendors' },
@@ -25,20 +26,22 @@ const links: { href: string; label: string }[] = [
   { href: '/board/backups', label: 'Backups' },
   { href: '/admin/feedback', label: 'Site feedback' },
   { href: '/admin/sms-requests', label: 'SMS requests' },
+  { href: '/portal/usage', label: 'Site usage' },
 ];
 
 function isCurrent(href: string): boolean {
   if (href === '/portal/board') return currentPath === '/portal/board';
+  if (href === '/portal/arb-dashboard') return currentPath === '/portal/arb-dashboard' || currentPath.startsWith('/portal/arb-dashboard');
   return currentPath.startsWith(href);
 }
 ---
 
-<nav class="bg-white/80 border-b border-gray-200 px-4 sm:px-6 py-2" aria-label="Board administration">
+<nav class="bg-white border-b border-gray-200 portal-theme-header px-4 sm:px-6 py-2" aria-label="Board administration">
   <div class="max-w-4xl mx-auto flex flex-wrap items-center gap-x-4 gap-y-1">
     {links.map(({ href, label }) => (
       <a
         href={href}
-        class={`text-sm py-1.5 px-1 rounded hover:bg-gray-100 ${isCurrent(href) ? 'font-semibold text-clr-green' : 'text-gray-600 hover:text-clr-green'}`}
+        class={`text-sm py-1.5 px-1 rounded hover:bg-gray-100 portal-theme-text ${isCurrent(href) ? 'font-semibold text-clr-green' : 'text-gray-600 portal-theme-text-muted hover:text-clr-green'}`}
       >
         {label}
       </a>

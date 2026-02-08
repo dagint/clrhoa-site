@@ -254,11 +254,30 @@ function parseFiles(filesJson: string | null): { name: string; key: string }[] {
           }
         }
         submitBtn.disabled = true;
-        fetch('/api/vendor-submissions', { method: 'POST', body: formData })
-          .then(function (res) { return res.json().then(function (data) { return { res: res, data: data }; }); })
-          .then(function (_) {
-            var res = _.res, data = _.data;
-            if (res.ok && data.success) {
+        fetch('/api/vendor-submissions', {
+          method: 'POST',
+          body: formData,
+          headers: { Accept: 'application/json' }
+        })
+          .then(function (res) {
+            if (res.redirected && res.url && res.url.indexOf('submitted=1') !== -1) {
+              return { redirected: true };
+            }
+            return res.json().then(function (data) { return { res: res, data: data }; });
+          })
+          .then(function (out) {
+            if (out.redirected) {
+              var target = '/portal/vendors?submitted=1';
+              if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                if (window.location.protocol === 'https:') {
+                  target = 'http://' + window.location.host + target;
+                }
+              }
+              window.location.href = target;
+              return;
+            }
+            var res = out.res, data = out.data;
+            if (res && res.ok && data && data.success) {
               messageEl.textContent = data.message || 'Submitted. A reviewer will approve it before it appears on the list.';
               messageEl.className = 'text-sm text-clr-green';
               form.reset();
@@ -267,8 +286,13 @@ function parseFiles(filesJson: string | null): { name: string; key: string }[] {
               if (categorySelect) categorySelect.value = '';
               if (categoryNewWrap) categoryNewWrap.classList.add('hidden');
               if (categoryNewInput) categoryNewInput.value = '';
+              var target = '/portal/vendors?submitted=1';
+              if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                if (window.location.protocol === 'https:') target = 'http://' + window.location.host + target;
+              }
+              setTimeout(function () { window.location.href = target; }, 800);
             } else {
-              messageEl.textContent = data.error || 'Submission failed.';
+              messageEl.textContent = (data && data.error) || 'Submission failed.';
               messageEl.className = 'text-sm text-red-600';
             }
           })

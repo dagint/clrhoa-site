@@ -55,8 +55,17 @@ const errorParam = url.searchParams.get('error') ?? '';
 
   <section class="mb-8" aria-labelledby="automated-heading">
     <h2 id="automated-heading" class="text-lg font-heading font-semibold text-clr-green mb-3">Automated backups (Cloudflare R2)</h2>
-    <p class="text-sm text-gray-600 mb-2">
-      The backup Worker runs daily at 2:00 AM UTC. It exports D1 and the whitelist and stores them in R2 under <code class="bg-gray-100 px-1 rounded">backups/d1/</code> and <code class="bg-gray-100 px-1 rounded">backups/kv/</code>. Retention is applied (default 30 days). Deploy the Worker with <code class="bg-gray-100 px-1 rounded">npm run backup:deploy</code> and set <code class="bg-gray-100 px-1 rounded">CLOUDFLARE_API_TOKEN</code> and <code class="bg-gray-100 px-1 rounded">CLOUDFLARE_ACCOUNT_ID</code>.
+    <p class="text-sm text-gray-600 mb-3">
+      The backup Worker runs daily at 2:00 AM UTC. It exports D1 and the whitelist and stores them in R2 under <code class="bg-gray-100 px-1 rounded">backups/d1/</code> and <code class="bg-gray-100 px-1 rounded">backups/kv/</code>. Retention is applied (default 30 days).
+    </p>
+    <div id="backup-status" class="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700 space-y-1.5" role="status" aria-live="polite">
+      <p class="font-medium text-gray-800">Status</p>
+      <p id="backup-status-manual">Checking…</p>
+      <p id="backup-status-r2">Checking…</p>
+      <p id="backup-status-google">Checking…</p>
+    </div>
+    <p class="text-xs text-gray-500 mt-2">
+      Deploy the Worker with <code class="bg-gray-100 px-1 rounded">npm run backup:deploy</code> and set <code class="bg-gray-100 px-1 rounded">CLOUDFLARE_API_TOKEN</code> and <code class="bg-gray-100 px-1 rounded">CLOUDFLARE_ACCOUNT_ID</code> for the Worker (and for manual download above).
     </p>
   </section>
 
@@ -129,6 +138,45 @@ const errorParam = url.searchParams.get('error') ?? '';
       }
       load();
 
+      (function loadBackupStatus() {
+        const manualEl = document.getElementById('backup-status-manual');
+        const r2El = document.getElementById('backup-status-r2');
+        const googleEl = document.getElementById('backup-status-google');
+        if (!manualEl || !r2El || !googleEl) return;
+        fetch('/api/board/backup-status', { credentials: 'same-origin' })
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
+            if (data.error) {
+              manualEl.textContent = 'Could not load status.';
+              r2El.textContent = '';
+              googleEl.textContent = '';
+              return;
+            }
+            manualEl.textContent = data.manual_download_configured
+              ? 'Manual download: Configured. (CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN are set.)'
+              : 'Manual download: Not configured. Set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN in your deployment to enable "Download backup (ZIP)".';
+            if (data.last_r2_backup_at) {
+              var d = new Date(data.last_r2_backup_at);
+              var label = isNaN(d.getTime()) ? data.last_r2_backup_at : d.toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' }) + ' UTC';
+              r2El.textContent = 'Automated R2 backups: Last run at ' + label + '.';
+            } else {
+              r2El.textContent = 'Automated R2 backups: No run recorded yet. Deploy the backup Worker (npm run backup:deploy) and set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN for the Worker.';
+            }
+            if (data.last_google_backup_at) {
+              var gd = new Date(data.last_google_backup_at);
+              var glabel = isNaN(gd.getTime()) ? data.last_google_backup_at : gd.toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' }) + ' UTC';
+              googleEl.textContent = 'Google Drive: Last run at ' + glabel + '.';
+            } else {
+              googleEl.textContent = 'Google Drive: No run recorded yet. Enable Google Drive backup and set a folder to see last run time.';
+            }
+          })
+          .catch(function () {
+            manualEl.textContent = 'Could not load status.';
+            r2El.textContent = '';
+            if (googleEl) googleEl.textContent = '';
+          });
+      })();
+
       form?.addEventListener('submit', async function (e) {
         e.preventDefault();
         const enabled = document.getElementById('google_drive_enabled');
@@ -137,10 +185,10 @@ const errorParam = url.searchParams.get('error') ?? '';
         const day = document.getElementById('schedule_day_of_week');
         const payload = {
           google_drive_enabled: enabled?.checked ?? false,
-          google_drive_folder_id: (folderId as HTMLInputElement)?.value ?? '',
-          schedule_type: (scheduleType as HTMLSelectElement)?.value ?? 'daily',
-          schedule_hour_utc: parseInt((hour as HTMLInputElement)?.value ?? '2', 10),
-          schedule_day_of_week: parseInt((day as HTMLInputElement)?.value ?? '0', 10),
+          google_drive_folder_id: folderId?.value ?? '',
+          schedule_type: scheduleType?.value ?? 'daily',
+          schedule_hour_utc: parseInt(hour?.value ?? '2', 10),
+          schedule_day_of_week: parseInt(day?.value ?? '0', 10),
           include_r2_manifest: false,
           include_r2_files: false,
         };

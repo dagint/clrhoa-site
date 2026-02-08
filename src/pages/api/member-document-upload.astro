@@ -77,13 +77,31 @@ if (!file || !(file instanceof File) || file.size === 0) {
   return new Response(JSON.stringify({ error: 'No file provided' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
 }
 
-const allowedTypes = [
+const MINUTES_TYPES = [
   'application/pdf',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   'application/msword',
 ];
-if (!allowedTypes.includes(file.type)) {
-  return new Response(JSON.stringify({ error: 'File must be PDF or Word (.pdf, .docx, .doc)' }), {
+const BUDGETS_OTHER_TYPES = [
+  ...MINUTES_TYPES,
+  'text/csv',
+  'text/plain', // some CSVs sent as text/plain
+  'application/csv',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+];
+const allowedByCategory =
+  category === 'minutes' ? MINUTES_TYPES : BUDGETS_OTHER_TYPES;
+const isAllowed = allowedByCategory.includes(file.type) || (file.type === 'text/plain' && category !== 'minutes' && /\.csv$/i.test(file.name));
+if (!isAllowed) {
+  const msg = category === 'minutes'
+    ? 'Minutes: use PDF or Word (.pdf, .docx, .doc).'
+    : 'Budgets / Other: use PDF, Word, CSV, Excel (.xls, .xlsx), or images (JPEG, PNG, GIF, WebP).';
+  return new Response(JSON.stringify({ error: msg }), {
     status: 400,
     headers: { 'Content-Type': 'application/json' },
   });
@@ -95,8 +113,28 @@ if (!db || !r2) {
   return new Response(JSON.stringify({ error: 'Server configuration error' }), { status: 503, headers: { 'Content-Type': 'application/json' } });
 }
 
-const ext = file.name.includes('.') ? file.name.split('.').pop()?.toLowerCase() ?? 'pdf' : 'pdf';
-const safeExt = ['pdf', 'docx', 'doc'].includes(ext) ? ext : 'pdf';
+function getSafeExt(file: File): string {
+  const name = file.name || '';
+  const ext = name.includes('.') ? name.split('.').pop()?.toLowerCase() ?? '' : '';
+  const fromType: Record<string, string> = {
+    'application/pdf': 'pdf',
+    'application/msword': 'doc',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+    'text/csv': 'csv',
+    'application/csv': 'csv',
+    'application/vnd.ms-excel': 'xls',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
+    'image/jpeg': 'jpg',
+    'image/png': 'png',
+    'image/gif': 'gif',
+    'image/webp': 'webp',
+  };
+  if (fromType[file.type]) return fromType[file.type];
+  if (['pdf', 'doc', 'docx', 'csv', 'xls', 'xlsx', 'jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) return ext === 'jpeg' ? 'jpg' : ext;
+  if (file.type.startsWith('image/')) return 'jpg';
+  return 'bin';
+}
+const safeExt = getSafeExt(file);
 const uniqueId = crypto.randomUUID?.() ?? Date.now().toString(36);
 const fileKey = `member-docs/${category}/${uniqueId}.${safeExt}`;
 

@@ -10,12 +10,14 @@ export const prerender = false;
 
 import { verifyCsrfToken, verifyOrigin, getEffectiveRole } from '../../lib/auth';
 import { requireSession, requireDb, jsonResponse } from '../../lib/api-helpers';
+import { canRecordPayments } from '../../lib/auth';
 import {
   listPreapprovalItems,
   getPreapprovalById,
   insertPreapprovalItem,
   updatePreapprovalItem,
   deletePreapprovalItem,
+  setPreapprovalApproved,
   createPreapprovalId,
   parsePhotos,
   type PreapprovalPhoto,
@@ -40,11 +42,12 @@ if (!verifyOrigin(origin, referer, Astro.url.origin)) {
 const effectiveRole = getEffectiveRole(session);
 const isReviewer = effectiveRole === 'board' || effectiveRole === 'admin' || effectiveRole === 'arb' || effectiveRole === 'arb_board';
 
-// GET: list (any authenticated)
+// GET: list (any authenticated). approved_only=1 for portal (only show approved items).
 if (Astro.request.method === 'GET') {
   const url = new URL(Astro.request.url);
   const category = url.searchParams.get('category') || undefined;
-  const items = await listPreapprovalItems(db, { category: category || undefined });
+  const approvedOnly = url.searchParams.get('approved_only') === '1';
+  const items = await listPreapprovalItems(db, { category: category || undefined, approvedOnly });
   return jsonResponse({ items });
 }
 
@@ -115,6 +118,24 @@ if (Astro.request.method === 'PUT') {
     rules: body.rules,
     photos: body.photos ?? undefined,
   });
+  if (!updated) return jsonResponse({ error: 'Item not found' }, 404);
+  return jsonResponse({ success: true });
+}
+
+// PATCH: approve item (board only). One board member must approve before item appears in portal library.
+if (Astro.request.method === 'PATCH') {
+  if (!canRecordPayments(effectiveRole)) return jsonResponse({ error: 'Only Board can approve library items.' }, 403);
+  let body: { id: string; approved?: number; csrf_token?: string };
+  try {
+    body = await Astro.request.json();
+  } catch {
+    return jsonResponse({ error: 'Invalid JSON' }, 400);
+  }
+  if (!verifyCsrfToken(session, body.csrf_token ?? '')) return jsonResponse({ error: 'Invalid security token.' }, 403);
+  const id = (body.id ?? '').trim();
+  if (!id) return jsonResponse({ error: 'id required' }, 400);
+  const approved = body.approved === 1 ? 1 : 0;
+  const updated = await setPreapprovalApproved(db, id, approved as 0 | 1);
   if (!updated) return jsonResponse({ error: 'Item not found' }, 404);
   return jsonResponse({ success: true });
 }

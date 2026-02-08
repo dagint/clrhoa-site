@@ -8,11 +8,36 @@ import { getPortalContext } from '../../lib/portal-context';
 import { getOwnerByEmail, getPhonesArray, listHouseholdMembersWithLogin } from '../../lib/directory-db';
 import { listArbRequestsByHousehold } from '../../lib/arb-db';
 import { getUserByEmail, type NotificationPreferences } from '../../lib/db';
-import { listLoginHistoryByEmail } from '../../lib/login-history-db';
+import { getLastLogonTime, listLoginHistoryByEmail } from '../../lib/login-history-db';
 import { NOTIFICATION_TYPES } from '../../lib/notifications';
+
+const LOGIN_PAGE_SIZES = [10, 25, 50, 100] as const;
+const DEFAULT_LOGIN_PAGE_SIZE = 10;
 
 const { env, session, effectiveRole } = await getPortalContext(Astro);
 if (!session) return Astro.redirect('/portal/login');
+
+const url = Astro.url;
+const getPage = (key: string): number => {
+  const p = url.searchParams.get(key);
+  const n = p ? parseInt(p, 10) : 1;
+  return Number.isNaN(n) || n < 1 ? 1 : Math.min(n, 500);
+};
+const getLimit = (): number => {
+  const p = url.searchParams.get('login_limit');
+  const n = p ? parseInt(p, 10) : DEFAULT_LOGIN_PAGE_SIZE;
+  return LOGIN_PAGE_SIZES.includes(n as (typeof LOGIN_PAGE_SIZES)[number]) ? n : DEFAULT_LOGIN_PAGE_SIZE;
+};
+const loginPage = getPage('login_page');
+const loginPageSize = getLimit();
+
+function loginActivityPageUrl(key: string, value: number): string {
+  const u = new URL(url);
+  if (value <= 1) u.searchParams.delete(key);
+  else u.searchParams.set(key, String(value));
+  if (loginPageSize !== DEFAULT_LOGIN_PAGE_SIZE) u.searchParams.set('login_limit', String(loginPageSize));
+  return u.pathname + u.search;
+}
 
 const db = env?.DB;
 const owner = db ? await getOwnerByEmail(db, session.email) : null;
@@ -47,8 +72,8 @@ const requiredParam = Astro.url.searchParams.get('required') === '1';
 const startInEditMode = !profileComplete || requiredParam;
 const pushEnabled = notification_preferences['push_enabled'] === true;
 
-const loginHistory = db ? await listLoginHistoryByEmail(db, session.email, 30) : [];
-const lastLogon = loginHistory[0]?.logged_at ?? null;
+const lastLogon = db ? await getLastLogonTime(db, session.email) : null;
+const loginHistory = db ? await listLoginHistoryByEmail(db, session.email, loginPageSize, (loginPage - 1) * loginPageSize) : [];
 
 const householdMembersWithLogin = db ? await listHouseholdMembersWithLogin(db, session.email) : [];
 
@@ -211,24 +236,53 @@ function formatLoginTime(iso: string | null): string {
           {loginHistory.length === 0 ? (
             <p class="text-sm text-gray-500">No login history yet. History is recorded each time you sign in.</p>
           ) : (
-            <div class="overflow-x-auto">
-              <table class="w-full text-sm">
-                <thead class="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th class="text-left py-2 px-3 font-medium text-gray-700">When</th>
-                    <th class="text-left py-2 px-3 font-medium text-gray-700">IP address</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {loginHistory.map((row) => (
-                    <tr class="border-b border-gray-100 last:border-0">
-                      <td class="py-2 px-3 text-gray-700">{formatLoginTime(row.logged_at)}</td>
-                      <td class="py-2 px-3 font-mono text-gray-600">{row.ip_address?.trim() || '—'}</td>
-                    </tr>
+            <>
+              <div class="flex flex-wrap items-center gap-2 mb-3">
+                <label for="profile-login-per-page" class="text-sm text-gray-600">Per page:</label>
+                <select id="profile-login-per-page" name="login_limit" class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-700 focus:border-clr-green focus:outline-none focus:ring-1 focus:ring-clr-green" aria-label="Login history entries per page">
+                  {LOGIN_PAGE_SIZES.map((size) => (
+                    <option value={size} selected={loginPageSize === size}>{size}</option>
                   ))}
-                </tbody>
-              </table>
-            </div>
+                </select>
+              </div>
+              <div class="rounded-xl border border-gray-200 overflow-hidden">
+                <div class="overflow-x-auto">
+                  <table class="w-full text-sm">
+                    <thead class="bg-gray-50 border-b border-gray-200">
+                      <tr>
+                        <th class="text-left py-2 px-3 font-medium text-gray-700">When</th>
+                        <th class="text-left py-2 px-3 font-medium text-gray-700">IP address</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {loginHistory.map((row) => (
+                        <tr class="border-b border-gray-100 last:border-0">
+                          <td class="py-2 px-3 text-gray-700">{formatLoginTime(row.logged_at)}</td>
+                          <td class="py-2 px-3 font-mono text-gray-600">{row.ip_address?.trim() || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <nav class="flex items-center justify-between gap-2 py-2 px-3 border-t border-gray-200 bg-gray-50 text-sm" aria-label="Login activity pagination">
+                  <span class="text-gray-600">Page {loginPage}</span>
+                  <div class="flex gap-2">
+                    {loginPage > 1 && <a href={loginActivityPageUrl('login_page', loginPage - 1)} class="text-clr-green hover:underline font-medium">Previous</a>}
+                    {loginHistory.length === loginPageSize && <a href={loginActivityPageUrl('login_page', loginPage + 1)} class="text-clr-green hover:underline font-medium">Next</a>}
+                  </div>
+                </nav>
+              </div>
+              <script>
+                document.getElementById('profile-login-per-page')?.addEventListener('change', function () {
+                  const limit = (this as HTMLSelectElement).value;
+                  const u = new URL(window.location.href);
+                  u.searchParams.set('login_limit', limit);
+                  u.searchParams.delete('login_page');
+                  if (limit === '10') u.searchParams.delete('login_limit');
+                  window.location.href = u.pathname + u.search;
+                });
+              </script>
+            </>
           )}
         </div>
       </section>

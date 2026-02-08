@@ -195,7 +195,8 @@ if (Astro.request.method === 'PUT') {
     }
   }
 
-  await insertVendorAuditLog(db, { vendor_id: vendorId, vendor_name: submission.name ?? null, action: 'created', done_by_email: session.email });
+  const clientIp = Astro.clientAddress || Astro.request.headers.get('cf-connecting-ip') || null;
+  await insertVendorAuditLog(db, { vendor_id: vendorId, vendor_name: submission.name ?? null, action: 'created', done_by_email: session.email, ip_address: clientIp });
 
   const updated = await updateSubmissionStatus(db, id, 'approved', session.email, reviewNotes, vendorId);
   if (!updated) {
@@ -296,7 +297,14 @@ if (r2 && files.length > 0) {
 const accept = Astro.request.headers.get('accept') ?? '';
 const wantsJson = accept.includes('application/json');
 if (!wantsJson) {
-  return Astro.redirect('/portal/vendors?submitted=1');
+  const path = '/portal/vendors?submitted=1';
+  try {
+    const url = new URL(Astro.request.url);
+    if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
+      return Astro.redirect(`http://${url.host}${path}`);
+    }
+  } catch (_) { /* use relative redirect */ }
+  return Astro.redirect(path);
 }
 return new Response(
   JSON.stringify({

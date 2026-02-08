@@ -99,8 +99,9 @@ if (!requestId) {
   return new Response(JSON.stringify({ error: 'requestId is required.' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
 }
 
+const clientIp = Astro.clientAddress || Astro.request.headers.get('cf-connecting-ip') || null;
 try {
-  const newId = await copyArbRequest(db, requestId, session.email);
+  const newId = await copyArbRequest(db, requestId, session.email, clientIp);
   return new Response(
     JSON.stringify({
       success: true,

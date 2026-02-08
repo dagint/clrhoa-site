@@ -195,7 +195,7 @@ const selectedTypes = req.application_type ? req.application_type.split(',').map
           ) : (
             <p class="text-sm text-gray-500 mb-4">No attachments yet.</p>
           )}
-          <p class="text-sm text-gray-500 mb-2">Add more: images or PDF, 5MB per file, 25MB total for this request.</p>
+          <p class="text-sm text-gray-500 mb-2">Add more: images or PDF, 5MB per file, 25MB total. Photos are resized before upload; by adding them you confirm you have reviewed the selection.</p>
           <input type="file" id="add-files-input" name="add_files" multiple accept="image/*,application/pdf" class="w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-clr-beige file:text-clr-green file:font-semibold" />
           <button type="button" id="add-files-btn" class="mt-2 px-4 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-sm font-semibold text-gray-700">Add selected files</button>
           <p id="add-files-error" class="mt-1 text-sm text-red-600 hidden" role="alert"></p>
@@ -374,14 +374,21 @@ const selectedTypes = req.application_type ? req.application_type.split(',').map
                 addFilesBtn.textContent = 'Add selected files';
                 return;
               }
-              formData.append('file_' + i, file);
               if (isImageType(file.type)) {
                 try {
                   var reviewFile = await resizeImage(file, reviewMaxWidth, 0.82);
-                  if (reviewFile) formData.append('file_' + i + '_review', reviewFile);
-                  var archiveFile = await resizeImage(file, archiveMaxWidth, 0.70);
-                  if (archiveFile) formData.append('file_' + i + '_archive', archiveFile);
-                } catch (e) {}
+                  if (reviewFile) {
+                    formData.append('file_' + i, reviewFile);
+                    var archiveFile = await resizeImage(file, archiveMaxWidth, 0.70);
+                    if (archiveFile) formData.append('file_' + i + '_archive', archiveFile);
+                  } else {
+                    formData.append('file_' + i, file);
+                  }
+                } catch (e) {
+                  formData.append('file_' + i, file);
+                }
+              } else {
+                formData.append('file_' + i, file);
               }
             }
             var res = await fetch('/api/arb-add-files', { method: 'POST', body: formData });

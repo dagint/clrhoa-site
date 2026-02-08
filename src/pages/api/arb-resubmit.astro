@@ -83,7 +83,8 @@ if (!requestId) {
   });
 }
 
-const updated = await setArbRequestInReview(db, requestId, session.email);
+const clientIp = Astro.clientAddress || Astro.request.headers.get('cf-connecting-ip') || null;
+const updated = await setArbRequestInReview(db, requestId, session.email, clientIp);
 
 if (!updated) {
   return new Response(
