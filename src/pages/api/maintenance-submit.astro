@@ -8,6 +8,7 @@ export const prerender = false;
 
 import { requireSession, requireDb, jsonResponse } from '../../lib/api-helpers';
 import { createMaintenanceId, insertMaintenanceRequest, MAINTENANCE_CATEGORIES } from '../../lib/maintenance-db';
+import { escapeHtml } from '../../lib/sanitize';
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
 const MAX_TOTAL_BYTES = 25 * 1024 * 1024;
@@ -88,12 +89,36 @@ for (let i = 0; i < files.length; i++) {
 const photosJson = JSON.stringify(photoKeys);
 await insertMaintenanceRequest(db, id, session.email, category, description, photosJson);
 
+let notifyStatus: 'sent' | 'skipped' | 'failed' = 'skipped';
+let notifyError: string | null = null;
+
 if (env?.NOTIFY_BOARD_EMAIL) {
-  const { sendEmail } = await import('../../lib/notifications');
-  const link = `${Astro.url.origin}/board/maintenance`;
-  const body = `<p>New maintenance request <strong>#${id}</strong></p><p>From: ${session.email}</p><p>Category: ${category}</p><p>Description: ${description.slice(0, 500)}${description.length > 500 ? '…' : ''}</p><p><a href="${link}">View Board Maintenance</a></p>`;
-  await sendEmail(env, env.NOTIFY_BOARD_EMAIL, `New Maintenance Request #${id}`, body);
+  try {
+    const { sendEmail } = await import('../../lib/notifications');
+    const link = `${Astro.url.origin}/board/maintenance`;
+    const body = `<p>New maintenance request <strong>#${id}</strong></p><p>From: ${escapeHtml(session.email)}</p><p>Category: ${escapeHtml(category)}</p><p>Description: ${escapeHtml(description.slice(0, 500))}${description.length > 500 ? '…' : ''}</p><p><a href="${escapeHtml(link)}">View Board Maintenance</a></p>`;
+    const result = await sendEmail(env, env.NOTIFY_BOARD_EMAIL, `New Maintenance Request #${id}`, body);
+    if (result.ok) {
+      notifyStatus = 'sent';
+    } else {
+      notifyStatus = 'failed';
+      notifyError = result.error ?? 'Unknown error';
+      console.error('[maintenance-submit] Board notification failed:', result.error);
+    }
+  } catch (e) {
+    notifyStatus = 'failed';
+    notifyError = e instanceof Error ? e.message : String(e);
+    console.error('[maintenance-submit] Board notification error:', notifyError);
+  }
+} else {
+  notifyError = 'NOTIFY_BOARD_EMAIL not set';
 }
 
-return jsonResponse({ success: true, id, message: 'Maintenance request submitted' });
+const body = { success: true, id, message: 'Maintenance request submitted' } as Record<string, unknown>;
+if (notifyError) body._notify = notifyStatus === 'failed' ? `failed: ${notifyError}` : notifyStatus;
+
+const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+headers['X-Maintenance-Notify'] = notifyStatus;
+if (notifyError) headers['X-Maintenance-Notify-Error'] = notifyError;
+return new Response(JSON.stringify(body), { status: 200, headers });
 ---

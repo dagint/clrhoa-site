@@ -1,0 +1,203 @@
+---
+export const prerender = false;
+
+import BoardLayout from '../../layouts/BoardLayout.astro';
+import { getBoardContext } from '../../lib/board-context';
+
+const ctx = await getBoardContext(Astro);
+if (ctx.redirect) return Astro.redirect(ctx.redirect);
+const { env, session, effectiveRole } = ctx;
+
+/** Env var names we show for troubleshooting (set/unset only; no values). */
+const ENV_KEYS = [
+  'DB', 'CLOURHOA_USERS', 'CLOURHOA_FILES', 'SESSION_SECRET', 'KV',
+  'NOTIFY_BOARD_EMAIL', 'NOTIFY_ARB_EMAIL', 'NOTIFY_NOREPLY_EMAIL',
+  'RESEND_API_KEY', 'MAILCHANNELS_API_KEY',
+  'TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_PHONE_NUMBER',
+  'CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN', 'D1_DATABASE_ID',
+  'GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'BACKUP_ENCRYPTION_KEY',
+];
+
+const envVars: Record<string, 'set' | 'unset'> = {};
+if (effectiveRole === 'admin' && env) {
+  const e = env as Record<string, unknown>;
+  for (const k of ENV_KEYS) {
+    const v = e[k];
+    envVars[k] = v != null && (typeof v !== 'string' || v !== '') ? 'set' : 'unset';
+  }
+}
+
+const csrfToken = session?.csrfToken ?? '';
+---
+
+<BoardLayout title="Test email & troubleshooting" subtitle="Send test emails and view env status (admin only)." draftCount={0} role={effectiveRole} session={session} elevatedUntil={session.elevated_until} mainWide showRoleBanner={false}>
+  <div class="space-y-8">
+    <section class="rounded-xl border border-gray-200 bg-white p-6">
+      <h2 class="text-lg font-semibold text-gray-800 mb-4">Send test email</h2>
+      <form id="test-email-form" class="space-y-4 max-w-xl">
+        <div>
+          <label for="to" class="block text-sm font-medium text-gray-700 mb-1">To (email) <span class="text-red-600">*</span></label>
+          <input type="email" id="to" name="to" required placeholder="you@example.com" class="w-full rounded border border-gray-300 px-3 py-2 text-sm" />
+        </div>
+        <div>
+          <label for="subject" class="block text-sm font-medium text-gray-700 mb-1">Subject (optional)</label>
+          <input type="text" id="subject" name="subject" placeholder="Test email from CLR HOA" class="w-full rounded border border-gray-300 px-3 py-2 text-sm" />
+        </div>
+        <div>
+          <label for="body" class="block text-sm font-medium text-gray-700 mb-1">Body (optional)</label>
+          <textarea id="body" name="body" rows="3" placeholder="This is a test email." class="w-full rounded border border-gray-300 px-3 py-2 text-sm"></textarea>
+        </div>
+        <button type="submit" id="send-btn" class="rounded bg-clr-green px-4 py-2 text-sm font-medium text-white hover:bg-clr-green/90">Send test email</button>
+      </form>
+
+      <div class="mt-6">
+        <h3 class="text-sm font-medium text-gray-700 mb-2">Send log</h3>
+        <div id="send-log" class="rounded border border-gray-200 bg-gray-50 p-3 min-h-[80px] text-sm font-mono space-y-2" role="log" aria-live="polite">
+          <p class="text-gray-500">No sends yet. Submit the form to send a test email.</p>
+        </div>
+      </div>
+    </section>
+
+    {effectiveRole === 'admin' && (
+      <section class="rounded-xl border border-amber-200 bg-amber-50/50 p-6" id="env-section">
+        <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
+          <div>
+            <h2 class="text-lg font-semibold text-gray-800 mb-2">Environment (troubleshooting only)</h2>
+            <p class="text-sm text-gray-600">Only variable names and whether they are set. No values are shown.</p>
+          </div>
+          <button type="button" id="env-refresh-btn" class="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50">Refresh</button>
+        </div>
+        <div class="overflow-x-auto rounded border border-gray-200 bg-white">
+          <table class="w-full text-sm">
+            <thead class="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th class="text-left py-2 px-3 font-medium text-gray-700">Variable</th>
+                <th class="text-left py-2 px-3 font-medium text-gray-700">Status</th>
+              </tr>
+            </thead>
+            <tbody id="env-check-tbody">
+              {Object.entries(envVars).map(([key, status]) => (
+                <tr class="border-b border-gray-100">
+                  <td class="py-2 px-3 font-mono text-gray-800">{key}</td>
+                  <td class="py-2 px-3">
+                    {status === 'set' ? <span class="text-green-700 font-medium">Set</span> : <span class="text-gray-500">Not set</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p id="env-check-message" class="mt-2 text-sm text-gray-500 hidden" aria-live="polite"></p>
+      </section>
+    )}
+
+    <section class="rounded-xl border border-gray-200 bg-white p-6">
+      <h2 class="text-lg font-semibold text-gray-800 mb-2">System & audit</h2>
+      <p class="text-sm text-gray-600 mb-4">Application audit data and usage are stored in the app; runtime logs (console) are only in the Cloudflare dashboard.</p>
+      <ul class="space-y-2 text-sm">
+        <li>
+          <a href="/board/audit-logs" class="text-clr-green hover:underline font-medium">Audit logs</a>
+          — Directory reveals, ARB actions, payments, assume-role, PIM elevation, vendors, member docs, feedback, meetings. Full transparency log.
+        </li>
+        <li>
+          <a href="/portal/usage" class="text-clr-green hover:underline font-medium">Site usage</a>
+          — Page views, unique sessions, and (for elevated users) per-user page view history.
+        </li>
+        <li class="text-gray-600">
+          <strong>Runtime logs</strong> (e.g. <code class="rounded bg-gray-100 px-1 py-0.5 text-xs">console.log</code> from the app, including test-email and API errors) are not readable inside the app. View them in the Cloudflare dashboard: Workers → your worker → Logs (Real-time logs, or Logpush if configured).
+        </li>
+      </ul>
+    </section>
+  </div>
+
+  <script define:vars={{ csrfToken }}>
+    (function () {
+      const form = document.getElementById('test-email-form');
+      const logEl = document.getElementById('send-log');
+      const sendBtn = document.getElementById('send-btn');
+      if (!form || !logEl || !sendBtn) return;
+
+      function addLogEntry(entry) {
+        const first = logEl.querySelector('p.text-gray-500');
+        if (first && first.textContent?.includes('No sends yet')) first.remove();
+        const div = document.createElement('div');
+        div.className = 'border-b border-gray-200 pb-2 last:border-0';
+        const time = new Date().toLocaleString();
+        const ok = entry.ok;
+        div.innerHTML = `<span class="text-gray-500">${time}</span> → To: ${escapeHtml(entry.to)} — ${ok ? '<span class="text-green-700">Sent</span>' : '<span class="text-red-700">Failed</span>' + (entry.error ? ': ' + escapeHtml(entry.error) : '')}`;
+        logEl.insertBefore(div, logEl.firstChild);
+      }
+
+      function escapeHtml(s) {
+        if (s == null) return '';
+        const div = document.createElement('div');
+        div.textContent = s;
+        return div.innerHTML;
+      }
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const to = form.querySelector('#to')?.value?.trim();
+        if (!to) return;
+        const subject = form.querySelector('#subject')?.value?.trim() || '';
+        const body = form.querySelector('#body')?.value?.trim() || '';
+        sendBtn.disabled = true;
+        try {
+          const res = await fetch('/api/admin/send-test-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ to, subject, body, csrf_token: csrfToken }),
+          });
+          const data = await res.json().catch(() => ({}));
+          const errMsg = res.status === 429 ? (data.error || 'Rate limit exceeded. Try again in a minute.') : data.error;
+          addLogEntry({ to, ok: data.ok && res.status !== 429, error: errMsg });
+        } catch (err) {
+          addLogEntry({ to, ok: false, error: err?.message || 'Network error' });
+        } finally {
+          sendBtn.disabled = false;
+        }
+      });
+
+      // Env check refresh (admin only)
+      const envRefreshBtn = document.getElementById('env-refresh-btn');
+      const envTbody = document.getElementById('env-check-tbody');
+      const envMessage = document.getElementById('env-check-message');
+      if (envRefreshBtn && envTbody && envMessage) {
+        function escapeHtml(s) {
+          if (s == null) return '';
+          const div = document.createElement('div');
+          div.textContent = s;
+          return div.innerHTML;
+        }
+        function renderEnvRows(data) {
+          const entries = Object.entries(data).sort((a, b) => a[0].localeCompare(b[0]));
+          envTbody.innerHTML = entries.map(([key, status]) => {
+            const statusHtml = status === 'set' ? '<span class="text-green-700 font-medium">Set</span>' : '<span class="text-gray-500">Not set</span>';
+            return `<tr class="border-b border-gray-100"><td class="py-2 px-3 font-mono text-gray-800">${escapeHtml(key)}</td><td class="py-2 px-3">${statusHtml}</td></tr>`;
+          }).join('');
+        }
+        envRefreshBtn.addEventListener('click', async () => {
+          envRefreshBtn.disabled = true;
+          envMessage.classList.add('hidden');
+          try {
+            const res = await fetch('/api/admin/env-check');
+            const data = await res.json().catch(() => ({}));
+            if (res.ok && typeof data === 'object' && data !== null) {
+              renderEnvRows(data);
+              envMessage.textContent = 'Updated at ' + new Date().toLocaleTimeString();
+              envMessage.classList.remove('hidden');
+            } else {
+              envMessage.textContent = 'Failed to load (' + (data.error || res.status) + ').';
+              envMessage.classList.remove('hidden');
+            }
+          } catch (err) {
+            envMessage.textContent = 'Failed to load: ' + (err?.message || 'Network error');
+            envMessage.classList.remove('hidden');
+          } finally {
+            envRefreshBtn.disabled = false;
+          }
+        });
+      }
+    })();
+  </script>
+</BoardLayout>

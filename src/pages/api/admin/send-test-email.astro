@@ -1,0 +1,107 @@
+---
+/**
+ * POST /api/admin/send-test-email — Board/Admin only. Send a test email to a given address.
+ * Body: { to: string, subject?: string, body?: string, csrf_token: string }.
+ * Used by admin test-email page for troubleshooting. Logged to console.
+ */
+export const prerender = false;
+
+import { getSessionFromCookie, verifyCsrfToken, verifyOrigin, getEffectiveRole } from '../../../lib/auth';
+import { isElevatedRole } from '../../../lib/auth';
+import { sendEmail } from '../../../lib/notifications';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+
+if (Astro.request.method !== 'POST') {
+  return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+    status: 405,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const origin = Astro.request.headers.get('origin');
+const referer = Astro.request.headers.get('referer');
+if (!verifyOrigin(origin, referer, Astro.url.origin)) {
+  return new Response(JSON.stringify({ error: 'Invalid origin.' }), { status: 403, headers: { 'Content-Type': 'application/json' } });
+}
+
+const session = await getSessionFromCookie(
+  Astro.request.headers.get('cookie') ?? undefined,
+  env?.SESSION_SECRET
+);
+if (!session) {
+  return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
+}
+
+const role = getEffectiveRole(session);
+if (!isElevatedRole(role)) {
+  return new Response(JSON.stringify({ error: 'Forbidden. Board or admin access required.' }), { status: 403, headers: { 'Content-Type': 'application/json' } });
+}
+
+let body: { to?: string; subject?: string; body?: string; csrf_token?: string; csrfToken?: string };
+try {
+  body = await Astro.request.json();
+} catch {
+  return new Response(JSON.stringify({ success: false, ok: false, error: 'Invalid JSON' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+}
+
+if (!verifyCsrfToken(session, body.csrf_token ?? body.csrfToken)) {
+  return new Response(JSON.stringify({ success: false, ok: false, error: 'Invalid security token.' }), { status: 403, headers: { 'Content-Type': 'application/json' } });
+}
+
+const to = (body.to ?? '').trim();
+if (!to) {
+  return new Response(JSON.stringify({ success: false, ok: false, error: 'Recipient email (to) is required.' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+}
+
+// Rate limit: 10 sends per user per minute (when KV is available)
+const TEST_EMAIL_LIMIT = 10;
+const TEST_EMAIL_WINDOW_SEC = 90;
+const kv = (env as { KV?: KVNamespace })?.KV;
+if (kv) {
+  const minute = Math.floor(Date.now() / 60000);
+  const rateKey = `test-email:${session.email}:${minute}`;
+  const current = await kv.get(rateKey);
+  const count = current ? parseInt(current, 10) || 0 : 0;
+  if (count >= TEST_EMAIL_LIMIT) {
+    return new Response(JSON.stringify({
+      success: false,
+      ok: false,
+      error: 'Rate limit exceeded. Try again in a minute.',
+      rateLimited: true,
+    }), {
+      status: 429,
+      headers: {
+        'Content-Type': 'application/json',
+        'Retry-After': '60',
+      },
+    });
+  }
+  await kv.put(rateKey, String(count + 1), { expirationTtl: TEST_EMAIL_WINDOW_SEC });
+}
+
+const subject = (body.subject ?? '').trim() || 'Test email from CLR HOA';
+const emailBody = (body.body ?? '').trim() || 'This is a test email from the admin test-email tool.';
+
+const result = await sendEmail(env as import('../../../lib/notifications').NotificationEnv, to, subject, emailBody);
+
+console.log('[admin send-test-email]', {
+  to,
+  subject,
+  ok: result.ok,
+  error: result.error,
+  by: session.email,
+  role,
+});
+
+return new Response(JSON.stringify({
+  success: true,
+  ok: result.ok,
+  error: result.error,
+  message: result.ok ? 'Email sent.' : (result.error ?? 'Send failed'),
+}), {
+  status: 200,
+  headers: { 'Content-Type': 'application/json' },
+});
+---
