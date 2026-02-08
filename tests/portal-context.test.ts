@@ -6,9 +6,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { getSessionFromCookie } from '../src/lib/auth';
 import { getPortalContext } from '../src/lib/portal-context';
 
-vi.mock('../src/lib/auth', () => ({
-  getSessionFromCookie: vi.fn(),
-}));
+vi.mock('../src/lib/auth', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../src/lib/auth')>();
+  return {
+    ...actual,
+    getSessionFromCookie: vi.fn(),
+  };
+});
 
 function mockRequest(overrides?: Partial<Request>): Request {
   const headers = new Headers();

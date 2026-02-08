@@ -4,10 +4,15 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { getArbRequest } from '../src/lib/arb-db';
+import { listEmailsAtSameAddress } from '../src/lib/directory-db';
 import { requireArbRequestAccess, requireArbRequestOwner } from '../src/lib/access-control';
 
 vi.mock('../src/lib/arb-db', () => ({
   getArbRequest: vi.fn(),
+}));
+
+vi.mock('../src/lib/directory-db', () => ({
+  listEmailsAtSameAddress: vi.fn(),
 }));
 
 const mockDb = {} as D1Database;
@@ -51,6 +56,9 @@ const mockRequest = {
 describe('requireArbRequestAccess', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(listEmailsAtSameAddress).mockImplementation((_db, email) =>
+      Promise.resolve([email.trim().toLowerCase()])
+    );
   });
 
   it('returns 404 when request not found', async () => {
@@ -84,6 +92,9 @@ describe('requireArbRequestAccess', () => {
 describe('requireArbRequestOwner', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(listEmailsAtSameAddress).mockImplementation((_db, email) =>
+      Promise.resolve([email.trim().toLowerCase()])
+    );
   });
 
   it('returns 404 when request not found', async () => {
@@ -93,11 +104,11 @@ describe('requireArbRequestOwner', () => {
     if ('response' in result) expect(result.response.status).toBe(404);
   });
 
-  it('returns 404 when user is not owner', async () => {
+  it('returns 403 when user is not owner', async () => {
     vi.mocked(getArbRequest).mockResolvedValue({ ...mockRequest } as any);
     const result = await requireArbRequestOwner(mockDb, 'ARB-2026-0001', sessionOther);
     expect('response' in result).toBe(true);
-    if ('response' in result) expect(result.response.status).toBe(404);
+    if ('response' in result) expect(result.response.status).toBe(403);
   });
 
   it('returns request when user is owner and no requirePending', async () => {
