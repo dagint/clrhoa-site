@@ -2,6 +2,8 @@
 
 This guide helps you deploy the current site (including the member portal and DB-backed public pages) without breaking existing functionality and ensures someone can always log in to manage the directory and allow list.
 
+**→ For a step-by-step checklist (resources, env vars, Resend, rate limits, Cloudflare tokens, backup, first user), use [DEPLOYMENT_CHECKLIST_PORTAL.md](./DEPLOYMENT_CHECKLIST_PORTAL.md).**
+
 ---
 
 ## 1. What would break (and what won’t)

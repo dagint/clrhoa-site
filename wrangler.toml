@@ -30,7 +30,7 @@ id = "f2a5e8346928438baa1ca38e40ab200a"
 # Then set binding = "KV" and id = the printed id (replace placeholder below).
 [[kv_namespaces]]
 binding = "KV"
-id = "REPLACE_WITH_RATE_LIMIT_KV_ID"
+id = "9249762b4c7b483a9785097db451f8e6"
 
 # R2: portal files (redacted minutes, budgets)
 [[r2_buckets]]
