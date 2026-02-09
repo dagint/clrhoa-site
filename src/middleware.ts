@@ -1,7 +1,7 @@
 /**
  * Astro Middleware: portal auth, board/elevated access, and security headers.
  * - /portal/* (except /portal/login): require session cookie or redirect to login; profile completeness redirect to /portal/profile?required=1.
- * - /board/*: require session (else redirect to login) and elevated role (else redirect to /portal/dashboard).
+ * - /board (exact): public Board & Committees page; no redirect. /board/*: require session and elevated role.
  * - Elevated API path prefixes: if session exists but role is not elevated, return 403 before the handler.
  * - Security headers on all responses.
  */
@@ -48,9 +48,10 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
   const env = context.locals.runtime?.env;
   const cookieHeader = context.request.headers.get('cookie') ?? undefined;
 
-  // Board admin: require session and effective elevated role (PIM: JIT elevation).
-  // If not elevated, send to request-elevated-access landing so they can elevate and then return here.
-  if (pathname.startsWith('/board')) {
+  // Board admin (/board/*): require session and effective elevated role (PIM: JIT elevation).
+  // The exact path /board (and /board/) is the public Board & Committees page — do not redirect.
+  const isPublicBoardPage = pathname === '/board' || pathname === '/board/';
+  if (!isPublicBoardPage && pathname.startsWith('/board')) {
     if (!context.cookies.has(SESSION_COOKIE_NAME)) {
       return context.redirect('/portal/login');
     }
