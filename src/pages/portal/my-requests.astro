@@ -382,7 +382,7 @@ function formatApproval(arbEsign: string | null, esignTimestamp: string | null):
     }
   </style>
 
-  <script>
+  <script is:inline>
     document.querySelectorAll('.request-summary').forEach(function (btn) {
       btn.addEventListener('click', function () {
         const id = this.getAttribute('data-request-id');
@@ -619,7 +619,7 @@ function formatApproval(arbEsign: string | null, esignTimestamp: string | null):
       });
     });
   </script>
-  <script define:vars={{ csrfToken: session.csrfToken ?? '' }}>
+  <script is:inline define:vars={{ csrfToken: session.csrfToken ?? '' }}>
     (function () {
       // Make CSRF token available to scripts
       if (typeof window !== 'undefined') {

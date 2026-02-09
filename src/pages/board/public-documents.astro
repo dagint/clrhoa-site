@@ -9,7 +9,7 @@ import { listArbRequestsByHousehold } from '../../lib/arb-db';
 import { sanitizeForScriptInjection } from '../../lib/sanitize';
 
 const ctx = await getBoardContext(Astro);
-if (ctx.redirect) return Astro.redirect(ctx.redirect);
+if ('redirect' in ctx) return Astro.redirect(ctx.redirect);
 const { env, session, effectiveRole } = ctx;
 const isBoard = effectiveRole === 'board' || effectiveRole === 'admin' || effectiveRole === 'arb_board';
 const isArb = effectiveRole === 'arb' || isBoard;
@@ -88,7 +88,7 @@ function formatDate(s: string | null): string {
   </p>
 </BoardLayout>
 
-<script define:vars={{ csrfToken: sanitizeForScriptInjection(session?.csrfToken ?? '') }}>
+<script is:inline define:vars={{ csrfToken: sanitizeForScriptInjection(session?.csrfToken ?? '') }}>
   const msgEl = document.getElementById('public-doc-message');
   function showPublicDocMessage(text, isError) {
     if (!msgEl) return;

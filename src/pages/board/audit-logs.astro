@@ -17,7 +17,7 @@ import { listPimElevationLog } from '../../lib/pim-db';
 import { listAdminAssumedRoleAudit } from '../../lib/admin-assumed-role-db';
 
 const ctx = await getBoardContext(Astro);
-if (ctx.redirect) return Astro.redirect(ctx.redirect);
+if ('redirect' in ctx) return Astro.redirect(ctx.redirect);
 const { env, session, effectiveRole } = ctx;
 
 const AUDIT_PAGE_SIZES = [10, 25, 50, 100] as const;
@@ -112,8 +112,8 @@ function formatDate(s: string | null): string {
     <span class="text-sm text-gray-500">Each paged section shows this many entries. Use Previous and Next at the bottom of a section to browse.</span>
   </div>
   <script>
-    document.getElementById('audit-per-page')?.addEventListener('change', function () {
-      const limit = (this as HTMLSelectElement).value;
+    document.getElementById('audit-per-page')?.addEventListener('change', function (this: HTMLSelectElement) {
+      const limit = this.value;
       const u = new URL(window.location.href);
       u.searchParams.set('audit_limit', limit);
       u.searchParams.delete('admin_page');
@@ -316,7 +316,7 @@ function formatDate(s: string | null): string {
                 <tbody>
                   {ownersWithUpdater.slice(0, 300).map((o) => (
                     <tr class="border-b border-gray-100 hover:bg-gray-50/50">
-                      <td class="py-2 px-3 text-gray-600">{formatDate(o.updated_at)}</td>
+                      <td class="py-2 px-3 text-gray-600">{formatDate(o.updated_at ?? null)}</td>
                       <td class="py-2 px-3">{o.name ?? BLANK} / {REDACTED}</td>
                       <td class="py-2 px-3">{REDACTED}</td>
                     </tr>

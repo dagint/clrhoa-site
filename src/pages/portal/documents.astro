@@ -52,7 +52,7 @@ const docsByCategory = MEMBER_DOC_CATEGORIES.map((cat) => ({
         </div>
       ) : (
         <div class="space-y-8">
-          {docsByCategory.map(({ category, label, docs: catDocs }) => (
+          {docsByCategory.map(({ label, docs: catDocs }) => (
             catDocs.length > 0 && (
               <section>
                 <h3 class="text-lg font-heading font-semibold text-clr-green mb-3">{label}</h3>

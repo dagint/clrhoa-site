@@ -126,6 +126,7 @@ let applicantName: string | null = null;
 let phone: string | null = null;
 let propertyAddress: string | null = null;
 let applicationType: string | null = null;
+let action = 'submit';
 /** Each item: original + optional review/archive (resized) blobs */
 const fileGroups: { name: string; type: string; size: number; original: Blob; review?: Blob; archive?: Blob }[] = [];
 
@@ -214,7 +215,7 @@ try {
   }
   
   description = (formData.get('description') as string)?.trim() ?? '';
-  const action = (formData.get('action') as string)?.trim() || 'submit'; // 'draft' or 'submit', default to 'submit' for backward compatibility
+  action = (formData.get('action') as string)?.trim() || 'submit'; // 'draft' or 'submit', default to 'submit' for backward compatibility
   esign = formData.get('esign') === 'on' || formData.get('esign') === '1';
   applicantName = (formData.get('applicant_name') as string)?.trim() || null;
   phone = (formData.get('phone') as string)?.trim() || null;
@@ -324,7 +325,7 @@ if (isSubmit && !esign) {
 }
 
 // Server-side file type validation: check actual MIME type, not just extension
-async function validateFileMimeType(file: File): Promise<boolean> {
+async function validateFileMimeType(file: File | Blob): Promise<boolean> {
   // Read first bytes to detect actual file type
   const buffer = await file.arrayBuffer();
   const bytes = new Uint8Array(buffer);

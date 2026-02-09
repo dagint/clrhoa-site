@@ -55,7 +55,7 @@ let csrfToken: string | null = null;
 const contentType = Astro.request.headers.get('content-type') ?? '';
 if (contentType.includes('application/json')) {
   try {
-    const body = await Astro.request.json();
+    const body = await Astro.request.json() as { requestId?: string; request_id?: string; csrfToken?: string };
     requestId = (body.requestId ?? body.request_id ?? '').trim() || null;
     csrfToken = body.csrfToken || null;
   } catch {

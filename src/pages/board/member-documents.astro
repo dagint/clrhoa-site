@@ -9,7 +9,7 @@ import { listArbRequestsByHousehold } from '../../lib/arb-db';
 import { sanitizeForScriptInjection } from '../../lib/sanitize';
 
 const ctx = await getBoardContext(Astro);
-if (ctx.redirect) return Astro.redirect(ctx.redirect);
+if ('redirect' in ctx) return Astro.redirect(ctx.redirect);
 const { env, session, effectiveRole } = ctx;
 const isBoard = effectiveRole === 'board' || effectiveRole === 'admin' || effectiveRole === 'arb_board';
 if (!isBoard) return Astro.redirect('/portal/dashboard');
@@ -76,7 +76,7 @@ const docsByCategory = MEMBER_DOC_CATEGORIES.map((cat) => ({
         <p class="text-gray-500">No member documents yet. Upload one above.</p>
       ) : (
         <div class="space-y-6">
-          {docsByCategory.map(({ category, label, docs: catDocs }) => (
+          {docsByCategory.map(({ label, docs: catDocs }) => (
             catDocs.length > 0 && (
               <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                 <h3 class="text-base font-heading font-semibold text-clr-green mb-3">{label}</h3>
@@ -102,7 +102,7 @@ const docsByCategory = MEMBER_DOC_CATEGORIES.map((cat) => ({
   </p>
 </BoardLayout>
 
-<script define:vars={{ csrfToken: sanitizeForScriptInjection(session?.csrfToken ?? '') }}>
+<script is:inline define:vars={{ csrfToken: sanitizeForScriptInjection(session?.csrfToken ?? '') }}>
   (function () {
     if (typeof window === 'undefined') return;
 

@@ -273,7 +273,7 @@ if (db && templateId) {
     </main>
   </div>
 
-  <script define:vars={{ maxFileBytes: 5 * 1024 * 1024, maxTotalBytes: 25 * 1024 * 1024, reviewMaxWidth: 2000, archiveMaxWidth: 1200 }}>
+  <script is:inline define:vars={{ maxFileBytes: 5 * 1024 * 1024, maxTotalBytes: 25 * 1024 * 1024, reviewMaxWidth: 2000, archiveMaxWidth: 1200 }}>
     (function () {
       const form = document.getElementById('arb-form');
       const fileInput = form?.querySelector('input[name="files"]');
@@ -289,7 +289,7 @@ if (db && templateId) {
       
       let currentRequestId = null;
       let autoSaveInterval = null;
-      let lastSaveTime = null;
+      let _lastSaveTime = null;
       let isAutoSaving = false;
 
       function showErr(el, msg) {
@@ -336,7 +336,7 @@ if (db && templateId) {
         });
       }
 
-      function formatBytes(bytes) {
+      function _formatBytes(bytes) {
         if (bytes === 0) return '0 B';
         const k = 1024;
         const sizes = ['B', 'KB', 'MB'];
@@ -473,7 +473,7 @@ if (db && templateId) {
           formSuccess.classList.add('hidden');
           
           const isSubmit = action === 'submit';
-          const isDraft = action === 'draft';
+          const _isDraft = action === 'draft';
           const activeBtn = isSubmit ? submitBtn : document.getElementById('save-draft-btn');
           
           // Validate esign for submit action
@@ -640,7 +640,7 @@ if (db && templateId) {
       }
     })();
   </script>
-  <script define:vars={{ csrfToken: session.csrfToken ?? '' }}>
+  <script is:inline define:vars={{ csrfToken: session.csrfToken ?? '' }}>
     (function () {
       // Make CSRF token available to scripts
       if (typeof window !== 'undefined') {

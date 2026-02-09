@@ -312,9 +312,9 @@ const showActionNeededBanner = showActionFeedback || showActionMaintenance || sh
       </main>
   </div>
   <PWAInstallPrompt />
-  <script>
+  <script is:inline>
     document.getElementById('pim-elevate-btn')?.addEventListener('click', function () {
-      const btn = this as HTMLButtonElement;
+      const btn = this;
       btn.disabled = true;
       fetch('/api/pim/elevate', { method: 'POST', credentials: 'same-origin' })
         .then(function (r) {
@@ -326,9 +326,9 @@ const showActionNeededBanner = showActionFeedback || showActionMaintenance || sh
 
     document.querySelectorAll('.notification-dismiss').forEach(function (btn) {
       btn.addEventListener('click', function () {
-        const key = (this as HTMLElement).getAttribute('data-key');
+        const key = this.getAttribute('data-key');
         if (!key) return;
-        const el = this as HTMLButtonElement;
+        const el = this;
         el.disabled = true;
         fetch('/api/notifications/dismiss', {
           method: 'POST',

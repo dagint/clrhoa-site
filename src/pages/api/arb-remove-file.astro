@@ -44,6 +44,8 @@ if (!db) {
   return new Response(JSON.stringify({ error: 'Server configuration error' }), { status: 503, headers: { 'Content-Type': 'application/json' } });
 }
 
+const logger = createLogger({ endpoint: '/api/arb-remove-file' });
+
 let body: { requestId?: string; fileId?: string; csrfToken?: string };
 try {
   body = await Astro.request.json();

@@ -114,7 +114,7 @@ try {
   // Fallback: try updating session if CSRF token is missing
   if (!csrfValid && env?.SESSION_SECRET) {
     if (!session.csrfToken) {
-      await updateSessionActivity(session, env.SESSION_SECRET);
+      await updateSessionActivity(Astro.request.headers.get('cookie') ?? undefined, env.SESSION_SECRET, userAgent, ipAddress);
       // Re-fetch session
       session = await getSessionFromCookie(
         Astro.request.headers.get('cookie') ?? undefined,
@@ -158,6 +158,13 @@ try {
     JSON.stringify({ error: 'Invalid form data. Please try again.' }),
     { status: 400, headers: { 'Content-Type': 'application/json' } }
   );
+}
+
+if (!session) {
+  return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+    status: 401,
+    headers: { 'Content-Type': 'application/json' },
+  });
 }
 
 // Validate description is not empty

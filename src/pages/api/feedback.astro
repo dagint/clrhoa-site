@@ -24,16 +24,17 @@ import {
 } from '../../lib/feedback-db';
 import { listOwners } from '../../lib/directory-db';
 import { getUserByEmail, getNotificationPrefsForEmails } from '../../lib/db';
-import { sendEmail, shouldSendNotification } from '../../lib/notifications';
+import { sendEmail, shouldSendNotification, type NotificationEnv } from '../../lib/notifications';
 
 const auth = await requireSession(Astro);
-if (auth.response) return auth.response;
+if ('response' in auth) return auth.response;
 const { session } = auth;
 
 const dbResult = requireDb(Astro.locals.runtime?.env);
-if (dbResult.response) return dbResult.response;
+if ('response' in dbResult) return dbResult.response;
 const { db } = dbResult;
 
+const env = Astro.locals.runtime?.env as NotificationEnv | undefined;
 const effectiveRole = getEffectiveRole(session);
 const isBoard = effectiveRole === 'board' || effectiveRole === 'admin' || effectiveRole === 'arb_board';
 const url = new URL(Astro.request.url);
@@ -142,7 +143,7 @@ if (Astro.request.method === 'POST') {
       }
       if (shouldSendNotification(prefs, 'feedback_response_confirm')) {
         await sendEmail(
-          env,
+          env as NotificationEnv,
           session.email,
           'Your feedback was recorded',
           `<p>Thank you. Your response for &quot;${doc.title ?? 'Document'}&quot; has been recorded.</p>`,
@@ -188,7 +189,7 @@ if (Astro.request.method === 'POST') {
         if (!to?.trim()) continue;
         const prefs = prefsByEmail.get(to.trim().toLowerCase()) ?? null;
         if (shouldSendNotification(prefs, 'feedback_new_doc')) {
-          await sendEmail(env, to.trim(), subject, bodyHtml);
+          await sendEmail(env as NotificationEnv, to.trim(), subject, bodyHtml);
         }
       }
     }

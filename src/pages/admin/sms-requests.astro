@@ -6,7 +6,7 @@ import { getBoardContext } from '../../lib/board-context';
 import { getSmsFeatureRequestCounts, listSmsFeatureRequests } from '../../lib/sms-feature-request-db';
 
 const ctx = await getBoardContext(Astro);
-if (ctx.redirect) return Astro.redirect(ctx.redirect);
+if ('redirect' in ctx) return Astro.redirect(ctx.redirect);
 const { env, session, effectiveRole } = ctx;
 
 const db = env?.DB;

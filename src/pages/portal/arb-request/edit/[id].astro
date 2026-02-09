@@ -230,7 +230,7 @@ const selectedTypes = req.application_type ? req.application_type.split(',').map
     </main>
   </div>
 
-  <script define:vars={{ requestId: req.id, reviewMaxWidth: 2000, archiveMaxWidth: 1200, maxFileBytes: 5 * 1024 * 1024, maxTotalBytes: 25 * 1024 * 1024 }}>
+  <script is:inline define:vars={{ requestId: req.id, reviewMaxWidth: 2000, archiveMaxWidth: 1200, maxFileBytes: 5 * 1024 * 1024, maxTotalBytes: 25 * 1024 * 1024 }}>
     (function () {
       const form = document.getElementById('arb-edit-form');
       const formError = document.getElementById('form-error');
@@ -410,7 +410,7 @@ const selectedTypes = req.application_type ? req.application_type.split(',').map
       }
     })();
   </script>
-  <script define:vars={{ csrfToken: session.csrfToken ?? '' }}>
+  <script is:inline define:vars={{ csrfToken: session.csrfToken ?? '' }}>
     (function () {
       // Make CSRF token available to scripts
       if (typeof window !== 'undefined') {

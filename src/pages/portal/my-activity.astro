@@ -82,9 +82,9 @@ function revealType(row: { target_name: string | null; target_phone: string | nu
         </select>
         <span class="text-sm text-gray-500">Use Previous and Next under each section to browse older activity.</span>
       </div>
-      <script>
+      <script is:inline>
         document.getElementById('activity-per-page')?.addEventListener('change', function () {
-          const limit = (this as HTMLSelectElement).value;
+          const limit = this.value;
           const u = new URL(window.location.href);
           u.searchParams.set('limit', limit);
           u.searchParams.delete('dir_page');

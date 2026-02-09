@@ -197,7 +197,7 @@ const chartDataJson = JSON.stringify(chartData).replace(/<\/script/gi, '<\\/scri
       </section>
     </main>
 
-    <script type="application/json" id="usage-chart-data" set:html={chartDataJson} />
+    <script is:inline type="application/json" id="usage-chart-data" set:html={chartDataJson} />
     <script>
       import '../../scripts/usage-charts';
     </script>

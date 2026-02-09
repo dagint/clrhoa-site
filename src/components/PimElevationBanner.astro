@@ -22,7 +22,7 @@ const { elevatedUntil } = Astro.props;
   </form>
 </div>
 
-<script define:vars={{ elevatedUntil }}>
+<script is:inline define:vars={{ elevatedUntil }}>
   (function () {
     const timerEl = document.getElementById('pim-elevation-timer');
     const form = document.getElementById('pim-drop-form');

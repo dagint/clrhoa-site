@@ -182,7 +182,7 @@ const nextDue = getNextDueDate();
     </div>
   </div>
   {nextDue && (
-    <script define:vars={{ dueDateIso: nextDue.dueDate.toISOString().slice(0, 10) }}>
+    <script is:inline define:vars={{ dueDateIso: nextDue.dueDate.toISOString().slice(0, 10) }}>
       (function () {
         const card = document.getElementById('dues-reminder-card');
         if (!card) return;

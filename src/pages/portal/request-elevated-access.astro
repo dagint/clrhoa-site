@@ -22,9 +22,10 @@ if (!hasStaffWhitelistRole) {
 
 // Already elevated: send to return URL or dashboard
 if (isCurrentlyElevated) {
-  const returnUrl = Astro.url.searchParams.get('return');
-  const safeReturn = returnUrl && returnUrl.startsWith('/') && !returnUrl.startsWith('//') ? returnUrl : null;
-  return Astro.redirect(safeReturn ?? '/portal/dashboard');
+  const returnTo = Astro.url.searchParams.get('return');
+  return Astro.redirect(
+    (returnTo && returnTo.startsWith('/') && !returnTo.startsWith('//') ? returnTo : null) ?? '/portal/dashboard'
+  );
 }
 
 const db = env?.DB;
@@ -63,7 +64,7 @@ const returnLabel = returnParam && returnParam.startsWith('/board') ? 'Board' : 
       </div>
     </main>
   </div>
-  <script define:vars={{ returnParam }}>
+  <script is:inline define:vars={{ returnParam }}>
     (function () {
       var btn = document.getElementById('pim-elevate-btn');
       if (!btn) return;

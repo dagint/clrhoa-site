@@ -119,7 +119,7 @@ function formatDate(s: string): string {
   </ProtectedPage>
 </PortalLayout>
 
-<script>
+<script is:inline>
   (function () {
     const form = document.getElementById('maintenance-form');
     const statusEl = document.getElementById('maint-form-status');
@@ -179,13 +179,13 @@ function formatDate(s: string): string {
 
     form?.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const category = (form.querySelector('[name="category"]') as HTMLSelectElement)?.value;
-      const description = (form.querySelector('[name="description"]') as HTMLTextAreaElement)?.value?.trim();
+      const category = form.querySelector('[name="category"]')?.value;
+      const description = form.querySelector('[name="description"]')?.value?.trim();
       if (!description) {
         alert('Please enter a description');
         return;
       }
-      const fileInput = form.querySelector('[name="photos"]') as HTMLInputElement;
+      const fileInput = form.querySelector('[name="photos"]');
       let files = fileInput?.files ? Array.from(fileInput.files).filter((f) => f.size > 0) : [];
 
       if (submitBtn) {

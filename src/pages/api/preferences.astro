@@ -10,11 +10,11 @@ import { getUserByEmail, updateUserPreferences, type NotificationPreferences } f
 import { getOwnerByEmail, getPhonesArray, updateOwnerByEmail } from '../../lib/directory-db';
 
 const auth = await requireSession(Astro);
-if (auth.response) return auth.response;
+if ('response' in auth) return auth.response;
 const { session } = auth;
 
 const dbResult = requireDb(Astro.locals.runtime?.env);
-if (dbResult.response) return dbResult.response;
+if ('response' in dbResult) return dbResult.response;
 const { db } = dbResult;
 
 if (Astro.request.method === 'GET') {

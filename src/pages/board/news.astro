@@ -8,7 +8,7 @@ import { listArbRequestsByHousehold } from '../../lib/arb-db';
 import { escapeHtml } from '../../lib/sanitize';
 
 const ctx = await getBoardContext(Astro);
-if (ctx.redirect) return Astro.redirect(ctx.redirect);
+if ('redirect' in ctx) return Astro.redirect(ctx.redirect);
 const { env, session, effectiveRole } = ctx;
 const isBoard = effectiveRole === 'board' || effectiveRole === 'admin' || effectiveRole === 'arb_board';
 if (!isBoard) return Astro.redirect('/portal/dashboard');
@@ -98,7 +98,7 @@ function formatDate(s: string | null): string {
     )}
   </div>
 
-  <script define:vars={{ csrfToken: typeof session !== 'undefined' && session?.csrfToken ? session.csrfToken : '' }}>
+  <script is:inline define:vars={{ csrfToken: typeof session !== 'undefined' && session?.csrfToken ? session.csrfToken : '' }}>
     (function () {
       const form = document.getElementById('news-form');
       const msgEl = document.getElementById('news-form-message');

@@ -5,7 +5,7 @@ import BoardLayout from '../../layouts/BoardLayout.astro';
 import { getBoardContext } from '../../lib/board-context';
 
 const ctx = await getBoardContext(Astro);
-if (ctx.redirect) return Astro.redirect(ctx.redirect);
+if ('redirect' in ctx) return Astro.redirect(ctx.redirect);
 const { env, session, effectiveRole } = ctx;
 
 /** Env var names we show for troubleshooting (set/unset only; no values). */
@@ -110,7 +110,7 @@ const csrfToken = session?.csrfToken ?? '';
     </section>
   </div>
 
-  <script define:vars={{ csrfToken }}>
+  <script is:inline define:vars={{ csrfToken }}>
     (function () {
       const form = document.getElementById('test-email-form');
       const logEl = document.getElementById('send-log');

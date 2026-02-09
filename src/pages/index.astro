@@ -72,7 +72,7 @@ const directionsUrl = hasAddress
           if (slides.length <= 1) return;
           let index = 0;
           const interval = 5000;
-          function ensureSlideBackground(slide) {
+          function ensureSlideBackground(slide: HTMLElement) {
             const bg = slide.getAttribute('data-bg');
             if (bg && !slide.style.backgroundImage) {
               slide.style.backgroundImage = 'url(' + bg + ')';
@@ -82,9 +82,9 @@ const directionsUrl = hasAddress
             slides[index].classList.remove('hero-slide-active', 'opacity-30');
             slides[index].classList.add('opacity-0');
             index = (index + 1) % slides.length;
-            ensureSlideBackground(slides[index]);
+            ensureSlideBackground(slides[index] as HTMLElement);
             var nextIndex = (index + 1) % slides.length;
-            ensureSlideBackground(slides[nextIndex]);
+            ensureSlideBackground(slides[nextIndex] as HTMLElement);
             slides[index].classList.remove('opacity-0');
             slides[index].classList.add('hero-slide-active', 'opacity-30');
           }, interval);

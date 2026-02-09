@@ -7,7 +7,7 @@ import { listAllMeetings } from '../../lib/meetings-db';
 import { listArbRequestsByHousehold } from '../../lib/arb-db';
 
 const ctx = await getBoardContext(Astro);
-if (ctx.redirect) return Astro.redirect(ctx.redirect);
+if ('redirect' in ctx) return Astro.redirect(ctx.redirect);
 const { env, session, effectiveRole } = ctx;
 const isBoard = effectiveRole === 'board' || effectiveRole === 'admin' || effectiveRole === 'arb_board';
 if (!isBoard) return Astro.redirect('/portal/dashboard');
@@ -140,7 +140,7 @@ function formatDateTime(dt: string): string {
         </ul>
       )}
 
-<script>
+<script is:inline>
   const formPanel = document.getElementById('form-panel');
   const formTitle = document.getElementById('form-title');
   const form = document.getElementById('meeting-form');
@@ -273,7 +273,7 @@ function formatDateTime(dt: string): string {
     }
 
     const postToPublic = document.getElementById('form-post-to-public-news').checked;
-    const body: Record<string, string | boolean> = { title, datetime, location, description, agenda_r2_key: agendaKey, post_to_public_news: postToPublic };
+    const body = { title, datetime, location, description, agenda_r2_key: agendaKey, post_to_public_news: postToPublic };
     const url = '/api/meetings';
     const method = id ? 'PUT' : 'POST';
     if (id) body.id = id;

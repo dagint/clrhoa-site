@@ -175,7 +175,7 @@ const email = (formData.get('email') as string)?.trim() ?? null;
 const website = (formData.get('website') as string)?.trim() ?? null;
 const notes = (formData.get('notes') as string)?.trim() ?? null;
 const showOnPublicRaw = formData.get('show_on_public');
-const show_on_public = showOnPublicRaw === true || showOnPublicRaw === '1' || showOnPublicRaw === 'on' ? 1 : 0;
+const show_on_public = showOnPublicRaw === '1' || showOnPublicRaw === 'on' ? 1 : 0;
 
 // Collect file inputs (file_0, file_1, ...)
 const fileIndices = new Set<number>();

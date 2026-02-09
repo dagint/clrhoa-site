@@ -69,10 +69,10 @@ if (Astro.request.method === 'POST') {
   const title = typeof body.title === 'string' ? body.title.trim() : '';
   const bodyText = typeof body.body === 'string' ? body.body : '';
   const isPublic = body.show_on_public !== undefined
-    ? (body.show_on_public === 1 || body.show_on_public === true ? 1 : 0)
-    : (body.is_public === 1 || body.is_public === true ? 1 : 0);
+    ? (body.show_on_public === 1 ? 1 : 0)
+    : (body.is_public === 1 ? 1 : 0);
   const showOnPortal = body.show_on_portal !== undefined
-    ? (body.show_on_portal === 1 || body.show_on_portal === true ? 1 : 0)
+    ? (body.show_on_portal === 1 ? 1 : 0)
     : 1;
   if (!title) {
     return new Response(JSON.stringify({ error: 'title required' }), {

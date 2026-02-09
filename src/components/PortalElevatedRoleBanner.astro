@@ -63,16 +63,16 @@ const label = role === 'admin' ? 'Administrator' : role === 'arb_board' ? 'ARB +
 </div>
 
 {canAssumeRole && (
-  <script>
+  <script is:inline>
     (function () {
       const form = document.getElementById('assume-role-form');
       const statusEl = document.getElementById('assume-role-status');
       const errorEl = document.getElementById('assume-role-error');
       const banner = document.querySelector('[data-session-role]');
-      const getCsrf = () => { const el = document.getElementById('assume-role-csrf') as HTMLInputElement | null; return el?.value ?? form?.getAttribute('data-csrf') ?? ''; };
+      const getCsrf = () => { const el = document.getElementById('assume-role-csrf'); return el?.value ?? form?.getAttribute('data-csrf') ?? ''; };
       const isAdmin = banner?.getAttribute('data-is-admin') === 'true';
 
-      function formatCountdown(untilMs: number): string {
+      function formatCountdown(untilMs) {
         const now = Date.now();
         const rem = untilMs - now;
         if (rem <= 0) return 'Expired';
@@ -105,7 +105,7 @@ const label = role === 'admin' ? 'Administrator' : role === 'arb_board' ? 'ARB +
         startCountdownTicker();
       }
 
-      function showError(msg: string) {
+      function showError(msg) {
         if (errorEl) {
           errorEl.textContent = msg;
           errorEl.classList.remove('hidden');
@@ -118,7 +118,7 @@ const label = role === 'admin' ? 'Administrator' : role === 'arb_board' ? 'ARB +
         }
       }
 
-      function renderStatus(assumedRole: string | null, assumedUntil: number | null) {
+      function renderStatus(assumedRole, assumedUntil) {
         if (!statusEl) return;
         const roleLabel = assumedRole === 'board' ? 'Board' : assumedRole === 'arb' ? 'ARB' : null;
         let html = '';
@@ -136,7 +136,7 @@ const label = role === 'admin' ? 'Administrator' : role === 'arb_board' ? 'ARB +
         if (assumedUntil != null) startCountdownTicker();
       }
 
-      function renderFormButtons(assumedRole: string | null) {
+      function renderFormButtons(assumedRole) {
         if (!form) return;
         const dropLabel = isAdmin ? 'Return to Admin (view only)' : 'Drop role';
         const csrf = getCsrf();
@@ -153,19 +153,19 @@ const label = role === 'admin' ? 'Administrator' : role === 'arb_board' ? 'ARB +
 
       function bindAssumeRoleButtons() {
         form?.querySelectorAll('.assume-role-btn').forEach((btn) => {
-          btn.addEventListener('click', async function (this: HTMLButtonElement) {
-            const role = this.getAttribute('data-role') || 'none';
+          btn.addEventListener('click', async function () {
+            const role = btn.getAttribute('data-role') || 'none';
             const token = getCsrf();
             clearError();
-            this.disabled = true;
+            btn.disabled = true;
             try {
               const res = await fetch('/api/admin/assume-role', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ role, csrf_token: token }),
               });
-              const data = (await res.json()) as { success?: boolean; assumed_role?: 'board' | 'arb' | null; assumed_until?: number | null; error?: string };
-              if (res.ok && data.success) {
+              const data = await res.json();
+              if (res.ok && data && data.success) {
                 const newRole = data.assumed_role ?? null;
                 if (newRole === 'arb') {
                   window.location.href = '/portal/arb-dashboard';
@@ -194,11 +194,11 @@ const label = role === 'admin' ? 'Administrator' : role === 'arb_board' ? 'ARB +
                   statusEl.appendChild(p);
                 }
               } else {
-                this.disabled = false;
+                btn.disabled = false;
                 showError(data.error || 'Couldn\'t switch role. Please try again or refresh the page.');
               }
             } catch (e) {
-              this.disabled = false;
+              btn.disabled = false;
               showError('Couldn\'t switch role. Please try again or refresh the page.');
             }
           });

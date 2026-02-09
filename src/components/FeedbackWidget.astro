@@ -64,10 +64,10 @@
   </button>
 </div>
 
-<script>
+<script is:inline>
   (function () {
     const FEEDBACK_KEY = 'site_feedback_session_id';
-    function getSessionId(): string {
+    function getSessionId() {
       try {
         let id = sessionStorage.getItem(FEEDBACK_KEY);
         if (!id) {
@@ -84,7 +84,7 @@
     const toggle = document.getElementById('feedback-toggle');
     const thumbsUp = document.getElementById('feedback-thumbs-up');
     const thumbsDown = document.getElementById('feedback-thumbs-down');
-    const comment = document.getElementById('feedback-comment') as HTMLTextAreaElement | null;
+    const comment = document.getElementById('feedback-comment');
     const charCount = document.getElementById('feedback-char-count');
     const submitBtn = document.getElementById('feedback-submit');
     const messageEl = document.getElementById('feedback-message');
@@ -94,9 +94,9 @@
     const thumbsUpEl = thumbsUp;
     const thumbsDownEl = thumbsDown;
     const messageElRef = messageEl;
-    let chosenThumbs: 1 | -1 | null = null;
+    let chosenThumbs = null;
 
-    function showMessage(text: string, isError: boolean) {
+    function showMessage(text, isError) {
       messageElRef.textContent = text;
       messageElRef.classList.toggle('text-red-600', isError);
       messageElRef.classList.toggle('text-green-600', !isError);
@@ -104,7 +104,7 @@
     }
 
     function setCharCount() {
-      if (charCount && comment) charCount.textContent = `${comment.value.length}/140`;
+      if (charCount && comment) charCount.textContent = `${String(comment['value'] ?? '').length}/140`;
     }
     comment?.addEventListener('input', setCharCount);
 
@@ -113,7 +113,7 @@
       panel.classList.toggle('hidden', open);
     });
 
-    function selectThumbs(v: 1 | -1) {
+    function selectThumbs(v) {
       chosenThumbs = v;
       thumbsUpEl.classList.toggle('border-green-500', v === 1);
       thumbsUpEl.classList.toggle('bg-green-50', v === 1);
@@ -138,7 +138,7 @@
         viewport: `${window.innerWidth}x${window.innerHeight}`,
         session_id: getSessionId(),
         thumbs: chosenThumbs,
-        comment: comment?.value?.trim().slice(0, 140) ?? '',
+        comment: String((comment && comment['value']) ?? '').trim().slice(0, 140) || '',
       };
 
       try {
@@ -147,16 +147,16 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
         });
-        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        const data = await res.json().catch(() => ({}));
         if (res.status === 429) {
           showMessage(
-            data.error ?? 'You can submit up to 3 feedback responses per day. Try again tomorrow.',
+            (data && data.error) ?? 'You can submit up to 3 feedback responses per day. Try again tomorrow.',
             true
           );
           return;
         }
         if (!res.ok) {
-          showMessage(data.error ?? 'Something went wrong. Please try again.', true);
+          showMessage((data && data.error) ?? 'Something went wrong. Please try again.', true);
           return;
         }
         showMessage('Thanks for your feedback!', false);

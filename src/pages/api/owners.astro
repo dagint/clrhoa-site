@@ -178,7 +178,7 @@ if (Astro.request.method === 'PUT') {
     lot_number: lotNumber,
     phone: body.phone,
     email: body.email,
-    is_primary: body.is_primary,
+    is_primary: body.is_primary === true ? 1 : body.is_primary === false ? 0 : undefined,
   }, session.email);
   if (!updated) {
     return new Response(JSON.stringify({ error: 'Owner not found or update failed.' }), {

@@ -9,7 +9,7 @@ import { listArbRequestsByHousehold } from '../../lib/arb-db';
 import { escapeHtml } from '../../lib/sanitize';
 
 const ctx = await getBoardContext(Astro);
-if (ctx.redirect) return Astro.redirect(ctx.redirect);
+if ('redirect' in ctx) return Astro.redirect(ctx.redirect);
 const { env, session, effectiveRole } = ctx;
 const isBoardOrAdmin = effectiveRole === 'board' || effectiveRole === 'admin' || effectiveRole === 'arb_board';
 
@@ -262,7 +262,7 @@ function parseFiles(filesJson: string | null): { name: string; key: string }[] {
       )}
         </>
       )}
-  <script define:vars={{ existingCategories: existingCategories }}>
+  <script is:inline define:vars={{ existingCategories: existingCategories }}>
     (function () {
       if (typeof window === 'undefined') return;
       var csrfHolder = document.getElementById('csrf-holder');
@@ -291,41 +291,41 @@ function parseFiles(filesJson: string | null): { name: string; key: string }[] {
         actionInput.value = 'create';
         idInput.value = '';
         nameInput.value = '';
-        if (categorySelect) (categorySelect as HTMLSelectElement).value = existingCategories[0] || 'Other';
-        if (categoryNewInput) { (categoryNewInput as HTMLInputElement).value = ''; categoryNewInput.classList.add('hidden'); }
+        if (categorySelect) categorySelect.value = existingCategories[0] || 'Other';
+        if (categoryNewInput) { categoryNewInput.value = ''; categoryNewInput.classList.add('hidden'); }
         if (categoryInput) categoryInput.value = existingCategories[0] || 'Other';
         phoneInput.value = '';
         emailInput.value = '';
         if (websiteInput) websiteInput.value = '';
         notesInput.value = '';
-        if (radioPublicPortal) (radioPublicPortal as HTMLInputElement).checked = true;
-        if (radioPortalOnly) (radioPortalOnly as HTMLInputElement).checked = false;
+        if (radioPublicPortal) radioPublicPortal.checked = true;
+        if (radioPortalOnly) radioPortalOnly.checked = false;
         if (fileInput) fileInput.value = '';
         submitBtn.textContent = 'Create vendor';
         cancelBtn.classList.add('hidden');
       }
 
       function syncFormCategoryFromSelect() {
-        var sel = categorySelect && (categorySelect as HTMLSelectElement).value;
+        var sel = categorySelect && categorySelect.value;
         if (sel === '__new__') {
-          if (categoryNewInput) { categoryNewInput.classList.remove('hidden'); (categoryInput as HTMLInputElement).value = (categoryNewInput as HTMLInputElement).value.trim() || ''; }
+          if (categoryNewInput) { categoryNewInput.classList.remove('hidden'); categoryInput.value = categoryNewInput.value.trim() || ''; }
         } else {
           if (categoryNewInput) categoryNewInput.classList.add('hidden');
-          if (categoryInput) (categoryInput as HTMLInputElement).value = sel || '';
+          if (categoryInput) categoryInput.value = sel || '';
         }
       }
       if (categorySelect) {
         categorySelect.addEventListener('change', function () {
-          var sel = (this as HTMLSelectElement).value;
+          var sel = this.value;
           if (categoryNewInput) {
             if (sel === '__new__') { categoryNewInput.classList.remove('hidden'); categoryNewInput.focus(); }
             else categoryNewInput.classList.add('hidden');
           }
-          if (categoryInput) (categoryInput as HTMLInputElement).value = sel === '__new__' ? (categoryNewInput && (categoryNewInput as HTMLInputElement).value.trim()) || '' : sel;
+          if (categoryInput) categoryInput.value = sel === '__new__' ? (categoryNewInput && categoryNewInput.value.trim()) || '' : sel;
         });
       }
       if (categoryNewInput) {
-        categoryNewInput.addEventListener('input', function () { if (categoryInput) (categoryInput as HTMLInputElement).value = (this as HTMLInputElement).value.trim(); });
+        categoryNewInput.addEventListener('input', function () { if (categoryInput) categoryInput.value = this.value.trim(); });
       }
       if (form) form.addEventListener('submit', function () { syncFormCategoryFromSelect(); });
 
@@ -343,15 +343,15 @@ function parseFiles(filesJson: string | null): { name: string; key: string }[] {
           idInput.value = id || '';
           nameInput.value = name;
           var catInList = existingCategories.indexOf(category) >= 0;
-          if (categorySelect) (categorySelect as HTMLSelectElement).value = catInList ? category : '__new__';
-          if (categoryNewInput) { (categoryNewInput as HTMLInputElement).value = catInList ? '' : category; categoryNewInput.classList.toggle('hidden', catInList); }
-          if (categoryInput) (categoryInput as HTMLInputElement).value = category;
+          if (categorySelect) categorySelect.value = catInList ? category : '__new__';
+          if (categoryNewInput) { categoryNewInput.value = catInList ? '' : category; categoryNewInput.classList.toggle('hidden', catInList); }
+          if (categoryInput) categoryInput.value = category;
           phoneInput.value = phone;
           emailInput.value = email;
           if (websiteInput) websiteInput.value = website;
           notesInput.value = notes;
-          if (radioPublicPortal) (radioPublicPortal as HTMLInputElement).checked = showOnPublic;
-          if (radioPortalOnly) (radioPortalOnly as HTMLInputElement).checked = !showOnPublic;
+          if (radioPublicPortal) radioPublicPortal.checked = showOnPublic;
+          if (radioPortalOnly) radioPortalOnly.checked = !showOnPublic;
           submitBtn.textContent = 'Update vendor';
           cancelBtn.classList.remove('hidden');
         });
@@ -414,33 +414,33 @@ function parseFiles(filesJson: string | null): { name: string; key: string }[] {
 
       document.querySelectorAll('.row-category-select').forEach(function (sel) {
         sel.addEventListener('change', function () {
-          var row = (this as HTMLElement).closest('.vendor-row');
-          var newInput = row ? row.querySelector('.row-category-new') as HTMLInputElement : null;
-          if (newInput) newInput.classList.toggle('hidden', (this as HTMLSelectElement).value !== '__new__');
+          var row = this.closest('.vendor-row');
+          var newInput = row ? row.querySelector('.row-category-new') : null;
+          if (newInput) newInput.classList.toggle('hidden', this.value !== '__new__');
         });
       });
       document.querySelectorAll('.vendor-row').forEach(function (row) {
-        var sel = row.querySelector('.row-category-select') as HTMLSelectElement;
+        var sel = row.querySelector('.row-category-select');
         if (sel && sel.value === '__new__') {
-          var newInput = row.querySelector('.row-category-new') as HTMLInputElement;
+          var newInput = row.querySelector('.row-category-new');
           if (newInput) newInput.classList.remove('hidden');
         }
       });
 
       document.querySelectorAll('.save-row-btn').forEach(function (btn) {
         btn.addEventListener('click', async function () {
-          var row = (this as HTMLElement).closest('.vendor-row');
+          var row = this.closest('.vendor-row');
           if (!row) return;
           var id = row.getAttribute('data-vendor-id');
           if (!id) return;
-          var nameEl = row.querySelector('.row-name') as HTMLInputElement;
-          var catSelect = row.querySelector('.row-category-select') as HTMLSelectElement;
-          var catNew = row.querySelector('.row-category-new') as HTMLInputElement;
-          var phoneEl = row.querySelector('.row-phone') as HTMLInputElement;
-          var emailEl = row.querySelector('.row-email') as HTMLInputElement;
-          var websiteEl = row.querySelector('.row-website') as HTMLInputElement;
-          var notesEl = row.querySelector('.row-notes') as HTMLInputElement;
-          var showEl = row.querySelector('.row-show') as HTMLSelectElement;
+          var nameEl = row.querySelector('.row-name');
+          var catSelect = row.querySelector('.row-category-select');
+          var catNew = row.querySelector('.row-category-new');
+          var phoneEl = row.querySelector('.row-phone');
+          var emailEl = row.querySelector('.row-email');
+          var websiteEl = row.querySelector('.row-website');
+          var notesEl = row.querySelector('.row-notes');
+          var showEl = row.querySelector('.row-show');
           var category = (catSelect && catSelect.value === '__new__' && catNew) ? (catNew.value || '').trim() : (catSelect ? catSelect.value : '');
           if (!category) category = 'Other';
           var fd = new FormData();
@@ -455,7 +455,7 @@ function parseFiles(filesJson: string | null): { name: string; key: string }[] {
           fd.set('notes', (notesEl && notesEl.value) || '');
           fd.set('show_on_public', (showEl && showEl.value) || '1');
           clearVendorsMessage();
-          var b = this as HTMLButtonElement; b.disabled = true; b.setAttribute('aria-busy', 'true');
+          var b = this; b.disabled = true; b.setAttribute('aria-busy', 'true');
           try {
             var res = await fetch('/api/vendors', { method: 'PUT', body: fd });
             var data = await res.json();
@@ -490,7 +490,7 @@ function parseFiles(filesJson: string | null): { name: string; key: string }[] {
             const data = await res.json();
             if (res.ok && data.success) {
               showVendorsMessage('Vendor removed.', false);
-              var row = (this as HTMLElement).closest('.vendor-row');
+              var row = this.closest('.vendor-row');
               if (row) row.remove();
               else setTimeout(function () { window.location.reload(); }, 1500);
             } else {
@@ -581,7 +581,8 @@ function parseFiles(filesJson: string | null): { name: string; key: string }[] {
         // Append multiple files as file_0, file_1, ...
         if (fileInput?.files?.length) {
           for (let i = 0; i < fileInput.files.length; i++) {
-            formData.set('file_' + i, fileInput.files[i]!);
+            const file = fileInput.files[i];
+            if (file) formData.set('file_' + i, file);
           }
         }
         const method = actionInput.value === 'update' ? 'PUT' : 'POST';

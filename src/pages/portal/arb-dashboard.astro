@@ -10,7 +10,7 @@ import ArbNav from '../../components/ArbNav.astro';
 import ArbDashboardCard from '../../components/ArbDashboardCard.astro';
 import ArbDashboardExportSection from '../../components/ArbDashboardExportSection.astro';
 import { getPortalContext } from '../../lib/portal-context';
-import { updateSessionActivity, canApproveArb } from '../../lib/auth';
+import { canApproveArb } from '../../lib/auth';
 import { getArbDashboardData, formatApproval } from '../../lib/arb-dashboard';
 import { sanitizeForScriptInjection } from '../../lib/sanitize';
 
@@ -19,8 +19,7 @@ if (!session) return Astro.redirect('/portal/login');
 
 const allowedRoles = ['arb', 'board', 'admin', 'arb_board'];
 if (!allowedRoles.includes(effectiveRole)) {
-  const returnUrl = encodeURIComponent('/portal/arb-dashboard');
-  return Astro.redirect(`/portal/request-elevated-access?return=${returnUrl}`);
+  return Astro.redirect('/portal/request-elevated-access?return=' + encodeURIComponent('/portal/arb-dashboard'));
 }
 
 const canApprove = canApproveArb(effectiveRole);
@@ -363,8 +362,8 @@ const periodOptions = dashboardData?.periodOptions ?? [];
     }
   </style>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" integrity="sha512-XMVd28F1oH/O71fzwBnV7HucLxVwtxf26XV8P4wPk26EDxuGZ91N8bsOttmnomcCD3CS5ZMRL50H0GgOHvegtg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-  <script define:vars={{ csrfToken: session.csrfToken ?? '', suggestedArbEsign: suggestedArbEsign }}>
+  <script is:inline src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" integrity="sha512-XMVd28F1oH/O71fzwBnV7HucLxVwtxf26XV8P4wPk26EDxuGZ91N8bsOttmnomcCD3CS5ZMRL50H0GgOHvegtg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script is:inline define:vars={{ csrfToken: session.csrfToken ?? '', suggestedArbEsign: suggestedArbEsign }}>
     (function () {
       // Make CSRF token available to scripts
       if (typeof window !== 'undefined') {

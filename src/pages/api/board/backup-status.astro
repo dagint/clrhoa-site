@@ -30,7 +30,7 @@ const manual_download_configured = Boolean(
 
 let last_r2_backup_at: string | null = null;
 let last_google_backup_at: string | null = null;
-const db = env?.DB;
+const db = env?.DB as D1Database | undefined;
 if (db) {
   try {
     const row = await db.prepare(
