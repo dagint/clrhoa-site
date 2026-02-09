@@ -11,7 +11,8 @@ This site uses environment variables to store sensitive information and configur
 - **If the Dues page shows wrong address, wrong amount, or placeholder text** → the Build step did not have those values. Set them as **GitHub Variables** (not Secrets).
 - **If Local Resources is missing waste management / recycling links and data** → same: add the recycling and waste vars as **GitHub Variables**.
 
-**Where to set them:** Repo → **Settings** → **Secrets and variables** → **Actions** → **Variables** tab → add (or edit) each variable below.
+**Where to set them:** Repo → **Settings** → **Secrets and variables** → **Actions** → **Variables** tab → add (or edit) each variable.  
+If you use **Environments** (e.g. production): Repo → **Settings** → **Environments** → **production** → **Environment variables**. The deploy workflow uses `environment: production` so it can read both repository Variables and production environment variables.
 
 **Minimum for Dues page and Local Resources:**
 

@@ -9,6 +9,8 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    # Required if variables are set under Settings → Environments → production (not just Actions → Variables)
+    environment: production
     permissions:
       contents: read
       deployments: write
