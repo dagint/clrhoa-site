@@ -18,7 +18,7 @@ Before deploying, edit `workers/backup/wrangler.toml`:
 Set secrets (from project root):
 
 ```bash
-npx wrangler secret put CLOUDFLARE_API_TOKEN --config workers/backup/wrangler.toml
+npx wrangler secret put CLOUDFLARE_BACKUP_API_TOKEN --config workers/backup/wrangler.toml
 ```
 
 Create an API token in Cloudflare Dashboard with **D1 Read** and **R2 Edit** (and **Account Read** if needed). The Worker uses it to trigger D1 export and write to R2.
@@ -38,7 +38,7 @@ Use a strong random string for `BACKUP_ENCRYPTION_KEY` (e.g. 32+ chars). Same ke
 For **Download backup (ZIP)** to work, the main app (Pages) needs:
 
 - **Vars** (in Cloudflare Pages env or root `wrangler.toml`): `CLOUDFLARE_ACCOUNT_ID`, `D1_DATABASE_ID` (optional; defaults to the id in wrangler).
-- **Secret**: `CLOUDFLARE_API_TOKEN` (same permissions as above).
+- **Secret**: `CLOUDFLARE_BACKUP_API_TOKEN` (scoped: D1 Read, R2 Edit, KV Read).
 
 For **Google Drive backup** (Connect Google Drive on Board → Backups):
 

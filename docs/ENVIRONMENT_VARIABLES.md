@@ -60,7 +60,7 @@ These are **resource bindings** in Pages (Settings → Bindings), not key/value 
 | Name | Type | Purpose |
 |------|------|---------|
 | `CLOUDFLARE_ACCOUNT_ID` | Plain or Secret | Backup download from Board |
-| `CLOUDFLARE_API_TOKEN` | **Secret** | Backup download from Board |
+| `CLOUDFLARE_BACKUP_API_TOKEN` | **Secret** | Backup download from Board + backup Worker |
 | `D1_DATABASE_ID` | Plain | Backup (if different from binding) |
 | `GOOGLE_CLIENT_ID` | **Secret** | Google Drive backup OAuth |
 | `GOOGLE_CLIENT_SECRET` | **Secret** | Google Drive backup OAuth |

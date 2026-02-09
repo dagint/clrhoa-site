@@ -152,7 +152,7 @@ If you use **automated** backups (cron: D1 export + KV dump to R2, optional Goog
 - [ ] Deploy: `npm run backup:deploy` (from repo root; uses `workers/backup/wrangler.toml`)
 - [ ] In **Workers & Pages → clrhoa-backup → Settings** (or the Worker name in that wrangler):
   - [ ] **CLOUDFLARE_ACCOUNT_ID** — Plain var (replace `REPLACE_WITH_ACCOUNT_ID` in wrangler or set in dashboard)
-  - [ ] **CLOUDFLARE_API_TOKEN** — **Secret.** Scoped for: **D1 Read** (export), **R2 Edit** (write backup objects), **KV Read** (dump whitelist). Prefer a token that cannot modify Workers, Pages, or DNS unless you need it for future automation.
+  - [ ] **CLOUDFLARE_BACKUP_API_TOKEN** — **Secret.** Scoped for: **D1 Read** (export), **R2 Edit** (write backup objects), **KV Read** (dump whitelist). This is separate from the deployment token for security.
   - [ ] **D1_DATABASE_ID** — Same as main app (already in workers/backup/wrangler.toml if you copied it)
   - [ ] **BACKUP_RETENTION_DAYS** — e.g. `30` (optional; default in wrangler)
 - [ ] For **Google Drive** backup: set **GOOGLE_CLIENT_ID**, **GOOGLE_CLIENT_SECRET**, **BACKUP_ENCRYPTION_KEY** as secrets on the **backup Worker** (not only on Pages).

@@ -7,7 +7,7 @@ const CF_API = "https://api.cloudflare.com/client/v4";
 
 interface Env {
   CLOUDFLARE_ACCOUNT_ID: string;
-  CLOUDFLARE_API_TOKEN: string;
+  CLOUDFLARE_BACKUP_API_TOKEN: string;
   D1_DATABASE_ID: string;
   BACKUP_RETENTION_DAYS: string;
   CLOURHOA_USERS: KVNamespace;
@@ -90,7 +90,7 @@ async function runBackup(env: Env, date: string): Promise<void> {
 async function exportD1(env: Env): Promise<string> {
   const base = `${CF_API}/accounts/${env.CLOUDFLARE_ACCOUNT_ID}/d1/database/${env.D1_DATABASE_ID}/export`;
   const headers = {
-    Authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}`,
+    Authorization: `Bearer ${env.CLOUDFLARE_BACKUP_API_TOKEN}`,
     "Content-Type": "application/json",
   };
 

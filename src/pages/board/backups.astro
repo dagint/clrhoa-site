@@ -65,7 +65,7 @@ const errorParam = url.searchParams.get('error') ?? '';
       <p id="backup-status-google">Checking…</p>
     </div>
     <p class="text-xs text-gray-500 mt-2">
-      Deploy the Worker with <code class="bg-gray-100 px-1 rounded">npm run backup:deploy</code> and set <code class="bg-gray-100 px-1 rounded">CLOUDFLARE_API_TOKEN</code> and <code class="bg-gray-100 px-1 rounded">CLOUDFLARE_ACCOUNT_ID</code> for the Worker (and for manual download above).
+      Deploy the Worker with <code class="bg-gray-100 px-1 rounded">npm run backup:deploy</code> and set <code class="bg-gray-100 px-1 rounded">CLOUDFLARE_BACKUP_API_TOKEN</code> and <code class="bg-gray-100 px-1 rounded">CLOUDFLARE_ACCOUNT_ID</code> for the Worker (and for manual download above).
     </p>
   </section>
 
@@ -153,14 +153,14 @@ const errorParam = url.searchParams.get('error') ?? '';
               return;
             }
             manualEl.textContent = data.manual_download_configured
-              ? 'Manual download: Configured. (CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN are set.)'
-              : 'Manual download: Not configured. Set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN in your deployment to enable "Download backup (ZIP)".';
+              ? 'Manual download: Configured. (CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_BACKUP_API_TOKEN are set.)'
+              : 'Manual download: Not configured. Set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_BACKUP_API_TOKEN in your deployment to enable "Download backup (ZIP)".';
             if (data.last_r2_backup_at) {
               var d = new Date(data.last_r2_backup_at);
               var label = isNaN(d.getTime()) ? data.last_r2_backup_at : d.toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' }) + ' UTC';
               r2El.textContent = 'Automated R2 backups: Last run at ' + label + '.';
             } else {
-              r2El.textContent = 'Automated R2 backups: No run recorded yet. Deploy the backup Worker (npm run backup:deploy) and set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN for the Worker.';
+              r2El.textContent = 'Automated R2 backups: No run recorded yet. Deploy the backup Worker (npm run backup:deploy) and set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_BACKUP_API_TOKEN for the Worker.';
             }
             if (data.last_google_backup_at) {
               var gd = new Date(data.last_google_backup_at);

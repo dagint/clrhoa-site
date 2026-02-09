@@ -2,8 +2,13 @@
 # Run: npx wrangler d1 create clrhoa_db
 #      npx wrangler kv namespace create clrhoa_users
 #      npx wrangler r2 bucket create clrhoa-files
-# Then replace placeholder IDs below. Set SESSION_SECRET via: npx wrangler secret put SESSION_SECRET
-# Local dev: add SESSION_SECRET to .dev.vars
+# Then replace placeholder IDs below.
+#
+# ⚠️  SECRETS: Do NOT put secrets (API keys, tokens, passwords) in this file!
+#     - For production: Use GitHub Secrets → GitHub Actions syncs to Cloudflare
+#     - For local dev: Use .dev.vars (gitignored)
+#     - See docs/GITHUB_SECRETS_SETUP.md for details
+#     - To list required secrets: npm run secrets:list
 
 name = "clrhoa-site"
 pages_build_output_dir = "./dist"
