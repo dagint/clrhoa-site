@@ -16,7 +16,7 @@ import {
 import { escapeHtml } from '../../lib/sanitize';
 
 const ctx = await getBoardContext(Astro);
-if (ctx.redirect) return Astro.redirect(ctx.redirect);
+if ('redirect' in ctx) return Astro.redirect(ctx.redirect);
 const { env, session, effectiveRole } = ctx;
 const isBoard = effectiveRole === 'board' || effectiveRole === 'admin' || effectiveRole === 'arb_board';
 if (!isBoard) return Astro.redirect('/portal/dashboard');
@@ -239,7 +239,7 @@ function formatCurrency(n: number): string {
   </section>
 </BoardLayout>
 
-<script define:vars={{ today: today, currentYear: currentYear, csrfToken: session?.csrfToken ?? '', missingCount: missingThisQuarter.length, totalCount: sortedOwners.length }}>
+<script is:inline define:vars={{ today: today, currentYear: currentYear, csrfToken: session?.csrfToken ?? '', missingCount: missingThisQuarter.length, totalCount: sortedOwners.length }}>
   (function () {
     const msgEl = document.getElementById('assessments-message');
     const csrfHolder = document.getElementById('csrf-holder');

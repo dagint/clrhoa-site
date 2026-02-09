@@ -7,7 +7,7 @@ import { listPreapprovalItems, listPreapprovalCategories, parsePhotos } from '..
 import { listArbRequestsByHousehold } from '../../lib/arb-db';
 
 const ctx = await getBoardContext(Astro);
-if (ctx.redirect) return Astro.redirect(ctx.redirect);
+if ('redirect' in ctx) return Astro.redirect(ctx.redirect);
 const { env, session, effectiveRole } = ctx;
 
 const db = env?.DB;

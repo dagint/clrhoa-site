@@ -272,9 +272,9 @@ function formatLoginTime(iso: string | null): string {
                   </div>
                 </nav>
               </div>
-              <script>
+              <script is:inline>
                 document.getElementById('profile-login-per-page')?.addEventListener('change', function () {
-                  const limit = (this as HTMLSelectElement).value;
+                  const limit = this.value;
                   const u = new URL(window.location.href);
                   u.searchParams.set('login_limit', limit);
                   u.searchParams.delete('login_page');
@@ -416,7 +416,7 @@ function formatLoginTime(iso: string | null): string {
         e.preventDefault();
         if (!messageEl) return;
         messageEl.textContent = '';
-        const token = (csrfInput && csrfInput.value) || '';
+        const _token = (csrfInput && csrfInput.value) || '';
         const phones = [];
         container?.querySelectorAll('.phone-input').forEach((input) => {
           const v = input.value?.trim();
@@ -527,7 +527,7 @@ function formatLoginTime(iso: string | null): string {
         const notification_preferences = getCurrentNotificationPrefs();
         notification_preferences.push_enabled = value;
         const csrfEl = document.getElementById('my-info-csrf');
-        const token = (csrfEl && csrfEl.value) || '';
+        const _token = (csrfEl && csrfEl.value) || '';
         return fetch('/api/preferences', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

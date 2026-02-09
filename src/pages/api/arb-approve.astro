@@ -61,6 +61,10 @@ if (!db) {
   });
 }
 
+const logger = createLogger({ endpoint: '/api/arb-approve' });
+const securityMonitor = getSecurityMonitor();
+const ipAddress = Astro.request.headers.get('cf-connecting-ip') ?? Astro.request.headers.get('x-forwarded-for') ?? 'unknown';
+
 let body: { requestId?: string; action?: string; arbEsign?: string; revisionNotes?: string; csrfToken?: string; timestamp?: number; nonce?: string; signature?: string };
 try {
   body = await Astro.request.json();

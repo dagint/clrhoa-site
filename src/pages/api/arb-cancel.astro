@@ -15,7 +15,7 @@ import { listArbFilesByRequest, deleteAllArbFilesByRequest, cancelArbRequest } f
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
-const logger = createLogger('arb-cancel');
+const logger = createLogger({ endpoint: 'arb-cancel' });
 const userAgent = Astro.request.headers.get('user-agent') ?? null;
 const ipAddress = Astro.request.headers.get('cf-connecting-ip') ?? 
                   Astro.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;

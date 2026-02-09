@@ -9,7 +9,7 @@ import { getSessionFromCookie, getEffectiveRole } from '../../../lib/auth';
 import { buildZip } from '../../../lib/zip-simple';
 
 const runtime = Astro.locals.runtime;
-const env = runtime?.env as import('../../../env.d').Env & {
+const env = runtime?.env as Env & {
   CLOUDFLARE_ACCOUNT_ID?: string;
   CLOUDFLARE_BACKUP_API_TOKEN?: string;
   D1_DATABASE_ID?: string;

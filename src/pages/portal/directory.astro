@@ -14,7 +14,7 @@ if (!session) return Astro.redirect('/portal/login');
 
 const db = env?.DB;
 const owners = db ? await listOwners(db) : [];
-const ownerRoles = await getRolesForEmails(env?.CLOURHOA_USERS, owners.map((o) => o.email));
+const ownerRoles = await getRolesForEmails(env?.CLOURHOA_USERS as KVNamespace<string> | undefined, owners.map((o) => o.email));
 const allRequests = db ? await listArbRequestsByHousehold(db, session.email) : [];
 const draftCount = allRequests.filter((r) => r.status === 'pending').length;
 
@@ -133,7 +133,7 @@ function canRevealContact(owner: { share_contact_with_members?: number | null })
     </main>
   </div>
 
-  <script define:vars={{ owners: owners, csrfToken: session.csrfToken ?? '' }}>
+  <script is:inline define:vars={{ owners: owners, csrfToken: session.csrfToken ?? '' }}>
     (function () {
       if (typeof window === 'undefined') return;
       window.csrfToken = csrfToken || '';

@@ -23,7 +23,7 @@ function isAllowedType(t: string): boolean {
 }
 
 // Server-side file type validation: check actual MIME type, not just extension
-async function validateFileMimeType(file: File): Promise<boolean> {
+async function validateFileMimeType(file: File | Blob): Promise<boolean> {
   const buffer = await file.arrayBuffer();
   const bytes = new Uint8Array(buffer);
   

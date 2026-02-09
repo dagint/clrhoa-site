@@ -14,7 +14,7 @@ import { requireArbRequestOwner } from '../../lib/access-control';
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
-const logger = createLogger('arb-update');
+const logger = createLogger({ endpoint: 'arb-update' });
 const userAgent = Astro.request.headers.get('user-agent') ?? null;
 const ipAddress = Astro.request.headers.get('cf-connecting-ip') ?? 
                   Astro.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;

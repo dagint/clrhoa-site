@@ -10,6 +10,7 @@ import { getSessionFromCookie, isElevatedRole, getEffectiveRole } from './auth';
 export interface BoardEnv {
   SESSION_SECRET?: string;
   DB?: D1Database;
+  CLOURHOA_USERS?: KVNamespace;
 }
 
 /** Minimal Astro-like context for board pages. */

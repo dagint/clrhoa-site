@@ -30,7 +30,6 @@ if (db) {
 
 const draftCount = requests.filter((r) => r.status === 'pending').length;
 const inReviewCount = requests.filter((r) => r.status === 'in_review').length;
-const nonFinalCount = draftCount + inReviewCount;
 
 function formatDate(s: string | null | undefined): string {
   if (!s) return '—';
@@ -271,30 +270,14 @@ function statusLabel(status: string): string {
   </ProtectedPage>
 </PortalLayout>
 
-<script define:vars={{ requests: requests, auditByRequestId: auditByRequestId, submittedForReviewAt: submittedForReviewAt, TABS: TABS }}>
+<script is:inline define:vars={{ requests: requests, auditByRequestId: auditByRequestId, submittedForReviewAt: submittedForReviewAt, TABS: TABS }}>
   (function () {
     if (typeof window === 'undefined') return;
 
     const listEl = document.getElementById('requests-list');
-    const container = document.getElementById('requests-list-container');
     if (!listEl) return;
 
-    let currentTab = 'all';
-
-    function getTabCounts() {
-      const counts = { all: requests.length, pending: 0, in_review: 0, approved: 0, rejected: 0, cancelled: 0 };
-      requests.forEach(function (r) {
-        if (r.status === 'pending') counts.pending++;
-        else if (r.status === 'in_review') counts.in_review++;
-        else if (r.status === 'approved') counts.approved++;
-        else if (r.status === 'rejected') counts.rejected++;
-        else if (r.status === 'cancelled') counts.cancelled++;
-      });
-      return counts;
-    }
-
     function filterTab(id) {
-      currentTab = id;
       listEl.querySelectorAll('.request-card').forEach(function (li) {
         const status = li.getAttribute('data-status');
         const show = id === 'all' ? true : status === id;

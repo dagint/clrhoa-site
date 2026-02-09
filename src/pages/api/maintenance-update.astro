@@ -10,7 +10,7 @@ import { getEffectiveRole } from '../../lib/auth';
 import { getMaintenanceById, updateMaintenanceRequest } from '../../lib/maintenance-db';
 
 const auth = await requireSession(Astro);
-if (auth.response) return auth.response;
+if ('response' in auth) return auth.response;
 const { session } = auth;
 
 const effectiveRole = getEffectiveRole(session);
@@ -18,7 +18,7 @@ const isBoard = effectiveRole === 'board' || effectiveRole === 'admin' || effect
 if (!isBoard) return jsonResponse({ error: 'Forbidden' }, 403);
 
 const dbResult = requireDb(Astro.locals.runtime?.env);
-if (dbResult.response) return dbResult.response;
+if ('response' in dbResult) return dbResult.response;
 const { db } = dbResult;
 
 if (Astro.request.method !== 'POST' && Astro.request.method !== 'PUT') {

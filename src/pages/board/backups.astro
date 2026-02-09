@@ -6,7 +6,7 @@ import { getBoardContext } from '../../lib/board-context';
 import { listArbRequestsByHousehold } from '../../lib/arb-db';
 
 const ctx = await getBoardContext(Astro);
-if (ctx.redirect) return Astro.redirect(ctx.redirect);
+if ('redirect' in ctx) return Astro.redirect(ctx.redirect);
 const { env, session, effectiveRole } = ctx;
 if (effectiveRole !== 'board' && effectiveRole !== 'admin') return Astro.redirect('/portal/dashboard');
 
@@ -110,7 +110,7 @@ const errorParam = url.searchParams.get('error') ?? '';
     </form>
   </section>
 
-  <script define:vars={{}}>
+  <script is:inline define:vars={{}}>
     (function () {
       const form = document.getElementById('backup-config-form');
       const scheduleType = document.getElementById('schedule_type');

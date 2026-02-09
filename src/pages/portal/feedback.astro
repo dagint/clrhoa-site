@@ -128,19 +128,19 @@ function formatDate(s: string | null): string {
   </ProtectedPage>
 </PortalLayout>
 
-<script>
+<script is:inline>
   document.querySelectorAll('.feedback-submit').forEach((btn) => {
     btn.addEventListener('click', async () => {
-      const docId = (btn as HTMLElement).dataset.docId;
+      const docId = btn.dataset.docId;
       if (!docId) return;
       const card = btn.closest('li');
-      const ack = (card?.querySelector('.feedback-ack') as HTMLInputElement)?.checked ?? false;
+      const ack = card?.querySelector('.feedback-ack')?.checked ?? false;
       const approvedEl = card?.querySelector('.feedback-approve');
       const rejectedEl = card?.querySelector('.feedback-reject');
-      let approved: boolean | null = null;
+      let approved = null;
       if (approvedEl?.classList.contains('ring-2')) approved = true;
       if (rejectedEl?.classList.contains('ring-2')) approved = false;
-      const comments = (card?.querySelector('.feedback-comments') as HTMLTextAreaElement)?.value?.trim() ?? '';
+      const comments = card?.querySelector('.feedback-comments')?.value?.trim() ?? '';
       try {
         const res = await fetch('/api/feedback', {
           method: 'POST',

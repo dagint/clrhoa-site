@@ -27,7 +27,7 @@ const specialAssessments = db ? await listSpecialAssessmentsByOwner(db, assessme
 const unpaidSpecials = specialAssessments.filter((s) => !s.paid_at);
 const totalDueFromSpecials = unpaidSpecials.reduce((sum, s) => sum + s.amount, 0);
 
-const lateFeeDays = typeof import.meta.env.PUBLIC_LATE_FEE_DAYS !== 'undefined' ? Number(import.meta.env.PUBLIC_LATE_FEE_DAYS) : 3;
+const _lateFeeDays = typeof import.meta.env.PUBLIC_LATE_FEE_DAYS !== 'undefined' ? Number(import.meta.env.PUBLIC_LATE_FEE_DAYS) : 3;
 const lateFeeAmount = typeof import.meta.env.PUBLIC_LATE_FEE_AMOUNT !== 'undefined' ? Number(import.meta.env.PUBLIC_LATE_FEE_AMOUNT) : 25;
 const quarterlyAmountRaw = (import.meta.env.PUBLIC_QUARTERLY_DUES_AMOUNT ?? '').toString().trim();
 const quarterlyAmountDisplay = quarterlyAmountRaw ? (Number(quarterlyAmountRaw) ? `$${Number(quarterlyAmountRaw).toFixed(2)}` : `$${quarterlyAmountRaw}`) : null;

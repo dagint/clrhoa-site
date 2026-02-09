@@ -7,7 +7,7 @@ import { listArbRequestsByHousehold } from '../../lib/arb-db';
 import { CONTACT_SUBMISSIONS_EXPIRY_WHERE } from '../../lib/contact-submissions';
 
 const ctx = await getBoardContext(Astro);
-if (ctx.redirect) return Astro.redirect(ctx.redirect);
+if ('redirect' in ctx) return Astro.redirect(ctx.redirect);
 const { env, session, effectiveRole } = ctx;
 const isBoard = effectiveRole === 'board' || effectiveRole === 'admin' || effectiveRole === 'arb_board';
 if (!isBoard) return Astro.redirect('/portal/dashboard');
@@ -142,7 +142,7 @@ function safeMailto(email: string): string {
     </>
   )}
 
-  <script define:vars={{ currentPage: page }}>
+  <script is:inline define:vars={{ currentPage: page }}>
     document.querySelectorAll('[data-delete-id]').forEach((btn) => {
       btn.addEventListener('click', async () => {
         const id = btn.getAttribute('data-delete-id');

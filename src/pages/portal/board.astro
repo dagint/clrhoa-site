@@ -16,8 +16,7 @@ if (!session) return Astro.redirect('/portal/login');
 const isBoardOrAdminOrArbBoard = effectiveRole === 'board' || effectiveRole === 'admin' || effectiveRole === 'arb_board';
 const isArbOnly = effectiveRole === 'arb';
 if (!isBoardOrAdminOrArbBoard && !isArbOnly) {
-  const returnUrl = encodeURIComponent('/portal/board');
-  return Astro.redirect(`/portal/request-elevated-access?return=${returnUrl}`);
+  return Astro.redirect('/portal/request-elevated-access?return=' + encodeURIComponent('/portal/board'));
 }
 
 const db = env?.DB;

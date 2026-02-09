@@ -7,7 +7,7 @@ import { listAllMaintenance, parsePhotosJson } from '../../lib/maintenance-db';
 import { listArbRequestsByHousehold } from '../../lib/arb-db';
 
 const ctx = await getBoardContext(Astro);
-if (ctx.redirect) return Astro.redirect(ctx.redirect);
+if ('redirect' in ctx) return Astro.redirect(ctx.redirect);
 const { env, session, effectiveRole } = ctx;
 const isBoard = effectiveRole === 'board' || effectiveRole === 'admin' || effectiveRole === 'arb_board';
 if (!isBoard) return Astro.redirect('/portal/dashboard');
@@ -124,14 +124,14 @@ function categoryLabel(cat: string): string {
         </ul>
       )}
 
-<script>
+<script is:inline>
   document.querySelectorAll('.save-maint').forEach((btn) => {
     btn.addEventListener('click', async () => {
-      const id = (btn as HTMLElement).dataset.id;
+      const id = btn.dataset.id;
       if (!id) return;
       const row = btn.closest('li');
-      const statusSelect = row?.querySelector('.status-select') as HTMLSelectElement;
-      const vendorInput = row?.querySelector('.vendor-input') as HTMLInputElement;
+      const statusSelect = row?.querySelector('.status-select');
+      const vendorInput = row?.querySelector('.vendor-input');
       const status = statusSelect?.value ?? 'reported';
       const vendor_assigned = vendorInput?.value.trim() ?? '';
 

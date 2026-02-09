@@ -8,7 +8,7 @@ import { getSessionFromCookie, getEffectiveRole } from '../../../lib/auth';
 import { encryptRefreshToken } from '../../../lib/backup-encrypt';
 
 const runtime = Astro.locals.runtime;
-const env = runtime?.env as import('../../../env.d').Env & {
+const env = runtime?.env as Env & {
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
   BACKUP_ENCRYPTION_KEY?: string;

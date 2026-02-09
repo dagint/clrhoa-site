@@ -8,7 +8,7 @@ export const prerender = false;
 import { getSessionFromCookie, getEffectiveRole } from '../../../lib/auth';
 
 const runtime = Astro.locals.runtime;
-const env = runtime?.env as import('../../../env.d').Env & { GOOGLE_CLIENT_ID?: string };
+const env = runtime?.env as Env & { GOOGLE_CLIENT_ID?: string };
 const session = await getSessionFromCookie(
   Astro.request.headers.get('cookie') ?? undefined,
   env?.SESSION_SECRET

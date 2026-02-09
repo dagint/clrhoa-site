@@ -146,7 +146,7 @@ function googleCalendarUrl(m: { title: string | null; datetime: string; descript
   </div>
   </ProtectedPage>
 
-<script>
+<script is:inline>
   document.querySelectorAll('.rsvp-btn').forEach((btn) => {
     btn.addEventListener('click', async () => {
       const meetingId = btn.dataset.meetingId;
