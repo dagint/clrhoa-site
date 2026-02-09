@@ -70,6 +70,7 @@ export const RATE_LIMITS = {
   '/api/vendors/upload-csv': { maxRequests: 10, windowSeconds: 60 * 60 }, // 10 uploads per hour per IP
   '/api/log-phone-view': { maxRequests: 60, windowSeconds: 60 }, // 60 reveals (phone or email) per minute per IP
   '/api/site-feedback': { maxRequests: 3, windowSeconds: 86400 }, // 3 site feedback submissions per day per IP
+  '/api/contact': { maxRequests: 10, windowSeconds: 60 * 60 }, // 10 contact form submissions per hour per IP
 } as const;
 
 /**

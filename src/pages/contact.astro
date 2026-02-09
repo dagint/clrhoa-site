@@ -1,9 +1,8 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 
-// StaticForms (optional) or Phase 3.5 /api/contact (email via Resend or MailChannels → NOTIFY_BOARD_EMAIL)
-const staticformsApiKey = import.meta.env.PUBLIC_STATICFORMS_API_KEY ?? '';
-const formAction = staticformsApiKey ? 'https://api.staticforms.dev/submit' : '/api/contact';
+// Contact form always uses /api/contact (Resend or MailChannels → NOTIFY_BOARD_EMAIL)
+const formAction = '/api/contact';
 const thanksUrl = `${import.meta.env.SITE ?? 'https://clrhoa.com'}/contact/thanks`;
 const recaptchaSiteKey = import.meta.env.PUBLIC_RECAPTCHA_SITE_KEY ?? '';
 
@@ -35,17 +34,11 @@ const prefillMessage = vendorParam
           This form does not accept file attachments. If your matter requires documents or photos, send your message here and a member of the Board or ARB will reach out to you to arrange sharing them.
         </p>
 
-        <!-- Contact form: StaticForms (if configured) or /api/contact (email via Resend or MailChannels → NOTIFY_BOARD_EMAIL) -->
+        <!-- Contact form: /api/contact (Resend or MailChannels → NOTIFY_BOARD_EMAIL) -->
         <div class="bg-clr-beige/30 border border-gray-100 rounded-xl p-6 mb-8">
           <h2 class="text-xl font-heading font-semibold text-clr-green mb-4">Send a message</h2>
           <form id="contact-form" action={formAction} method="POST" class="space-y-4" novalidate data-redirect-to={thanksUrl}>
             <input type="text" name="honeypot" class="hidden" tabindex="-1" autocomplete="off" aria-hidden="true" />
-            {staticformsApiKey && (
-              <>
-                <input type="hidden" name="apiKey" value={staticformsApiKey} />
-                <input type="hidden" name="redirectTo" value={thanksUrl} />
-              </>
-            )}
               
               <!-- Recipient field -->
               <div>
@@ -137,7 +130,7 @@ const prefillMessage = vendorParam
               </div>
               
               {recaptchaSiteKey && (
-                <div class="g-recaptcha" data-sitekey={recaptchaSiteKey} data-theme="light"></div>
+                <div class="g-recaptcha" data-sitekey={recaptchaSiteKey} data-theme="light" aria-label="reCAPTCHA"></div>
               )}
               <button type="submit" class="inline-flex items-center px-5 py-2.5 rounded-lg text-sm font-medium text-white bg-clr-green hover:bg-clr-green/90 transition-colors font-body disabled:opacity-50 disabled:cursor-not-allowed">
                 Send message
@@ -152,11 +145,9 @@ const prefillMessage = vendorParam
               Please use the contact form above to send messages securely. The form allows you to select
               whether you're contacting the Board of Directors or the Architectural Review Board.
             </p>
-            {!staticformsApiKey && (
-              <p class="text-clr-gray font-body text-sm mt-2">
-                <strong>Note:</strong> Messages are sent via the portal to the board. Set NOTIFY_BOARD_EMAIL in wrangler for delivery.
-              </p>
-            )}
+            <p class="text-clr-gray font-body text-sm mt-2">
+              <strong>Note:</strong> Messages are sent by email to the board (Resend or MailChannels). Set NOTIFY_BOARD_EMAIL and RESEND_API_KEY (or MAILCHANNELS_API_KEY) for delivery.
+            </p>
           </div>
 
           <div class="card-hover bg-clr-beige/30 p-6 rounded-2xl border border-gray-100">
@@ -206,173 +197,178 @@ const prefillMessage = vendorParam
       </section>
     </div>
   </div>
-  {staticformsApiKey && (
-    <>
-      {recaptchaSiteKey && (
-        <script src="https://www.google.com/recaptcha/api.js" async defer></script>
-      )}
-      <script lang="ts">
-        (function () {
-          const form = document.getElementById('contact-form') as HTMLFormElement | null;
-          if (!form) return;
-
-          const recipient = document.getElementById('recipient') as HTMLSelectElement | null;
-          const name = document.getElementById('name') as HTMLInputElement | null;
-          const email = document.getElementById('email') as HTMLInputElement | null;
-          const message = document.getElementById('message') as HTMLTextAreaElement | null;
-          const formError = document.getElementById('form-error');
-          const formSubmitError = document.getElementById('form-submit-error');
-          if (!recipient || !name || !email || !message || !formError || !formSubmitError) return;
-
-          const urlParams = new URLSearchParams(window.location.search);
-          const recipientParam = urlParams.get('recipient');
-          const vendorParam = urlParams.get('vendor');
-
-          if (recipientParam) recipient.value = recipientParam;
-          if (vendorParam) message.value = `I would like to request contact information for: ${vendorParam}`;
-
-          function showError(field: HTMLElement, errorElement: HTMLElement, msg: string) {
-            field.setAttribute('aria-invalid', 'true');
-            field.classList.add('border-red-500');
-            field.classList.remove('border-gray-300');
-            errorElement.textContent = msg;
-            errorElement.classList.remove('hidden');
-          }
-
-          function clearError(field: HTMLElement, errorElement: HTMLElement) {
-            field.setAttribute('aria-invalid', 'false');
-            field.classList.remove('border-red-500');
-            field.classList.add('border-gray-300');
-            errorElement.classList.add('hidden');
-            errorElement.textContent = '';
-          }
-
-          function validateRecipient() {
-            const errorElement = document.getElementById('recipient-error');
-            if (!errorElement) return false;
-            if (!recipient.value) {
-              showError(recipient, errorElement, 'Please select a recipient.');
-              return false;
-            }
-            clearError(recipient, errorElement);
-            return true;
-          }
-
-          function validateName() {
-            const errorElement = document.getElementById('name-error');
-            if (!errorElement) return false;
-            const value = name.value.trim();
-            if (!value) {
-              showError(name, errorElement as HTMLElement, 'Name is required.');
-              return false;
-            }
-            if (value.length < 2) {
-              showError(name, errorElement, 'Name must be at least 2 characters.');
-              return false;
-            }
-            if (value.length > 100) {
-              showError(name, errorElement, 'Name must be less than 100 characters.');
-              return false;
-            }
-            clearError(name, errorElement);
-            return true;
-          }
-
-          function validateEmail() {
-            const errorElement = document.getElementById('email-error');
-            if (!errorElement) return false;
-            const value = email.value.trim();
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            if (!value) {
-              showError(email, errorElement, 'Email is required.');
-              return false;
-            }
-            if (!emailRegex.test(value)) {
-              showError(email, errorElement, 'Please enter a valid email address.');
-              return false;
-            }
-            clearError(email, errorElement);
-            return true;
-          }
-
-          function validateMessage() {
-            const errorElement = document.getElementById('message-error');
-            if (!errorElement) return false;
-            const value = message.value.trim();
-            if (!value) {
-              showError(message, errorElement, 'Message is required.');
-              return false;
-            }
-            if (value.length < 10) {
-              showError(message, errorElement, 'Message must be at least 10 characters.');
-              return false;
-            }
-            if (value.length > 2000) {
-              showError(message, errorElement, 'Message must be less than 2000 characters.');
-              return false;
-            }
-            clearError(message, errorElement);
-            return true;
-          }
-
-          // Real-time validation on blur
-          recipient.addEventListener('blur', validateRecipient);
-          recipient.addEventListener('change', validateRecipient);
-          name.addEventListener('blur', validateName);
-          name.addEventListener('input', function() {
-            if (name.getAttribute('aria-invalid') === 'true') {
-              validateName();
-            }
-          });
-          email.addEventListener('blur', validateEmail);
-          email.addEventListener('input', function() {
-            if (email.getAttribute('aria-invalid') === 'true') {
-              validateEmail();
-            }
-          });
-          message.addEventListener('blur', validateMessage);
-          message.addEventListener('input', function() {
-            if (message.getAttribute('aria-invalid') === 'true') {
-              validateMessage();
-            }
-          });
-
-          // Form submission: validate, then submit via fetch for error handling
-          form.addEventListener('submit', async function(e) {
-            e.preventDefault();
-            if (formSubmitError) formSubmitError.classList.add('hidden');
-            const isValid = validateRecipient() && validateName() && validateEmail() && validateMessage();
-            if (!isValid) {
-              formError.classList.remove('hidden');
-              formError.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-              const firstInvalid = form.querySelector('[aria-invalid="true"]');
-              if (firstInvalid) (firstInvalid as HTMLElement).focus();
-              return;
-            }
-            formError.classList.add('hidden');
-            const submitBtn = form.querySelector('button[type="submit"]');
-            if (submitBtn) { submitBtn.setAttribute('disabled', 'true'); submitBtn.textContent = 'Sending…'; }
-            try {
-              const res = await fetch(form.action, { method: 'POST', body: new FormData(form) });
-              if (res.ok) {
-                const redirectEl = form.querySelector('[name="redirectTo"]') as HTMLInputElement | null;
-                const redirectTo = form.dataset.redirectTo || redirectEl?.value;
-                if (redirectTo) window.location.href = redirectTo;
-                else {
-                  const p = formSubmitError?.querySelector('p');
-                  if (p) p.textContent = 'Message sent. You will be redirected shortly.';
-                }
-              } else {
-                if (formSubmitError) { formSubmitError.classList.remove('hidden'); formSubmitError.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
-              }
-            } catch (_) {
-              if (formSubmitError) { formSubmitError.classList.remove('hidden'); formSubmitError.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
-            } finally {
-              if (submitBtn) { submitBtn.removeAttribute('disabled'); submitBtn.textContent = 'Send message'; }
-            }
-          });
-        })();
-      </script>
-    </>
+  {recaptchaSiteKey && (
+    <script src="https://www.google.com/recaptcha/api.js" async defer></script>
   )}
+  <script is:inline>
+    (function () {
+      const form = document.getElementById('contact-form');
+      if (!form) return;
+
+      const recipient = document.getElementById('recipient');
+      const name = document.getElementById('name');
+      const email = document.getElementById('email');
+      const message = document.getElementById('message');
+      const formError = document.getElementById('form-error');
+      const formSubmitError = document.getElementById('form-submit-error');
+      if (!recipient || !name || !email || !message || !formError || !formSubmitError) return;
+
+      const urlParams = new URLSearchParams(window.location.search);
+      const recipientParam = urlParams.get('recipient');
+      const vendorParam = urlParams.get('vendor');
+
+      if (recipientParam) recipient.value = recipientParam;
+      if (vendorParam) message.value = 'I would like to request contact information for: ' + vendorParam;
+
+      function showError(field, errorElement, msg) {
+        field.setAttribute('aria-invalid', 'true');
+        field.classList.add('border-red-500');
+        field.classList.remove('border-gray-300');
+        errorElement.textContent = msg;
+        errorElement.classList.remove('hidden');
+      }
+
+      function clearError(field, errorElement) {
+        field.setAttribute('aria-invalid', 'false');
+        field.classList.remove('border-red-500');
+        field.classList.add('border-gray-300');
+        errorElement.classList.add('hidden');
+        errorElement.textContent = '';
+      }
+
+      function validateRecipient() {
+        const errorElement = document.getElementById('recipient-error');
+        if (!errorElement) return false;
+        if (!recipient.value) {
+          showError(recipient, errorElement, 'Please select a recipient.');
+          return false;
+        }
+        clearError(recipient, errorElement);
+        return true;
+      }
+
+      function validateName() {
+        const errorElement = document.getElementById('name-error');
+        if (!errorElement) return false;
+        const value = name.value.trim();
+        if (!value) {
+          showError(name, errorElement, 'Name is required.');
+          return false;
+        }
+        if (value.length < 2) {
+          showError(name, errorElement, 'Name must be at least 2 characters.');
+          return false;
+        }
+        if (value.length > 100) {
+          showError(name, errorElement, 'Name must be less than 100 characters.');
+          return false;
+        }
+        clearError(name, errorElement);
+        return true;
+      }
+
+      function validateEmail() {
+        const errorElement = document.getElementById('email-error');
+        if (!errorElement) return false;
+        const value = email.value.trim();
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!value) {
+          showError(email, errorElement, 'Email is required.');
+          return false;
+        }
+        if (!emailRegex.test(value)) {
+          showError(email, errorElement, 'Please enter a valid email address.');
+          return false;
+        }
+        clearError(email, errorElement);
+        return true;
+      }
+
+      function validateMessage() {
+        const errorElement = document.getElementById('message-error');
+        if (!errorElement) return false;
+        const value = message.value.trim();
+        if (!value) {
+          showError(message, errorElement, 'Message is required.');
+          return false;
+        }
+        if (value.length < 10) {
+          showError(message, errorElement, 'Message must be at least 10 characters.');
+          return false;
+        }
+        if (value.length > 2000) {
+          showError(message, errorElement, 'Message must be less than 2000 characters.');
+          return false;
+        }
+        clearError(message, errorElement);
+        return true;
+      }
+
+      recipient.addEventListener('blur', validateRecipient);
+      recipient.addEventListener('change', validateRecipient);
+      name.addEventListener('blur', validateName);
+      name.addEventListener('input', function() {
+        if (name.getAttribute('aria-invalid') === 'true') validateName();
+      });
+      email.addEventListener('blur', validateEmail);
+      email.addEventListener('input', function() {
+        if (email.getAttribute('aria-invalid') === 'true') validateEmail();
+      });
+      message.addEventListener('blur', validateMessage);
+      message.addEventListener('input', function() {
+        if (message.getAttribute('aria-invalid') === 'true') validateMessage();
+      });
+
+      form.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        if (formSubmitError) formSubmitError.classList.add('hidden');
+        var isValid = validateRecipient() && validateName() && validateEmail() && validateMessage();
+        if (!isValid) {
+          formError.classList.remove('hidden');
+          formError.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          var firstInvalid = form.querySelector('[aria-invalid="true"]');
+          if (firstInvalid && firstInvalid.focus) firstInvalid.focus();
+          return;
+        }
+        formError.classList.add('hidden');
+        if (typeof grecaptcha !== 'undefined' && document.querySelector('.g-recaptcha')) {
+          var token = grecaptcha.getResponse && grecaptcha.getResponse();
+          if (!token) {
+            if (formError) { formError.classList.remove('hidden'); var p = formError.querySelector('p'); if (p) p.textContent = 'Please complete the captcha before sending.'; formError.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+            return;
+          }
+        }
+        var submitBtn = form.querySelector('button[type="submit"]');
+        if (submitBtn) { submitBtn.setAttribute('disabled', 'true'); submitBtn.textContent = 'Sending…'; }
+        try {
+          var res = await fetch(form.action, { method: 'POST', body: new FormData(form) });
+          if (res.ok) {
+            var redirectTo = form.dataset.redirectTo;
+            if (redirectTo) window.location.href = redirectTo;
+            else {
+              var p = formSubmitError && formSubmitError.querySelector('p');
+              if (p) p.textContent = 'Message sent. You will be redirected shortly.';
+            }
+          } else {
+            if (formSubmitError) {
+              formSubmitError.classList.remove('hidden');
+              var errP = formSubmitError.querySelector('p');
+              try {
+                var errData = await res.json();
+                if (errP && errData && typeof errData.error === 'string') errP.textContent = errData.error;
+              } catch (_) {}
+              if (errP && !errP.textContent) errP.textContent = 'We couldn\'t send your message. Please try again in a few moments, or use the mailing address below.';
+              formSubmitError.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+            if (typeof grecaptcha !== 'undefined' && grecaptcha.reset) grecaptcha.reset();
+          }
+        } catch (_) {
+          if (formSubmitError) { formSubmitError.classList.remove('hidden'); formSubmitError.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+          if (typeof grecaptcha !== 'undefined' && grecaptcha.reset) grecaptcha.reset();
+        } finally {
+          if (submitBtn) { submitBtn.removeAttribute('disabled'); submitBtn.textContent = 'Send message'; }
+        }
+      });
+    })();
+  </script>
 </BaseLayout>
