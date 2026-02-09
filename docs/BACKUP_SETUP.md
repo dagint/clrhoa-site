@@ -4,6 +4,18 @@ Quick reference for enabling automated backups and Board backup download.
 
 ## 1. Backup Worker (cron → R2, optional Google Drive)
 
+### If you use CI/CD (GitHub Actions deploy workflow)
+
+On every push to `main`, the workflow now:
+
+1. **Deploys** the backup Worker (so it gets code updates).
+2. **Injects** `CLOUDFLARE_ACCOUNT_ID` from GitHub Secrets into `workers/backup/wrangler.toml` (replaces `REPLACE_WITH_ACCOUNT_ID`) so you don't commit the account ID.
+3. **Syncs secrets** to the backup Worker from GitHub Secrets via `scripts/sync-backup-worker-secrets.js` (CLOUDFLARE_BACKUP_API_TOKEN, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, BACKUP_ENCRYPTION_KEY, BACKUP_TRIGGER_SECRET).
+
+Ensure those secrets are set in GitHub → Settings → Secrets and variables → Actions → Secrets. You do **not** need to manually edit `CLOUDFLARE_ACCOUNT_ID` in the file or run `wrangler secret put` for the backup worker when using CI/CD.
+
+### If you deploy the backup Worker manually
+
 From project root:
 
 ```bash
@@ -12,7 +24,7 @@ npm run backup:deploy
 
 Before deploying, edit `workers/backup/wrangler.toml`:
 
-- Set `CLOUDFLARE_ACCOUNT_ID` (your Cloudflare account id).
+- Set `CLOUDFLARE_ACCOUNT_ID` (your Cloudflare account id; replace `REPLACE_WITH_ACCOUNT_ID`).
 - `D1_DATABASE_ID` should match the main app (same as in root `wrangler.toml`).
 
 Set secrets (from project root):

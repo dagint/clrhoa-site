@@ -88,14 +88,12 @@ jobs:
           # Git commit info for deployment
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Sync Secrets to Cloudflare Workers
+      - name: Sync Secrets to Cloudflare Pages
         if: success() && secrets.CLOUDFLARE_DEPLOY_API_TOKEN != ''
         run: |
-          echo "Syncing secrets from GitHub to Cloudflare Workers..."
-          npm install -g wrangler
-          node scripts/sync-secrets-to-cloudflare.js
+          echo "Syncing secrets from GitHub to Cloudflare Pages..."
+          node scripts/sync-secrets-to-cloudflare-pages.js
         env:
-          # Map GitHub secrets to environment variables for the script
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
@@ -112,3 +110,29 @@ jobs:
           TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
           TWILIO_PHONE_NUMBER: ${{ secrets.TWILIO_PHONE_NUMBER }}
           RECAPTCHA_SECRET_KEY: ${{ secrets.RECAPTCHA_SECRET_KEY }}
+
+      - name: Deploy backup Worker and sync its secrets
+        if: success() && secrets.CLOUDFLARE_DEPLOY_API_TOKEN != ''
+        run: |
+          echo "Injecting CLOUDFLARE_ACCOUNT_ID into backup worker wrangler.toml..."
+          node -e "
+            const fs = require('fs');
+            const path = 'workers/backup/wrangler.toml';
+            const accountId = process.env.CLOUDFLARE_ACCOUNT_ID || '';
+            if (!accountId) { console.error('CLOUDFLARE_ACCOUNT_ID not set'); process.exit(1); }
+            let c = fs.readFileSync(path, 'utf8');
+            c = c.replace(/REPLACE_WITH_ACCOUNT_ID/g, accountId);
+            fs.writeFileSync(path, c);
+          "
+          echo "Deploying backup Worker (clrhoa-backup)..."
+          npx wrangler deploy --config workers/backup/wrangler.toml
+          echo "Syncing secrets to backup Worker..."
+          node scripts/sync-backup-worker-secrets.js
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_BACKUP_API_TOKEN: ${{ secrets.CLOUDFLARE_BACKUP_API_TOKEN }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          BACKUP_ENCRYPTION_KEY: ${{ secrets.BACKUP_ENCRYPTION_KEY }}
+          BACKUP_TRIGGER_SECRET: ${{ secrets.BACKUP_TRIGGER_SECRET }}

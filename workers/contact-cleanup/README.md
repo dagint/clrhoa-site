@@ -2,6 +2,15 @@
 
 Automated cleanup worker that deletes contact form submissions older than 1 year (same cutoff as the board report).
 
+## Secrets and vars
+
+**This worker does not need any secrets or vars from the main app.** It only needs:
+
+- **D1** — already configured in `wrangler.toml` (same database as the main site).
+- **CLEANUP_TRIGGER_SECRET** (optional) — only if you want to call the HTTP trigger endpoint; set via `wrangler secret put CLEANUP_TRIGGER_SECRET --config workers/contact-cleanup/wrangler.toml`.
+
+No sync from GitHub or Pages env is required.
+
 ## Deployment
 
 Deploy from the repo root:
