@@ -83,7 +83,8 @@ These are read at **build** time and embedded into the client bundle. Set them i
 ### Form Configuration
 
 - `PUBLIC_STATICFORMS_API_KEY` - StaticForms API key for contact form submissions ([staticforms.xyz](https://www.staticforms.xyz/))
-- `PUBLIC_RECAPTCHA_SITE_KEY` - (Optional) reCAPTCHA site key if you enable reCAPTCHA in StaticForms dashboard; otherwise honeypot-only is used
+- `PUBLIC_RECAPTCHA_SITE_KEY` - (Optional) reCAPTCHA v2 site key for the contact form; when set, the "I'm not a robot" widget is shown
+- `RECAPTCHA_SECRET_KEY` - (Optional, server secret) reCAPTCHA v2 secret key; when set together with the site key, the contact API verifies the captcha and rejects submissions without a valid token. The API also verifies the hostname matches your domain (prevents token reuse). Set via `wrangler secret put RECAPTCHA_SECRET_KEY` or Cloudflare Pages → Settings → Environment variables (mark as secret)
 
 ## Contact Information (PII)
 

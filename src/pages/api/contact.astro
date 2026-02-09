@@ -1,11 +1,20 @@
 ---
 /**
- * POST /api/contact — public contact form. Sends email to NOTIFY_BOARD_EMAIL via configured provider (Resend or MailChannels).
+ * POST /api/contact — public contact form. Logs to contact_submissions (backup), then sends email via Resend/MailChannels.
  * Body: name, email, message, recipient (form or JSON). No auth required.
+ * Security: rate limit, honeypot, input length limits, subject sanitization, recipient allowlist.
  */
 export const prerender = false;
 
 import { sendEmail } from '../../lib/notifications';
+import { checkRateLimit, getRateLimitConfig } from '../../lib/rate-limit';
+import { CONTACT_SUBMISSIONS_EXPIRY_WHERE } from '../../lib/contact-submissions';
+
+const MAX_NAME = 200;
+const MAX_EMAIL = 254;
+const MAX_MESSAGE = 5000;
+const MAX_RECIPIENT = 50;
+const ALLOWED_RECIPIENTS = ['board', 'arb', 'vendor'];
 
 function escapeHtml(s: string): string {
   return s
@@ -15,40 +24,133 @@ function escapeHtml(s: string): string {
     .replace(/"/g, '&quot;');
 }
 
+/** Strip newlines and control chars to prevent email header injection. */
+function safeForSubject(s: string): string {
+  return s.replace(/[\r\n\x00-\x1f]+/g, ' ').trim().slice(0, 100);
+}
+
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
-
+const db = env?.DB;
 const boardEmail = env?.NOTIFY_BOARD_EMAIL;
 const site = import.meta.env.SITE ?? 'https://clrhoa.com';
+const siteUrl = new URL(site);
+const expectedHostname = siteUrl.hostname;
+const ip =
+  Astro.request.headers.get('cf-connecting-ip') ??
+  Astro.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
+  null;
 
 if (Astro.request.method !== 'POST') {
   return new Response(null, { status: 405, headers: { Allow: 'POST' } });
+}
+
+// Rate limit (per IP)
+const kv = env?.KV;
+const rateConfig = getRateLimitConfig('/api/contact');
+if (rateConfig && kv) {
+  const rl = await checkRateLimit(kv, '/api/contact', ip, rateConfig.maxRequests, rateConfig.windowSeconds);
+  if (!rl.allowed) {
+    return new Response(
+      JSON.stringify({ error: 'Too many submissions. Please try again later.' }),
+      {
+        status: 429,
+        headers: {
+          'Content-Type': 'application/json',
+          'Retry-After': String(Math.max(0, rl.resetAt - Math.floor(Date.now() / 1000))),
+        },
+      }
+    );
+  }
 }
 
 let name = '';
 let email = '';
 let message = '';
 let recipient = '';
+let honeypot = '';
+let recaptchaToken = '';
 try {
   const ct = Astro.request.headers.get('content-type') ?? '';
   if (ct.includes('application/json')) {
     const body = await Astro.request.json() as Record<string, unknown>;
-    name = String(body.name ?? '').trim();
-    email = String(body.email ?? '').trim();
-    message = String(body.message ?? '').trim();
-    recipient = String(body.recipient ?? '').trim();
+    name = String(body.name ?? '').trim().slice(0, MAX_NAME);
+    email = String(body.email ?? '').trim().slice(0, MAX_EMAIL);
+    message = String(body.message ?? '').trim().slice(0, MAX_MESSAGE);
+    recipient = String(body.recipient ?? '').trim().slice(0, MAX_RECIPIENT);
+    honeypot = String(body.honeypot ?? '').trim();
+    recaptchaToken = String(body['g-recaptcha-response'] ?? '').trim();
   } else {
     const form = await Astro.request.formData();
     name = (form.get('name') as string)?.trim() ?? '';
     email = (form.get('email') as string)?.trim() ?? '';
     message = (form.get('message') as string)?.trim() ?? '';
     recipient = (form.get('recipient') as string)?.trim() ?? '';
+    honeypot = (form.get('honeypot') as string)?.trim() ?? '';
+    recaptchaToken = (form.get('g-recaptcha-response') as string)?.trim() ?? '';
+    if (name.length > MAX_NAME) name = name.slice(0, MAX_NAME);
+    if (email.length > MAX_EMAIL) email = email.slice(0, MAX_EMAIL);
+    if (message.length > MAX_MESSAGE) message = message.slice(0, MAX_MESSAGE);
+    if (recipient.length > MAX_RECIPIENT) recipient = recipient.slice(0, MAX_RECIPIENT);
   }
 } catch {
   return new Response(JSON.stringify({ error: 'Invalid body' }), {
     status: 400,
     headers: { 'Content-Type': 'application/json' },
   });
+}
+
+if (honeypot) {
+  return new Response(JSON.stringify({ error: 'Invalid request' }), {
+    status: 400,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+// reCAPTCHA: when RECAPTCHA_SECRET_KEY is set, require and verify token. Set PUBLIC_RECAPTCHA_SITE_KEY too so the form shows the widget.
+const recaptchaSecret = env && 'RECAPTCHA_SECRET_KEY' in env ? (env as { RECAPTCHA_SECRET_KEY?: string }).RECAPTCHA_SECRET_KEY : undefined;
+if (recaptchaSecret) {
+  if (!recaptchaToken) {
+    return new Response(JSON.stringify({ error: 'Please complete the captcha.' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  try {
+    const verifyUrl = 'https://www.google.com/recaptcha/api/siteverify';
+    const body = new URLSearchParams({
+      secret: recaptchaSecret,
+      response: recaptchaToken,
+      ...(ip ? { remoteip: ip } : {}),
+    });
+    const verifyRes = await fetch(verifyUrl, { method: 'POST', body: body.toString(), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
+    const data = (await verifyRes.json()) as { success?: boolean; hostname?: string; 'error-codes'?: string[] };
+    if (!data.success) {
+      return new Response(JSON.stringify({ error: 'Captcha verification failed. Please try again.' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    // Verify hostname matches expected domain (prevents token reuse from other sites)
+    // Allow exact match, www subdomain, or localhost (for local dev)
+    if (
+      data.hostname &&
+      data.hostname !== expectedHostname &&
+      data.hostname !== `www.${expectedHostname}` &&
+      data.hostname !== 'localhost' &&
+      !data.hostname.startsWith('127.0.0.1')
+    ) {
+      return new Response(JSON.stringify({ error: 'Captcha verification failed. Please try again.' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+  } catch {
+    return new Response(JSON.stringify({ error: 'Captcha verification failed. Please try again.' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
 }
 
 if (!name || !email || !message) {
@@ -58,15 +160,29 @@ if (!name || !email || !message) {
   });
 }
 
-if (!boardEmail || !env) {
-  return new Response(JSON.stringify({ error: 'Contact form is not configured' }), {
-    status: 503,
-    headers: { 'Content-Type': 'application/json' },
-  });
+if (!ALLOWED_RECIPIENTS.includes(recipient)) {
+  recipient = 'board';
 }
 
+const id = crypto.randomUUID();
 const recipientLabel = recipient === 'arb' ? 'ARB' : recipient === 'vendor' ? 'Vendor Information Request' : 'Board of Directors';
-const htmlBody = `
+
+// Log submission first (backup in case email fails). Board can view at /board/contacts.
+if (db) {
+  try {
+    await db.prepare(
+      `INSERT INTO contact_submissions (id, name, email, message, recipient, email_sent, email_error) VALUES (?, ?, ?, ?, ?, 0, NULL)`
+    ).bind(id, name, email, message, recipient).run();
+  } catch (e) {
+    console.warn('Contact submission log insert failed:', e);
+  }
+}
+
+let emailSent = false;
+let emailError: string | null = null;
+
+if (boardEmail && env) {
+  const htmlBody = `
 <p><strong>Public contact form</strong></p>
 <p>Recipient: ${recipientLabel}</p>
 <p><strong>From:</strong> ${escapeHtml(name)} &lt;${escapeHtml(email)}&gt;</p>
@@ -75,12 +191,35 @@ const htmlBody = `
 <hr>
 <p><em>Sent via ${site}/contact</em></p>
 `;
+  const subject = `Contact form: ${recipientLabel} - ${safeForSubject(name)}`;
+const result = await sendEmail(env, boardEmail, subject, htmlBody);
+  emailSent = result.ok;
+  emailError = result.ok ? null : (result.error ?? 'Unknown error');
 
-const result = await sendEmail(env, boardEmail, `Contact form: ${recipientLabel} - ${name}`, htmlBody);
+  if (db) {
+    try {
+      await db.prepare(
+        `UPDATE contact_submissions SET email_sent = ?, email_error = ? WHERE id = ?`
+      ).bind(emailSent ? 1 : 0, emailError, id).run();
+    } catch (e) {
+      console.warn('Contact submission log update failed:', e);
+    }
+  }
 
-if (!result.ok) {
-  return new Response(JSON.stringify({ error: 'Failed to send message. Please try again.' }), {
-    status: 502,
+  if (!result.ok) {
+    return new Response(JSON.stringify({ error: 'Failed to send message. Please try again.' }), {
+      status: 502,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+} else {
+  if (db) {
+    try {
+      await db.prepare(`UPDATE contact_submissions SET email_error = ? WHERE id = ?`).bind('Not configured (NOTIFY_BOARD_EMAIL or provider missing)', id).run();
+    } catch (_) {}
+  }
+  return new Response(JSON.stringify({ error: 'Contact form is not configured' }), {
+    status: 503,
     headers: { 'Content-Type': 'application/json' },
   });
 }

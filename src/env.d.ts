@@ -30,6 +30,8 @@ interface Env {
   TWILIO_ACCOUNT_SID?: string;
   TWILIO_AUTH_TOKEN?: string;
   TWILIO_PHONE_NUMBER?: string;
+  /** reCAPTCHA v2 secret key; when set, contact form requires valid captcha. */
+  RECAPTCHA_SECRET_KEY?: string;
 }
 
 type Runtime = import('@astrojs/cloudflare').Runtime<Env>;
@@ -67,6 +69,8 @@ interface Env {
   TWILIO_ACCOUNT_SID?: string;
   TWILIO_AUTH_TOKEN?: string;
   TWILIO_PHONE_NUMBER?: string;
+  /** reCAPTCHA v2 secret key; when set, contact form requires valid captcha. */
+  RECAPTCHA_SECRET_KEY?: string;
 }
 
 type Runtime = import('@astrojs/cloudflare').Runtime<Env>;

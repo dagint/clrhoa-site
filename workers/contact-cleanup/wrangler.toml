@@ -1,0 +1,17 @@
+# Contact Submissions Cleanup Worker: cron-triggered deletion of expired contact submissions (>1 year old).
+# Deploy from repo root: npx wrangler deploy workers/contact-cleanup
+# Or from this dir: npx wrangler deploy
+name = "clrhoa-contact-cleanup"
+main = "src/index.ts"
+compatibility_date = "2025-02-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Run monthly on the 1st at 3:00 AM UTC (after backup runs at 2 AM)
+[triggers]
+crons = ["0 3 1 * *"]
+
+# Same D1 as main app
+[[d1_databases]]
+binding = "DB"
+database_name = "clrhoa_db"
+database_id = "a214f9da-3577-4ee7-bc50-bc9b9754a79c"

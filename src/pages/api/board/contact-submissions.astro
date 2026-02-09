@@ -1,0 +1,84 @@
+---
+/**
+ * GET /api/board/contact-submissions — Board/Admin/arb_board only. Returns contact form submissions with paging.
+ *   Query: ?page=1&pageSize=20 (defaults: page=1, pageSize=20)
+ * DELETE /api/board/contact-submissions — Same roles. Query: ?id=<uuid> to delete one submission.
+ */
+export const prerender = false;
+
+import { getSessionFromCookie, getEffectiveRole } from '../../../lib/auth';
+import { CONTACT_SUBMISSIONS_EXPIRY_WHERE } from '../../../lib/contact-submissions';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env as { SESSION_SECRET?: string; DB?: D1Database };
+const session = await getSessionFromCookie(
+  Astro.request.headers.get('cookie') ?? undefined,
+  env?.SESSION_SECRET
+);
+
+if (!session) {
+  return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
+}
+const effectiveRole = getEffectiveRole(session);
+const canManage = effectiveRole === 'board' || effectiveRole === 'admin' || effectiveRole === 'arb_board';
+if (!canManage) {
+  return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403, headers: { 'Content-Type': 'application/json' } });
+}
+
+const db = env?.DB;
+const method = Astro.request.method;
+
+if (method === 'DELETE') {
+  const url = new URL(Astro.request.url);
+  const id = url.searchParams.get('id')?.trim();
+  if (!id) {
+    return new Response(JSON.stringify({ error: 'Missing id' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+  }
+  if (!db) {
+    return new Response(JSON.stringify({ error: 'Database unavailable' }), { status: 503, headers: { 'Content-Type': 'application/json' } });
+  }
+  try {
+    const result = await db.prepare('DELETE FROM contact_submissions WHERE id = ?').bind(id).run();
+    return new Response(JSON.stringify({ success: true, deleted: result.meta.changes > 0 }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  } catch (e) {
+    return new Response(JSON.stringify({ error: 'Delete failed', details: String(e) }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+}
+
+// GET: list with paging
+const url = new URL(Astro.request.url);
+const page = Math.max(1, parseInt(url.searchParams.get('page') ?? '1', 10) || 1);
+const pageSize = Math.min(100, Math.max(1, parseInt(url.searchParams.get('pageSize') ?? '20', 10) || 20));
+const offset = (page - 1) * pageSize;
+
+let list: { id: string; name: string; email: string; message: string; recipient: string; email_sent: number; email_error: string | null; created_at: string }[] = [];
+let total = 0;
+
+if (db) {
+  try {
+    const countResult = await db.prepare(`SELECT COUNT(*) as n FROM contact_submissions WHERE ${CONTACT_SUBMISSIONS_EXPIRY_WHERE}`).first<{ n: number }>();
+    total = countResult?.n ?? 0;
+    const stmt = db.prepare(
+      `SELECT id, name, email, message, recipient, email_sent, email_error, created_at FROM contact_submissions WHERE ${CONTACT_SUBMISSIONS_EXPIRY_WHERE} ORDER BY created_at DESC LIMIT ? OFFSET ?`
+    );
+    const result = await stmt.bind(pageSize, offset).all<{ id: string; name: string; email: string; message: string; recipient: string; email_sent: number; email_error: string | null; created_at: string }>();
+    list = result.results ?? [];
+  } catch (e) {
+    return new Response(JSON.stringify({ error: 'Database error', details: String(e) }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+}
+
+return new Response(JSON.stringify({ submissions: list, total, page, pageSize }), {
+  status: 200,
+  headers: { 'Content-Type': 'application/json' },
+});
+---
