@@ -71,10 +71,13 @@ export async function sendEmail(
   body: string,
   options?: { html?: boolean }
 ): Promise<{ ok: boolean; error?: string }> {
-  const from = env.NOTIFY_NOREPLY_EMAIL;
+  const from = env.NOTIFY_NOREPLY_EMAIL?.trim();
   const toTrimmed = to?.trim();
-  if (!from || !toTrimmed) {
-    return { ok: false, error: 'Missing from or recipient' };
+  if (!from) {
+    return { ok: false, error: 'Missing sender: set NOTIFY_NOREPLY_EMAIL in env (e.g. noreply@yourdomain.com)' };
+  }
+  if (!toTrimmed) {
+    return { ok: false, error: 'Missing recipient (to)' };
   }
 
   if (env.RESEND_API_KEY) {
