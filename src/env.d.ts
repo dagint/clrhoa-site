@@ -13,7 +13,10 @@ interface Env {
   SESSION_SECRET: string;
   KV?: KVNamespace;
   CLOUDFLARE_ACCOUNT_ID?: string;
-  CLOUDFLARE_API_TOKEN?: string;
+  /** Cloudflare API token for deployment (GitHub Actions): Cloudflare Pages Edit, Cloudflare Workers Edit, Account Read. Used by cloudflare/pages-action and wrangler secret put. */
+  CLOUDFLARE_DEPLOY_API_TOKEN?: string;
+  /** Cloudflare API token for backup operations (manual downloads + backup Worker): D1 Read, R2 Edit, KV Read. */
+  CLOUDFLARE_BACKUP_API_TOKEN?: string;
   D1_DATABASE_ID?: string;
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
@@ -47,7 +50,10 @@ interface Env {
   SESSION_SECRET: string;
   KV?: KVNamespace;
   CLOUDFLARE_ACCOUNT_ID?: string;
-  CLOUDFLARE_API_TOKEN?: string;
+  /** Cloudflare API token for deployment (GitHub Actions): Cloudflare Pages Edit, Cloudflare Workers Edit, Account Read. Used by cloudflare/pages-action and wrangler secret put. */
+  CLOUDFLARE_DEPLOY_API_TOKEN?: string;
+  /** Cloudflare API token for backup operations (manual downloads + backup Worker): D1 Read, R2 Edit, KV Read. */
+  CLOUDFLARE_BACKUP_API_TOKEN?: string;
   D1_DATABASE_ID?: string;
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
@@ -77,6 +83,8 @@ interface ImportMetaEnv {
   /** Cloudflare Web Analytics: token from Web Analytics → Add site → Manage site (script snippet). */
   readonly PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN?: string;
   readonly SITE?: string;
+  /** Optional: ISO date string (e.g. "2025-02-04") used as lastmod for static pages in sitemap.xml. If unset, build time is used. */
+  readonly SITE_LAST_MODIFIED?: string;
   
   // Contact information (PII)
   readonly PUBLIC_SECURITY_EMAIL?: string;

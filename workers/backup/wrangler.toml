@@ -1,7 +1,7 @@
 # Backup Worker: cron-triggered D1 export + KV whitelist dump to R2, optional Google Drive (Phase 3).
 # Deploy from repo root: npx wrangler deploy workers/backup
-# Set secrets: npx wrangler secret put CLOUDFLARE_API_TOKEN --env backup (from workers/backup dir)
-# Or from root: npx wrangler secret put CLOUDFLARE_API_TOKEN --config workers/backup/wrangler.toml
+# Set secrets: npx wrangler secret put CLOUDFLARE_BACKUP_API_TOKEN --env backup (from workers/backup dir)
+# Or from root: npx wrangler secret put CLOUDFLARE_BACKUP_API_TOKEN --config workers/backup/wrangler.toml
 name = "clrhoa-backup"
 main = "src/index.ts"
 compatibility_date = "2025-02-01"
@@ -34,5 +34,5 @@ D1_DATABASE_ID = "a214f9da-3577-4ee7-bc50-bc9b9754a79c"
 BACKUP_RETENTION_DAYS = "30"
 
 # Secrets (set via wrangler secret put):
-# CLOUDFLARE_API_TOKEN - API token with D1 Read + R2 Edit (and D1 Read for DB binding in Phase 3)
+# CLOUDFLARE_BACKUP_API_TOKEN - API token scoped: D1 Read (export), R2 Edit (write backups), KV Read (dump whitelist)
 # Phase 3: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, BACKUP_ENCRYPTION_KEY (for decrypting refresh_token)

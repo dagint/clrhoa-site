@@ -11,7 +11,7 @@ import { buildZip } from '../../../lib/zip-simple';
 const runtime = Astro.locals.runtime;
 const env = runtime?.env as import('../../../env.d').Env & {
   CLOUDFLARE_ACCOUNT_ID?: string;
-  CLOUDFLARE_API_TOKEN?: string;
+  CLOUDFLARE_BACKUP_API_TOKEN?: string;
   D1_DATABASE_ID?: string;
 };
 
@@ -37,11 +37,11 @@ if (!canDownloadBackup) {
 }
 
 const accountId = env?.CLOUDFLARE_ACCOUNT_ID;
-const apiToken = env?.CLOUDFLARE_API_TOKEN;
+const apiToken = env?.CLOUDFLARE_BACKUP_API_TOKEN;
 const databaseId = env?.D1_DATABASE_ID ?? 'a214f9da-3577-4ee7-bc50-bc9b9754a79c';
 
 if (!accountId || !apiToken) {
-  return new Response(JSON.stringify({ error: 'Backup not configured (missing Cloudflare API credentials)' }), {
+  return new Response(JSON.stringify({ error: 'Backup not configured (missing Cloudflare backup API credentials)' }), {
     status: 503,
     headers: { 'Content-Type': 'application/json' },
   });

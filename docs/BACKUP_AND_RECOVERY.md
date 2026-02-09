@@ -30,9 +30,9 @@ Automated backups are implemented by a **separate Cloudflare Worker** with a cro
 2. **Google Workspace Drive (optional):** A Board or Admin configures backup in the portal (**Board → Backups**): connects Google Drive (OAuth), selects a folder, and sets a schedule (e.g. daily 2 AM, weekly Sunday). The same Worker then uploads the same backup set (D1 + whitelist, optionally R2 manifest) to that Drive folder. Keeps size minimal and uses your existing Google Workspace.
 3. **Retention:** Worker deletes backups older than `BACKUP_RETENTION_DAYS` (default 30). Drive retention is managed by the board in the chosen folder.
 
-**Deploy the backup Worker:** From project root run `npm run backup:deploy`. Set secrets and vars in `workers/backup/wrangler.toml`: `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN` (secret), and for Google Drive: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `BACKUP_ENCRYPTION_KEY` (secrets).
+**Deploy the backup Worker:** From project root run `npm run backup:deploy`. Set secrets and vars in `workers/backup/wrangler.toml`: `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_BACKUP_API_TOKEN` (secret), and for Google Drive: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `BACKUP_ENCRYPTION_KEY` (secrets).
 
-**Board/Admin: download full backup to your computer:** Go to **Board → Backups** and click **Download backup (ZIP)**. The ZIP contains the current D1 SQL dump and KV whitelist JSON. The main app needs `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` (and optionally `D1_DATABASE_ID`) in env for this to work.
+**Board/Admin: download full backup to your computer:** Go to **Board → Backups** and click **Download backup (ZIP)**. The ZIP contains the current D1 SQL dump and KV whitelist JSON. The main app needs `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_BACKUP_API_TOKEN` (and optionally `D1_DATABASE_ID`) in env for this to work.
 
 ### Restore from Backup
 

@@ -8,7 +8,7 @@ export const prerender = false;
 import { getSessionFromCookie, getEffectiveRole } from '../../../lib/auth';
 
 const runtime = Astro.locals.runtime;
-const env = runtime?.env as Record<string, unknown> & { CLOUDFLARE_ACCOUNT_ID?: string; CLOUDFLARE_API_TOKEN?: string };
+const env = runtime?.env as Record<string, unknown> & { CLOUDFLARE_ACCOUNT_ID?: string; CLOUDFLARE_BACKUP_API_TOKEN?: string };
 const session = await getSessionFromCookie(
   Astro.request.headers.get('cookie') ?? undefined,
   env?.SESSION_SECRET as string | undefined
@@ -25,7 +25,7 @@ if (!canManageBackup) {
 
 const manual_download_configured = Boolean(
   env?.CLOUDFLARE_ACCOUNT_ID && String(env.CLOUDFLARE_ACCOUNT_ID).trim() !== '' &&
-  env?.CLOUDFLARE_API_TOKEN && String(env.CLOUDFLARE_API_TOKEN).trim() !== ''
+  env?.CLOUDFLARE_BACKUP_API_TOKEN && String(env.CLOUDFLARE_BACKUP_API_TOKEN).trim() !== ''
 );
 
 let last_r2_backup_at: string | null = null;
