@@ -89,7 +89,7 @@ jobs:
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Sync Secrets to Cloudflare Pages
-        if: success() && secrets.CLOUDFLARE_DEPLOY_API_TOKEN != ''
+        if: success()
         run: |
           echo "Syncing secrets and variables from GitHub to Cloudflare Pages..."
           node scripts/sync-secrets-to-cloudflare-pages.js
@@ -159,7 +159,7 @@ jobs:
           PUBLIC_NEXTDOOR_URL: ${{ vars.PUBLIC_NEXTDOOR_URL }}
 
       - name: Deploy backup Worker and sync its secrets
-        if: success() && secrets.CLOUDFLARE_DEPLOY_API_TOKEN != ''
+        if: success()
         run: |
           echo "Injecting CLOUDFLARE_ACCOUNT_ID into backup worker wrangler.toml..."
           node -e "

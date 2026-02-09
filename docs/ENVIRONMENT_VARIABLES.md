@@ -4,6 +4,43 @@ This site uses environment variables to store sensitive information and configur
 
 ---
 
+## Why the live site shows wrong address, dues amount, or missing recycling data
+
+**The site is built in GitHub Actions**, not on Cloudflare. The workflow runs `npm run build` and passes **GitHub Variables** into that step. Those values are baked into the static pages at build time. Cloudflare only receives the built `dist` folder.
+
+- **If the Dues page shows wrong address, wrong amount, or placeholder text** → the Build step did not have those values. Set them as **GitHub Variables** (not Secrets).
+- **If Local Resources is missing waste management / recycling links and data** → same: add the recycling and waste vars as **GitHub Variables**.
+
+**Where to set them:** Repo → **Settings** → **Secrets and variables** → **Actions** → **Variables** tab → add (or edit) each variable below.
+
+**Minimum for Dues page and Local Resources:**
+
+| Variable | Used for |
+|----------|----------|
+| `PUBLIC_QUARTERLY_DUES_AMOUNT` | Dues page amount (e.g. `150`) |
+| `PUBLIC_MAILING_ADDRESS_NAME` | Dues & contact (e.g. Crooked Lake Reserve HOA) |
+| `PUBLIC_MAILING_ADDRESS_LINE1` | Dues & contact (e.g. P.O. Box 1234) |
+| `PUBLIC_MAILING_ADDRESS_LINE2` | Dues & contact (e.g. City, ST 12345) |
+| `PUBLIC_PAYMENT_METHODS` | Dues page (e.g. Check or money order) |
+| `PUBLIC_LATE_FEE_AMOUNT` | Dues page (e.g. `25`) |
+| `PUBLIC_LATE_FEE_DAYS` | Dues page (e.g. `15`) |
+| `PUBLIC_PAYMENT_INSTRUCTIONS` | Dues page instructions |
+| `PUBLIC_PAYMENT_DROP_OFF_LOCATION` | Dues page drop-off (you said this one works) |
+| `PUBLIC_TRASH_SCHEDULE` | Local Resources |
+| `PUBLIC_RECYCLING_SCHEDULE` | Local Resources |
+| `PUBLIC_RECYCLING_CENTER_NAME` | Local Resources |
+| `PUBLIC_RECYCLING_CENTER_ADDRESS` | Local Resources |
+| `PUBLIC_RECYCLING_CENTER_HOURS` | Local Resources |
+| `PUBLIC_RECYCLING_CENTER_PHONE` | Local Resources |
+| `PUBLIC_RECYCLING_CENTER_WEBSITE` | Local Resources |
+| `PUBLIC_WASTE_MANAGEMENT_CONTACT` | Local Resources |
+| `PUBLIC_WASTE_MANAGEMENT_PHONE` | Local Resources |
+| `PUBLIC_WASTE_MANAGEMENT_WEBSITE` | Local Resources |
+
+After adding or changing Variables, **re-run the deploy** (push a small commit to `main` or use Actions → "Deploy to Cloudflare" → Run workflow) so a new build runs with the updated values.
+
+---
+
 ## Production deployment: one place (Cloudflare Pages)
 
 **You do not manage the site in two places.** The live site is a **single Cloudflare Pages project**. All env vars, secrets, and bindings for the site are configured in that project only:
