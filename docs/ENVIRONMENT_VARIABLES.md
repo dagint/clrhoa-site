@@ -291,9 +291,17 @@ All variables have default fallback values in the code. However, **you should al
 
 ## Troubleshooting
 
+### Public variables set in GitHub but not showing on the site
+
+The site is **built in GitHub Actions**; the build step receives `PUBLIC_*` and `SITE` from **GitHub Variables** (not Secrets). If they are set in GitHub but the live site still shows placeholders or wrong data:
+
+1. **Use Variables, not Secrets.** `vars.PUBLIC_MEETING_LOCATION` etc. only read from **Settings → Secrets and variables → Actions → Variables** (or **Environments → production → Environment variables**). If you added them as **Secrets**, the workflow cannot use them for build-time vars; move them to Variables (they are safe to be non-secret if they are `PUBLIC_*`).
+2. **Environment scope.** The deploy job uses `environment: production`. If your variables are under **Environments → production → Environment variables**, they are available. If they are only under another environment (e.g. development), the production deploy won’t see them. Either add them to **Actions → Variables** (repository-wide) or to **production** environment variables.
+3. **Check the deploy run.** After pushing or re-running the workflow, open the latest “Deploy to Cloudflare” run and look at the **Verify public env vars** step. It prints which of the main public vars are `set` or `missing`. If key vars show `missing`, add or fix them in GitHub (Variables, correct environment), then re-run the workflow.
+
 ### Variables Not Showing
 
-- Verify variables are set in Cloudflare Pages
+- Verify variables are set in Cloudflare Pages (or in GitHub Variables if you deploy via Actions)
 - Check variable names match exactly (case-sensitive)
 - Ensure variables start with `PUBLIC_` for client-side access
 - Redeploy after adding/updating variables
