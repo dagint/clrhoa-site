@@ -6,13 +6,12 @@ This guide explains how to use GitHub Secrets to manage Cloudflare Workers/Pages
 
 This project uses **two types** of environment variables:
 
-1. **Runtime Secrets** (Workers secrets) - Sensitive values stored in GitHub Secrets → synced to Cloudflare Workers
-2. **Build-time Variables** (PUBLIC_*) - Public values stored in GitHub Variables → passed to build
+1. **Runtime Secrets** (Workers secrets) — Sensitive values in **GitHub Secrets** → synced to Cloudflare
+2. **Build-time Variables** — `PUBLIC_*` and `SITE` in **GitHub Variables** → passed into `npm run build`; baked into the site
 
-- **GitHub Secrets** store sensitive runtime values (API keys, tokens, passwords)
-- **GitHub Variables** store public build-time values (contact info, addresses, etc.)
-- **GitHub Actions workflow** automatically syncs secrets to Cloudflare and passes variables to build
-- **No secrets in code** - `wrangler.toml` only contains non-sensitive configuration
+- **GitHub Secrets** = API keys, tokens, passwords. Used at runtime and by the sync step. **Not** passed to the build.
+- **GitHub Variables** = Dues amount, address, waste management, meeting location, etc. **Must** be Variables (not Secrets) or the live site will show placeholders or missing content.
+- **Troubleshooting:** If the live site is missing dues/address/waste/meeting data, see [TROUBLESHOOTING_VARS_AND_DEPLOY.md](./TROUBLESHOOTING_VARS_AND_DEPLOY.md). Most often the values were added as Secrets instead of Variables.
 
 ## Quick Start
 
