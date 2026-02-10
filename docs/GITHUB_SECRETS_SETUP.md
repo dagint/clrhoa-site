@@ -107,6 +107,16 @@ The GitHub Actions workflow (`.github/workflows/deploy.yml`) will:
 
 **First deployment:** Make sure `CLOUDFLARE_DEPLOY_API_TOKEN` is set in GitHub Secrets, then push to `main` branch.
 
+### Scripts: GitHub vs Cloudflare
+
+| Script | Pushes to | Purpose |
+|--------|-----------|--------|
+| `npm run secrets:update` | **GitHub** Secrets (from `.secrets.local`) | So the deploy workflow and sync have the values. Does **not** push to Cloudflare. |
+| `npm run vars:update` | **GitHub** Variables (from `.vars.local`) | So the build gets `PUBLIC_*` and `SITE`. Does **not** push to Cloudflare. |
+| `npm run pages:sync-env` | **Cloudflare Pages** (from `.env.local` or env) | Syncs runtime secrets (and optionally vars) to the Pages project. Use when the workflow sync step fails (e.g. API 500) or you want to update Cloudflare from your machine. Requires `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` (or `CLOUDFLARE_DEPLOY_API_TOKEN`) in env or `.env.local`. Run from repo root; loads `.env.local` automatically when not in CI. |
+
+So: **secrets:update** and **vars:update** only update GitHub. To get those values into **Cloudflare Pages**, the deploy workflow runs a sync step (or you run `npm run pages:sync-env` locally).
+
 ## How It Works
 
 ### GitHub Actions Workflow

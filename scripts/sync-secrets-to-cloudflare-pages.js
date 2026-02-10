@@ -6,9 +6,13 @@
  * Cloudflare when the build runs in GitHub.
  *
  * Usage: node scripts/sync-secrets-to-cloudflare-pages.js
+ *        npm run pages:sync-env   (loads .env.local when not in CI)
  * Optional: SYNC_PAGES_VARS=1 to also sync PUBLIC_* and SITE (larger payload, may 500).
  * Requires: CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN (or CLOUDFLARE_DEPLOY_API_TOKEN)
  */
+
+import fs from 'fs';
+import path from 'path';
 
 const REQUIRED_SECRETS = ['SESSION_SECRET'];
 
@@ -84,8 +88,8 @@ const PAGES_VARS = [
 const PROJECT_NAME = 'clrhoa-site';
 const API_BASE = 'https://api.cloudflare.com/client/v4';
 
-/** Max env vars per PATCH request to avoid Cloudflare 500 on large payloads. */
-const ENV_VARS_BATCH_SIZE = 20;
+/** Max env vars per PATCH request. Use 1 to minimize payload and avoid Cloudflare API 500. */
+const ENV_VARS_BATCH_SIZE = 1;
 
 /** Retry delays in ms (transient 500s). */
 const RETRY_DELAYS_MS = [0, 2000, 4000];
@@ -235,6 +239,7 @@ async function setPagesEnvVars(accountId, projectName, envVarsToSet, environment
     if (lastErr) throw lastErr;
     // Refresh project config for next batch so we don't overwrite
     if (b < batches.length - 1) {
+      await new Promise((r) => setTimeout(r, 400)); // gentle on API when sending one-by-one
       const updated = await getPagesProjectConfig(accountId, projectName);
       const nextEnvConfig = updated.deployment_configs?.[environment] || {};
       envVars = { ...(nextEnvConfig.env_vars || {}) };
@@ -242,7 +247,26 @@ async function setPagesEnvVars(accountId, projectName, envVarsToSet, environment
   }
 }
 
+/** When not in CI, load .env.local so running locally (e.g. npm run pages:sync-env) picks up vars. */
+function loadEnvLocalIfNeeded() {
+  if (process.env.CI === 'true') return;
+  const envPath = path.join(process.cwd(), '.env.local');
+  if (!fs.existsSync(envPath)) return;
+  const content = fs.readFileSync(envPath, 'utf-8');
+  for (const line of content.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const eq = trimmed.indexOf('=');
+    if (eq <= 0) continue;
+    const key = trimmed.slice(0, eq).trim();
+    let value = trimmed.slice(eq + 1).trim();
+    if (value.startsWith('"') && value.endsWith('"')) value = value.slice(1, -1).replace(/\\"/g, '"');
+    if (!process.env[key]) process.env[key] = value;
+  }
+}
+
 async function main() {
+  loadEnvLocalIfNeeded();
   console.log('Syncing GitHub Secrets and Variables to Cloudflare Pages\n');
 
   const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
