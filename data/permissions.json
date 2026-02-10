@@ -1,0 +1,295 @@
+{
+  "comment": "Static fallback permissions for local/development mode",
+  "version": "1.0.0",
+  "lastUpdated": "2026-02-10",
+  "permissions": {
+    "/portal/dashboard": {
+      "member": "write",
+      "arb": "write",
+      "board": "write",
+      "admin": "write"
+    },
+    "/portal/directory": {
+      "member": "write",
+      "arb": "write",
+      "board": "write",
+      "admin": "write"
+    },
+    "/portal/documents": {
+      "member": "write",
+      "arb": "write",
+      "board": "write",
+      "admin": "write"
+    },
+    "/portal/profile": {
+      "member": "write",
+      "arb": "write",
+      "board": "write",
+      "admin": "write"
+    },
+    "/portal/requests": {
+      "member": "write",
+      "arb": "write",
+      "board": "write",
+      "admin": "write"
+    },
+    "/portal/my-requests": {
+      "member": "write",
+      "arb": "write",
+      "board": "write",
+      "admin": "write"
+    },
+    "/portal/arb-request": {
+      "member": "write",
+      "arb": "write",
+      "board": "write",
+      "admin": "write"
+    },
+    "/portal/maintenance": {
+      "member": "write",
+      "arb": "write",
+      "board": "write",
+      "admin": "write"
+    },
+    "/portal/meetings": {
+      "member": "write",
+      "arb": "write",
+      "board": "write",
+      "admin": "write"
+    },
+    "/portal/vendors": {
+      "member": "write",
+      "arb": "write",
+      "board": "write",
+      "admin": "write"
+    },
+    "/portal/library": {
+      "member": "write",
+      "arb": "write",
+      "board": "write",
+      "admin": "write"
+    },
+    "/portal/assessments": {
+      "member": "write",
+      "arb": "write",
+      "board": "write",
+      "admin": "write"
+    },
+    "/portal/feedback": {
+      "member": "write",
+      "arb": "write",
+      "board": "write",
+      "admin": "write"
+    },
+    "/portal/news": {
+      "member": "write",
+      "arb": "write",
+      "board": "write",
+      "admin": "write"
+    },
+    "/portal/docs": {
+      "member": "write",
+      "arb": "write",
+      "board": "write",
+      "admin": "write"
+    },
+    "/portal/faq": {
+      "member": "write",
+      "arb": "write",
+      "board": "write",
+      "admin": "write"
+    },
+    "/portal/admin": {
+      "member": "none",
+      "arb": "none",
+      "board": "none",
+      "admin": "write"
+    },
+    "/portal/admin/feedback": {
+      "member": "none",
+      "arb": "none",
+      "board": "none",
+      "admin": "write"
+    },
+    "/portal/admin/sms-requests": {
+      "member": "none",
+      "arb": "none",
+      "board": "none",
+      "admin": "write"
+    },
+    "/portal/admin/test-email": {
+      "member": "none",
+      "arb": "none",
+      "board": "none",
+      "admin": "write"
+    },
+    "/portal/admin/backups": {
+      "member": "none",
+      "arb": "none",
+      "board": "none",
+      "admin": "write"
+    },
+    "/portal/admin/usage": {
+      "member": "none",
+      "arb": "none",
+      "board": "none",
+      "admin": "write"
+    },
+    "/portal/admin/audit-logs": {
+      "member": "none",
+      "arb": "none",
+      "board": "none",
+      "admin": "write"
+    },
+    "/portal/admin/vendors": {
+      "member": "none",
+      "arb": "none",
+      "board": "none",
+      "admin": "write"
+    },
+    "/portal/admin/maintenance": {
+      "member": "none",
+      "arb": "none",
+      "board": "none",
+      "admin": "write"
+    },
+    "/portal/admin/directory": {
+      "member": "none",
+      "arb": "none",
+      "board": "none",
+      "admin": "read"
+    },
+    "/portal/admin/contacts": {
+      "member": "none",
+      "arb": "none",
+      "board": "none",
+      "admin": "write"
+    },
+    "/portal/admin/news": {
+      "member": "none",
+      "arb": "none",
+      "board": "none",
+      "admin": "write"
+    },
+    "/portal/admin/member-documents": {
+      "member": "none",
+      "arb": "none",
+      "board": "none",
+      "admin": "write"
+    },
+    "/portal/admin/public-documents": {
+      "member": "none",
+      "arb": "none",
+      "board": "none",
+      "admin": "write"
+    },
+    "/portal/admin/permissions": {
+      "member": "none",
+      "arb": "none",
+      "board": "none",
+      "admin": "write"
+    },
+    "/portal/board": {
+      "member": "none",
+      "arb": "none",
+      "board": "write",
+      "admin": "none"
+    },
+    "/board/directory": {
+      "member": "none",
+      "arb": "none",
+      "board": "write",
+      "admin": "none"
+    },
+    "/board/assessments": {
+      "member": "none",
+      "arb": "none",
+      "board": "write",
+      "admin": "none"
+    },
+    "/board/vendors": {
+      "member": "none",
+      "arb": "write",
+      "board": "write",
+      "admin": "none"
+    },
+    "/board/meetings": {
+      "member": "none",
+      "arb": "write",
+      "board": "write",
+      "admin": "none"
+    },
+    "/board/maintenance": {
+      "member": "none",
+      "arb": "write",
+      "board": "write",
+      "admin": "none"
+    },
+    "/board/feedback": {
+      "member": "none",
+      "arb": "write",
+      "board": "write",
+      "admin": "none"
+    },
+    "/board/contacts": {
+      "member": "none",
+      "arb": "write",
+      "board": "write",
+      "admin": "none"
+    },
+    "/board/news": {
+      "member": "none",
+      "arb": "write",
+      "board": "write",
+      "admin": "none"
+    },
+    "/board/library": {
+      "member": "none",
+      "arb": "write",
+      "board": "write",
+      "admin": "none"
+    },
+    "/board/public-documents": {
+      "member": "none",
+      "arb": "write",
+      "board": "write",
+      "admin": "none"
+    },
+    "/board/member-documents": {
+      "member": "none",
+      "arb": "write",
+      "board": "write",
+      "admin": "none"
+    },
+    "/board/audit-logs": {
+      "member": "none",
+      "arb": "none",
+      "board": "write",
+      "admin": "none"
+    },
+    "/board/backups": {
+      "member": "none",
+      "arb": "write",
+      "board": "write",
+      "admin": "none"
+    },
+    "/portal/arb": {
+      "member": "none",
+      "arb": "write",
+      "board": "none",
+      "admin": "none"
+    },
+    "/portal/arb-dashboard": {
+      "member": "none",
+      "arb": "write",
+      "board": "read",
+      "admin": "read"
+    },
+    "/portal/request-elevated-access": {
+      "member": "write",
+      "arb": "write",
+      "board": "write",
+      "admin": "write"
+    }
+  }
+}
