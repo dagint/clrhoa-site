@@ -63,7 +63,7 @@ const label = role === 'admin' ? 'Administrator' : role === 'arb_board' ? 'ARB +
 </div>
 
 {canAssumeRole && (
-  <script is:inline>
+  <script>
     (function () {
       const form = document.getElementById('assume-role-form');
       const statusEl = document.getElementById('assume-role-status');
@@ -120,19 +120,48 @@ const label = role === 'admin' ? 'Administrator' : role === 'arb_board' ? 'ARB +
 
       function renderStatus(assumedRole, assumedUntil) {
         if (!statusEl) return;
+        statusEl.textContent = '';
         const roleLabel = assumedRole === 'board' ? 'Board' : assumedRole === 'arb' ? 'ARB' : null;
-        let html = '';
         if (roleLabel) {
-          html += `<p class="mb-1">Acting as <strong>${roleLabel}</strong>${isAdmin ? ' for technical assistance' : ''}. All actions are logged. Drop or wait for timeout (2 hr) before switching to the other role.</p>`;
+          const p = document.createElement('p');
+          p.className = 'mb-1';
+          p.appendChild(document.createTextNode('Acting as '));
+          const strong = document.createElement('strong');
+          strong.textContent = roleLabel;
+          p.appendChild(strong);
+          p.appendChild(document.createTextNode((isAdmin ? ' for technical assistance' : '') + '. All actions are logged. Drop or wait for timeout (2 hr) before switching to the other role.'));
+          statusEl.appendChild(p);
           if (assumedUntil != null) {
-            html += `<p id="assume-role-countdown" class="text-xs text-amber-800 mb-2" data-assumed-until="${assumedUntil}" aria-live="polite">Role expires in <span class="assume-role-countdown-text">${formatCountdown(assumedUntil)}</span></p>`;
+            const countdown = document.createElement('p');
+            countdown.id = 'assume-role-countdown';
+            countdown.className = 'text-xs text-amber-800 mb-2';
+            countdown.setAttribute('data-assumed-until', String(assumedUntil));
+            countdown.setAttribute('aria-live', 'polite');
+            countdown.appendChild(document.createTextNode('Role expires in '));
+            const span = document.createElement('span');
+            span.className = 'assume-role-countdown-text';
+            span.textContent = formatCountdown(assumedUntil);
+            countdown.appendChild(span);
+            statusEl.appendChild(countdown);
           }
         } else {
-          html += isAdmin
-            ? '<p class="mb-2">You are signed in as <strong>Administrator</strong>. You have view-only access to Dues and ARB requests. To provide technical assistance, you may assume a role below (one at a time; all actions are logged).</p>'
-            : '<p class="mb-2">You are <strong>ARB + Board</strong>. Choose which role you are acting in (one at a time). Drop or wait for timeout (2 hr) before switching to the other role.</p>';
+          const p = document.createElement('p');
+          p.className = 'mb-2';
+          if (isAdmin) {
+            p.appendChild(document.createTextNode('You are signed in as '));
+            const strong = document.createElement('strong');
+            strong.textContent = 'Administrator';
+            p.appendChild(strong);
+            p.appendChild(document.createTextNode('. You have view-only access to Dues and ARB requests. To provide technical assistance, you may assume a role below (one at a time; all actions are logged).'));
+          } else {
+            p.appendChild(document.createTextNode('You are '));
+            const strong = document.createElement('strong');
+            strong.textContent = 'ARB + Board';
+            p.appendChild(strong);
+            p.appendChild(document.createTextNode('. Choose which role you are acting in (one at a time). Drop or wait for timeout (2 hr) before switching to the other role.'));
+          }
+          statusEl.appendChild(p);
         }
-        statusEl.innerHTML = html;
         if (assumedUntil != null) startCountdownTicker();
       }
 
@@ -140,14 +169,30 @@ const label = role === 'admin' ? 'Administrator' : role === 'arb_board' ? 'ARB +
         if (!form) return;
         const dropLabel = isAdmin ? 'Return to Admin (view only)' : 'Drop role';
         const csrf = getCsrf();
-        form.innerHTML = `
-          <input type="hidden" name="csrf_token" id="assume-role-csrf" value="${csrf}" />
-          ${assumedRole
-            ? `<button type="button" class="assume-role-btn px-3 py-1.5 rounded-lg border border-amber-700 bg-amber-100 text-amber-900 text-xs font-semibold hover:bg-amber-200" data-role="none">${dropLabel}</button>`
-            : `<button type="button" class="assume-role-btn px-3 py-1.5 rounded-lg border border-clr-green bg-clr-green/20 text-clr-green text-xs font-semibold hover:bg-clr-green/30" data-role="board">Act as Board</button>
-               <button type="button" class="assume-role-btn px-3 py-1.5 rounded-lg border border-clr-green bg-clr-green/20 text-clr-green text-xs font-semibold hover:bg-clr-green/30" data-role="arb">Act as ARB</button>`
-          }
-        `;
+        form.textContent = '';
+        const hidden = document.createElement('input');
+        hidden.type = 'hidden';
+        hidden.name = 'csrf_token';
+        hidden.id = 'assume-role-csrf';
+        hidden.value = csrf;
+        form.appendChild(hidden);
+        if (assumedRole) {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'assume-role-btn px-3 py-1.5 rounded-lg border border-amber-700 bg-amber-100 text-amber-900 text-xs font-semibold hover:bg-amber-200';
+          btn.setAttribute('data-role', 'none');
+          btn.textContent = dropLabel;
+          form.appendChild(btn);
+        } else {
+          ['board', 'arb'].forEach(function (role) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'assume-role-btn px-3 py-1.5 rounded-lg border border-clr-green bg-clr-green/20 text-clr-green text-xs font-semibold hover:bg-clr-green/30';
+            btn.setAttribute('data-role', role);
+            btn.textContent = 'Act as ' + (role === 'board' ? 'Board' : 'ARB');
+            form.appendChild(btn);
+          });
+        }
         bindAssumeRoleButtons();
       }
 

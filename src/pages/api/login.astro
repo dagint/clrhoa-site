@@ -11,6 +11,7 @@ import { getOwnerByEmail } from '../../lib/directory-db';
 import { insertLoginHistory } from '../../lib/login-history-db';
 import { createLogger, maskEmail } from '../../lib/logging';
 import { getSecurityMonitor } from '../../lib/monitoring';
+import { checkRateLimit, getRateLimitConfig } from '../../lib/rate-limit';
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
@@ -46,10 +47,24 @@ if (!kv || !db || !secret) {
   return Astro.redirect('/portal/login?error=config');
 }
 
-  // Check account lockout
-  const ipAddress = Astro.clientAddress || Astro.request.headers.get('cf-connecting-ip') || null;
-  if (rateLimitKv) {
-    const lockoutUntil = await checkAccountLockout(rateLimitKv, normalized);
+const ipAddress = Astro.clientAddress || Astro.request.headers.get('cf-connecting-ip') || null;
+
+// IP-based rate limit: cap total login attempts per IP (stops email enumeration from one IP)
+if (rateLimitKv && ipAddress) {
+  const ipLimitConfig = getRateLimitConfig('/api/login:ip');
+  if (ipLimitConfig) {
+    const ipLimit = await checkRateLimit(rateLimitKv, '/api/login:ip', ipAddress, ipLimitConfig.maxRequests, ipLimitConfig.windowSeconds);
+    if (!ipLimit.allowed) {
+      logger.warn('Login rate limit exceeded (IP)', { ip: ipAddress });
+      securityMonitor.trackFailedLogin(normalized, ipAddress, 'ip_rate_limit');
+      return Astro.redirect('/portal/login?error=too_many_attempts');
+    }
+  }
+}
+
+// Check per-account lockout
+if (rateLimitKv) {
+  const lockoutUntil = await checkAccountLockout(rateLimitKv, normalized);
     if (lockoutUntil) {
       logger.warn('Login attempt on locked account', {
         email: maskEmail(normalized),

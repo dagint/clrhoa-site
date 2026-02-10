@@ -11,7 +11,7 @@ interface Props {
 const { elevatedUntil } = Astro.props;
 ---
 
-<div id="pim-elevation-banner" class="bg-amber-100 border-b border-amber-300 px-4 py-2 flex flex-wrap items-center justify-between gap-2" role="status" aria-live="polite">
+<div id="pim-elevation-banner" class="bg-amber-100 border-b border-amber-300 px-4 py-2 flex flex-wrap items-center justify-between gap-2" role="status" aria-live="polite" data-elevated-until={String(elevatedUntil)}>
   <span class="text-amber-900 text-sm font-medium">
     <span id="pim-elevation-label">Elevated access</span>
     <span id="pim-elevation-timer" class="ml-2 font-mono">—</span>
@@ -22,11 +22,13 @@ const { elevatedUntil } = Astro.props;
   </form>
 </div>
 
-<script is:inline define:vars={{ elevatedUntil }}>
+<script>
   (function () {
     const timerEl = document.getElementById('pim-elevation-timer');
     const form = document.getElementById('pim-drop-form');
-    if (!timerEl) return;
+    const bannerEl = document.getElementById('pim-elevation-banner');
+    if (!timerEl || !bannerEl) return;
+    const elevatedUntil = parseInt(bannerEl.getAttribute('data-elevated-until') || '0', 10);
 
     function updateTimer() {
       const now = Date.now();

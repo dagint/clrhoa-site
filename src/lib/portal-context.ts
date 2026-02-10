@@ -52,9 +52,6 @@ export async function getPortalContext(
       userAgent,
       ipAddress
     );
-    if (!session) {
-      session = await getSessionFromCookie(cookieHeader, env.SESSION_SECRET);
-    }
   } else if (env?.SESSION_SECRET) {
     session = await getSessionFromCookie(cookieHeader, env.SESSION_SECRET);
   }

@@ -55,13 +55,6 @@ let session = await getSessionFromCookie(
   ipAddress
 );
 
-if (!session && env?.SESSION_SECRET) {
-  session = await getSessionFromCookie(
-    Astro.request.headers.get('cookie') ?? undefined,
-    env.SESSION_SECRET
-  );
-}
-
 if (!session) {
   return new Response(JSON.stringify({ error: 'Unauthorized' }), {
     status: 401,

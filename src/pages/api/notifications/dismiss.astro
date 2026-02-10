@@ -6,6 +6,7 @@
 export const prerender = false;
 
 import { requireSession, requireDb, jsonResponse } from '../../../lib/api-helpers';
+import { verifyCsrfToken } from '../../../lib/auth';
 import { setDismissed, isValidDismissalKey } from '../../../lib/notification-dismissals';
 
 const auth = await requireSession(Astro);
@@ -20,12 +21,16 @@ if (Astro.request.method !== 'POST') {
   return new Response(null, { status: 405, headers: { Allow: 'POST' } });
 }
 
-let body: { key?: string };
+let body: { key?: string; csrf_token?: string; csrfToken?: string };
 try {
   const ct = Astro.request.headers.get('content-type') ?? '';
   body = ct.includes('application/json') ? await Astro.request.json() : Object.fromEntries(await Astro.request.formData());
 } catch {
   return jsonResponse({ error: 'Invalid body' }, 400);
+}
+const csrf = body.csrf_token ?? body.csrfToken;
+if (!verifyCsrfToken(session, typeof csrf === 'string' ? csrf : undefined)) {
+  return jsonResponse({ error: 'Invalid security token. Please refresh the page.' }, 403);
 }
 
 const key = typeof body.key === 'string' ? body.key.trim() : '';

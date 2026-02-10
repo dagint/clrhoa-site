@@ -7,6 +7,7 @@ export const prerender = false;
 
 import { getSessionFromCookie, isElevatedRole, getEffectiveRole } from '../../lib/auth';
 import { listOwners, getPhonesArray, insertDirectoryExportLog } from '../../lib/directory-db';
+import { escapeCsv } from '../../lib/csv-utils';
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
@@ -38,15 +39,6 @@ if (!db) {
 }
 
 const owners = await listOwners(db);
-
-function escapeCsv(value: string | null | undefined): string {
-  if (value == null) return '';
-  const s = String(value).trim();
-  if (s.includes('"') || s.includes(',') || s.includes('\n') || s.includes('\r')) {
-    return `"${s.replace(/"/g, '""')}"`;
-  }
-  return s;
-}
 
 // Header: name, email, phone (primary), phones, address, lot_number
 const header = 'name,email,phone,phones,address,lot_number\n';

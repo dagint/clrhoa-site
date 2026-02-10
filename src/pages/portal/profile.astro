@@ -398,10 +398,22 @@ function formatLoginTime(iso: string | null): string {
         const row = document.createElement('div');
         row.className = 'flex gap-2 items-center phone-row';
         const idx = container?.querySelectorAll('.phone-row').length ?? 0;
-        row.innerHTML = '<input type="tel" class="phone-input mt-1 block flex-1 rounded-lg border border-gray-200 px-3 py-2" placeholder="(555) 555-5555" data-index="' + idx + '" /><button type="button" class="remove-phone text-sm text-red-600 hover:underline shrink-0" data-index="' + idx + '" aria-label="Remove phone">Remove</button>';
-        row.querySelector('.remove-phone')?.addEventListener('click', function () {
+        const input = document.createElement('input');
+        input.type = 'tel';
+        input.className = 'phone-input mt-1 block flex-1 rounded-lg border border-gray-200 px-3 py-2';
+        input.placeholder = '(555) 555-5555';
+        input.setAttribute('data-index', String(idx));
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'remove-phone text-sm text-red-600 hover:underline shrink-0';
+        removeBtn.setAttribute('data-index', String(idx));
+        removeBtn.setAttribute('aria-label', 'Remove phone');
+        removeBtn.textContent = 'Remove';
+        removeBtn.addEventListener('click', function () {
           if ((container?.querySelectorAll('.phone-row').length ?? 0) > 1) row.remove();
         });
+        row.appendChild(input);
+        row.appendChild(removeBtn);
         container?.appendChild(row);
       });
 

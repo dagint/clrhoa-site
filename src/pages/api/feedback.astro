@@ -8,7 +8,7 @@
 export const prerender = false;
 
 import { requireSession, requireDb, jsonResponse } from '../../lib/api-helpers';
-import { getEffectiveRole } from '../../lib/auth';
+import { getEffectiveRole, verifyCsrfToken } from '../../lib/auth';
 import {
   listActiveFeedbackDocs,
   listAllFeedbackDocs,
@@ -115,6 +115,10 @@ if (Astro.request.method === 'POST') {
   } catch {
     return jsonResponse({ error: 'Invalid body' }, 400);
   }
+  const csrf = body.csrf_token ?? body.csrfToken;
+  if (!verifyCsrfToken(session, typeof csrf === 'string' ? csrf : undefined)) {
+    return jsonResponse({ error: 'Invalid security token. Please refresh the page.' }, 403);
+  }
 
   const action = body.action ?? body._action;
   if (action === 'response') {
@@ -208,6 +212,10 @@ if (Astro.request.method === 'PUT') {
   } catch {
     return jsonResponse({ error: 'Invalid body' }, 400);
   }
+  const csrf = body.csrf_token ?? body.csrfToken;
+  if (!verifyCsrfToken(session, typeof csrf === 'string' ? csrf : undefined)) {
+    return jsonResponse({ error: 'Invalid security token. Please refresh the page.' }, 403);
+  }
   const id = String(body.id ?? '').trim();
   if (!id) return jsonResponse({ error: 'id required' }, 400);
   const doc = await getFeedbackDocById(db, id);
@@ -223,8 +231,29 @@ if (Astro.request.method === 'PUT') {
 
 if (Astro.request.method === 'DELETE') {
   if (!isBoard) return jsonResponse({ error: 'Forbidden' }, 403);
-  const id = url.searchParams.get('id') || (await Astro.request.json().catch(() => ({})) as Record<string, string>).id;
+  let body: Record<string, unknown>;
+  try {
+    const ct = Astro.request.headers.get('content-type') ?? '';
+    body = ct.includes('application/json') ? await Astro.request.json() : Object.fromEntries(await Astro.request.formData());
+  } catch {
+    body = {};
+  }
+  const csrf = body.csrf_token ?? body.csrfToken;
+  if (!verifyCsrfToken(session, typeof csrf === 'string' ? csrf : undefined)) {
+    return jsonResponse({ error: 'Invalid security token. Please refresh the page.' }, 403);
+  }
+  const id = url.searchParams.get('id') ?? String(body.id ?? '').trim();
   if (!id) return jsonResponse({ error: 'id required' }, 400);
+  const doc = await getFeedbackDocById(db, id);
+  if (!doc) return jsonResponse({ error: 'Not found' }, 404);
+  const r2 = Astro.locals.runtime?.env?.CLOURHOA_FILES;
+  if (r2 && doc.r2_key) {
+    try {
+      await r2.delete(doc.r2_key);
+    } catch {
+      // Non-fatal: DB row will still be removed; orphan can be purged later
+    }
+  }
   const ok = await deleteFeedbackDoc(db, id);
   if (!ok) return jsonResponse({ error: 'Not found' }, 404);
   return jsonResponse({ success: true });

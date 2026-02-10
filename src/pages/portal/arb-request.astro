@@ -556,7 +556,11 @@ if (db && templateId) {
               }
               
               if (isSubmit) {
-                formSuccess.innerHTML = '<strong>Success!</strong> Your request has been submitted for review. Redirecting to your requests...';
+                formSuccess.textContent = '';
+                const strong1 = document.createElement('strong');
+                strong1.textContent = 'Success!';
+                formSuccess.appendChild(strong1);
+                formSuccess.appendChild(document.createTextNode(' Your request has been submitted for review. Redirecting to your requests...'));
                 formSuccess.classList.remove('hidden');
                 form.reset();
                 setTimeout(() => { window.location.href = '/portal/my-requests'; }, 2000);
@@ -565,16 +569,33 @@ if (db && templateId) {
                 currentRequestId = data.requestId || currentRequestId;
                 if (requestIdInput && currentRequestId) requestIdInput.value = currentRequestId;
                 updateLastSaved(data.updated_at);
-                
-                formSuccess.innerHTML = '<strong>Draft saved!</strong> Your request has been saved. <a href="/portal/my-requests" class="underline font-semibold">View all requests</a> or continue editing.';
+
+                formSuccess.textContent = '';
+                const strong2 = document.createElement('strong');
+                strong2.textContent = 'Draft saved!';
+                formSuccess.appendChild(strong2);
+                formSuccess.appendChild(document.createTextNode(' Your request has been saved. '));
+                const viewLink = document.createElement('a');
+                viewLink.href = '/portal/my-requests';
+                viewLink.className = 'underline font-semibold';
+                viewLink.textContent = 'View all requests';
+                formSuccess.appendChild(viewLink);
+                formSuccess.appendChild(document.createTextNode(' or continue editing.'));
                 formSuccess.classList.remove('hidden');
-                
+
                 // Don't auto-redirect for drafts - let user continue editing
               }
             } else {
               const errorMsg = data.error || (isSubmit ? 'Submission failed. Please try again.' : 'Save failed. Please try again.');
               if (data.duplicateRequestId) {
-                showErr(formError, errorMsg + ` <a href="/portal/my-requests" class="underline font-semibold">View your requests</a>`);
+                formError.textContent = '';
+                formError.appendChild(document.createTextNode(errorMsg + ' '));
+                const dupLink = document.createElement('a');
+                dupLink.href = '/portal/my-requests';
+                dupLink.className = 'underline font-semibold';
+                dupLink.textContent = 'View your requests';
+                formError.appendChild(dupLink);
+                formError.classList.remove('hidden');
               } else {
                 showErr(formError, errorMsg);
               }

@@ -181,6 +181,20 @@ CREATE INDEX idx_arb_requests_deleted ON arb_requests(deleted_at);
 
 ---
 
+### 10.1 **Virus scanning for uploads**
+**Risk**: Malware in uploaded files (ARB attachments, maintenance photos, member docs, feedback PDFs).  
+**Impact**: Stored malware could be served to users or spread; compliance/insurance concerns.  
+**Current state**: Files are validated by type/size and stored in R2; no malware scanning.  
+
+**Options**:
+- **ClamAV**: Self-hosted (e.g. in a Worker or separate service). Scan buffer before or after upload; reject if infected. Requires running ClamAV daemon and updating virus definitions.
+- **Cloud scanning APIs**: e.g. VirusTotal API, MetaDefender, or provider-specific (e.g. Cloudflare malware scanning if available). Upload or hash file; block on positive result. May have cost/rate limits.
+- **Worker + external scanner**: Upload to a temporary location, call an internal ClamAV/scan service via HTTP, then move to R2 only if clean (or delete temp object).
+
+**Recommendation**: Document the risk in security assessments; add virus scanning when operational and compliance requirements justify it. Prefer a small, dedicated scan step (e.g. Worker calling ClamAV or a cloud API) before persisting to R2.
+
+---
+
 ## Low Priority Recommendations 🟢
 
 ### 11. **Security.txt File**
