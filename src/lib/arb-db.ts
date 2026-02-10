@@ -1,6 +1,7 @@
 /**
  * D1 helpers for ARB requests and files (Phase 2).
  */
+/// <reference types="@cloudflare/workers-types" />
 
 import { listEmailsAtSameAddress } from './directory-db.js';
 
@@ -113,7 +114,7 @@ export async function insertArbRequest(
     )
     .bind(id, ownerEmail.trim().toLowerCase(), applicantName, phone, propertyAddress, applicationType, description, copiedFromId)
     .run();
-  
+
   // Log creation to audit table
   const ipAddress = options?.ip_address?.trim() || null;
   try {
@@ -292,16 +293,16 @@ export async function updateArbRequestStatus(
   // Get old status for audit log
   const oldReq = await getArbRequest(db, id);
   const oldStatus = oldReq?.status ?? null;
-  
+
   const result = await db
     .prepare(
       `UPDATE arb_requests SET status = ?, arb_esign = ?, esign_timestamp = datetime('now') WHERE id = ? AND status = 'in_review'`
     )
     .bind(status, arbEsign, id)
     .run();
-  
+
   const updated = (result.meta.changes ?? 0) > 0;
-  
+
   // Log to audit table
   if (updated) {
     try {
@@ -316,7 +317,7 @@ export async function updateArbRequestStatus(
       // Don't fail the update if audit log fails
     }
   }
-  
+
   return updated;
 }
 
@@ -329,16 +330,16 @@ export async function setArbRequestInReview(
 ): Promise<boolean> {
   const oldReq = await getArbRequest(db, id);
   const oldStatus = oldReq?.status ?? null;
-  
+
   const result = await db
     .prepare(
       `UPDATE arb_requests SET status = 'in_review', revision_notes = NULL, updated_at = datetime('now') WHERE id = ? AND owner_email = ? AND status = 'pending'`
     )
     .bind(id, ownerEmail.trim().toLowerCase())
     .run();
-  
+
   const updated = (result.meta.changes ?? 0) > 0;
-  
+
   if (updated) {
     try {
       await db
@@ -351,7 +352,7 @@ export async function setArbRequestInReview(
       console.error('[arb-db] Failed to write audit log:', e);
     }
   }
-  
+
   return updated;
 }
 
@@ -367,16 +368,16 @@ export async function setArbRequestPendingForRevision(
   const oldReq = await getArbRequest(db, id);
   const oldStatus = oldReq?.status ?? null;
   const notes = revisionNotes?.trim() || null;
-  
+
   const result = await db
     .prepare(
       `UPDATE arb_requests SET status = 'pending', revision_notes = ?, updated_at = datetime('now') WHERE id = ? AND status = 'in_review'`
     )
     .bind(notes, id)
     .run();
-  
+
   const updated = (result.meta.changes ?? 0) > 0;
-  
+
   if (updated) {
     try {
       await db
@@ -389,7 +390,7 @@ export async function setArbRequestPendingForRevision(
       console.error('[arb-db] Failed to write audit log:', e);
     }
   }
-  
+
   return updated;
 }
 
@@ -561,16 +562,16 @@ export async function cancelArbRequest(
 ): Promise<boolean> {
   const oldReq = await getArbRequest(db, requestId);
   const oldStatus = oldReq?.status ?? null;
-  
+
   const result = await db
     .prepare(
       `UPDATE arb_requests SET status = 'cancelled', updated_at = datetime('now') WHERE id = ? AND owner_email = ? AND status = 'pending'`
     )
     .bind(requestId, ownerEmail.trim().toLowerCase())
     .run();
-  
+
   const updated = (result.meta.changes ?? 0) > 0;
-  
+
   if (updated) {
     try {
       await db
@@ -583,7 +584,7 @@ export async function cancelArbRequest(
       console.error('[arb-db] Failed to write audit log:', e);
     }
   }
-  
+
   return updated;
 }
 

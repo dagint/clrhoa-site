@@ -2,6 +2,7 @@
  * Portal auth: session cookie (signed), KV whitelist check, helpers.
  * Session: HttpOnly, Secure, SameSite=Lax, signed payload.
  */
+/// <reference types="@cloudflare/workers-types" />
 
 export const SESSION_COOKIE_NAME = 'clrhoa_session';
 const SESSION_MAX_AGE_SEC = 60 * 60 * 24 * 7; // 7 days
@@ -305,13 +306,13 @@ export async function getSessionFromCookie(
     const payload = JSON.parse(payloadJson) as SessionPayload;
     if (typeof payload.exp !== 'number' || payload.exp < Date.now() / 1000)
       return null;
-    
+
     // Check session timeout (30 minutes of inactivity)
     const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
     if (payload.lastActivity && Date.now() - payload.lastActivity * 1000 > SESSION_TIMEOUT_MS) {
       return null; // Session expired due to inactivity
     }
-    
+
     // Verify signature
     const encoder = new TextEncoder();
     const data = encoder.encode(payloadJson);
@@ -328,7 +329,7 @@ export async function getSessionFromCookie(
     );
     const ok = await crypto.subtle.verify('HMAC', key, sig, data);
     if (!ok) return null;
-    
+
     // Verify session fingerprint (if present)
     if (payload.fingerprint && userAgent !== undefined && ipAddress !== undefined) {
       if (!verifySessionFingerprint(payload.fingerprint, userAgent, ipAddress)) {
@@ -336,7 +337,7 @@ export async function getSessionFromCookie(
         return null;
       }
     }
-    
+
     return payload;
   } catch {
     return null;
@@ -475,7 +476,7 @@ export function verifyOrigin(
   expectedOrigin: string
 ): boolean {
   if (!origin && !referer) return false;
-  
+
   // Check Origin header first (more reliable)
   if (origin) {
     try {
@@ -486,7 +487,7 @@ export function verifyOrigin(
       return false;
     }
   }
-  
+
   // Fallback to Referer header
   if (referer) {
     try {
@@ -497,7 +498,7 @@ export function verifyOrigin(
       return false;
     }
   }
-  
+
   return false;
 }
 
@@ -534,31 +535,31 @@ export async function recordFailedLoginAttempt(
   if (!kv) {
     return { locked: false, attemptsRemaining: 5 };
   }
-  
+
   const normalizedEmail = email.toLowerCase();
   const attemptKey = `login_attempts:${normalizedEmail}`;
   const lockoutKey = `login_lockout:${normalizedEmail}`;
   const ipKey = `login_ip:${normalizedEmail}`;
-  
+
   // Check if already locked
   const lockoutUntil = await checkAccountLockout(kv, normalizedEmail);
   if (lockoutUntil) {
     return { locked: true, attemptsRemaining: 0, lockoutUntil };
   }
-  
+
   // Get current attempt count
   const attemptsStr = await kv.get(attemptKey, { type: 'text' });
   const attempts = parseInt(attemptsStr ?? '0', 10);
   const newAttempts = attempts + 1;
-  
+
   // Store IP address for security tracking
   if (ipAddress) {
     await kv.put(ipKey, ipAddress, { expirationTtl: 3600 }); // 1 hour
   }
-  
+
   const MAX_ATTEMPTS = 5;
   const LOCKOUT_DURATION_SEC = 15 * 60; // 15 minutes
-  
+
   if (newAttempts >= MAX_ATTEMPTS) {
     // Lock account
     const lockoutExpiry = Math.floor(Date.now() / 1000) + LOCKOUT_DURATION_SEC;

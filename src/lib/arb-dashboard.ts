@@ -2,6 +2,7 @@
  * ARB dashboard: data loading and pure helpers.
  * Extracted from portal/arb-dashboard.astro to keep the page focused and testable.
  */
+/// <reference types="@cloudflare/workers-types" />
 
 import type { ArbRequest, ArbFile } from './arb-db';
 import { listAllArbRequests, listArbFilesByRequest, listArbRequestsByHousehold } from './arb-db';

@@ -43,22 +43,22 @@ const resourcesMenuItems = [
   { name: 'Overview', path: '/resources', category: 'main' },
   { name: 'Emergency Contacts', path: '/resources/emergency-contacts', category: 'main' },
   { name: 'FAQ', path: '/resources/faq', category: 'main' },
-  
+
   // Community Resources
   { name: 'Local Resources', path: '/resources/local-resources', category: 'community' },
   { name: 'Internet Services', path: '/resources/internet-services', category: 'community' },
   { name: 'Vendor List', path: '/resources/vendors', category: 'community' },
   { name: 'Community Map', path: '/resources/map', category: 'community' },
-  
+
   // Safety & Preparedness
   { name: 'Hurricane Preparedness', path: '/resources/hurricane', category: 'safety' },
   { name: 'Wildlife Safety', path: '/resources/wildlife-safety', category: 'safety' },
   { name: 'Water Restrictions', path: '/resources/water-restrictions', category: 'safety' },
-  
+
   // Legal & Compliance
   { name: 'Florida HOA Law', path: '/resources/law', category: 'legal' },
   { name: 'Flood Insurance', path: '/resources/flood-insurance', category: 'legal' },
-  
+
   // Maintenance
   { name: 'Pest Control', path: '/resources/pest-control', category: 'maintenance' },
 ];
@@ -96,7 +96,7 @@ const resourcesByCategory = {
     <title>{fullTitle}</title>
     <link rel="canonical" href={canonicalURL} />
     <link rel="alternate" type="application/rss+xml" href={`${siteURL}/rss.xml`} title="Crooked Lake Reserve HOA News" />
-    
+
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website" />
     <meta property="og:url" content={canonicalURL} />
@@ -104,14 +104,14 @@ const resourcesByCategory = {
     <meta property="og:description" content={description} />
     <meta property="og:image" content={ogImage} />
     <meta property="og:site_name" content="Crooked Lake Reserve HOA" />
-    
+
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:url" content={canonicalURL} />
     <meta name="twitter:title" content={fullTitle} />
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={ogImage} />
-    
+
     <!-- Structured Data (JSON-LD) -->
     <script type="application/ld+json" set:html={JSON.stringify({
       "@context": "https://schema.org",
@@ -166,7 +166,7 @@ const resourcesByCategory = {
             <a href="/documents" class={`text-lg font-medium transition-colors ${isActive('/documents') ? 'text-clr-green border-b-2 border-clr-green pb-1' : 'text-gray-700 hover:text-clr-green'}`}>Documents</a>
             <a href="/dues" class={`text-lg font-medium transition-colors ${isActive('/dues') ? 'text-clr-green border-b-2 border-clr-green pb-1' : 'text-gray-700 hover:text-clr-green'}`}>Dues</a>
             <a href="/board" class={`text-lg font-medium transition-colors ${isActive('/board') ? 'text-clr-green border-b-2 border-clr-green pb-1' : 'text-gray-700 hover:text-clr-green'}`}>Board</a>
-            
+
             <!-- Resources Dropdown -->
             <div class="relative group" id="resources-dropdown">
               <button
@@ -203,7 +203,7 @@ const resourcesByCategory = {
                       <div class="border-t border-gray-100 my-1"></div>
                     </>
                   )}
-                  
+
                   {/* Community Resources */}
                   {resourcesByCategory.community.length > 0 && (
                     <>
@@ -220,7 +220,7 @@ const resourcesByCategory = {
                       <div class="border-t border-gray-100 my-1"></div>
                     </>
                   )}
-                  
+
                   {/* Safety & Preparedness */}
                   {resourcesByCategory.safety.length > 0 && (
                     <>
@@ -237,7 +237,7 @@ const resourcesByCategory = {
                       <div class="border-t border-gray-100 my-1"></div>
                     </>
                   )}
-                  
+
                   {/* Legal & Compliance */}
                   {resourcesByCategory.legal.length > 0 && (
                     <>
@@ -254,7 +254,7 @@ const resourcesByCategory = {
                       {resourcesByCategory.maintenance.length > 0 && <div class="border-t border-gray-100 my-1"></div>}
                     </>
                   )}
-                  
+
                   {/* Maintenance */}
                   {resourcesByCategory.maintenance.length > 0 && (
                     <>
@@ -273,9 +273,9 @@ const resourcesByCategory = {
                 </div>
               </div>
             </div>
-            
+
             <a href="/news" class={`text-lg font-medium transition-colors ${isActive('/news') ? 'text-clr-green border-b-2 border-clr-green pb-1' : 'text-gray-700 hover:text-clr-green'}`}>News</a>
-            
+
             <!-- Quick Contact Button -->
             <a
               href="/contact"
@@ -313,7 +313,7 @@ const resourcesByCategory = {
           <a href="/documents" class={`block text-lg font-medium transition-colors py-3 px-2 rounded-lg ${isActive('/documents') ? 'bg-clr-beige/30 text-clr-green font-semibold' : 'text-gray-700 hover:bg-clr-beige/20 hover:text-clr-green'}`}>Documents</a>
           <a href="/dues" class={`block text-lg font-medium transition-colors py-3 px-2 rounded-lg ${isActive('/dues') ? 'bg-clr-beige/30 text-clr-green font-semibold' : 'text-gray-700 hover:bg-clr-beige/20 hover:text-clr-green'}`}>Dues</a>
           <a href="/board" class={`block text-lg font-medium transition-colors py-3 px-2 rounded-lg ${isActive('/board') ? 'bg-clr-beige/30 text-clr-green font-semibold' : 'text-gray-700 hover:bg-clr-beige/20 hover:text-clr-green'}`}>Board</a>
-          
+
           <!-- Mobile Resources Dropdown -->
           <div>
             <button
@@ -343,7 +343,7 @@ const resourcesByCategory = {
                   ))}
                 </>
               )}
-              
+
               {/* Community Resources */}
               {resourcesByCategory.community.length > 0 && (
                 <>
@@ -358,7 +358,7 @@ const resourcesByCategory = {
                   ))}
                 </>
               )}
-              
+
               {/* Safety & Preparedness */}
               {resourcesByCategory.safety.length > 0 && (
                 <>
@@ -373,7 +373,7 @@ const resourcesByCategory = {
                   ))}
                 </>
               )}
-              
+
               {/* Legal & Compliance */}
               {resourcesByCategory.legal.length > 0 && (
                 <>
@@ -388,7 +388,7 @@ const resourcesByCategory = {
                   ))}
                 </>
               )}
-              
+
               {/* Maintenance */}
               {resourcesByCategory.maintenance.length > 0 && (
                 <>
@@ -405,7 +405,7 @@ const resourcesByCategory = {
               )}
             </div>
           </div>
-          
+
           <a href="/news" class={`block text-lg font-medium transition-colors py-3 px-2 rounded-lg ${isActive('/news') ? 'bg-clr-beige/30 text-clr-green font-semibold' : 'text-gray-700 hover:bg-clr-beige/20 hover:text-clr-green'}`}>News</a>
         </nav>
       </div>
@@ -420,7 +420,9 @@ const resourcesByCategory = {
         const menuButton = document.getElementById('mobile-menu-button');
         const mobileMenu = document.getElementById('mobile-menu');
         if (!menuButton || !mobileMenu) return;
+        /** @type {HTMLElement} */
         const btn = menuButton;
+        /** @type {HTMLElement} */
         const menu = mobileMenu;
 
         const menuLinks = menu.querySelectorAll('a');
@@ -429,12 +431,12 @@ const resourcesByCategory = {
 
         const menuIcon = document.getElementById('mobile-menu-icon');
         const menuCloseIcon = document.getElementById('mobile-menu-close-icon');
-        
+
         function toggleMenu() {
           const isOpen = !menu.classList.contains('hidden');
           menu.classList.toggle('hidden');
           btn.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
-          
+
           // Toggle icon visibility
           if (menuIcon && menuCloseIcon) {
             if (isOpen) {
@@ -445,7 +447,7 @@ const resourcesByCategory = {
               menuCloseIcon.classList.remove('hidden');
             }
           }
-          
+
           // Focus management
           if (!isOpen) {
             // Menu opening - focus first link
@@ -474,6 +476,7 @@ const resourcesByCategory = {
         });
 
         // Focus trap when menu is open
+        /** @param {KeyboardEvent} e */
         function handleTabKey(e) {
           if (menu.classList.contains('hidden')) return;
 
@@ -498,7 +501,7 @@ const resourcesByCategory = {
 
         // Close menu when clicking outside
         document.addEventListener('click', function (e) {
-          var target = e.target;
+          var target = /** @type {Node | null} */ (e.target);
           if (!menu.classList.contains('hidden') && target &&
               !menu.contains(target) &&
               !btn.contains(target)) {
@@ -517,7 +520,7 @@ const resourcesByCategory = {
         const mobileResourcesToggle = document.getElementById('mobile-resources-toggle');
         const mobileResourcesSubmenu = document.getElementById('mobile-resources-submenu');
         const mobileResourcesChevron = document.getElementById('mobile-resources-chevron');
-        
+
         if (mobileResourcesToggle && mobileResourcesSubmenu && mobileResourcesChevron) {
           mobileResourcesToggle.addEventListener('click', () => {
             const isOpen = !mobileResourcesSubmenu.classList.contains('hidden');
@@ -540,7 +543,7 @@ const resourcesByCategory = {
         const resourcesDropdownButton = document.getElementById('resources-dropdown-button');
         if (resourcesDropdown && resourcesDropdownButton) {
           const dropdownMenu = resourcesDropdown.querySelector('[role="menu"]');
-          
+
           resourcesDropdownButton.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' || e.key === ' ') {
               e.preventDefault();
@@ -560,7 +563,7 @@ const resourcesByCategory = {
 
           // Close dropdown when clicking outside
           document.addEventListener('click', function (e) {
-            var target = e.target;
+            var target = /** @type {Node | null} */ (e.target);
             if (!target || !resourcesDropdown.contains(target)) {
               dropdownMenu?.classList.add('opacity-0', 'invisible');
               dropdownMenu?.classList.remove('opacity-100', 'visible');
@@ -569,6 +572,7 @@ const resourcesByCategory = {
           });
 
           // Close dropdown when pointer leaves after a short delay (roll up when focus moves away)
+          /** @type {ReturnType<typeof setTimeout> | null} */
           var closeTimer = null;
           const closeDelayMs = 400;
           resourcesDropdown.addEventListener('pointerleave', () => {

@@ -1,6 +1,7 @@
 /**
  * D1 helpers for Phase 5: Assessments (view + board record payments, special assessments).
  */
+/// <reference types="@cloudflare/workers-types" />
 
 const ID_LEN = 21;
 

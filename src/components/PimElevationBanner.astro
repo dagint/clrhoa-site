@@ -25,7 +25,7 @@ const { elevatedUntil } = Astro.props;
 <script>
   (function () {
     const timerEl = document.getElementById('pim-elevation-timer');
-    const form = document.getElementById('pim-drop-form');
+    const form = document.getElementById('pim-drop-form') as HTMLFormElement | null;
     const bannerEl = document.getElementById('pim-elevation-banner');
     if (!timerEl || !bannerEl) return;
     const elevatedUntil = parseInt(bannerEl.getAttribute('data-elevated-until') || '0', 10);
@@ -34,14 +34,14 @@ const { elevatedUntil } = Astro.props;
       const now = Date.now();
       const until = typeof elevatedUntil === 'number' ? elevatedUntil : 0;
       if (until <= now) {
-        timerEl.textContent = 'expired';
-        if (form) form.submit();
+        if (timerEl) timerEl.textContent = 'expired';
+        if (form) (form as HTMLFormElement).submit();
         return;
       }
       const sec = Math.floor((until - now) / 1000);
       const m = Math.floor(sec / 60);
       const s = sec % 60;
-      timerEl.textContent = `expires in ${m}:${String(s).padStart(2, '0')}`;
+      if (timerEl) timerEl.textContent = `expires in ${m}:${String(s).padStart(2, '0')}`;
     }
 
     updateTimer();

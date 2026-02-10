@@ -69,10 +69,10 @@ const label = role === 'admin' ? 'Administrator' : role === 'arb_board' ? 'ARB +
       const statusEl = document.getElementById('assume-role-status');
       const errorEl = document.getElementById('assume-role-error');
       const banner = document.querySelector('[data-session-role]');
-      const getCsrf = () => { const el = document.getElementById('assume-role-csrf'); return el?.value ?? form?.getAttribute('data-csrf') ?? ''; };
+      const getCsrf = () => { const el = document.getElementById('assume-role-csrf') as HTMLInputElement | null; return el?.value ?? form?.getAttribute('data-csrf') ?? ''; };
       const isAdmin = banner?.getAttribute('data-is-admin') === 'true';
 
-      function formatCountdown(untilMs) {
+      function formatCountdown(untilMs: number) {
         const now = Date.now();
         const rem = untilMs - now;
         if (rem <= 0) return 'Expired';
@@ -105,7 +105,7 @@ const label = role === 'admin' ? 'Administrator' : role === 'arb_board' ? 'ARB +
         startCountdownTicker();
       }
 
-      function showError(msg) {
+      function showError(msg: string) {
         if (errorEl) {
           errorEl.textContent = msg;
           errorEl.classList.remove('hidden');
@@ -118,7 +118,7 @@ const label = role === 'admin' ? 'Administrator' : role === 'arb_board' ? 'ARB +
         }
       }
 
-      function renderStatus(assumedRole, assumedUntil) {
+      function renderStatus(assumedRole: string | null, assumedUntil: number | null) {
         if (!statusEl) return;
         statusEl.textContent = '';
         const roleLabel = assumedRole === 'board' ? 'Board' : assumedRole === 'arb' ? 'ARB' : null;
@@ -165,7 +165,7 @@ const label = role === 'admin' ? 'Administrator' : role === 'arb_board' ? 'ARB +
         if (assumedUntil != null) startCountdownTicker();
       }
 
-      function renderFormButtons(assumedRole) {
+      function renderFormButtons(assumedRole: string | null) {
         if (!form) return;
         const dropLabel = isAdmin ? 'Return to Admin (view only)' : 'Drop role';
         const csrf = getCsrf();
@@ -198,19 +198,20 @@ const label = role === 'admin' ? 'Administrator' : role === 'arb_board' ? 'ARB +
 
       function bindAssumeRoleButtons() {
         form?.querySelectorAll('.assume-role-btn').forEach((btn) => {
-          btn.addEventListener('click', async function () {
-            const role = btn.getAttribute('data-role') || 'none';
+          const button = btn as HTMLButtonElement;
+          button.addEventListener('click', async function () {
+            const role = button.getAttribute('data-role') || 'none';
             const token = getCsrf();
             clearError();
-            btn.disabled = true;
+            button.disabled = true;
             try {
               const res = await fetch('/api/admin/assume-role', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ role, csrf_token: token }),
               });
-              const data = await res.json();
-              if (res.ok && data && data.success) {
+              const data = (await res.json()) as { success?: boolean; assumed_role?: string | null; assumed_until?: number | null; error?: string };
+              if (res.ok && data?.success) {
                 const newRole = data.assumed_role ?? null;
                 if (newRole === 'arb') {
                   window.location.href = '/portal/arb-dashboard';
@@ -239,11 +240,11 @@ const label = role === 'admin' ? 'Administrator' : role === 'arb_board' ? 'ARB +
                   statusEl.appendChild(p);
                 }
               } else {
-                btn.disabled = false;
+                button.disabled = false;
                 showError(data.error || 'Couldn\'t switch role. Please try again or refresh the page.');
               }
             } catch (e) {
-              btn.disabled = false;
+              button.disabled = false;
               showError('Couldn\'t switch role. Please try again or refresh the page.');
             }
           });

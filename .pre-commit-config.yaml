@@ -1,0 +1,26 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+
+  - repo: https://github.com/psf/black
+    rev: 24.4.2
+    hooks:
+      - id: black
+        language_version: python3.12  # Use your Python version
+
+  # Node-based mirrors (eslint, prettier) removed: they trigger npm pack ERR_INVALID_URL under WSL.
+  # Lint is covered by the local astro-check hook.
+
+  - repo: local
+    hooks:
+      - id: astro-check
+        name: Astro Check
+        entry: npx astro check
+        language: system
+        pass_filenames: false
+        always_run: true
