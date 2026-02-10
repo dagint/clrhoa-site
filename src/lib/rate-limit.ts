@@ -55,7 +55,8 @@ export async function checkRateLimit(
  * Rate limit configuration for different endpoints.
  */
 export const RATE_LIMITS = {
-  '/api/login': { maxRequests: 5, windowSeconds: 15 * 60 }, // 5 attempts per 15 minutes
+  '/api/login': { maxRequests: 5, windowSeconds: 15 * 60 }, // per-email lockout (used in auth.ts)
+  '/api/login:ip': { maxRequests: 20, windowSeconds: 15 * 60 }, // per-IP cap to prevent email enumeration
   '/api/arb-upload': { maxRequests: 10, windowSeconds: 60 * 60 }, // 10 uploads per hour
   '/api/arb-approve': { maxRequests: 100, windowSeconds: 60 }, // 100 requests per minute
   '/api/arb-update': { maxRequests: 20, windowSeconds: 60 }, // 20 updates per minute

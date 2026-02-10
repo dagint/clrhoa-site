@@ -124,15 +124,21 @@ const csrfToken = session?.csrfToken ?? '';
         div.className = 'border-b border-gray-200 pb-2 last:border-0';
         const time = new Date().toLocaleString();
         const ok = entry.ok;
-        div.innerHTML = `<span class="text-gray-500">${time}</span> → To: ${escapeHtml(entry.to)} — ${ok ? '<span class="text-green-700">Sent</span>' : '<span class="text-red-700">Failed</span>' + (entry.error ? ': ' + escapeHtml(entry.error) : '')}`;
+        const timeSpan = document.createElement('span');
+        timeSpan.className = 'text-gray-500';
+        timeSpan.textContent = time;
+        div.appendChild(timeSpan);
+        div.appendChild(document.createTextNode(' \u2192 To: ' + (entry.to || '') + ' \u2014 '));
+        const statusSpan = document.createElement('span');
+        if (ok) {
+          statusSpan.className = 'text-green-700';
+          statusSpan.textContent = 'Sent';
+        } else {
+          statusSpan.className = 'text-red-700';
+          statusSpan.textContent = 'Failed' + (entry.error ? ': ' + entry.error : '');
+        }
+        div.appendChild(statusSpan);
         logEl.insertBefore(div, logEl.firstChild);
-      }
-
-      function escapeHtml(s) {
-        if (s == null) return '';
-        const div = document.createElement('div');
-        div.textContent = s;
-        return div.innerHTML;
       }
 
       form.addEventListener('submit', async (e) => {
@@ -163,18 +169,25 @@ const csrfToken = session?.csrfToken ?? '';
       const envTbody = document.getElementById('env-check-tbody');
       const envMessage = document.getElementById('env-check-message');
       if (envRefreshBtn && envTbody && envMessage) {
-        function escapeHtml(s) {
-          if (s == null) return '';
-          const div = document.createElement('div');
-          div.textContent = s;
-          return div.innerHTML;
-        }
         function renderEnvRows(data) {
+          envTbody.textContent = '';
           const entries = Object.entries(data).sort((a, b) => a[0].localeCompare(b[0]));
-          envTbody.innerHTML = entries.map(([key, status]) => {
-            const statusHtml = status === 'set' ? '<span class="text-green-700 font-medium">Set</span>' : '<span class="text-gray-500">Not set</span>';
-            return `<tr class="border-b border-gray-100"><td class="py-2 px-3 font-mono text-gray-800">${escapeHtml(key)}</td><td class="py-2 px-3">${statusHtml}</td></tr>`;
-          }).join('');
+          entries.forEach(([key, status]) => {
+            const tr = document.createElement('tr');
+            tr.className = 'border-b border-gray-100';
+            const tdKey = document.createElement('td');
+            tdKey.className = 'py-2 px-3 font-mono text-gray-800';
+            tdKey.textContent = key;
+            const tdStatus = document.createElement('td');
+            tdStatus.className = 'py-2 px-3';
+            const statusSpan = document.createElement('span');
+            statusSpan.className = status === 'set' ? 'text-green-700 font-medium' : 'text-gray-500';
+            statusSpan.textContent = status === 'set' ? 'Set' : 'Not set';
+            tdStatus.appendChild(statusSpan);
+            tr.appendChild(tdKey);
+            tr.appendChild(tdStatus);
+            envTbody.appendChild(tr);
+          });
         }
         envRefreshBtn.addEventListener('click', async () => {
           envRefreshBtn.disabled = true;

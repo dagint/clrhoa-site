@@ -11,9 +11,11 @@ const errorMessage =
       ? 'This email is not on the member list. Contact the board if you believe this is an error.'
       : error === 'locked'
         ? `Account temporarily locked due to too many failed login attempts. Please try again in ${minutes || '15'} minutes.`
-        : error === 'invalid' || error === 'config'
-          ? 'Something went wrong. Please try again.'
-          : null;
+        : error === 'too_many_attempts'
+          ? 'Too many login attempts from this device or network. Please try again in 15 minutes.'
+          : error === 'invalid' || error === 'config'
+            ? 'Something went wrong. Please try again.'
+            : null;
 ---
 
 <!doctype html>

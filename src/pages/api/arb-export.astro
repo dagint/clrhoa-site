@@ -9,6 +9,7 @@ export const prerender = false;
 import { getSessionFromCookie, getEffectiveRole } from '../../lib/auth';
 import { listAllArbRequestsFiltered } from '../../lib/arb-db';
 import { escapeHtml } from '../../lib/sanitize';
+import { escapeCsv } from '../../lib/csv-utils';
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
@@ -38,13 +39,6 @@ const format = (url.searchParams.get('format') || 'csv').toLowerCase();
 const validFormat = format === 'html' ? 'html' : 'csv';
 
 const requests = await listAllArbRequestsFiltered(db, { fromDate: fromDate || null, toDate: toDate || null, status: status || null });
-
-function escapeCsv(val: string | null | undefined): string {
-  if (val == null) return '';
-  const s = String(val).trim();
-  if (s.includes('"') || s.includes(',') || s.includes('\n') || s.includes('\r')) return `"${s.replace(/"/g, '""')}"`;
-  return s;
-}
 
 function formatDate(s: string | null | undefined): string {
   if (!s) return '';

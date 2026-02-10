@@ -7,6 +7,7 @@
 export const prerender = false;
 
 import { requireSession, requireDb, jsonResponse } from '../../lib/api-helpers';
+import { verifyCsrfToken } from '../../lib/auth';
 import { createMaintenanceId, insertMaintenanceRequest, MAINTENANCE_CATEGORIES } from '../../lib/maintenance-db';
 import { escapeHtml } from '../../lib/sanitize';
 
@@ -35,6 +36,10 @@ const files: File[] = [];
 
 try {
   const form = await Astro.request.formData();
+  const csrf = form.get('csrf_token') ?? form.get('csrfToken');
+  if (!verifyCsrfToken(session, typeof csrf === 'string' ? csrf : undefined)) {
+    return jsonResponse({ error: 'Invalid security token. Please refresh the page.' }, 403);
+  }
   category = String(form.get('category') ?? '').trim().toLowerCase();
   description = String(form.get('description') ?? '').trim();
   const photoList = form.getAll('photos');

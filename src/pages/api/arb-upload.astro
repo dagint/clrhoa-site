@@ -49,13 +49,6 @@ let session = await getSessionFromCookie(
   ipAddress
 );
 
-// If session validation fails due to fingerprint mismatch, try without fingerprint check
-if (!session && env?.SESSION_SECRET) {
-  session = await getSessionFromCookie(
-    Astro.request.headers.get('cookie') ?? undefined,
-    env.SESSION_SECRET
-  );
-}
 if (!session) {
   return new Response(JSON.stringify({ error: 'Unauthorized' }), {
     status: 401,
@@ -166,41 +159,19 @@ try {
       ipAddress
     );
     if (updatedCookieValue) {
-      // Try with fingerprint first
       let updatedSession = await getSessionFromCookie(
         `${SESSION_COOKIE_NAME}=${updatedCookieValue}`,
         env.SESSION_SECRET,
         userAgent,
         ipAddress
       );
-      // If that fails, try without fingerprint (cookie might have been updated on page load)
-      if (!updatedSession) {
-        updatedSession = await getSessionFromCookie(
-          `${SESSION_COOKIE_NAME}=${updatedCookieValue}`,
-          env.SESSION_SECRET
-        );
-      }
       if (updatedSession?.csrfToken) {
         session = updatedSession;
       }
     }
   }
   
-  // Verify CSRF token - if it fails, try reading session without fingerprint as fallback
-  // This handles cases where page updated cookie but API reads old session due to fingerprint mismatch
-  let csrfValid = verifyCsrfToken(session, csrfToken);
-  if (!csrfValid && env?.SESSION_SECRET && csrfToken) {
-    // Try to get session without fingerprint check (in case cookie was updated on page)
-    const fallbackSession = await getSessionFromCookie(
-      Astro.request.headers.get('cookie') ?? undefined,
-      env.SESSION_SECRET
-    );
-    if (fallbackSession && verifyCsrfToken(fallbackSession, csrfToken)) {
-      session = fallbackSession;
-      csrfValid = true;
-    }
-  }
-  
+  const csrfValid = verifyCsrfToken(session, csrfToken);
   if (!csrfValid) {
     logger.warn('CSRF token validation failed', { 
       hasSessionToken: !!session.csrfToken,
@@ -515,7 +486,7 @@ try {
   logger.error('ARB insertArbRequest failed', { error: String(e) });
   return new Response(
     JSON.stringify({
-      error: 'Could not save request. If testing locally, ensure D1 ARB tables exist (run db:arb:init:local).',
+      error: 'Could not save request. Please try again or contact support if the problem persists.',
     }),
     { status: 500, headers: { 'Content-Type': 'application/json' } }
   );

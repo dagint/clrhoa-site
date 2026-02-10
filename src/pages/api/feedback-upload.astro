@@ -6,7 +6,7 @@
 export const prerender = false;
 
 import { requireSession, jsonResponse } from '../../lib/api-helpers';
-import { getEffectiveRole } from '../../lib/auth';
+import { getEffectiveRole, verifyCsrfToken } from '../../lib/auth';
 
 const auth = await requireSession(Astro);
 if ('response' in auth) return auth.response;
@@ -26,6 +26,10 @@ if (Astro.request.method !== 'POST') {
 let file: File;
 try {
   const form = await Astro.request.formData();
+  const csrf = form.get('csrf_token') ?? form.get('csrfToken');
+  if (!verifyCsrfToken(session, typeof csrf === 'string' ? csrf : undefined)) {
+    return jsonResponse({ error: 'Invalid security token. Please refresh the page.' }, 403);
+  }
   const f = form.get('file');
   if (!(f instanceof File) || f.size === 0) {
     return jsonResponse({ error: 'No file or empty file' }, 400);

@@ -6,6 +6,7 @@
 export const prerender = false;
 
 import { requireSession, requireDb, jsonResponse } from '../../lib/api-helpers';
+import { verifyCsrfToken } from '../../lib/auth';
 import { getMeetingById, setRsvp } from '../../lib/meetings-db';
 
 const auth = await requireSession(Astro);
@@ -26,6 +27,10 @@ try {
   body = ct.includes('application/json') ? await Astro.request.json() : Object.fromEntries(await Astro.request.formData());
 } catch {
   return jsonResponse({ error: 'Invalid body' }, 400);
+}
+const csrf = body.csrf_token ?? body.csrfToken;
+if (!verifyCsrfToken(session, typeof csrf === 'string' ? csrf : undefined)) {
+  return jsonResponse({ error: 'Invalid security token. Please refresh the page.' }, 403);
 }
 
 const meetingId = String(body.meeting_id ?? '').trim();
