@@ -38,9 +38,12 @@ export interface Vendor {
   show_on_public: number;
 }
 
-export async function listVendors(db: D1Database): Promise<Vendor[]> {
+export async function listVendors(db: D1Database, limit = 500, offset = 0): Promise<Vendor[]> {
+  const safeLimit = Math.max(1, Math.min(limit, 1000));
+  const safeOffset = Math.max(0, offset);
   const { results } = await db
-    .prepare(`SELECT ${VENDOR_SELECT} FROM vendors ORDER BY category ASC, name ASC`)
+    .prepare(`SELECT ${VENDOR_SELECT} FROM vendors ORDER BY category ASC, name ASC LIMIT ? OFFSET ?`)
+    .bind(safeLimit, safeOffset)
     .all<Vendor>();
   return results ?? [];
 }

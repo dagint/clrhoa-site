@@ -37,7 +37,9 @@ interface Env {
 type Runtime = import('@astrojs/cloudflare').Runtime<Env>;
 
 declare namespace App {
-  interface Locals extends Runtime {}
+  interface Locals extends Runtime {
+    correlationId?: string;
+  }
 }
 
 /**
@@ -76,7 +78,9 @@ interface Env {
 type Runtime = import('@astrojs/cloudflare').Runtime<Env>;
 
 declare namespace App {
-  interface Locals extends Runtime {}
+  interface Locals extends Runtime {
+    correlationId?: string;
+  }
 }
 
 interface ImportMetaEnv {
@@ -89,7 +93,7 @@ interface ImportMetaEnv {
   readonly SITE?: string;
   /** Optional: ISO date string (e.g. "2025-02-04") used as lastmod for static pages in sitemap.xml. If unset, build time is used. */
   readonly SITE_LAST_MODIFIED?: string;
-  
+
   // Contact information (PII)
   readonly PUBLIC_SECURITY_EMAIL?: string;
   readonly PUBLIC_MAILING_ADDRESS_NAME?: string;
@@ -105,7 +109,7 @@ interface ImportMetaEnv {
   readonly PUBLIC_MEETING_ADDRESS_CITY?: string;
   readonly PUBLIC_MEETING_ADDRESS_STATE?: string;
   readonly PUBLIC_MEETING_ADDRESS_ZIP?: string;
-  
+
   // Waste Management & Recycling
   readonly PUBLIC_TRASH_SCHEDULE?: string;
   readonly PUBLIC_RECYCLING_SCHEDULE?: string;
@@ -117,7 +121,7 @@ interface ImportMetaEnv {
   readonly PUBLIC_WASTE_MANAGEMENT_CONTACT?: string;
   readonly PUBLIC_WASTE_MANAGEMENT_PHONE?: string;
   readonly PUBLIC_WASTE_MANAGEMENT_WEBSITE?: string;
-  
+
   // Dues & Payment Information
   readonly PUBLIC_QUARTERLY_DUES_AMOUNT?: string;
   readonly PUBLIC_PAYMENT_METHODS?: string;
@@ -125,7 +129,7 @@ interface ImportMetaEnv {
   readonly PUBLIC_LATE_FEE_DAYS?: string;
   readonly PUBLIC_PAYMENT_INSTRUCTIONS?: string;
   readonly PUBLIC_PAYMENT_DROP_OFF_LOCATION?: string;
-  
+
   // Water Restrictions
   readonly PUBLIC_WATER_RESTRICTION_SCHEDULE?: string;
   readonly PUBLIC_WATER_RESTRICTION_PHONE?: string;
@@ -133,7 +137,7 @@ interface ImportMetaEnv {
   readonly PUBLIC_WATER_UTILITY_CONTACT?: string;
   readonly PUBLIC_WATER_UTILITY_PHONE?: string;
   readonly PUBLIC_WATER_UTILITY_WEBSITE?: string;
-  
+
   // Social Media (Optional)
   readonly PUBLIC_FACEBOOK_URL?: string;
   readonly PUBLIC_TWITTER_URL?: string;

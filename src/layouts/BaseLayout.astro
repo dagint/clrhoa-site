@@ -3,6 +3,14 @@ import '../styles/tailwind.css';
 import Analytics from '../components/Analytics.astro';
 import FeedbackWidget from '../components/FeedbackWidget.astro';
 import UsageBeacon from '../components/UsageBeacon.astro';
+import {
+  publicMainLinks,
+  resourcesByCategory as getResourcesByCategory,
+  resourceCategoryOrder,
+  resourceCategoryLabels,
+  footerQuickLinks,
+  footerResourceLinks,
+} from '../config/navigation';
 
 interface Props {
   title: string;
@@ -37,40 +45,7 @@ const twitterUrl = import.meta.env.PUBLIC_TWITTER_URL ?? '';
 const instagramUrl = import.meta.env.PUBLIC_INSTAGRAM_URL ?? '';
 const nextdoorUrl = import.meta.env.PUBLIC_NEXTDOOR_URL ?? '';
 
-// Resources dropdown menu items - organized by category
-const resourcesMenuItems = [
-  // Most Frequently Used
-  { name: 'Overview', path: '/resources', category: 'main' },
-  { name: 'Emergency Contacts', path: '/resources/emergency-contacts', category: 'main' },
-  { name: 'FAQ', path: '/resources/faq', category: 'main' },
-
-  // Community Resources
-  { name: 'Local Resources', path: '/resources/local-resources', category: 'community' },
-  { name: 'Internet Services', path: '/resources/internet-services', category: 'community' },
-  { name: 'Vendor List', path: '/resources/vendors', category: 'community' },
-  { name: 'Community Map', path: '/resources/map', category: 'community' },
-
-  // Safety & Preparedness
-  { name: 'Hurricane Preparedness', path: '/resources/hurricane', category: 'safety' },
-  { name: 'Wildlife Safety', path: '/resources/wildlife-safety', category: 'safety' },
-  { name: 'Water Restrictions', path: '/resources/water-restrictions', category: 'safety' },
-
-  // Legal & Compliance
-  { name: 'Florida HOA Law', path: '/resources/law', category: 'legal' },
-  { name: 'Flood Insurance', path: '/resources/flood-insurance', category: 'legal' },
-
-  // Maintenance
-  { name: 'Pest Control', path: '/resources/pest-control', category: 'maintenance' },
-];
-
-// Group resources by category for better organization
-const resourcesByCategory = {
-  main: resourcesMenuItems.filter(item => item.category === 'main'),
-  community: resourcesMenuItems.filter(item => item.category === 'community'),
-  safety: resourcesMenuItems.filter(item => item.category === 'safety'),
-  legal: resourcesMenuItems.filter(item => item.category === 'legal'),
-  maintenance: resourcesMenuItems.filter(item => item.category === 'maintenance'),
-};
+const resourcesByCategory = getResourcesByCategory();
 ---
 
 <!doctype html>
@@ -162,10 +137,9 @@ const resourcesByCategory = {
             Crooked Lake Reserve HOA
           </a>
           <nav class="hidden md:flex space-x-6 items-center">
-            <a href="/" class={`text-lg font-medium transition-colors ${isActive('/') ? 'text-clr-green border-b-2 border-clr-green pb-1' : 'text-gray-700 hover:text-clr-green'}`}>Home</a>
-            <a href="/documents" class={`text-lg font-medium transition-colors ${isActive('/documents') ? 'text-clr-green border-b-2 border-clr-green pb-1' : 'text-gray-700 hover:text-clr-green'}`}>Documents</a>
-            <a href="/dues" class={`text-lg font-medium transition-colors ${isActive('/dues') ? 'text-clr-green border-b-2 border-clr-green pb-1' : 'text-gray-700 hover:text-clr-green'}`}>Dues</a>
-            <a href="/board" class={`text-lg font-medium transition-colors ${isActive('/board') ? 'text-clr-green border-b-2 border-clr-green pb-1' : 'text-gray-700 hover:text-clr-green'}`}>Board</a>
+            {publicMainLinks.filter(l => l.href !== '/news').map((link) => (
+              <a href={link.href} class={`text-lg font-medium transition-colors ${isActive(link.href) ? 'text-clr-green border-b-2 border-clr-green pb-1' : 'text-gray-700 hover:text-clr-green'}`}>{link.label}</a>
+            ))}
 
             <!-- Resources Dropdown -->
             <div class="relative group" id="resources-dropdown">
@@ -187,94 +161,31 @@ const resourcesByCategory = {
                 aria-labelledby="resources-dropdown-button"
               >
                 <div class="py-2 max-h-96 overflow-y-auto">
-                  {/* Most Frequently Used */}
-                  {resourcesByCategory.main.length > 0 && (
-                    <>
-                      <div class="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Most Used</div>
-                      {resourcesByCategory.main.map((item) => (
-                        <a
-                          href={item.path}
-                          class={`block px-4 py-2 text-sm transition-colors font-body ${isActive(item.path) ? 'bg-clr-beige/30 text-clr-green font-semibold' : 'text-gray-700 hover:bg-clr-beige/30 hover:text-clr-green'}`}
-                          role="menuitem"
-                        >
-                          {item.name}
-                        </a>
-                      ))}
-                      <div class="border-t border-gray-100 my-1"></div>
-                    </>
-                  )}
-
-                  {/* Community Resources */}
-                  {resourcesByCategory.community.length > 0 && (
-                    <>
-                      <div class="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Community</div>
-                      {resourcesByCategory.community.map((item) => (
-                        <a
-                          href={item.path}
-                          class={`block px-4 py-2 text-sm transition-colors font-body ${isActive(item.path) ? 'bg-clr-beige/30 text-clr-green font-semibold' : 'text-gray-700 hover:bg-clr-beige/30 hover:text-clr-green'}`}
-                          role="menuitem"
-                        >
-                          {item.name}
-                        </a>
-                      ))}
-                      <div class="border-t border-gray-100 my-1"></div>
-                    </>
-                  )}
-
-                  {/* Safety & Preparedness */}
-                  {resourcesByCategory.safety.length > 0 && (
-                    <>
-                      <div class="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Safety</div>
-                      {resourcesByCategory.safety.map((item) => (
-                        <a
-                          href={item.path}
-                          class={`block px-4 py-2 text-sm transition-colors font-body ${isActive(item.path) ? 'bg-clr-beige/30 text-clr-green font-semibold' : 'text-gray-700 hover:bg-clr-beige/30 hover:text-clr-green'}`}
-                          role="menuitem"
-                        >
-                          {item.name}
-                        </a>
-                      ))}
-                      <div class="border-t border-gray-100 my-1"></div>
-                    </>
-                  )}
-
-                  {/* Legal & Compliance */}
-                  {resourcesByCategory.legal.length > 0 && (
-                    <>
-                      <div class="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Legal</div>
-                      {resourcesByCategory.legal.map((item) => (
-                        <a
-                          href={item.path}
-                          class={`block px-4 py-2 text-sm transition-colors font-body ${isActive(item.path) ? 'bg-clr-beige/30 text-clr-green font-semibold' : 'text-gray-700 hover:bg-clr-beige/30 hover:text-clr-green'}`}
-                          role="menuitem"
-                        >
-                          {item.name}
-                        </a>
-                      ))}
-                      {resourcesByCategory.maintenance.length > 0 && <div class="border-t border-gray-100 my-1"></div>}
-                    </>
-                  )}
-
-                  {/* Maintenance */}
-                  {resourcesByCategory.maintenance.length > 0 && (
-                    <>
-                      <div class="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Maintenance</div>
-                      {resourcesByCategory.maintenance.map((item) => (
-                        <a
-                          href={item.path}
-                          class={`block px-4 py-2 text-sm transition-colors font-body ${isActive(item.path) ? 'bg-clr-beige/30 text-clr-green font-semibold' : 'text-gray-700 hover:bg-clr-beige/30 hover:text-clr-green'}`}
-                          role="menuitem"
-                        >
-                          {item.name}
-                        </a>
-                      ))}
-                    </>
-                  )}
+                  {resourceCategoryOrder.map((cat, idx) => {
+                    const items = resourcesByCategory[cat];
+                    return items.length > 0 && (
+                      <>
+                        <div class="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">{resourceCategoryLabels[cat]}</div>
+                        {items.map((item) => (
+                          <a
+                            href={item.href}
+                            class={`block px-4 py-2 text-sm transition-colors font-body ${isActive(item.href) ? 'bg-clr-beige/30 text-clr-green font-semibold' : 'text-gray-700 hover:bg-clr-beige/30 hover:text-clr-green'}`}
+                            role="menuitem"
+                          >
+                            {item.label}
+                          </a>
+                        ))}
+                        {idx < resourceCategoryOrder.length - 1 && <div class="border-t border-gray-100 my-1"></div>}
+                      </>
+                    );
+                  })}
                 </div>
               </div>
             </div>
 
-            <a href="/news" class={`text-lg font-medium transition-colors ${isActive('/news') ? 'text-clr-green border-b-2 border-clr-green pb-1' : 'text-gray-700 hover:text-clr-green'}`}>News</a>
+            {publicMainLinks.filter(l => l.href === '/news').map((link) => (
+              <a href={link.href} class={`text-lg font-medium transition-colors ${isActive(link.href) ? 'text-clr-green border-b-2 border-clr-green pb-1' : 'text-gray-700 hover:text-clr-green'}`}>{link.label}</a>
+            ))}
 
             <!-- Quick Contact Button -->
             <a
@@ -309,10 +220,9 @@ const resourcesByCategory = {
           </div>
         </div>
         <nav id="mobile-menu" class="hidden md:hidden pb-4 pt-4 border-t border-gray-200 space-y-1" role="navigation" aria-label="Mobile navigation">
-          <a href="/" class={`block text-lg font-medium transition-colors py-3 px-2 rounded-lg ${isActive('/') ? 'bg-clr-beige/30 text-clr-green font-semibold' : 'text-gray-700 hover:bg-clr-beige/20 hover:text-clr-green'}`}>Home</a>
-          <a href="/documents" class={`block text-lg font-medium transition-colors py-3 px-2 rounded-lg ${isActive('/documents') ? 'bg-clr-beige/30 text-clr-green font-semibold' : 'text-gray-700 hover:bg-clr-beige/20 hover:text-clr-green'}`}>Documents</a>
-          <a href="/dues" class={`block text-lg font-medium transition-colors py-3 px-2 rounded-lg ${isActive('/dues') ? 'bg-clr-beige/30 text-clr-green font-semibold' : 'text-gray-700 hover:bg-clr-beige/20 hover:text-clr-green'}`}>Dues</a>
-          <a href="/board" class={`block text-lg font-medium transition-colors py-3 px-2 rounded-lg ${isActive('/board') ? 'bg-clr-beige/30 text-clr-green font-semibold' : 'text-gray-700 hover:bg-clr-beige/20 hover:text-clr-green'}`}>Board</a>
+          {publicMainLinks.filter(l => l.href !== '/news').map((link) => (
+            <a href={link.href} class={`block text-lg font-medium transition-colors py-3 px-2 rounded-lg ${isActive(link.href) ? 'bg-clr-beige/30 text-clr-green font-semibold' : 'text-gray-700 hover:bg-clr-beige/20 hover:text-clr-green'}`}>{link.label}</a>
+          ))}
 
           <!-- Mobile Resources Dropdown -->
           <div>
@@ -329,84 +239,28 @@ const resourcesByCategory = {
               </svg>
             </button>
             <div id="mobile-resources-submenu" class="hidden pl-4 space-y-1 mt-1">
-              {/* Most Frequently Used */}
-              {resourcesByCategory.main.length > 0 && (
-                <>
-                  <div class="px-2 py-1 text-xs font-semibold text-gray-500 uppercase tracking-wider">Most Used</div>
-                  {resourcesByCategory.main.map((item) => (
-                    <a
-                      href={item.path}
-                      class={`block text-base transition-colors py-2 px-2 rounded-lg font-body mobile-resources-link ${isActive(item.path) ? 'bg-clr-beige/30 text-clr-green font-semibold' : 'text-gray-600 hover:bg-clr-beige/20 hover:text-clr-green'}`}
-                    >
-                      {item.name}
-                    </a>
-                  ))}
-                </>
-              )}
-
-              {/* Community Resources */}
-              {resourcesByCategory.community.length > 0 && (
-                <>
-                  <div class="px-2 py-1 text-xs font-semibold text-gray-500 uppercase tracking-wider mt-2">Community</div>
-                  {resourcesByCategory.community.map((item) => (
-                    <a
-                      href={item.path}
-                      class={`block text-base transition-colors py-2 px-2 rounded-lg font-body mobile-resources-link ${isActive(item.path) ? 'bg-clr-beige/30 text-clr-green font-semibold' : 'text-gray-600 hover:bg-clr-beige/20 hover:text-clr-green'}`}
-                    >
-                      {item.name}
-                    </a>
-                  ))}
-                </>
-              )}
-
-              {/* Safety & Preparedness */}
-              {resourcesByCategory.safety.length > 0 && (
-                <>
-                  <div class="px-2 py-1 text-xs font-semibold text-gray-500 uppercase tracking-wider mt-2">Safety</div>
-                  {resourcesByCategory.safety.map((item) => (
-                    <a
-                      href={item.path}
-                      class={`block text-base transition-colors py-2 px-2 rounded-lg font-body mobile-resources-link ${isActive(item.path) ? 'bg-clr-beige/30 text-clr-green font-semibold' : 'text-gray-600 hover:bg-clr-beige/20 hover:text-clr-green'}`}
-                    >
-                      {item.name}
-                    </a>
-                  ))}
-                </>
-              )}
-
-              {/* Legal & Compliance */}
-              {resourcesByCategory.legal.length > 0 && (
-                <>
-                  <div class="px-2 py-1 text-xs font-semibold text-gray-500 uppercase tracking-wider mt-2">Legal</div>
-                  {resourcesByCategory.legal.map((item) => (
-                    <a
-                      href={item.path}
-                      class={`block text-base transition-colors py-2 px-2 rounded-lg font-body mobile-resources-link ${isActive(item.path) ? 'bg-clr-beige/30 text-clr-green font-semibold' : 'text-gray-600 hover:bg-clr-beige/20 hover:text-clr-green'}`}
-                    >
-                      {item.name}
-                    </a>
-                  ))}
-                </>
-              )}
-
-              {/* Maintenance */}
-              {resourcesByCategory.maintenance.length > 0 && (
-                <>
-                  <div class="px-2 py-1 text-xs font-semibold text-gray-500 uppercase tracking-wider mt-2">Maintenance</div>
-                  {resourcesByCategory.maintenance.map((item) => (
-                    <a
-                      href={item.path}
-                      class={`block text-base transition-colors py-2 px-2 rounded-lg font-body mobile-resources-link ${isActive(item.path) ? 'bg-clr-beige/30 text-clr-green font-semibold' : 'text-gray-600 hover:bg-clr-beige/20 hover:text-clr-green'}`}
-                    >
-                      {item.name}
-                    </a>
-                  ))}
-                </>
-              )}
+              {resourceCategoryOrder.map((cat, idx) => {
+                const items = resourcesByCategory[cat];
+                return items.length > 0 && (
+                  <>
+                    <div class={`px-2 py-1 text-xs font-semibold text-gray-500 uppercase tracking-wider${idx > 0 ? ' mt-2' : ''}`}>{resourceCategoryLabels[cat]}</div>
+                    {items.map((item) => (
+                      <a
+                        href={item.href}
+                        class={`block text-base transition-colors py-2 px-2 rounded-lg font-body mobile-resources-link ${isActive(item.href) ? 'bg-clr-beige/30 text-clr-green font-semibold' : 'text-gray-600 hover:bg-clr-beige/20 hover:text-clr-green'}`}
+                      >
+                        {item.label}
+                      </a>
+                    ))}
+                  </>
+                );
+              })}
             </div>
           </div>
 
-          <a href="/news" class={`block text-lg font-medium transition-colors py-3 px-2 rounded-lg ${isActive('/news') ? 'bg-clr-beige/30 text-clr-green font-semibold' : 'text-gray-700 hover:bg-clr-beige/20 hover:text-clr-green'}`}>News</a>
+          {publicMainLinks.filter(l => l.href === '/news').map((link) => (
+            <a href={link.href} class={`block text-lg font-medium transition-colors py-3 px-2 rounded-lg ${isActive(link.href) ? 'bg-clr-beige/30 text-clr-green font-semibold' : 'text-gray-700 hover:bg-clr-beige/20 hover:text-clr-green'}`}>{link.label}</a>
+          ))}
         </nav>
       </div>
     </header>
@@ -604,22 +458,17 @@ const resourcesByCategory = {
           <div>
             <h3 class="text-lg font-heading font-semibold text-white mb-4">Quick Links</h3>
             <ul class="space-y-2 text-sm font-body">
-              <li><a href="/documents" class="hover:text-clr-beige transition-colors">Documents</a></li>
-              <li><a href="/dues" class="hover:text-clr-beige transition-colors">Dues & Payment</a></li>
-              <li><a href="/board" class="hover:text-clr-beige transition-colors">Board & Committees</a></li>
-              <li><a href="/news" class="hover:text-clr-beige transition-colors">News</a></li>
-              <li><a href="/arb-process" class="hover:text-clr-beige transition-colors">ARB Process</a></li>
-              <li><a href="/voting" class="hover:text-clr-beige transition-colors">Voting & Proxy</a></li>
+              {footerQuickLinks.map((link) => (
+                <li><a href={link.href} class="hover:text-clr-beige transition-colors">{link.label}</a></li>
+              ))}
             </ul>
           </div>
           <div>
             <h3 class="text-lg font-heading font-semibold text-white mb-4">Resources</h3>
             <ul class="space-y-2 text-sm font-body">
-              <li><a href="/resources" class="hover:text-clr-beige transition-colors">Resources Overview</a></li>
-              <li><a href="/resources/emergency-contacts" class="hover:text-clr-beige transition-colors">Emergency Contacts</a></li>
-              <li><a href="/resources/faq" class="hover:text-clr-beige transition-colors">FAQ</a></li>
-              <li><a href="/contact" class="hover:text-clr-beige transition-colors">Contact Us</a></li>
-              <li><a href="/about" class="hover:text-clr-beige transition-colors">About</a></li>
+              {footerResourceLinks.map((link) => (
+                <li><a href={link.href} class="hover:text-clr-beige transition-colors">{link.label}</a></li>
+              ))}
             </ul>
           </div>
         </div>

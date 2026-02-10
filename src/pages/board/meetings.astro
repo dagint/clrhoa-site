@@ -3,17 +3,42 @@ export const prerender = false;
 
 import BoardLayout from '../../layouts/BoardLayout.astro';
 import { getBoardContext } from '../../lib/board-context';
+import { isBoardOnly } from '../../lib/auth';
 import { listAllMeetings } from '../../lib/meetings-db';
 import { listArbRequestsByHousehold } from '../../lib/arb-db';
 
 const ctx = await getBoardContext(Astro);
 if ('redirect' in ctx) return Astro.redirect(ctx.redirect);
 const { env, session, effectiveRole } = ctx;
-const isBoard = effectiveRole === 'board' || effectiveRole === 'admin' || effectiveRole === 'arb_board';
+const isBoard = isBoardOnly(effectiveRole) || effectiveRole === 'admin';
 if (!isBoard) return Astro.redirect('/portal/dashboard');
 
+const MEETINGS_PAGE_SIZES = [10, 25, 50, 100] as const;
+const DEFAULT_MEETINGS_PAGE_SIZE = 25;
+const url = Astro.url;
+const getPage = (): number => {
+  const p = url.searchParams.get('page');
+  const n = p ? parseInt(p, 10) : 1;
+  return Number.isNaN(n) || n < 1 ? 1 : Math.min(n, 1000);
+};
+const getLimit = (): number => {
+  const p = url.searchParams.get('limit');
+  const n = p ? parseInt(p, 10) : DEFAULT_MEETINGS_PAGE_SIZE;
+  return MEETINGS_PAGE_SIZES.includes(n as (typeof MEETINGS_PAGE_SIZES)[number]) ? n : DEFAULT_MEETINGS_PAGE_SIZE;
+};
+const page = getPage();
+const pageSize = getLimit();
+
+function meetingsPageUrl(value: number): string {
+  const u = new URL(url);
+  if (value <= 1) u.searchParams.delete('page');
+  else u.searchParams.set('page', String(value));
+  if (pageSize !== DEFAULT_MEETINGS_PAGE_SIZE) u.searchParams.set('limit', String(pageSize));
+  return u.pathname + u.search;
+}
+
 const db = env?.DB;
-const meetings = db ? await listAllMeetings(db) : [];
+const meetings = db ? await listAllMeetings(db, pageSize, (page - 1) * pageSize) : [];
 const allRequests = db ? await listArbRequestsByHousehold(db, session.email) : [];
 const draftCount = allRequests.filter((r) => r.status === 'pending').length;
 
@@ -91,11 +116,30 @@ function formatDateTime(dt: string): string {
         </form>
       </div>
 
-      {meetings.length === 0 ? (
+      {meetings.length === 0 && page === 1 ? (
         <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center text-gray-500">
           No meetings yet. Click &quot;New meeting&quot; to add one.
         </div>
       ) : (
+        <>
+        <div class="flex flex-wrap items-center gap-2 mb-4">
+          <label for="meetings-per-page" class="text-sm text-gray-600">Per page:</label>
+          <select id="meetings-per-page" name="limit" class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-700 focus:border-clr-green focus:outline-none focus:ring-1 focus:ring-clr-green" aria-label="Entries per page">
+            {MEETINGS_PAGE_SIZES.map((size) => (
+              <option value={size} selected={pageSize === size}>{size}</option>
+            ))}
+          </select>
+        </div>
+        <script is:inline>
+          document.getElementById('meetings-per-page')?.addEventListener('change', function () {
+            const limit = this.value;
+            const u = new URL(window.location.href);
+            u.searchParams.set('limit', limit);
+            u.searchParams.delete('page');
+            if (limit === '25') u.searchParams.delete('limit');
+            window.location.href = u.pathname + u.search;
+          });
+        </script>
         <ul class="space-y-4">
           {meetings.map((m) => (
             <li class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex flex-wrap items-center justify-between gap-3">
@@ -138,6 +182,16 @@ function formatDateTime(dt: string): string {
             </li>
           ))}
         </ul>
+        {meetings.length > 0 && (
+          <nav class="flex items-center justify-between gap-2 py-2 px-3 mt-4 border-t border-gray-200 bg-gray-50 text-sm" aria-label="Meetings pagination">
+            <span class="text-gray-600">Page {page}</span>
+            <div class="flex gap-2">
+              {page > 1 && <a href={meetingsPageUrl(page - 1)} class="text-clr-green hover:underline font-medium">Previous</a>}
+              {meetings.length === pageSize && <a href={meetingsPageUrl(page + 1)} class="text-clr-green hover:underline font-medium">Next</a>}
+            </div>
+          </nav>
+        )}
+        </>
       )}
 
 <script is:inline>

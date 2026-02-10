@@ -8,7 +8,7 @@
 export const prerender = false;
 
 import { requireSession, requireDb, jsonResponse } from '../../lib/api-helpers';
-import { getEffectiveRole, verifyCsrfToken } from '../../lib/auth';
+import { getEffectiveRole, verifyCsrfToken, isBoardOnly } from '../../lib/auth';
 import {
   listActiveFeedbackDocs,
   listAllFeedbackDocs,
@@ -36,7 +36,7 @@ const { db } = dbResult;
 
 const env = Astro.locals.runtime?.env as NotificationEnv | undefined;
 const effectiveRole = getEffectiveRole(session);
-const isBoard = effectiveRole === 'board' || effectiveRole === 'admin' || effectiveRole === 'arb_board';
+const isBoard = isBoardOnly(effectiveRole) || effectiveRole === 'admin';
 const url = new URL(Astro.request.url);
 
 if (Astro.request.method === 'GET') {

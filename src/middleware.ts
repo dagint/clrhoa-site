@@ -9,6 +9,7 @@
 import type { MiddlewareHandler } from 'astro';
 import { getSessionFromCookie, SESSION_COOKIE_NAME, isElevatedRole, getEffectiveRole } from './lib/auth';
 import { getOwnerByEmail, getPhonesArray } from './lib/directory-db';
+import { generateCorrelationId } from './lib/logging';
 
 /** Admin accounts (e.g. service providers) are not required to have an address in the directory. */
 function isProfileComplete(
@@ -45,6 +46,17 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
   if (!hasHeaders) {
     return await next();
   }
+
+  // Generate correlation ID for request tracing (check for existing one from upstream, e.g., Cloudflare)
+  const existingCorrelationId = context.request.headers.get('X-Correlation-ID') ||
+                                 context.request.headers.get('CF-Ray') ||
+                                 null;
+  const correlationId = existingCorrelationId || generateCorrelationId();
+
+  // Store correlation ID in context.locals for access throughout the request
+  // Note: context.locals is initialized by Astro with runtime property, so we just add correlationId
+  context.locals.correlationId = correlationId;
+
   const env = context.locals.runtime?.env;
   const cookieHeader = context.request.headers.get('cookie') ?? undefined;
 
@@ -143,6 +155,15 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
     return response;
   }
 
+  // Add correlation ID to response headers for client-side tracing
+  try {
+    if (correlationId) {
+      response.headers.set('X-Correlation-ID', correlationId);
+    }
+  } catch (_) {
+    // Non-fatal: correlation ID header is optional
+  }
+
   try {
     // Ensure HTML responses declare UTF-8 so special characters render correctly
     const contentType = response.headers.get('Content-Type');
@@ -161,12 +182,12 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
     response.headers.set('X-XSS-Protection', '1; mode=block');
     response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
     response.headers.set('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
-    
+
     // HSTS - Only set for HTTPS (Cloudflare handles this, but good to have)
     if (context.url.protocol === 'https:') {
       response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
     }
-    
+
     // Content Security Policy
     // form-action: StaticForms (contact form); script-src/frame-src: reCAPTCHA (optional)
     // frame-ancestors: 'self' so portal can embed file-view in iframes; use 'none' for all other routes
@@ -185,13 +206,13 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
       `frame-ancestors ${frameAncestors}`,
       "upgrade-insecure-requests",
     ].join('; ');
-    
+
     response.headers.set('Content-Security-Policy', csp);
   } catch (error) {
     // If setting headers fails (e.g., during static generation), return response as-is
     // Headers will be set at runtime or via Cloudflare configuration
     console.warn('Failed to set security headers in middleware:', error);
   }
-  
+
   return response;
 };

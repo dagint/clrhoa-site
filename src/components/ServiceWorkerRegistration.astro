@@ -1,0 +1,64 @@
+---
+/**
+ * Service Worker registration for PWA offline support.
+ * Registers the service worker and handles updates.
+ */
+---
+
+<script is:inline>
+  (function () {
+    if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) {
+      return; // Service workers not supported
+    }
+
+    const SW_URL = '/sw.js';
+    const SW_VERSION = 'v1'; // Update this when service worker changes
+
+    // Register service worker
+    window.addEventListener('load', function () {
+      navigator.serviceWorker
+        .register(SW_URL, { scope: '/' })
+        .then(function (registration) {
+          console.log('[SW] Service Worker registered:', registration.scope);
+
+          // Check for updates periodically
+          setInterval(function () {
+            registration.update();
+          }, 60 * 60 * 1000); // Check every hour
+
+          // Handle updates
+          registration.addEventListener('updatefound', function () {
+            const newWorker = registration.installing;
+            if (!newWorker) return;
+
+            newWorker.addEventListener('statechange', function () {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                // New service worker available
+                console.log('[SW] New service worker available');
+                // Optionally show a notification to the user
+                // For now, we'll just log it - the new SW will activate on next page load
+              }
+            });
+          });
+        })
+        .catch(function (error) {
+          console.warn('[SW] Service Worker registration failed:', error);
+        });
+
+      // Handle service worker controller change (new SW activated)
+      navigator.serviceWorker.addEventListener('controllerchange', function () {
+        console.log('[SW] New service worker activated');
+        // Optionally reload the page to get the latest version
+        // window.location.reload();
+      });
+    });
+
+    // Handle messages from service worker
+    navigator.serviceWorker.addEventListener('message', function (event) {
+      if (event.data && event.data.type === 'SW_UPDATED') {
+        console.log('[SW] Update available');
+        // Optionally show a notification to the user
+      }
+    });
+  })();
+</script>

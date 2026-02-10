@@ -9,13 +9,40 @@ const ctx = await getBoardContext(Astro);
 if ('redirect' in ctx) return Astro.redirect(ctx.redirect);
 const { env, session, effectiveRole } = ctx;
 
-const db = env?.DB;
-const q = Astro.url.searchParams;
+const ADMIN_FEEDBACK_PAGE_SIZES = [10, 25, 50, 100] as const;
+const DEFAULT_ADMIN_FEEDBACK_PAGE_SIZE = 25;
+const url = Astro.url;
+const q = url.searchParams;
 const from = q.get('from') ?? '';
 const to = q.get('to') ?? '';
 const thumbsParam = q.get('thumbs') ?? '';
 const urlContains = q.get('url') ?? '';
+const getPage = (): number => {
+  const p = q.get('page');
+  const n = p ? parseInt(p, 10) : 1;
+  return Number.isNaN(n) || n < 1 ? 1 : Math.min(n, 1000);
+};
+const getLimit = (): number => {
+  const p = q.get('limit');
+  const n = p ? parseInt(p, 10) : DEFAULT_ADMIN_FEEDBACK_PAGE_SIZE;
+  return ADMIN_FEEDBACK_PAGE_SIZES.includes(n as (typeof ADMIN_FEEDBACK_PAGE_SIZES)[number]) ? n : DEFAULT_ADMIN_FEEDBACK_PAGE_SIZE;
+};
+const page = getPage();
+const pageSize = getLimit();
 
+function adminFeedbackPageUrl(value: number): string {
+  const u = new URL(url);
+  if (value <= 1) u.searchParams.delete('page');
+  else u.searchParams.set('page', String(value));
+  if (pageSize !== DEFAULT_ADMIN_FEEDBACK_PAGE_SIZE) u.searchParams.set('limit', String(pageSize));
+  if (from.trim()) u.searchParams.set('from', from.trim());
+  if (to.trim()) u.searchParams.set('to', to.trim());
+  if (thumbsParam === '1' || thumbsParam === '-1') u.searchParams.set('thumbs', thumbsParam);
+  if (urlContains.trim()) u.searchParams.set('url', urlContains.trim());
+  return u.pathname + u.search;
+}
+
+const db = env?.DB;
 const thumbsFilter = thumbsParam === '1' ? 1 : thumbsParam === '-1' ? -1 : undefined;
 const feedback = db
   ? await listSiteFeedback(db, {
@@ -23,7 +50,8 @@ const feedback = db
       to: to.trim() || undefined,
       thumbs: thumbsFilter,
       urlContains: urlContains.trim() || undefined,
-      limit: 500,
+      limit: pageSize,
+      offset: (page - 1) * pageSize,
     })
   : [];
 
@@ -76,10 +104,30 @@ const csvHref = `/api/site-feedback?${csvParams.toString()}`;
     </a>
   </div>
 
+  <div class="flex flex-wrap items-center gap-2 mb-4">
+    <label for="admin-feedback-per-page" class="text-sm text-gray-600">Per page:</label>
+    <select id="admin-feedback-per-page" name="limit" class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-700 focus:border-clr-green focus:outline-none focus:ring-1 focus:ring-clr-green" aria-label="Entries per page">
+      {ADMIN_FEEDBACK_PAGE_SIZES.map((size) => (
+        <option value={size} selected={pageSize === size}>{size}</option>
+      ))}
+    </select>
+  </div>
+  <script is:inline>
+    document.getElementById('admin-feedback-per-page')?.addEventListener('change', function () {
+      const limit = this.value;
+      const u = new URL(window.location.href);
+      u.searchParams.set('limit', limit);
+      u.searchParams.delete('page');
+      if (limit === '25') u.searchParams.delete('limit');
+      window.location.href = u.pathname + u.search;
+    });
+  </script>
+
   <div class="rounded-xl border border-gray-200 bg-white overflow-hidden">
-    {feedback.length === 0 ? (
+    {feedback.length === 0 && page === 1 ? (
       <p class="p-6 text-gray-500">No feedback matching the filters.</p>
     ) : (
+      <>
       <div class="overflow-x-auto">
         <table class="w-full text-sm">
           <thead class="bg-gray-50 border-b border-gray-200">
@@ -106,6 +154,16 @@ const csvHref = `/api/site-feedback?${csvParams.toString()}`;
           </tbody>
         </table>
       </div>
+      {feedback.length > 0 && (
+        <nav class="flex items-center justify-between gap-2 py-2 px-3 border-t border-gray-200 bg-gray-50 text-sm" aria-label="Feedback pagination">
+          <span class="text-gray-600">Page {page}</span>
+          <div class="flex gap-2">
+            {page > 1 && <a href={adminFeedbackPageUrl(page - 1)} class="text-clr-green hover:underline font-medium">Previous</a>}
+            {feedback.length === pageSize && <a href={adminFeedbackPageUrl(page + 1)} class="text-clr-green hover:underline font-medium">Next</a>}
+          </div>
+        </nav>
+      )}
+      </>
     )}
   </div>
 </BoardLayout>

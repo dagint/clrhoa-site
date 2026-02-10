@@ -8,6 +8,7 @@ import '../styles/tailwind.css';
 import GlobalSearch from '../components/GlobalSearch.astro';
 import FeedbackWidget from '../components/FeedbackWidget.astro';
 import UsageBeacon from '../components/UsageBeacon.astro';
+import ServiceWorkerRegistration from '../components/ServiceWorkerRegistration.astro';
 
 interface Props {
   title?: string;
@@ -34,5 +35,6 @@ const { title = 'Member Portal | Crooked Lake Reserve HOA' } = Astro.props;
     </div>
     <FeedbackWidget />
     <UsageBeacon />
+    <ServiceWorkerRegistration />
   </body>
 </html>

@@ -12,6 +12,7 @@ import { insertLoginHistory } from '../../lib/login-history-db';
 import { createLogger, maskEmail } from '../../lib/logging';
 import { getSecurityMonitor } from '../../lib/monitoring';
 import { checkRateLimit, getRateLimitConfig } from '../../lib/rate-limit';
+import { getCorrelationId } from '../../lib/api-helpers';
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
@@ -19,7 +20,8 @@ const kv = env?.CLOURHOA_USERS;
 const rateLimitKv = env?.KV; // For login lockout tracking
 const db = env?.DB;
 const secret = env?.SESSION_SECRET;
-const logger = createLogger({ endpoint: '/api/login' });
+const correlationId = getCorrelationId(Astro) || 'unknown';
+const logger = createLogger({ endpoint: '/api/login', correlationId });
 const securityMonitor = getSecurityMonitor();
 
 if (Astro.request.method !== 'POST') {

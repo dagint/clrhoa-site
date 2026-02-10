@@ -51,11 +51,14 @@ export async function listActiveFeedbackDocs(db: D1Database): Promise<FeedbackDo
 }
 
 /** List all feedback docs for board (newest first). */
-export async function listAllFeedbackDocs(db: D1Database): Promise<FeedbackDoc[]> {
+export async function listAllFeedbackDocs(db: D1Database, limit = 500, offset = 0): Promise<FeedbackDoc[]> {
+  const safeLimit = Math.max(1, Math.min(limit, 1000));
+  const safeOffset = Math.max(0, offset);
   const { results } = await db
     .prepare(
-      'SELECT id, title, description, r2_key, deadline, created_by, created FROM feedback_docs ORDER BY created DESC'
+      'SELECT id, title, description, r2_key, deadline, created_by, created FROM feedback_docs ORDER BY created DESC LIMIT ? OFFSET ?'
     )
+    .bind(safeLimit, safeOffset)
     .all<FeedbackDoc>();
   return results ?? [];
 }

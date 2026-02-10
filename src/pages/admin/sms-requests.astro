@@ -9,9 +9,33 @@ const ctx = await getBoardContext(Astro);
 if ('redirect' in ctx) return Astro.redirect(ctx.redirect);
 const { env, session, effectiveRole } = ctx;
 
+const ADMIN_SMS_PAGE_SIZES = [10, 25, 50, 100] as const;
+const DEFAULT_ADMIN_SMS_PAGE_SIZE = 25;
+const url = Astro.url;
+const getPage = (): number => {
+  const p = url.searchParams.get('page');
+  const n = p ? parseInt(p, 10) : 1;
+  return Number.isNaN(n) || n < 1 ? 1 : Math.min(n, 1000);
+};
+const getLimit = (): number => {
+  const p = url.searchParams.get('limit');
+  const n = p ? parseInt(p, 10) : DEFAULT_ADMIN_SMS_PAGE_SIZE;
+  return ADMIN_SMS_PAGE_SIZES.includes(n as (typeof ADMIN_SMS_PAGE_SIZES)[number]) ? n : DEFAULT_ADMIN_SMS_PAGE_SIZE;
+};
+const page = getPage();
+const pageSize = getLimit();
+
+function adminSmsPageUrl(value: number): string {
+  const u = new URL(url);
+  if (value <= 1) u.searchParams.delete('page');
+  else u.searchParams.set('page', String(value));
+  if (pageSize !== DEFAULT_ADMIN_SMS_PAGE_SIZE) u.searchParams.set('limit', String(pageSize));
+  return u.pathname + u.search;
+}
+
 const db = env?.DB;
 const counts = db ? await getSmsFeatureRequestCounts(db) : { distinctLots: 0, totalRequests: 0 };
-const requests = db ? await listSmsFeatureRequests(db, 500) : [];
+const requests = db ? await listSmsFeatureRequests(db, pageSize, (page - 1) * pageSize) : [];
 
 function formatDate(s: string | null): string {
   if (!s) return '—';
@@ -34,10 +58,30 @@ function formatDate(s: string | null): string {
     </p>
   </div>
 
+  <div class="flex flex-wrap items-center gap-2 mb-4">
+    <label for="admin-sms-per-page" class="text-sm text-gray-600">Per page:</label>
+    <select id="admin-sms-per-page" name="limit" class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-700 focus:border-clr-green focus:outline-none focus:ring-1 focus:ring-clr-green" aria-label="Entries per page">
+      {ADMIN_SMS_PAGE_SIZES.map((size) => (
+        <option value={size} selected={pageSize === size}>{size}</option>
+      ))}
+    </select>
+  </div>
+  <script is:inline>
+    document.getElementById('admin-sms-per-page')?.addEventListener('change', function () {
+      const limit = this.value;
+      const u = new URL(window.location.href);
+      u.searchParams.set('limit', limit);
+      u.searchParams.delete('page');
+      if (limit === '25') u.searchParams.delete('limit');
+      window.location.href = u.pathname + u.search;
+    });
+  </script>
+
   <div class="rounded-xl border border-gray-200 bg-white overflow-hidden">
-    {requests.length === 0 ? (
+    {requests.length === 0 && page === 1 ? (
       <p class="p-6 text-gray-500">No SMS feature requests yet.</p>
     ) : (
+      <>
       <div class="overflow-x-auto">
         <table class="w-full text-sm">
           <thead class="bg-gray-50 border-b border-gray-200">
@@ -56,6 +100,16 @@ function formatDate(s: string | null): string {
           </tbody>
         </table>
       </div>
+      {requests.length > 0 && (
+        <nav class="flex items-center justify-between gap-2 py-2 px-3 border-t border-gray-200 bg-gray-50 text-sm" aria-label="SMS requests pagination">
+          <span class="text-gray-600">Page {page}</span>
+          <div class="flex gap-2">
+            {page > 1 && <a href={adminSmsPageUrl(page - 1)} class="text-clr-green hover:underline font-medium">Previous</a>}
+            {requests.length === pageSize && <a href={adminSmsPageUrl(page + 1)} class="text-clr-green hover:underline font-medium">Next</a>}
+          </div>
+        </nav>
+      )}
+      </>
     )}
   </div>
 </BoardLayout>

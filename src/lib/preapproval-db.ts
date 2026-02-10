@@ -49,41 +49,45 @@ const PREAPPROVAL_SELECT = 'id, category, title, description, rules, photos, cre
 /** List items, optionally by category and/or approved-only. Newest first. */
 export async function listPreapprovalItems(
   db: D1Database,
-  options?: { category?: string | null; approvedOnly?: boolean }
+  options?: { category?: string | null; approvedOnly?: boolean; limit?: number; offset?: number }
 ): Promise<PreapprovalItem[]> {
   const approvedOnly = options?.approvedOnly === true;
   const category = options?.category != null && options.category !== '' ? options.category : null;
+  const limit = Math.max(1, Math.min(options?.limit ?? 500, 1000));
+  const offset = Math.max(0, options?.offset ?? 0);
 
   if (category && approvedOnly) {
     const { results } = await db
       .prepare(
-        `SELECT ${PREAPPROVAL_SELECT} FROM preapproval_items WHERE category = ? AND COALESCE(approved, 1) = 1 ORDER BY created DESC`
+        `SELECT ${PREAPPROVAL_SELECT} FROM preapproval_items WHERE category = ? AND COALESCE(approved, 1) = 1 ORDER BY created DESC LIMIT ? OFFSET ?`
       )
-      .bind(category)
+      .bind(category, limit, offset)
       .all<PreapprovalItem>();
     return results ?? [];
   }
   if (category) {
     const { results } = await db
       .prepare(
-        `SELECT ${PREAPPROVAL_SELECT} FROM preapproval_items WHERE category = ? ORDER BY created DESC`
+        `SELECT ${PREAPPROVAL_SELECT} FROM preapproval_items WHERE category = ? ORDER BY created DESC LIMIT ? OFFSET ?`
       )
-      .bind(category)
+      .bind(category, limit, offset)
       .all<PreapprovalItem>();
     return results ?? [];
   }
   if (approvedOnly) {
     const { results } = await db
       .prepare(
-        `SELECT ${PREAPPROVAL_SELECT} FROM preapproval_items WHERE COALESCE(approved, 1) = 1 ORDER BY created DESC`
+        `SELECT ${PREAPPROVAL_SELECT} FROM preapproval_items WHERE COALESCE(approved, 1) = 1 ORDER BY created DESC LIMIT ? OFFSET ?`
       )
+      .bind(limit, offset)
       .all<PreapprovalItem>();
     return results ?? [];
   }
   const { results } = await db
     .prepare(
-      `SELECT ${PREAPPROVAL_SELECT} FROM preapproval_items ORDER BY created DESC`
+      `SELECT ${PREAPPROVAL_SELECT} FROM preapproval_items ORDER BY created DESC LIMIT ? OFFSET ?`
     )
+    .bind(limit, offset)
     .all<PreapprovalItem>();
   return results ?? [];
 }

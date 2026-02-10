@@ -5,7 +5,7 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie, verifyCsrfToken, verifyOrigin, getEffectiveRole } from '../../lib/auth';
+import { getSessionFromCookie, verifyCsrfToken, verifyOrigin, getEffectiveRole, isBoardOnly } from '../../lib/auth';
 import {
   listVendors,
   getVendorById,
@@ -34,7 +34,7 @@ function safeFileName(name: string): string {
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
 const userAgent = Astro.request.headers.get('user-agent') ?? null;
-const ipAddress = Astro.request.headers.get('cf-connecting-ip') ?? 
+const ipAddress = Astro.request.headers.get('cf-connecting-ip') ??
   Astro.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
 let session = await getSessionFromCookie(
   Astro.request.headers.get('cookie') ?? undefined,
@@ -51,7 +51,7 @@ if (!session) {
 }
 
 const effectiveRole = getEffectiveRole(session);
-const isBoard = effectiveRole === 'board' || effectiveRole === 'admin' || effectiveRole === 'arb_board';
+const isBoard = isBoardOnly(effectiveRole) || effectiveRole === 'admin';
 const origin = Astro.request.headers.get('origin');
 const referer = Astro.request.headers.get('referer');
 const expectedOrigin = Astro.url.origin;

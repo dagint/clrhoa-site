@@ -58,15 +58,17 @@ function daysInReview(submittedAt: string | null | undefined): number | null {
 
 function timelineLabel(row: ArbAuditLogRow): string {
   const action = (row.action ?? '').replace(/_/g, ' ');
-  const by = row.changed_by_role ?? '—';
+  const byEmail = row.changed_by_email ?? null;
+  const byRole = row.changed_by_role ?? null;
+  const by = byEmail ? `${byEmail}${byRole ? ` (${byRole})` : ''}` : byRole ?? '—';
   const when = formatDateTime(row.created);
   if (row.action === 'create') return `Created · ${when}`;
   if (row.action === 'submit_for_review') return `Submitted for review · ${when}`;
-  if (row.action === 'request_revision') return `Revision requested by ARB · ${when}`;
+  if (row.action === 'request_revision') return `Revision requested by ${by} · ${when}`;
   if (row.action === 'cancel') return `Cancelled · ${when}`;
   if (row.new_status === 'approved') return `Approved by ${by} · ${when}`;
-  if (row.new_status === 'rejected') return `Rejected · ${when}`;
-  return `${action} · ${when}`;
+  if (row.new_status === 'rejected') return `Rejected by ${by} · ${when}`;
+  return `${action}${byEmail || byRole ? ` by ${by}` : ''} · ${when}`;
 }
 
 /** Tabs match ARB request status (single source of truth). */

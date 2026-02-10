@@ -18,7 +18,18 @@ export function jsonResponse(data: object, status = 200): Response {
 /** Minimal Astro-like context for API routes (avoids importing Astro in lib). */
 export interface ApiRequestContext {
   request: Request;
-  locals: { runtime?: { env?: { SESSION_SECRET?: string } } };
+  locals: {
+    runtime?: { env?: { SESSION_SECRET?: string } };
+    correlationId?: string;
+  };
+}
+
+/**
+ * Get correlation ID from request context for logging.
+ * Returns null if not available (e.g., during static generation).
+ */
+export function getCorrelationId(ctx: ApiRequestContext): string | null {
+  return ctx.locals?.correlationId ?? null;
 }
 
 /**

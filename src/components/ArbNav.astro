@@ -7,13 +7,11 @@ interface Props {
   currentPath: string;
 }
 
+import { arbLinks } from '../config/navigation';
+
 const { currentPath } = Astro.props;
 
-const links: { href: string; label: string }[] = [
-  { href: '/portal/board', label: 'ARB' },
-  { href: '/portal/arb-dashboard', label: 'ARB Dashboard' },
-  { href: '/board/library', label: 'Pre-approval library' },
-];
+const links = arbLinks;
 
 function isCurrent(href: string): boolean {
   if (href === '/portal/board') return currentPath === '/portal/board';

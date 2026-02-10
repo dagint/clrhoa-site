@@ -9,6 +9,7 @@ import { getSessionFromCookie, verifyCsrfToken, verifyOrigin } from '../../lib/a
 import { listArbRequestsByHousehold, listArbFilesByRequest } from '../../lib/arb-db';
 import { getSecurityMonitor } from '../../lib/monitoring';
 import { createLogger } from '../../lib/logging';
+import { getCorrelationId } from '../../lib/api-helpers';
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
@@ -24,7 +25,8 @@ if (!session) {
   });
 }
 
-const logger = createLogger({ endpoint: '/api/arb-export-data', email: session.email });
+const correlationId = getCorrelationId(Astro) || 'unknown';
+const logger = createLogger({ endpoint: '/api/arb-export-data', email: session.email, correlationId });
 const securityMonitor = getSecurityMonitor();
 
 // CSRF protection: verify origin
@@ -62,7 +64,7 @@ if (!db) {
 try {
   // Get all user's requests
   const requests = await listArbRequestsByHousehold(db, session.email);
-  
+
   // Get files for each request
   const exportData = {
     exportedAt: new Date().toISOString(),

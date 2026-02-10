@@ -21,8 +21,32 @@ const whitelistRole = (session.role ?? 'member').toLowerCase();
 const canView = ELEVATED_ROLES.has(whitelistRole);
 if (!canView) return Astro.redirect('/portal/dashboard');
 
+const ELEVATION_AUDIT_PAGE_SIZES = [10, 25, 50, 100] as const;
+const DEFAULT_ELEVATION_AUDIT_PAGE_SIZE = 25;
+const url = Astro.url;
+const getPage = (): number => {
+  const p = url.searchParams.get('page');
+  const n = p ? parseInt(p, 10) : 1;
+  return Number.isNaN(n) || n < 1 ? 1 : Math.min(n, 1000);
+};
+const getLimit = (): number => {
+  const p = url.searchParams.get('limit');
+  const n = p ? parseInt(p, 10) : DEFAULT_ELEVATION_AUDIT_PAGE_SIZE;
+  return ELEVATION_AUDIT_PAGE_SIZES.includes(n as (typeof ELEVATION_AUDIT_PAGE_SIZES)[number]) ? n : DEFAULT_ELEVATION_AUDIT_PAGE_SIZE;
+};
+const page = getPage();
+const pageSize = getLimit();
+
+function elevationAuditPageUrl(value: number): string {
+  const u = new URL(url);
+  if (value <= 1) u.searchParams.delete('page');
+  else u.searchParams.set('page', String(value));
+  if (pageSize !== DEFAULT_ELEVATION_AUDIT_PAGE_SIZE) u.searchParams.set('limit', String(pageSize));
+  return u.pathname + u.search;
+}
+
 const db = env?.DB;
-const pimLog = db ? await listPimElevationLog(db, 500) : [];
+const pimLog = db ? await listPimElevationLog(db, pageSize, (page - 1) * pageSize) : [];
 const allRequests = db ? await listArbRequestsByHousehold(db, session.email) : [];
 const draftCount = allRequests.filter((r) => r.status === 'pending').length;
 
@@ -50,10 +74,31 @@ function formatDate(s: string | null): string {
         <h1 class="text-2xl font-heading font-bold text-clr-green mb-2">PIM: elevated access requests</h1>
         <p class="text-gray-600 mb-6">Who elevated or dropped temporary access, and when that access was set to expire.</p>
 
-        <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          {pimLog.length === 0 ? (
-            <p class="p-4 text-gray-500">No elevation entries yet.</p>
-          ) : (
+        {pimLog.length === 0 && page === 1 ? (
+          <div class="bg-white rounded-xl border border-gray-200 p-4">
+            <p class="text-gray-500">No elevation entries yet.</p>
+          </div>
+        ) : (
+          <>
+          <div class="flex flex-wrap items-center gap-2 mb-4">
+            <label for="elevation-audit-per-page" class="text-sm text-gray-600">Per page:</label>
+            <select id="elevation-audit-per-page" name="limit" class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-700 focus:border-clr-green focus:outline-none focus:ring-1 focus:ring-clr-green" aria-label="Entries per page">
+              {ELEVATION_AUDIT_PAGE_SIZES.map((size) => (
+                <option value={size} selected={pageSize === size}>{size}</option>
+              ))}
+            </select>
+          </div>
+          <script is:inline>
+            document.getElementById('elevation-audit-per-page')?.addEventListener('change', function () {
+              const limit = this.value;
+              const u = new URL(window.location.href);
+              u.searchParams.set('limit', limit);
+              u.searchParams.delete('page');
+              if (limit === '25') u.searchParams.delete('limit');
+              window.location.href = u.pathname + u.search;
+            });
+          </script>
+          <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
             <div class="overflow-x-auto">
               <table class="w-full text-sm">
                 <thead class="bg-gray-50 border-b border-gray-200">
@@ -78,8 +123,18 @@ function formatDate(s: string | null): string {
                 </tbody>
               </table>
             </div>
-          )}
-        </div>
+            {pimLog.length > 0 && (
+              <nav class="flex items-center justify-between gap-2 py-2 px-3 border-t border-gray-200 bg-gray-50 text-sm" aria-label="Elevation audit pagination">
+                <span class="text-gray-600">Page {page}</span>
+                <div class="flex gap-2">
+                  {page > 1 && <a href={elevationAuditPageUrl(page - 1)} class="text-clr-green hover:underline font-medium">Previous</a>}
+                  {pimLog.length === pageSize && <a href={elevationAuditPageUrl(page + 1)} class="text-clr-green hover:underline font-medium">Next</a>}
+                </div>
+              </nav>
+            )}
+          </div>
+          </>
+        )}
       </main>
     </div>
   </ProtectedPage>
