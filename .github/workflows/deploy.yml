@@ -98,9 +98,10 @@ jobs:
 
       - name: Sync Secrets to Cloudflare Pages
         if: success()
+        continue-on-error: true  # Cloudflare API often returns 500; set secrets manually in Dashboard if this fails
         run: |
           echo "Syncing secrets and variables from GitHub to Cloudflare Pages..."
-          node scripts/sync-secrets-to-cloudflare-pages.js
+          node scripts/sync-secrets-to-cloudflare-pages.js || echo "::warning::Sync failed. Set SESSION_SECRET, D1_DATABASE_ID, RESEND_API_KEY, etc. in Cloudflare Pages → Settings → Environment variables."
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
