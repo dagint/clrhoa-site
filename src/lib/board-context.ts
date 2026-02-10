@@ -186,3 +186,18 @@ export async function getArbContext(astro: RoleContextAstro): Promise<GetRoleCon
 
   return { env, session, effectiveRole };
 }
+
+/**
+ * Get context for admin-only pages. Redirects if not admin.
+ * Use for /portal/admin/* pages.
+ */
+export async function getAdminContext(astro: BoardContextAstro): Promise<GetBoardContextResult> {
+  const result = await getBoardContext(astro);
+  if ('redirect' in result) return result;
+  if (!isAdminRole(result.effectiveRole)) {
+    if (result.effectiveRole === 'board' || result.effectiveRole === 'arb_board') return { redirect: '/portal/board' };
+    if (result.effectiveRole === 'arb') return { redirect: '/portal/arb' };
+    return { redirect: '/portal/dashboard' };
+  }
+  return result;
+}
