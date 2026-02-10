@@ -1,0 +1,32 @@
+---
+/**
+ * Access Denied Page
+ *
+ * Standalone page for unauthorized access.
+ * Shows helpful message and actions user can take.
+ */
+export const prerender = false;
+
+import PortalLayout from '../../layouts/PortalLayout.astro';
+import AccessDeniedComponent from '../../components/AccessDenied.astro';
+import { getCurrentUser } from '../../utils/rbac';
+
+// Get query params
+const url = Astro.url;
+const path = url.searchParams.get('path') || 'this page';
+const requiredLevel = url.searchParams.get('required') || 'appropriate';
+const reason = url.searchParams.get('reason') || undefined;
+
+// Get current user for context
+const user = await getCurrentUser(Astro);
+const currentRole = user?.effectiveRole || 'guest';
+---
+
+<PortalLayout title="Access Denied">
+  <AccessDeniedComponent
+    path={path}
+    requiredLevel={requiredLevel}
+    currentRole={currentRole}
+    reason={reason}
+  />
+</PortalLayout>
