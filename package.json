@@ -151,7 +151,8 @@
     "vars:list": "node scripts/list-all-env-vars.js",
     "vars:export": "node scripts/export-github-vars-template.js",
     "vars:update": "node scripts/update-github-vars-from-file.js",
-    "pages:sync-env": "node scripts/sync-secrets-to-cloudflare-pages.js"
+    "pages:sync-env": "node scripts/sync-secrets-to-cloudflare-pages-wrangler.js",
+    "pages:sync-env-api": "node scripts/sync-secrets-to-cloudflare-pages.js"
   },
   "dependencies": {
     "@astrojs/cloudflare": "^12.0.0",
