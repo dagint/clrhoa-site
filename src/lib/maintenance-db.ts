@@ -73,23 +73,28 @@ export async function listMaintenanceByHousehold(db: D1Database, userEmail: stri
 /** List all for board, optional status filter. */
 export async function listAllMaintenance(
   db: D1Database,
-  statusFilter?: 'reported' | 'in_progress' | 'completed'
+  statusFilter?: 'reported' | 'in_progress' | 'completed',
+  limit = 500,
+  offset = 0
 ): Promise<MaintenanceRequest[]> {
+  const safeLimit = Math.max(1, Math.min(limit, 1000));
+  const safeOffset = Math.max(0, offset);
   if (statusFilter) {
     const result = await db
       .prepare(
         `SELECT id, owner_email, category, description, status, vendor_assigned, photos, created, updated
-         FROM maintenance_requests WHERE status = ? ORDER BY updated DESC, created DESC`
+         FROM maintenance_requests WHERE status = ? ORDER BY updated DESC, created DESC LIMIT ? OFFSET ?`
       )
-      .bind(statusFilter)
+      .bind(statusFilter, safeLimit, safeOffset)
       .all<MaintenanceRequest>();
     return result.results ?? [];
   }
   const result = await db
     .prepare(
       `SELECT id, owner_email, category, description, status, vendor_assigned, photos, created, updated
-       FROM maintenance_requests ORDER BY updated DESC, created DESC`
+       FROM maintenance_requests ORDER BY updated DESC, created DESC LIMIT ? OFFSET ?`
     )
+    .bind(safeLimit, safeOffset)
     .all<MaintenanceRequest>();
   return result.results ?? [];
 }

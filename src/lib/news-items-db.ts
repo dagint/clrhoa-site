@@ -65,37 +65,39 @@ export async function listPublicNewsItems(db: D1Database, limit = 50): Promise<N
 }
 
 /** Items to show in member portal News (show_on_portal = 1). */
-export async function listPortalNewsItems(db: D1Database, limit = 100): Promise<NewsItemRow[]> {
+export async function listPortalNewsItems(db: D1Database, limit = 100, offset = 0): Promise<NewsItemRow[]> {
   const cap = Math.min(Math.max(limit, 1), 500);
+  const safeOffset = Math.max(0, offset);
   try {
     const { results } = await db
       .prepare(
-        `SELECT ${SELECT_COLS} FROM news_items WHERE COALESCE(show_on_portal, 1) = 1 ORDER BY created_at DESC LIMIT ?`
+        `SELECT ${SELECT_COLS} FROM news_items WHERE COALESCE(show_on_portal, 1) = 1 ORDER BY created_at DESC LIMIT ? OFFSET ?`
       )
-      .bind(cap)
+      .bind(cap, safeOffset)
       .all<NewsItemRow>();
     return (results ?? []).map((r) => ({ ...r, images: r.images ?? null }));
   } catch {
-    return listAllNewsItems(db, cap);
+    return listAllNewsItems(db, cap, safeOffset);
   }
 }
 
-export async function listAllNewsItems(db: D1Database, limit = 100): Promise<NewsItemRow[]> {
+export async function listAllNewsItems(db: D1Database, limit = 100, offset = 0): Promise<NewsItemRow[]> {
   const cap = Math.min(Math.max(limit, 1), 500);
+  const safeOffset = Math.max(0, offset);
   try {
     const { results } = await db
       .prepare(
-        `SELECT ${SELECT_COLS} FROM news_items ORDER BY created_at DESC LIMIT ?`
+        `SELECT ${SELECT_COLS} FROM news_items ORDER BY created_at DESC LIMIT ? OFFSET ?`
       )
-      .bind(cap)
+      .bind(cap, safeOffset)
       .all<NewsItemRow>();
     return (results ?? []).map((r) => ({ ...r, images: r.images ?? null }));
   } catch {
     const { results } = await db
       .prepare(
-        `SELECT id, title, body, created_at, is_public FROM news_items ORDER BY created_at DESC LIMIT ?`
+        `SELECT id, title, body, created_at, is_public FROM news_items ORDER BY created_at DESC LIMIT ? OFFSET ?`
       )
-      .bind(cap)
+      .bind(cap, safeOffset)
       .all<NewsItemRow & { show_on_portal?: number; images?: string | null }>();
     return (results ?? []).map((r) => ({ ...r, show_on_portal: 1, images: null }));
   }

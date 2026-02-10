@@ -2,12 +2,13 @@
 /**
  * POST /api/arb-upload — authenticated ARB request submission.
  * Multipart: description, esign (checkbox), files[] (image/* or PDF).
- * Limits: 5MB per file, 25MB total. Stores in R2 (originals/; review/ & archive/ when Sharp available).
+ * Limits: 5MB per file, 25MB total. Stores in R2 (originals/; review/ & archive/ when client-side resized).
  */
 export const prerender = false;
 
 import { getSessionFromCookie, verifyCsrfToken, verifyOrigin, updateSessionActivity, SESSION_COOKIE_NAME } from '../../lib/auth';
 import { createLogger, maskEmail, maskRequestId } from '../../lib/logging';
+import { getCorrelationId } from '../../lib/api-helpers';
 import { getSecurityMonitor } from '../../lib/monitoring';
 import { checkRateLimit, getRateLimitConfig } from '../../lib/rate-limit';
 import {
@@ -40,7 +41,7 @@ function isAllowedType(t: string): boolean {
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
 const userAgent = Astro.request.headers.get('user-agent') ?? null;
-const ipAddress = Astro.request.headers.get('cf-connecting-ip') ?? 
+const ipAddress = Astro.request.headers.get('cf-connecting-ip') ??
                   Astro.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
 let session = await getSessionFromCookie(
   Astro.request.headers.get('cookie') ?? undefined,
@@ -56,10 +57,12 @@ if (!session) {
   });
 }
 
-// Logger will be updated with requestId after creation
-let logger = createLogger({ 
+// Logger with correlation ID for request tracing
+const correlationId = getCorrelationId(Astro) || 'unknown';
+let logger = createLogger({
   endpoint: '/api/arb-upload',
-  email: session.email
+  email: session.email,
+  correlationId
 });
 
 // CSRF protection: verify origin
@@ -120,7 +123,7 @@ let phone: string | null = null;
 let propertyAddress: string | null = null;
 let applicationType: string | null = null;
 let action = 'submit';
-/** Each item: original + optional review/archive (resized) blobs */
+/** Each item: original + optional review/archive (client-side resized) blobs */
 const fileGroups: { name: string; type: string; size: number; original: Blob; review?: Blob; archive?: Blob }[] = [];
 
 // Set up timeout protection
@@ -132,7 +135,7 @@ try {
   // Race between formData parsing and timeout
   const formDataPromise = Astro.request.formData();
   const formData = await Promise.race([formDataPromise, timeoutPromise]);
-  
+
   // Check request size (approximate - Content-Length header)
   const contentLength = Astro.request.headers.get('content-length');
   if (contentLength) {
@@ -146,10 +149,10 @@ try {
       );
     }
   }
-  
+
   // CSRF token verification (from hidden form field)
   const csrfToken = formData.get('csrf_token') as string | null;
-  
+
   // If session doesn't have CSRF token, try to update it (might be an old session)
   if (!session.csrfToken && env?.SESSION_SECRET) {
     const updatedCookieValue = await updateSessionActivity(
@@ -170,13 +173,13 @@ try {
       }
     }
   }
-  
+
   const csrfValid = verifyCsrfToken(session, csrfToken);
   if (!csrfValid) {
-    logger.warn('CSRF token validation failed', { 
+    logger.warn('CSRF token validation failed', {
       hasSessionToken: !!session.csrfToken,
       hasRequestToken: !!csrfToken,
-      sessionEmail: session.email 
+      sessionEmail: session.email
     });
     securityMonitor.trackCsrfFailure('/api/arb-upload', clientIpAddress);
     return new Response(
@@ -184,7 +187,7 @@ try {
       { status: 403, headers: { 'Content-Type': 'application/json' } }
     );
   }
-  
+
   description = (formData.get('description') as string)?.trim() ?? '';
   action = (formData.get('action') as string)?.trim() || 'submit'; // 'draft' or 'submit', default to 'submit' for backward compatibility
   esign = formData.get('esign') === 'on' || formData.get('esign') === '1';
@@ -300,7 +303,7 @@ async function validateFileMimeType(file: File | Blob): Promise<boolean> {
   // Read first bytes to detect actual file type
   const buffer = await file.arrayBuffer();
   const bytes = new Uint8Array(buffer);
-  
+
   // Check magic numbers for common file types
   // JPEG: FF D8 FF
   if (bytes[0] === 0xFF && bytes[1] === 0xD8 && bytes[2] === 0xFF) {
@@ -317,7 +320,7 @@ async function validateFileMimeType(file: File | Blob): Promise<boolean> {
   // WebP: RIFF...WEBP
   if (bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46) {
     // Check for WEBP signature at offset 8
-    if (bytes.length >= 12 && 
+    if (bytes.length >= 12 &&
         bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50) {
       return file.type === 'image/webp';
     }
@@ -327,7 +330,7 @@ async function validateFileMimeType(file: File | Blob): Promise<boolean> {
     return file.type === 'application/pdf';
   }
   // HEIC: ftyp...heic (check at offset 4)
-  if (bytes.length >= 12 && 
+  if (bytes.length >= 12 &&
       bytes[4] === 0x66 && bytes[5] === 0x74 && bytes[6] === 0x79 && bytes[7] === 0x70) {
     // Check for 'heic' or 'mif1' (HEIF variants)
     const brand = String.fromCharCode(bytes[8], bytes[9], bytes[10], bytes[11]);
@@ -335,7 +338,7 @@ async function validateFileMimeType(file: File | Blob): Promise<boolean> {
       return file.type === 'image/heic' || file.type === 'image/heif';
     }
   }
-  
+
   // If no magic number match, fall back to declared MIME type check
   return isAllowedType(file.type) || file.type === 'application/pdf';
 }
@@ -350,7 +353,7 @@ for (const f of fileGroups) {
       { status: 400, headers: { 'Content-Type': 'application/json' } }
     );
   }
-  
+
   // Server-side MIME type validation
   const isValidMime = await validateFileMimeType(f.original);
   if (!isValidMime) {
@@ -361,7 +364,7 @@ for (const f of fileGroups) {
       { status: 400, headers: { 'Content-Type': 'application/json' } }
     );
   }
-  
+
   // Also validate review and archive versions if present
   if (f.review) {
     const isValidReview = await validateFileMimeType(f.review);
@@ -385,7 +388,7 @@ for (const f of fileGroups) {
       );
     }
   }
-  
+
   totalBytes += f.size;
 }
 if (totalBytes > MAX_TOTAL_BYTES) {
@@ -407,7 +410,7 @@ try {
     )
     .bind(session.email.toLowerCase(), thirtyDaysAgo.toISOString())
     .all<{ id: string; description: string; created: string }>();
-  
+
   // Simple similarity check: if description is very similar (80%+ match) or exact duplicate
   const descLower = description.toLowerCase().trim();
   for (const req of recentRequests.results ?? []) {
@@ -464,7 +467,7 @@ try {
     applicationType,
     ip_address: clientIp,
   });
-  
+
   // If submitting for review, update status from 'pending' to 'in_review'
   if (isSubmit) {
     const submitted = await setArbRequestInReview(db, requestId, session.email, clientIp);
@@ -473,7 +476,7 @@ try {
       // Don't fail the request - it's saved as pending, user can resubmit later
     }
   }
-  
+
   // Increment rate limit counter only for submissions (not drafts)
   if (isSubmit && kv) {
     const today = new Date().toISOString().split('T')[0];
@@ -599,7 +602,7 @@ return new Response(
   JSON.stringify({
     success: true,
     requestId,
-    message: isSubmit 
+    message: isSubmit
       ? 'Your ARB request has been submitted and is pending review.'
       : 'Your ARB request has been saved as a draft. You can edit and submit it later from "My requests".',
   }),

@@ -27,12 +27,15 @@ export function isMemberDocCategory(s: string): s is MemberDocCategory {
 }
 
 /** List all member documents, newest first (for board admin and portal). */
-export async function listMemberDocuments(db: D1Database): Promise<MemberDocumentRow[]> {
+export async function listMemberDocuments(db: D1Database, limit = 500, offset = 0): Promise<MemberDocumentRow[]> {
+  const safeLimit = Math.max(1, Math.min(limit, 1000));
+  const safeOffset = Math.max(0, offset);
   const { results } = await db
     .prepare(
       `SELECT id, category, title, file_key, content_type, uploaded_at, uploaded_by_email
-       FROM member_documents ORDER BY category, uploaded_at DESC`
+       FROM member_documents ORDER BY category, uploaded_at DESC LIMIT ? OFFSET ?`
     )
+    .bind(safeLimit, safeOffset)
     .all<MemberDocumentRow>();
   return results ?? [];
 }

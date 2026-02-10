@@ -73,24 +73,26 @@ const OWNERS_SELECT_FULL_WITH_PRIMARY = 'SELECT id, name, address, phone, email,
 const OWNERS_SELECT_FULL_WITH_UPDATED = 'SELECT id, name, address, phone, email, phones, created_by_email, share_contact_with_members, COALESCE(is_primary, 1) as is_primary, updated_by, updated_at, lot_number FROM owners';
 const OWNERS_SELECT = 'SELECT id, name, address, phone, email, phones FROM owners';
 
-export async function listOwners(db: D1Database): Promise<Owner[]> {
+export async function listOwners(db: D1Database, limit = LIST_OWNERS_MAX, offset = 0): Promise<Owner[]> {
+  const safeLimit = Math.max(1, Math.min(limit, LIST_OWNERS_MAX));
+  const safeOffset = Math.max(0, offset);
   try {
     const { results } = await db
-      .prepare(`${OWNERS_SELECT_FULL_WITH_UPDATED} ORDER BY name ASC LIMIT ?`)
-      .bind(LIST_OWNERS_MAX)
+      .prepare(`${OWNERS_SELECT_FULL_WITH_UPDATED} ORDER BY name ASC LIMIT ? OFFSET ?`)
+      .bind(safeLimit, safeOffset)
       .all<Owner>();
     return results ?? [];
   } catch {
     try {
       const { results } = await db
-        .prepare(`${OWNERS_SELECT_FULL_WITH_PRIMARY} ORDER BY name ASC LIMIT ?`)
-        .bind(LIST_OWNERS_MAX)
+        .prepare(`${OWNERS_SELECT_FULL_WITH_PRIMARY} ORDER BY name ASC LIMIT ? OFFSET ?`)
+        .bind(safeLimit, safeOffset)
         .all<Owner>();
       return (results ?? []).map((o) => ({ ...o, updated_by: null, updated_at: null }));
     } catch {
       const { results } = await db
-        .prepare(`${OWNERS_SELECT_FULL} ORDER BY name ASC LIMIT ?`)
-        .bind(LIST_OWNERS_MAX)
+        .prepare(`${OWNERS_SELECT_FULL} ORDER BY name ASC LIMIT ? OFFSET ?`)
+        .bind(safeLimit, safeOffset)
         .all<Owner>();
       return (results ?? []).map((o) => ({ ...o, updated_by: null, updated_at: null }));
     }

@@ -3,7 +3,7 @@ export const prerender = false;
 
 import BoardLayout from '../../layouts/BoardLayout.astro';
 import { getBoardContext } from '../../lib/board-context';
-import { canRecordPayments } from '../../lib/auth';
+import { canRecordPayments, isBoardOnly } from '../../lib/auth';
 import { listPrimaryOwnersByAddress } from '../../lib/directory-db';
 import { listArbRequestsByHousehold } from '../../lib/arb-db';
 import {
@@ -18,7 +18,7 @@ import { escapeHtml } from '../../lib/sanitize';
 const ctx = await getBoardContext(Astro);
 if ('redirect' in ctx) return Astro.redirect(ctx.redirect);
 const { env, session, effectiveRole } = ctx;
-const isBoard = effectiveRole === 'board' || effectiveRole === 'admin' || effectiveRole === 'arb_board';
+const isBoard = isBoardOnly(effectiveRole) || effectiveRole === 'admin';
 if (!isBoard) return Astro.redirect('/portal/dashboard');
 const canRecord = canRecordPayments(effectiveRole);
 

@@ -5,7 +5,7 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie, verifyCsrfToken, verifyOrigin, getEffectiveRole } from '../../lib/auth';
+import { getSessionFromCookie, verifyCsrfToken, verifyOrigin, getEffectiveRole, isBoardOnly } from '../../lib/auth';
 import { isMemberDocCategory, insertMemberDocument } from '../../lib/member-documents-db';
 
 const runtime = Astro.locals.runtime;
@@ -23,9 +23,9 @@ if (!session) {
 }
 
 const effectiveRole = getEffectiveRole(session);
-const isBoard = effectiveRole === 'board' || effectiveRole === 'admin' || effectiveRole === 'arb_board';
+const isBoard = isBoardOnly(effectiveRole) || effectiveRole === 'admin';
 if (!isBoard) {
-  return new Response(JSON.stringify({ error: 'Forbidden. Only Board, Admin, or ARB+Board can upload member documents.' }), {
+  return new Response(JSON.stringify({ error: 'Forbidden. Only Board or Admin can upload member documents.' }), {
     status: 403,
     headers: { 'Content-Type': 'application/json' },
   });

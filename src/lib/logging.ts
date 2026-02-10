@@ -3,6 +3,16 @@
  */
 
 /**
+ * Generate a unique correlation ID for request tracing.
+ * Format: timestamp (base36) + random (8 chars) = ~12-13 chars total
+ */
+export function generateCorrelationId(): string {
+  const timestamp = Date.now().toString(36);
+  const random = Math.random().toString(36).substring(2, 10);
+  return `${timestamp}-${random}`;
+}
+
+/**
  * Mask email address: j***@example.com
  */
 export function maskEmail(email: string | null | undefined): string {
@@ -49,36 +59,61 @@ export function maskRequestId(id: string | null | undefined): string {
 }
 
 /**
- * Safe logger that masks PII in messages.
+ * Safe logger that masks PII in messages and includes correlation ID for tracing.
  */
 export class SafeLogger {
   private context: Record<string, any> = {};
+  private correlationId: string | null = null;
 
   constructor(context: Record<string, any> = {}) {
     this.context = context;
+    // Extract correlationId from context if provided
+    if (context.correlationId) {
+      this.correlationId = String(context.correlationId);
+      // Don't include it in context to avoid duplication
+      const { correlationId, ...rest } = context;
+      this.context = rest;
+    }
   }
 
   /**
-   * Log error with PII masking.
+   * Set correlation ID for this logger instance.
+   */
+  setCorrelationId(id: string): void {
+    this.correlationId = id;
+  }
+
+  /**
+   * Get correlation ID prefix for log messages.
+   */
+  private getLogPrefix(): string {
+    return this.correlationId ? `[${this.correlationId}]` : '';
+  }
+
+  /**
+   * Log error with PII masking and correlation ID.
    */
   error(message: string, data?: Record<string, any>): void {
     const masked = this.maskPII({ ...this.context, ...data });
-    console.error(`[ERROR] ${message}`, masked);
+    const prefix = this.getLogPrefix();
+    console.error(`${prefix}[ERROR] ${message}`, masked);
   }
 
   /**
-   * Log warning with PII masking.
+   * Log warning with PII masking and correlation ID.
    */
   warn(message: string, data?: Record<string, any>): void {
     const masked = this.maskPII({ ...this.context, ...data });
-    console.warn(`[WARN] ${message}`, masked);
+    const prefix = this.getLogPrefix();
+    console.warn(`${prefix}[WARN] ${message}`, masked);
   }
 
   /**
-   * Log info (no masking needed for non-sensitive info).
+   * Log info with correlation ID (no masking needed for non-sensitive info).
    */
   info(message: string, data?: Record<string, any>): void {
-    console.log(`[INFO] ${message}`, { ...this.context, ...data });
+    const prefix = this.getLogPrefix();
+    console.log(`${prefix}[INFO] ${message}`, { ...this.context, ...data });
   }
 
   /**
@@ -109,6 +144,7 @@ export class SafeLogger {
 
 /**
  * Create a logger instance with context.
+ * If context includes correlationId, it will be included in all log messages.
  */
 export function createLogger(context: Record<string, any> = {}): SafeLogger {
   return new SafeLogger(context);

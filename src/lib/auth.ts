@@ -86,6 +86,16 @@ export function isBoardOrArbOnly(role: string): boolean {
 }
 
 /**
+ * True only for effective role 'board' (not arb, not arb_board unless they assumed Board).
+ * Use for Board-only operations: feedback management, meetings, maintenance, vendors.
+ * Ensures arb_board must explicitly assume Board role to perform Board actions.
+ */
+export function isBoardOnly(role: string): boolean {
+  const r = role?.toLowerCase();
+  return r === 'board';
+}
+
+/**
  * Effective role for access control (PIM/JIT). If user has an elevated whitelist role but
  * elevated_until is missing or expired, they see member access until they request elevation.
  * For admin and arb_board: if assumed_role is set and not expired, returns that role (board or arb)
@@ -253,34 +263,38 @@ function generateSessionId(): string {
 }
 
 /**
- * Generate a session fingerprint from browser and IP information.
+ * Generate a session fingerprint from browser and IP information using SHA-256.
  * This helps detect session hijacking attempts.
+ * Uses crypto.subtle.digest for cryptographically secure hashing.
  */
-export function generateSessionFingerprint(
+export async function generateSessionFingerprint(
   userAgent: string | null,
   ipAddress: string | null
-): string {
+): Promise<string> {
   const data = `${userAgent || 'unknown'}|${ipAddress || 'unknown'}`;
-  // Simple hash function (in production, use crypto.subtle.digest)
-  let hash = 0;
-  for (let i = 0; i < data.length; i++) {
-    const char = data.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash; // Convert to 32-bit integer
-  }
-  return Math.abs(hash).toString(16);
+  const encoder = new TextEncoder();
+  const dataBuffer = encoder.encode(data);
+
+  // Use SHA-256 for cryptographically secure hashing
+  const hashBuffer = await crypto.subtle.digest('SHA-256', dataBuffer);
+
+  // Convert ArrayBuffer to hex string
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
+  return hashHex;
 }
 
 /**
  * Verify session fingerprint matches current request.
  */
-export function verifySessionFingerprint(
+export async function verifySessionFingerprint(
   sessionFingerprint: string | undefined,
   userAgent: string | null,
   ipAddress: string | null
-): boolean {
+): Promise<boolean> {
   if (!sessionFingerprint) return true; // Allow legacy sessions without fingerprint
-  const currentFingerprint = generateSessionFingerprint(userAgent, ipAddress);
+  const currentFingerprint = await generateSessionFingerprint(userAgent, ipAddress);
   return sessionFingerprint === currentFingerprint;
 }
 
@@ -332,7 +346,7 @@ export async function getSessionFromCookie(
 
     // Verify session fingerprint (if present)
     if (payload.fingerprint && userAgent !== undefined && ipAddress !== undefined) {
-      if (!verifySessionFingerprint(payload.fingerprint, userAgent, ipAddress)) {
+      if (!(await verifySessionFingerprint(payload.fingerprint, userAgent, ipAddress))) {
         // Fingerprint mismatch - possible session hijacking
         return null;
       }
@@ -444,13 +458,14 @@ export async function createSessionCookieValue(
   ipAddress?: string | null
 ): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
+  const fingerprint = await generateSessionFingerprint(userAgent || null, ipAddress || null);
   const full: SessionPayload = {
     ...payload,
     exp: now + SESSION_MAX_AGE_SEC,
     csrfToken: generateCsrfToken(),
     lastActivity: now,
     sessionId: generateSessionId(),
-    fingerprint: generateSessionFingerprint(userAgent || null, ipAddress || null),
+    fingerprint,
     createdAt: now,
   };
   return signPayload(full, secret);

@@ -12,8 +12,32 @@ if ('redirect' in ctx) return Astro.redirect(ctx.redirect);
 const { env, session, effectiveRole } = ctx;
 const canEditDirectory = isBoardOrArbOnly(effectiveRole) || effectiveRole === 'admin';
 
+const DIRECTORY_PAGE_SIZES = [10, 25, 50, 100] as const;
+const DEFAULT_DIRECTORY_PAGE_SIZE = 25;
+const url = Astro.url;
+const getPage = (): number => {
+  const p = url.searchParams.get('page');
+  const n = p ? parseInt(p, 10) : 1;
+  return Number.isNaN(n) || n < 1 ? 1 : Math.min(n, 1000);
+};
+const getLimit = (): number => {
+  const p = url.searchParams.get('limit');
+  const n = p ? parseInt(p, 10) : DEFAULT_DIRECTORY_PAGE_SIZE;
+  return DIRECTORY_PAGE_SIZES.includes(n as (typeof DIRECTORY_PAGE_SIZES)[number]) ? n : DEFAULT_DIRECTORY_PAGE_SIZE;
+};
+const page = getPage();
+const pageSize = getLimit();
+
+function directoryPageUrl(value: number): string {
+  const u = new URL(url);
+  if (value <= 1) u.searchParams.delete('page');
+  else u.searchParams.set('page', String(value));
+  if (pageSize !== DEFAULT_DIRECTORY_PAGE_SIZE) u.searchParams.set('limit', String(pageSize));
+  return u.pathname + u.search;
+}
+
 const db = env?.DB;
-const owners = db ? await listOwners(db) : [];
+const owners = db ? await listOwners(db, pageSize, (page - 1) * pageSize) : [];
 const ownerRoles = await getRolesForEmails(env?.CLOURHOA_USERS, owners.map((o) => o.email));
 const allRequests = db ? await listArbRequestsByHousehold(db, session.email) : [];
 const draftCount = allRequests.filter((r) => r.status === 'pending').length;
@@ -100,9 +124,28 @@ function roleLabel(role: string): string {
   )}
 
       <h3 class="text-lg font-heading font-semibold text-clr-green mb-3">Current directory</h3>
-      {owners.length === 0 ? (
+      {owners.length === 0 && page === 1 ? (
         <p class="text-gray-500">No owners yet. Add one above or upload a CSV. Members will see them on the portal Directory page.</p>
       ) : (
+        <>
+        <div class="flex flex-wrap items-center gap-2 mb-4">
+          <label for="directory-per-page" class="text-sm text-gray-600">Per page:</label>
+          <select id="directory-per-page" name="limit" class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-700 focus:border-clr-green focus:outline-none focus:ring-1 focus:ring-clr-green" aria-label="Entries per page">
+            {DIRECTORY_PAGE_SIZES.map((size) => (
+              <option value={size} selected={pageSize === size}>{size}</option>
+            ))}
+          </select>
+        </div>
+        <script is:inline>
+          document.getElementById('directory-per-page')?.addEventListener('change', function () {
+            const limit = this.value;
+            const u = new URL(window.location.href);
+            u.searchParams.set('limit', limit);
+            u.searchParams.delete('page');
+            if (limit === '25') u.searchParams.delete('limit');
+            window.location.href = u.pathname + u.search;
+          });
+        </script>
         <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           {canEditDirectory && (
           <div class="px-4 py-2 bg-gray-50 border-b border-gray-200 flex flex-wrap items-center gap-3">
@@ -169,7 +212,17 @@ function roleLabel(role: string): string {
               })}
             </tbody>
           </table>
+          {owners.length > 0 && (
+            <nav class="flex items-center justify-between gap-2 py-2 px-3 border-t border-gray-200 bg-gray-50 text-sm" aria-label="Directory pagination">
+              <span class="text-gray-600">Page {page}</span>
+              <div class="flex gap-2">
+                {page > 1 && <a href={directoryPageUrl(page - 1)} class="text-clr-green hover:underline font-medium">Previous</a>}
+                {owners.length === pageSize && <a href={directoryPageUrl(page + 1)} class="text-clr-green hover:underline font-medium">Next</a>}
+              </div>
+            </nav>
+          )}
         </div>
+        </>
       )}
 
       {owners.some((o) => o.lot_number?.trim()) && (() => {

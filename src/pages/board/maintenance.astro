@@ -3,18 +3,44 @@ export const prerender = false;
 
 import BoardLayout from '../../layouts/BoardLayout.astro';
 import { getBoardContext } from '../../lib/board-context';
+import { isBoardOnly } from '../../lib/auth';
 import { listAllMaintenance, parsePhotosJson } from '../../lib/maintenance-db';
 import { listArbRequestsByHousehold } from '../../lib/arb-db';
 
 const ctx = await getBoardContext(Astro);
 if ('redirect' in ctx) return Astro.redirect(ctx.redirect);
 const { env, session, effectiveRole } = ctx;
-const isBoard = effectiveRole === 'board' || effectiveRole === 'admin' || effectiveRole === 'arb_board';
+const isBoard = isBoardOnly(effectiveRole) || effectiveRole === 'admin';
 if (!isBoard) return Astro.redirect('/portal/dashboard');
 
+const MAINTENANCE_PAGE_SIZES = [10, 25, 50, 100] as const;
+const DEFAULT_MAINTENANCE_PAGE_SIZE = 25;
+const url = Astro.url;
+const statusFilter = (url.searchParams.get('status') as 'reported' | 'in_progress' | 'completed') || undefined;
+const getPage = (): number => {
+  const p = url.searchParams.get('page');
+  const n = p ? parseInt(p, 10) : 1;
+  return Number.isNaN(n) || n < 1 ? 1 : Math.min(n, 1000);
+};
+const getLimit = (): number => {
+  const p = url.searchParams.get('limit');
+  const n = p ? parseInt(p, 10) : DEFAULT_MAINTENANCE_PAGE_SIZE;
+  return MAINTENANCE_PAGE_SIZES.includes(n as (typeof MAINTENANCE_PAGE_SIZES)[number]) ? n : DEFAULT_MAINTENANCE_PAGE_SIZE;
+};
+const page = getPage();
+const pageSize = getLimit();
+
+function maintenancePageUrl(value: number): string {
+  const u = new URL(url);
+  if (value <= 1) u.searchParams.delete('page');
+  else u.searchParams.set('page', String(value));
+  if (pageSize !== DEFAULT_MAINTENANCE_PAGE_SIZE) u.searchParams.set('limit', String(pageSize));
+  if (statusFilter) u.searchParams.set('status', statusFilter);
+  return u.pathname + u.search;
+}
+
 const db = env?.DB;
-const statusFilter = (Astro.url.searchParams.get('status') as 'reported' | 'in_progress' | 'completed') || undefined;
-const allRequests = db ? await listAllMaintenance(db, statusFilter) : [];
+const allRequests = db ? await listAllMaintenance(db, statusFilter, pageSize, (page - 1) * pageSize) : [];
 const allArbRequests = db ? await listArbRequestsByHousehold(db, session.email) : [];
 const draftCount = allArbRequests.filter((r) => r.status === 'pending').length;
 
@@ -60,11 +86,30 @@ function categoryLabel(cat: string): string {
         </a>
       </div>
 
-      {allRequests.length === 0 ? (
+      {allRequests.length === 0 && page === 1 ? (
         <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center text-gray-500">
           No requests {statusFilter ? `with status "${statusFilter}"` : ''}.
         </div>
       ) : (
+        <>
+        <div class="flex flex-wrap items-center gap-2 mb-4">
+          <label for="maintenance-per-page" class="text-sm text-gray-600">Per page:</label>
+          <select id="maintenance-per-page" name="limit" class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-700 focus:border-clr-green focus:outline-none focus:ring-1 focus:ring-clr-green" aria-label="Entries per page">
+            {MAINTENANCE_PAGE_SIZES.map((size) => (
+              <option value={size} selected={pageSize === size}>{size}</option>
+            ))}
+          </select>
+        </div>
+        <script is:inline>
+          document.getElementById('maintenance-per-page')?.addEventListener('change', function () {
+            const limit = this.value;
+            const u = new URL(window.location.href);
+            u.searchParams.set('limit', limit);
+            u.searchParams.delete('page');
+            if (limit === '25') u.searchParams.delete('limit');
+            window.location.href = u.pathname + u.search;
+          });
+        </script>
         <ul class="space-y-4">
           {allRequests.map((r) => {
             const photos = parsePhotosJson(r.photos);
@@ -122,6 +167,16 @@ function categoryLabel(cat: string): string {
             );
           })}
         </ul>
+        {allRequests.length > 0 && (
+          <nav class="flex items-center justify-between gap-2 py-2 px-3 mt-4 border-t border-gray-200 bg-gray-50 text-sm" aria-label="Maintenance pagination">
+            <span class="text-gray-600">Page {page}</span>
+            <div class="flex gap-2">
+              {page > 1 && <a href={maintenancePageUrl(page - 1)} class="text-clr-green hover:underline font-medium">Previous</a>}
+              {allRequests.length === pageSize && <a href={maintenancePageUrl(page + 1)} class="text-clr-green hover:underline font-medium">Next</a>}
+            </div>
+          </nav>
+        )}
+        </>
       )}
 
 <script is:inline>

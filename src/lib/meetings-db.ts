@@ -83,11 +83,14 @@ export async function listUpcomingWithCountsAndUser(
 }
 
 /** List all meetings for board (past and future), sorted by datetime desc. */
-export async function listAllMeetings(db: D1Database): Promise<Meeting[]> {
+export async function listAllMeetings(db: D1Database, limit = 500, offset = 0): Promise<Meeting[]> {
+  const safeLimit = Math.max(1, Math.min(limit, 1000));
+  const safeOffset = Math.max(0, offset);
   const result = await db
     .prepare(
-      `SELECT ${MEETING_SELECT} FROM meetings ORDER BY datetime DESC`
+      `SELECT ${MEETING_SELECT} FROM meetings ORDER BY datetime DESC LIMIT ? OFFSET ?`
     )
+    .bind(safeLimit, safeOffset)
     .all<Meeting>();
   return result.results ?? [];
 }

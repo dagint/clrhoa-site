@@ -52,16 +52,19 @@ export async function listPendingSubmissions(db: D1Database): Promise<VendorSubm
   return results ?? [];
 }
 
-export async function listSubmissions(db: D1Database, options?: { status?: string }): Promise<VendorSubmission[]> {
+export async function listSubmissions(db: D1Database, options?: { status?: string; limit?: number; offset?: number }): Promise<VendorSubmission[]> {
+  const limit = Math.max(1, Math.min(options?.limit ?? 500, 1000));
+  const offset = Math.max(0, options?.offset ?? 0);
   if (options?.status) {
     const { results } = await db
-      .prepare(`${VENDOR_SUBMISSIONS_SELECT} WHERE status = ? ORDER BY submitted_at DESC`)
-      .bind(options.status)
+      .prepare(`${VENDOR_SUBMISSIONS_SELECT} WHERE status = ? ORDER BY submitted_at DESC LIMIT ? OFFSET ?`)
+      .bind(options.status, limit, offset)
       .all<VendorSubmission>();
     return results ?? [];
   }
   const { results } = await db
-    .prepare(`${VENDOR_SUBMISSIONS_SELECT} ORDER BY submitted_at DESC`)
+    .prepare(`${VENDOR_SUBMISSIONS_SELECT} ORDER BY submitted_at DESC LIMIT ? OFFSET ?`)
+    .bind(limit, offset)
     .all<VendorSubmission>();
   return results ?? [];
 }

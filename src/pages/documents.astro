@@ -17,7 +17,7 @@ const documentsByCategory = publishedDocuments.reduce((acc, doc) => {
   return acc;
 }, {} as Record<string, typeof publishedDocuments>);
 
-const categories = ['Governing Documents', 'Policies', 'Forms', 'Minutes', 'Other'] as const;
+const categories = ['Governing Documents', 'Policies', 'Forms', 'Other'] as const;
 
 // Board/ARB may have uploaded replacements; use those links when present (public page: only slug/file_key/content_type)
 const runtime = Astro.locals.runtime;

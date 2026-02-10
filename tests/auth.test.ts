@@ -43,35 +43,41 @@ describe('ELEVATED_ROLES / VALID_ROLES', () => {
 });
 
 describe('generateSessionFingerprint', () => {
-  it('returns deterministic hash for same inputs', () => {
-    const a = generateSessionFingerprint('Mozilla/5.0', '192.168.1.1');
-    const b = generateSessionFingerprint('Mozilla/5.0', '192.168.1.1');
+  it('returns deterministic hash for same inputs', async () => {
+    const a = await generateSessionFingerprint('Mozilla/5.0', '192.168.1.1');
+    const b = await generateSessionFingerprint('Mozilla/5.0', '192.168.1.1');
     expect(a).toBe(b);
   });
-  it('returns different hash for different inputs', () => {
-    const a = generateSessionFingerprint('Mozilla', '1.1.1.1');
-    const b = generateSessionFingerprint('Chrome', '1.1.1.1');
+  it('returns different hash for different inputs', async () => {
+    const a = await generateSessionFingerprint('Mozilla', '1.1.1.1');
+    const b = await generateSessionFingerprint('Chrome', '1.1.1.1');
     expect(a).not.toBe(b);
   });
-  it('handles null userAgent and ipAddress', () => {
-    const fp = generateSessionFingerprint(null, null);
+  it('handles null userAgent and ipAddress', async () => {
+    const fp = await generateSessionFingerprint(null, null);
     expect(typeof fp).toBe('string');
     expect(fp.length).toBeGreaterThan(0);
+    // SHA-256 produces 64-character hex string
+    expect(fp.length).toBe(64);
+  });
+  it('produces SHA-256 hash (64 hex characters)', async () => {
+    const fp = await generateSessionFingerprint('test', '1.2.3.4');
+    expect(fp).toMatch(/^[0-9a-f]{64}$/);
   });
 });
 
 describe('verifySessionFingerprint', () => {
-  it('returns true when fingerprint matches current request', () => {
+  it('returns true when fingerprint matches current request', async () => {
     const ua = 'Mozilla/5.0';
     const ip = '10.0.0.1';
-    const fp = generateSessionFingerprint(ua, ip);
-    expect(verifySessionFingerprint(fp, ua, ip)).toBe(true);
+    const fp = await generateSessionFingerprint(ua, ip);
+    expect(await verifySessionFingerprint(fp, ua, ip)).toBe(true);
   });
-  it('returns false when fingerprint does not match', () => {
-    const fp = generateSessionFingerprint('Mozilla', '1.2.3.4');
-    expect(verifySessionFingerprint(fp, 'Chrome', '1.2.3.4')).toBe(false);
+  it('returns false when fingerprint does not match', async () => {
+    const fp = await generateSessionFingerprint('Mozilla', '1.2.3.4');
+    expect(await verifySessionFingerprint(fp, 'Chrome', '1.2.3.4')).toBe(false);
   });
-  it('returns true when session has no fingerprint (legacy)', () => {
-    expect(verifySessionFingerprint(undefined, 'Mozilla', '1.2.3.4')).toBe(true);
+  it('returns true when session has no fingerprint (legacy)', async () => {
+    expect(await verifySessionFingerprint(undefined, 'Mozilla', '1.2.3.4')).toBe(true);
   });
 });

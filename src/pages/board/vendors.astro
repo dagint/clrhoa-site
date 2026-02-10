@@ -3,6 +3,7 @@ export const prerender = false;
 
 import BoardLayout from '../../layouts/BoardLayout.astro';
 import { getBoardContext } from '../../lib/board-context';
+import { isBoardOnly } from '../../lib/auth';
 import { listVendors } from '../../lib/vendors-db';
 import { listPendingSubmissions } from '../../lib/vendor-submissions-db';
 import { listArbRequestsByHousehold } from '../../lib/arb-db';
@@ -11,10 +12,34 @@ import { escapeHtml } from '../../lib/sanitize';
 const ctx = await getBoardContext(Astro);
 if ('redirect' in ctx) return Astro.redirect(ctx.redirect);
 const { env, session, effectiveRole } = ctx;
-const isBoardOrAdmin = effectiveRole === 'board' || effectiveRole === 'admin' || effectiveRole === 'arb_board';
+const isBoardOrAdmin = isBoardOnly(effectiveRole) || effectiveRole === 'admin';
+
+const VENDORS_PAGE_SIZES = [10, 25, 50, 100] as const;
+const DEFAULT_VENDORS_PAGE_SIZE = 25;
+const url = Astro.url;
+const getPage = (): number => {
+  const p = url.searchParams.get('page');
+  const n = p ? parseInt(p, 10) : 1;
+  return Number.isNaN(n) || n < 1 ? 1 : Math.min(n, 1000);
+};
+const getLimit = (): number => {
+  const p = url.searchParams.get('limit');
+  const n = p ? parseInt(p, 10) : DEFAULT_VENDORS_PAGE_SIZE;
+  return VENDORS_PAGE_SIZES.includes(n as (typeof VENDORS_PAGE_SIZES)[number]) ? n : DEFAULT_VENDORS_PAGE_SIZE;
+};
+const page = getPage();
+const pageSize = getLimit();
+
+function vendorsPageUrl(value: number): string {
+  const u = new URL(url);
+  if (value <= 1) u.searchParams.delete('page');
+  else u.searchParams.set('page', String(value));
+  if (pageSize !== DEFAULT_VENDORS_PAGE_SIZE) u.searchParams.set('limit', String(pageSize));
+  return u.pathname + u.search;
+}
 
 const db = env?.DB;
-const vendorsList = db ? await listVendors(db) : [];
+const vendorsList = db ? await listVendors(db, pageSize, (page - 1) * pageSize) : [];
 const pendingSubmissions = db ? await listPendingSubmissions(db) : [];
 const allRequests = db ? await listArbRequestsByHousehold(db, session.email) : [];
 const draftCount = allRequests.filter((r) => r.status === 'pending').length;
@@ -67,9 +92,9 @@ function parseFiles(filesJson: string | null): { name: string; key: string }[] {
                         {sub.submitted_by && <p class="text-xs text-gray-400 mt-1">Submitted by {sub.submitted_by}</p>}
                         {subFiles.length > 0 && (
                           <div class="mt-2 text-sm text-clr-green">
-                            {subFiles.map((f) => (
-                              <a href={`/api/portal/file/${encodeURIComponent(f.key)}`} class="mr-2 hover:underline">{f.name}</a>
-                            ))}
+                            {subFiles.map((f) => {
+                              return <a href={`/api/portal/file/${encodeURIComponent(f.key)}`} class="mr-2 hover:underline">{f.name}</a>;
+                            })}
                           </div>
                         )}
                       </div>
@@ -178,12 +203,23 @@ function parseFiles(filesJson: string | null): { name: string; key: string }[] {
           <button type="button" id="vendor-cancel-edit" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 hidden">Cancel edit</button>
         </div>
       </form>
+        </>
+      )}
 
       <h3 class="text-lg font-heading font-semibold text-clr-green mb-3">Current vendors — edit inline</h3>
       <p class="text-sm text-gray-600 mb-4">Edit any cell and click <strong>Save</strong> on that row to update. Use the form above to add a new vendor.</p>
-      {vendorsList.length === 0 ? (
+      {vendorsList.length === 0 && page === 1 ? (
         <p class="text-gray-500">No vendors yet. Add one above or upload a CSV.</p>
       ) : (
+        <>
+        <div class="flex flex-wrap items-center gap-2 mb-4">
+          <label for="vendors-per-page" class="text-sm text-gray-600">Per page:</label>
+          <select id="vendors-per-page" name="limit" class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-700 focus:border-clr-green focus:outline-none focus:ring-1 focus:ring-clr-green" aria-label="Entries per page">
+            {VENDORS_PAGE_SIZES.map((size) => (
+              <option value={size} selected={pageSize === size}>{size}</option>
+            ))}
+          </select>
+        </div>
         <div class="overflow-x-auto rounded-xl border border-gray-200 bg-white">
           <table class="vendors-table w-full text-sm border-collapse" aria-label="Vendor list editable by row">
             <thead class="bg-gray-50 border-b border-gray-200">
@@ -216,7 +252,7 @@ function parseFiles(filesJson: string | null): { name: string; key: string }[] {
                           ))}
                           <option value="__new__" selected={!catInList && Boolean((v.category ?? '').trim())}>Add new…</option>
                         </select>
-                        <input type="text" class="row-category-new hidden rounded border border-gray-200 px-2 py-1 w-32" placeholder="New category" value={!catInList && (v.category ?? '').trim() ? (v.category ?? '') : ''} data-vendor-id={v.id} aria-label="New category name" />
+                        <input type="text" class="row-category-new hidden rounded border border-gray-200 px-2 py-1 w-32" placeholder="New category" value={catInList ? '' : (v.category ?? '')} data-vendor-id={v.id} aria-label="New category name" />
                       </div>
                     </td>
                     <td class="py-1.5 px-2 align-top">
@@ -240,9 +276,9 @@ function parseFiles(filesJson: string | null): { name: string; key: string }[] {
                     <td class="py-1.5 px-2 align-top">
                       {files.length > 0 ? (
                         <span class="text-clr-green text-xs">
-                          {files.map((f) => (
-                            <a href={`/api/portal/file/${encodeURIComponent(f.key)}`} class="hover:underline" target="_blank" rel="noopener noreferrer">{f.name}</a>
-                          ))}
+                          {files.map((f) => {
+                            return <a href={`/api/portal/file/${encodeURIComponent(f.key)}`} class="hover:underline" target="_blank" rel="noopener noreferrer">{f.name}</a>;
+                          })}
                         </span>
                       ) : (
                         <span class="text-gray-400">—</span>
@@ -259,9 +295,27 @@ function parseFiles(filesJson: string | null): { name: string; key: string }[] {
             </tbody>
           </table>
         </div>
-      )}
+        {vendorsList.length > 0 && (
+          <nav class="flex items-center justify-between gap-2 py-2 px-3 mt-4 border-t border-gray-200 bg-gray-50 text-sm" aria-label="Vendors pagination">
+            <span class="text-gray-600">Page {page}</span>
+            <div class="flex gap-2">
+              {page > 1 && <a href={vendorsPageUrl(page - 1)} class="text-clr-green hover:underline font-medium">Previous</a>}
+              {vendorsList.length === pageSize && <a href={vendorsPageUrl(page + 1)} class="text-clr-green hover:underline font-medium">Next</a>}
+            </div>
+          </nav>
+        )}
         </>
       )}
+  <script is:inline>
+    document.getElementById('vendors-per-page')?.addEventListener('change', function () {
+      const limit = this.value;
+      const u = new URL(window.location.href);
+      u.searchParams.set('limit', limit);
+      u.searchParams.delete('page');
+      if (limit === '25') u.searchParams.delete('limit');
+      window.location.href = u.pathname + u.search;
+    });
+  </script>
   <script is:inline define:vars={{ existingCategories: existingCategories }}>
     (function () {
       if (typeof window === 'undefined') return;

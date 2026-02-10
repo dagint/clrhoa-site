@@ -62,6 +62,7 @@ export interface ListSiteFeedbackFilters {
   to?: string | null;
   urlContains?: string | null;
   limit?: number;
+  offset?: number;
 }
 
 export async function listSiteFeedback(
@@ -71,6 +72,7 @@ export async function listSiteFeedback(
   const conditions: string[] = [];
   const bind: (string | number)[] = [];
   const limit = Math.min(Math.max(filters.limit ?? 500, 1), 5000);
+  const offset = Math.max(0, filters.offset ?? 0);
 
   if (filters.thumbs === 1 || filters.thumbs === -1) {
     conditions.push('thumbs = ?');
@@ -93,9 +95,9 @@ export async function listSiteFeedback(
   const { results } = await db
     .prepare(
       `SELECT id, url, created_at, viewport, session_id, thumbs, comment
-       FROM site_feedback ${where} ORDER BY created_at DESC LIMIT ?`
+       FROM site_feedback ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`
     )
-    .bind(...bind, limit)
+    .bind(...bind, limit, offset)
     .all<SiteFeedbackRow>();
 
   return results ?? [];

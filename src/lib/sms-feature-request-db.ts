@@ -63,17 +63,19 @@ export async function getSmsFeatureRequestCounts(db: D1Database): Promise<SmsFea
 
 export async function listSmsFeatureRequests(
   db: D1Database,
-  limit = 500
+  limit = 500,
+  offset = 0
 ): Promise<SmsFeatureRequestRow[]> {
   const cap = Math.min(Math.max(limit, 1), 5000);
+  const safeOffset = Math.max(0, offset);
   const { results } = await db
     .prepare(
       `SELECT id, lot_number, created_at
        FROM sms_feature_requests
        ORDER BY created_at DESC
-       LIMIT ?`
+       LIMIT ? OFFSET ?`
     )
-    .bind(cap)
+    .bind(cap, safeOffset)
     .all<SmsFeatureRequestRow>();
 
   return results ?? [];

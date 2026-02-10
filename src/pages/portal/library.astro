@@ -12,13 +12,36 @@ import { listArbRequestsByHousehold } from '../../lib/arb-db';
 const { env, session, effectiveRole } = await getPortalContext(Astro);
 if (!session) return Astro.redirect('/portal/login');
 
-const db = env?.DB;
-const url = new URL(Astro.request.url);
+const PORTAL_LIBRARY_PAGE_SIZES = [10, 25, 50, 100] as const;
+const DEFAULT_PORTAL_LIBRARY_PAGE_SIZE = 25;
+const url = Astro.url;
 const categoryFilter = url.searchParams.get('category') || '';
+const getPage = (): number => {
+  const p = url.searchParams.get('page');
+  const n = p ? parseInt(p, 10) : 1;
+  return Number.isNaN(n) || n < 1 ? 1 : Math.min(n, 1000);
+};
+const getLimit = (): number => {
+  const p = url.searchParams.get('limit');
+  const n = p ? parseInt(p, 10) : DEFAULT_PORTAL_LIBRARY_PAGE_SIZE;
+  return PORTAL_LIBRARY_PAGE_SIZES.includes(n as (typeof PORTAL_LIBRARY_PAGE_SIZES)[number]) ? n : DEFAULT_PORTAL_LIBRARY_PAGE_SIZE;
+};
+const page = getPage();
+const pageSize = getLimit();
 
+function portalLibraryPageUrl(value: number): string {
+  const u = new URL(url);
+  if (value <= 1) u.searchParams.delete('page');
+  else u.searchParams.set('page', String(value));
+  if (pageSize !== DEFAULT_PORTAL_LIBRARY_PAGE_SIZE) u.searchParams.set('limit', String(pageSize));
+  if (categoryFilter) u.searchParams.set('category', categoryFilter);
+  return u.pathname + u.search;
+}
+
+const db = env?.DB;
 const categories = db ? await listPreapprovalCategories(db) : [];
 const items = db
-  ? await listPreapprovalItems(db, categoryFilter ? { category: categoryFilter, approvedOnly: true } : { approvedOnly: true })
+  ? await listPreapprovalItems(db, categoryFilter ? { category: categoryFilter, approvedOnly: true, limit: pageSize, offset: (page - 1) * pageSize } : { approvedOnly: true, limit: pageSize, offset: (page - 1) * pageSize })
   : [];
 const allRequests = db ? await listArbRequestsByHousehold(db, session.email) : [];
 const draftCount = allRequests.filter((r) => r.status === 'pending').length;
@@ -56,11 +79,30 @@ const draftCount = allRequests.filter((r) => r.status === 'pending').length;
           </div>
         )}
 
-        {items.length === 0 ? (
+        {items.length === 0 && page === 1 ? (
           <div class="bg-white rounded-2xl border border-gray-100 p-8 text-center text-gray-500 portal-theme-text-muted">
             No pre-approved items yet. The board may add designs to this library over time.
           </div>
         ) : (
+          <>
+          <div class="flex flex-wrap items-center gap-2 mb-4">
+            <label for="portal-library-per-page" class="text-sm text-gray-600">Per page:</label>
+            <select id="portal-library-per-page" name="limit" class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-700 focus:border-clr-green focus:outline-none focus:ring-1 focus:ring-clr-green" aria-label="Entries per page">
+              {PORTAL_LIBRARY_PAGE_SIZES.map((size) => (
+                <option value={size} selected={pageSize === size}>{size}</option>
+              ))}
+            </select>
+          </div>
+          <script is:inline>
+            document.getElementById('portal-library-per-page')?.addEventListener('change', function () {
+              const limit = this.value;
+              const u = new URL(window.location.href);
+              u.searchParams.set('limit', limit);
+              u.searchParams.delete('page');
+              if (limit === '25') u.searchParams.delete('limit');
+              window.location.href = u.pathname + u.search;
+            });
+          </script>
           <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" id="library-grid">
             {items.map((item) => {
               const photos = parsePhotos(item.photos);
@@ -101,6 +143,16 @@ const draftCount = allRequests.filter((r) => r.status === 'pending').length;
               );
             })}
           </div>
+          {items.length > 0 && (
+            <nav class="flex items-center justify-between gap-2 py-2 px-3 mt-4 border-t border-gray-200 bg-gray-50 text-sm" aria-label="Library pagination">
+              <span class="text-gray-600">Page {page}</span>
+              <div class="flex gap-2">
+                {page > 1 && <a href={portalLibraryPageUrl(page - 1)} class="text-clr-green hover:underline font-medium">Previous</a>}
+                {items.length === pageSize && <a href={portalLibraryPageUrl(page + 1)} class="text-clr-green hover:underline font-medium">Next</a>}
+              </div>
+            </nav>
+          )}
+          </>
         )}
       </main>
     </div>

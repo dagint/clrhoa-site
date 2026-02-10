@@ -6,7 +6,7 @@
 export const prerender = false;
 
 import { requireSession, requireDb, jsonResponse } from '../../lib/api-helpers';
-import { getEffectiveRole, verifyCsrfToken } from '../../lib/auth';
+import { getEffectiveRole, verifyCsrfToken, isBoardOnly } from '../../lib/auth';
 import { getMaintenanceById, updateMaintenanceRequest } from '../../lib/maintenance-db';
 
 const auth = await requireSession(Astro);
@@ -14,7 +14,7 @@ if ('response' in auth) return auth.response;
 const { session } = auth;
 
 const effectiveRole = getEffectiveRole(session);
-const isBoard = effectiveRole === 'board' || effectiveRole === 'admin' || effectiveRole === 'arb_board';
+const isBoard = isBoardOnly(effectiveRole) || effectiveRole === 'admin';
 if (!isBoard) return jsonResponse({ error: 'Forbidden' }, 403);
 
 const dbResult = requireDb(Astro.locals.runtime?.env);
