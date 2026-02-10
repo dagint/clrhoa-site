@@ -1,4 +1,89 @@
 ---
+/**
+ * ADMIN-ONLY: Site Feedback Management
+ *
+ * Required permissions: effectiveRole === 'admin'
+ *
+ * Route-level guard: Uses getAdminContext() to enforce admin-only access.
+ * This page displays site feedback submissions (thumbs up/down + comments) from the feedback widget.
+ *
+ * Redirects non-admin users to their appropriate landing zone.
+ *
+ * Note: This is a legacy route that redirects to /portal/admin/feedback.
+ * New admin pages should be created under /portal/admin/*.
+ */
 export const prerender = false;
-return Astro.redirect('/portal/admin/feedback' + (Astro.url.search || ''));
+
+import BoardLayout from '../../layouts/BoardLayout.astro';
+import { getAdminContext } from '../../lib/board-context';
+import { listSiteFeedback } from '../../lib/site-feedback-db';
+
+// Route-level guard: enforce admin-only access
+const ctx = await getAdminContext(Astro);
+if ('redirect' in ctx) return Astro.redirect(ctx.redirect);
+const { env, session, effectiveRole } = ctx;
+
+const ADMIN_FEEDBACK_PAGE_SIZES = [10, 25, 50, 100] as const;
+const DEFAULT_ADMIN_FEEDBACK_PAGE_SIZE = 25;
+const url = Astro.url;
+const q = url.searchParams;
+const from = q.get('from') ?? '';
+const to = q.get('to') ?? '';
+const thumbsParam = q.get('thumbs') ?? '';
+const urlContains = q.get('url') ?? '';
+const getPage = (): number => {
+  const p = q.get('page');
+  const n = p ? parseInt(p, 10) : 1;
+  return Number.isNaN(n) || n < 1 ? 1 : Math.min(n, 1000);
+};
+const getLimit = (): number => {
+  const p = q.get('limit');
+  const n = p ? parseInt(p, 10) : DEFAULT_ADMIN_FEEDBACK_PAGE_SIZE;
+  return ADMIN_FEEDBACK_PAGE_SIZES.includes(n as (typeof ADMIN_FEEDBACK_PAGE_SIZES)[number]) ? n : DEFAULT_ADMIN_FEEDBACK_PAGE_SIZE;
+};
+const page = getPage();
+const pageSize = getLimit();
+
+function adminFeedbackPageUrl(value: number): string {
+  const u = new URL(url);
+  if (value <= 1) u.searchParams.delete('page');
+  else u.searchParams.set('page', String(value));
+  if (pageSize !== DEFAULT_ADMIN_FEEDBACK_PAGE_SIZE) u.searchParams.set('limit', String(pageSize));
+  if (from.trim()) u.searchParams.set('from', from.trim());
+  if (to.trim()) u.searchParams.set('to', to.trim());
+  if (thumbsParam === '1' || thumbsParam === '-1') u.searchParams.set('thumbs', thumbsParam);
+  if (urlContains.trim()) u.searchParams.set('url', urlContains.trim());
+  return u.pathname + u.search;
+}
+
+const db = env?.DB;
+const thumbsFilter = thumbsParam === '1' ? 1 : thumbsParam === '-1' ? -1 : undefined;
+const feedback = db
+  ? await listSiteFeedback(db, {
+      from: from.trim() || undefined,
+      to: to.trim() || undefined,
+      thumbs: thumbsFilter,
+      urlContains: urlContains.trim() || undefined,
+      limit: pageSize,
+      offset: (page - 1) * pageSize,
+    })
+  : [];
+
+function formatDate(s: string | null): string {
+  if (!s) return '—';
+  try {
+    const d = new Date(s);
+    return Number.isNaN(d.getTime()) ? s : d.toLocaleString();
+  } catch {
+    return s ?? '—';
+  }
+}
+
+const csvParams = new URLSearchParams();
+if (from.trim()) csvParams.set('from', from.trim());
+if (to.trim()) csvParams.set('to', to.trim());
+if (thumbsParam === '1' || thumbsParam === '-1') csvParams.set('thumbs', thumbsParam);
+if (urlContains.trim()) csvParams.set('url', urlContains.trim());
+csvParams.set('export', 'csv');
+const csvHref = `/api/site-feedback?${csvParams.toString()}`;
 ---

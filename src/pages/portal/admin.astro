@@ -1,21 +1,32 @@
 ---
+/**
+ * ADMIN Landing Zone: /portal/admin
+ *
+ * Required permissions: effectiveRole === 'admin'
+ *
+ * Route-level guard: Uses getAdminContext() to enforce admin-only access.
+ * Redirects non-admin users to their appropriate landing zone:
+ * - board/arb_board → /portal/board
+ * - arb → /portal/arb
+ * - admin whitelist but not elevated → /portal/request-elevated-access
+ * - member → /portal/dashboard
+ *
+ * When a user elevates to admin role (via PIM), they are redirected here.
+ * When a user de-elevates or PIM expires, they revert to member role and see /portal/dashboard.
+ */
 export const prerender = false;
 
 import PortalLayout from '../../layouts/PortalLayout.astro';
 import ProtectedPage from '../../components/ProtectedPage.astro';
 import PortalNav from '../../components/PortalNav.astro';
 import AdminNav from '../../components/AdminNav.astro';
-import { getPortalContext } from '../../lib/portal-context';
-import { isAdminRole } from '../../lib/auth';
+import { getAdminContext } from '../../lib/board-context';
 import { listArbRequestsByHousehold } from '../../lib/arb-db';
 
-const { env, session, effectiveRole } = await getPortalContext(Astro, { fingerprint: true });
-if (!session) return Astro.redirect('/portal/login');
-if (!isAdminRole(effectiveRole)) {
-  if (effectiveRole === 'board' || effectiveRole === 'arb_board') return Astro.redirect('/portal/board');
-  if (effectiveRole === 'arb') return Astro.redirect('/portal/arb');
-  return Astro.redirect('/portal/request-elevated-access?return=' + encodeURIComponent('/portal/admin'));
-}
+// Route-level guard: enforce admin-only access
+const ctx = await getAdminContext(Astro);
+if ('redirect' in ctx) return Astro.redirect(ctx.redirect);
+const { env, session, effectiveRole } = ctx;
 
 const db = env?.DB;
 const allRequests = db ? await listArbRequestsByHousehold(db, session.email) : [];

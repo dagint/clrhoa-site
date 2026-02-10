@@ -1,4 +1,63 @@
 ---
+/**
+ * ADMIN-ONLY: SMS Feature Requests
+ *
+ * Required permissions: effectiveRole === 'admin'
+ *
+ * Route-level guard: Uses getAdminContext() to enforce admin-only access.
+ * This page displays members who have requested SMS notifications (for planning purposes).
+ *
+ * Redirects non-admin users to their appropriate landing zone.
+ *
+ * Note: This is a legacy route that redirects to /portal/admin/sms-requests.
+ * New admin pages should be created under /portal/admin/*.
+ */
 export const prerender = false;
-return Astro.redirect('/portal/admin/sms-requests' + (Astro.url.search || ''));
+
+import BoardLayout from '../../layouts/BoardLayout.astro';
+import { getAdminContext } from '../../lib/board-context';
+import { getSmsFeatureRequestCounts, listSmsFeatureRequests } from '../../lib/sms-feature-request-db';
+
+// Route-level guard: enforce admin-only access
+const ctx = await getAdminContext(Astro);
+if ('redirect' in ctx) return Astro.redirect(ctx.redirect);
+const { env, session, effectiveRole } = ctx;
+
+const ADMIN_SMS_PAGE_SIZES = [10, 25, 50, 100] as const;
+const DEFAULT_ADMIN_SMS_PAGE_SIZE = 25;
+const url = Astro.url;
+const getPage = (): number => {
+  const p = url.searchParams.get('page');
+  const n = p ? parseInt(p, 10) : 1;
+  return Number.isNaN(n) || n < 1 ? 1 : Math.min(n, 1000);
+};
+const getLimit = (): number => {
+  const p = url.searchParams.get('limit');
+  const n = p ? parseInt(p, 10) : DEFAULT_ADMIN_SMS_PAGE_SIZE;
+  return ADMIN_SMS_PAGE_SIZES.includes(n as (typeof ADMIN_SMS_PAGE_SIZES)[number]) ? n : DEFAULT_ADMIN_SMS_PAGE_SIZE;
+};
+const page = getPage();
+const pageSize = getLimit();
+
+function adminSmsPageUrl(value: number): string {
+  const u = new URL(url);
+  if (value <= 1) u.searchParams.delete('page');
+  else u.searchParams.set('page', String(value));
+  if (pageSize !== DEFAULT_ADMIN_SMS_PAGE_SIZE) u.searchParams.set('limit', String(pageSize));
+  return u.pathname + u.search;
+}
+
+const db = env?.DB;
+const counts = db ? await getSmsFeatureRequestCounts(db) : { distinctLots: 0, totalRequests: 0 };
+const requests = db ? await listSmsFeatureRequests(db, pageSize, (page - 1) * pageSize) : [];
+
+function formatDate(s: string | null): string {
+  if (!s) return '—';
+  try {
+    const d = new Date(s);
+    return Number.isNaN(d.getTime()) ? s : d.toLocaleString();
+  } catch {
+    return s ?? '—';
+  }
+}
 ---

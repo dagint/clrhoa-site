@@ -1,4 +1,46 @@
 ---
+/**
+ * ADMIN-ONLY: Test Email & Environment Troubleshooting
+ *
+ * Required permissions: effectiveRole === 'admin'
+ *
+ * Route-level guard: Uses getAdminContext() to enforce admin-only access.
+ * This page allows admins to send test emails and view environment variable status
+ * (names only, no values) for troubleshooting.
+ *
+ * Redirects non-admin users to their appropriate landing zone.
+ *
+ * Note: This is a legacy route that redirects to /portal/admin/test-email.
+ * New admin pages should be created under /portal/admin/*.
+ */
 export const prerender = false;
-return Astro.redirect('/portal/admin/test-email' + (Astro.url.search || ''));
+
+import BoardLayout from '../../layouts/BoardLayout.astro';
+import { getAdminContext } from '../../lib/board-context';
+
+// Route-level guard: enforce admin-only access
+const ctx = await getAdminContext(Astro);
+if ('redirect' in ctx) return Astro.redirect(ctx.redirect);
+const { env, session, effectiveRole } = ctx;
+
+/** Env var names we show for troubleshooting (set/unset only; no values). */
+const ENV_KEYS = [
+  'DB', 'CLOURHOA_USERS', 'CLOURHOA_FILES', 'SESSION_SECRET', 'KV',
+  'NOTIFY_BOARD_EMAIL', 'NOTIFY_ARB_EMAIL', 'NOTIFY_NOREPLY_EMAIL',
+  'RESEND_API_KEY', 'MAILCHANNELS_API_KEY',
+  'TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_PHONE_NUMBER',
+  'CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_DEPLOY_API_TOKEN', 'CLOUDFLARE_BACKUP_API_TOKEN', 'D1_DATABASE_ID',
+  'GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'BACKUP_ENCRYPTION_KEY',
+];
+
+const envVars: Record<string, 'set' | 'unset'> = {};
+if (effectiveRole === 'admin' && env) {
+  const e = env as Record<string, unknown>;
+  for (const k of ENV_KEYS) {
+    const v = e[k];
+    envVars[k] = v != null && (typeof v !== 'string' || v !== '') ? 'set' : 'unset';
+  }
+}
+
+const csrfToken = session?.csrfToken ?? '';
 ---
