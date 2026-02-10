@@ -128,6 +128,8 @@
     "db:notification-dismissals:local": "wrangler d1 execute clrhoa_db --local --file=./scripts/schema-notification-dismissals.sql",
     "db:route-permissions": "wrangler d1 execute clrhoa_db --remote --file=./scripts/schema-route-permissions.sql",
     "db:route-permissions:local": "wrangler d1 execute clrhoa_db --local --file=./scripts/schema-route-permissions.sql",
+    "db:indexes-performance": "wrangler d1 execute clrhoa_db --remote --file=./scripts/schema-indexes-performance.sql",
+    "db:indexes-performance:local": "wrangler d1 execute clrhoa_db --local --file=./scripts/schema-indexes-performance.sql",
     "db:local:all": "node scripts/run-all-db-local.js",
     "db:remote:all": "node scripts/run-all-db-remote.js",
     "astro": "astro",

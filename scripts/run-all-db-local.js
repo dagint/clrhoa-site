@@ -97,6 +97,7 @@ run('db:pim-elevation', 'schema-pim-elevation.sql');
 run('db:notification-dismissals', 'schema-notification-dismissals.sql');
 run('db:assessment-payments-method-check', 'schema-assessment-payments-method-check.sql');
 run('db:route-permissions', 'schema-route-permissions.sql');
+run('db:indexes-performance', 'schema-indexes-performance.sql');
 
 console.log('\nAll local DB migrations completed. You can run npm run dev.');
 process.exit(0);
