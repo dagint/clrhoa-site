@@ -28,7 +28,7 @@ const elevatedLink = getPortalElevatedLink(staffRole);
 function isCurrent(href: string) {
   if (href === '/portal/dashboard') return currentPath === '/portal/dashboard';
   if (href === '/portal/board') return currentPath === '/portal/board' || currentPath.startsWith('/board/');
-  if (href === '/portal/admin') return currentPath === '/portal/admin' || currentPath.startsWith('/admin/') || currentPath === '/portal/usage';
+  if (href === '/portal/admin') return currentPath === '/portal/admin' || currentPath.startsWith('/portal/admin/');
   if (href === '/portal/arb') return currentPath === '/portal/arb' || currentPath.startsWith('/portal/arb');
   return currentPath.startsWith(href);
 }
@@ -63,7 +63,7 @@ const isStaffFromWhitelist = !!elevatedLink;
               <svg class="w-4 h-4 transition group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
             </summary>
             <div id="nav-more-menu" class="absolute left-0 top-full mt-1 py-2 w-56 rounded-xl bg-white border border-gray-200 shadow-lg z-50 portal-theme-card" role="menu">
-              {portalMoreLinks.map((link) => (
+              {!isElevated && portalMoreLinks.map((link) => (
                 <a
                   href={link.href}
                   class={`flex items-center justify-between gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 portal-theme-text ${link.href === '/portal/requests' ? '' : 'block'}`}

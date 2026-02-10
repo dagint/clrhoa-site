@@ -114,19 +114,27 @@ export const ROLE_LANDING: Record<string, string> = {
 
 // ─── Admin only ─────────────────────────────────────────────────────
 
-/** Admin-only nav: site feedback, SMS requests, test email, site usage, audit logs. */
+/** Admin-only nav: all under /portal/admin/*. */
 export const adminLinks: NavLink[] = [
   { label: 'Admin', href: '/portal/admin' },
-  { label: 'Site feedback', href: '/admin/feedback' },
-  { label: 'SMS requests', href: '/admin/sms-requests' },
-  { label: 'Test email', href: '/admin/test-email' },
-  { label: 'Site usage', href: '/portal/usage' },
-  { label: 'Audit logs', href: '/board/audit-logs' },
+  { label: 'Site feedback', href: '/portal/admin/feedback' },
+  { label: 'SMS requests', href: '/portal/admin/sms-requests' },
+  { label: 'Test email', href: '/portal/admin/test-email' },
+  { label: 'Backups', href: '/portal/admin/backups' },
+  { label: 'Site usage', href: '/portal/admin/usage' },
+  { label: 'Audit logs', href: '/portal/admin/audit-logs' },
+  { label: 'Vendors', href: '/portal/admin/vendors' },
+  { label: 'Maintenance', href: '/portal/admin/maintenance' },
+  { label: 'Directory', href: '/portal/admin/directory' },
+  { label: 'Contacts', href: '/portal/admin/contacts' },
+  { label: 'News', href: '/portal/admin/news' },
+  { label: 'Member documents', href: '/portal/admin/member-documents' },
+  { label: 'Public documents', href: '/portal/admin/public-documents' },
 ];
 
 // ─── Board only ─────────────────────────────────────────────────────
 
-/** Board-only nav: board dashboard, ARB dashboard, directory, dues, vendors, meetings, maintenance, feedback, contacts, news, library, documents, audit logs. */
+/** Board-only nav: board dashboard, ARB dashboard, directory, dues, vendors, meetings, maintenance, feedback, contacts, news, library, documents, audit logs, backups. */
 export const boardLinks: NavLink[] = [
   { label: 'Board', href: '/portal/board' },
   { label: 'ARB Dashboard', href: '/portal/arb-dashboard' },
@@ -147,11 +155,20 @@ export const boardLinks: NavLink[] = [
 
 // ─── ARB only ────────────────────────────────────────────────────────
 
-/** ARB-only nav: ARB dashboard, pre-approval library. */
+/** ARB-only nav: ARB dashboard, vendors, meetings, maintenance, feedback, contacts, news, library, documents, backups. */
 export const arbLinks: NavLink[] = [
   { label: 'ARB', href: '/portal/arb' },
   { label: 'ARB Dashboard', href: '/portal/arb-dashboard' },
-  { label: 'Pre-approval library', href: '/board/library' },
+  { label: 'Vendors', href: '/board/vendors' },
+  { label: 'Meetings', href: '/board/meetings' },
+  { label: 'Maintenance', href: '/board/maintenance' },
+  { label: 'Feedback', href: '/board/feedback' },
+  { label: 'Contacts', href: '/board/contacts' },
+  { label: 'News', href: '/board/news' },
+  { label: 'Library', href: '/board/library' },
+  { label: 'Member documents', href: '/board/member-documents' },
+  { label: 'Public documents', href: '/board/public-documents' },
+  { label: 'Backups', href: '/board/backups' },
 ];
 
 // ─── Portal navigation ──────────────────────────────────────────────
