@@ -1,25 +1,24 @@
 ---
 /**
- * Nav for ARB role: ARB Dashboard and Pre-approval library only.
- * Shown when user is acting as ARB (e.g. on /portal/board or /board/library).
+ * Secondary nav for admin role: site feedback, SMS requests, test email, site usage, audit logs.
  */
 interface Props {
   currentPath: string;
 }
 
-import { arbLinks } from '../config/navigation';
+import { adminLinks } from '../config/navigation';
 
 const { currentPath } = Astro.props;
 
-const links = arbLinks;
+const links = adminLinks;
 
 function isCurrent(href: string): boolean {
-  if (href === '/portal/arb') return currentPath === '/portal/arb';
+  if (href === '/portal/admin') return currentPath === '/portal/admin';
   return currentPath.startsWith(href);
 }
 ---
 
-<nav class="bg-white border-b border-gray-200 portal-theme-header px-4 sm:px-6 py-2" aria-label="ARB administration">
+<nav class="bg-white border-b border-gray-200 portal-theme-header px-4 sm:px-6 py-2" aria-label="Admin">
   <div class="max-w-4xl mx-auto flex flex-wrap items-center gap-x-4 gap-y-1">
     {links.map(({ href, label }) => (
       <a

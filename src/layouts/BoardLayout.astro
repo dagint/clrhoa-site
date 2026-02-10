@@ -10,6 +10,7 @@ import PortalNav from '../components/PortalNav.astro';
 import PortalElevatedRoleBanner from '../components/PortalElevatedRoleBanner.astro';
 import BoardNav from '../components/BoardNav.astro';
 import ArbNav from '../components/ArbNav.astro';
+import AdminNav from '../components/AdminNav.astro';
 import PimElevationBanner from '../components/PimElevationBanner.astro';
 import type { SessionPayload } from '../lib/auth';
 
@@ -36,9 +37,9 @@ const showPimBanner = typeof elevatedUntil === 'number' && elevatedUntil > Date.
   <ProtectedPage>
     <div class="min-h-screen portal-theme-bg font-body">
       {showPimBanner && <PimElevationBanner elevatedUntil={elevatedUntil!} role={role} />}
-      <PortalNav currentPath={currentPath} draftCount={draftCount} role={role} staffRole={role} />
+      <PortalNav currentPath={currentPath} draftCount={draftCount} role={role} staffRole={session?.role ?? role} />
       {showRoleBanner && <PortalElevatedRoleBanner role={role} session={session} />}
-      {role === 'arb' ? <ArbNav currentPath={currentPath} /> : <BoardNav currentPath={currentPath} />}
+      {role === 'admin' ? <AdminNav currentPath={currentPath} /> : role === 'arb' ? <ArbNav currentPath={currentPath} /> : <BoardNav currentPath={currentPath} />}
 
       <main class={mainWide ? 'max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-12' : 'max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12'}>
         <div class="mb-6">

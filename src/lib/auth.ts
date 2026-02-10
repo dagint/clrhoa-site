@@ -96,6 +96,23 @@ export function isBoardOnly(role: string): boolean {
 }
 
 /**
+ * True only for effective role 'admin'. Use for admin-only routes: site feedback,
+ * SMS requests, test email, site usage, audit logs. Ensures clear separation from Board/ARB.
+ */
+export function isAdminRole(role: string): boolean {
+  const r = role?.toLowerCase();
+  return r === 'admin';
+}
+
+/**
+ * True for effective role 'arb' (or arb_board when acting as ARB). Use for ARB-only landing and routes.
+ */
+export function isArbRole(role: string): boolean {
+  const r = role?.toLowerCase();
+  return r === 'arb';
+}
+
+/**
  * Effective role for access control (PIM/JIT). If user has an elevated whitelist role but
  * elevated_until is missing or expired, they see member access until they request elevation.
  * For admin and arb_board: if assumed_role is set and not expired, returns that role (board or arb)

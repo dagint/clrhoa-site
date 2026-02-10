@@ -1,0 +1,53 @@
+---
+export const prerender = false;
+
+import PortalLayout from '../../layouts/PortalLayout.astro';
+import ProtectedPage from '../../components/ProtectedPage.astro';
+import PortalNav from '../../components/PortalNav.astro';
+import ArbNav from '../../components/ArbNav.astro';
+import { getPortalContext } from '../../lib/portal-context';
+import { isArbRole } from '../../lib/auth';
+import { getArbRequestCountsByStatus, listArbRequestsByHousehold } from '../../lib/arb-db';
+
+const { env, session, effectiveRole } = await getPortalContext(Astro, { fingerprint: true });
+if (!session) return Astro.redirect('/portal/login');
+if (!isArbRole(effectiveRole)) {
+  if (effectiveRole === 'admin') return Astro.redirect('/portal/admin');
+  if (effectiveRole === 'board' || effectiveRole === 'arb_board') return Astro.redirect('/portal/board');
+  return Astro.redirect('/portal/request-elevated-access?return=' + encodeURIComponent('/portal/arb'));
+}
+
+const db = env?.DB;
+const allRequests = db ? await listArbRequestsByHousehold(db, session.email) : [];
+const draftCount = allRequests.filter((r) => r.status === 'pending').length;
+const arbCounts = db ? await getArbRequestCountsByStatus(db) : { in_review: 0, pending: 0, approved: 0, rejected: 0, cancelled: 0 };
+---
+
+<PortalLayout title="ARB | Member Portal | Crooked Lake Reserve HOA">
+  <ProtectedPage>
+  <div class="min-h-screen portal-theme-bg font-body">
+    <PortalNav currentPath="/portal/arb" draftCount={draftCount} role={effectiveRole} staffRole={session.role ?? ''} arbInReviewCount={arbCounts.in_review} />
+
+    <ArbNav currentPath="/portal/arb" />
+
+    <main class="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+      <div class="mb-6">
+        <h2 class="text-2xl font-heading font-bold text-clr-green mb-1">ARB</h2>
+        <p class="text-gray-600 text-sm">Review ARB requests and manage the pre-approval library. Board tools (directory, dues, documents) require Board role or Act as Board.</p>
+      </div>
+      <div class="mb-6 flex flex-wrap gap-3">
+        <a href="/portal/arb-dashboard" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-clr-green hover:brightness-110 text-white font-semibold text-sm shadow-sm">
+          ARB Dashboard
+          {arbCounts.in_review > 0 && (
+            <span class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 rounded-full bg-amber-500 text-white text-xs font-bold">{arbCounts.in_review}</span>
+          )}
+        </a>
+        <a href="/board/library" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 border-gray-300 text-gray-700 hover:bg-gray-100 font-semibold text-sm">
+          Pre-approval library
+        </a>
+      </div>
+      <p class="text-sm text-gray-500">Use the banner to <strong>Act as Board</strong> when you need directory, dues, meetings, or other board-only tools (arb_board only).</p>
+    </main>
+  </div>
+  </ProtectedPage>
+</PortalLayout>
