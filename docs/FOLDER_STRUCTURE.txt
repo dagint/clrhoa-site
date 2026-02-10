@@ -1,0 +1,128 @@
+CLRHOA Portal - Complete Folder Structure
+==========================================
+
+src/pages/portal/
+│
+├── 📁 admin/                         [Admin Only - /portal/admin/*]
+│   ├── audit-logs.astro             ✅ Security & audit logs
+│   ├── backups.astro                ✅ Database backups
+│   ├── contacts.astro               ✅ Board contact management
+│   ├── directory.astro              ✅ Directory (read-only)
+│   ├── feedback.astro               ✅ Site feedback management
+│   ├── maintenance.astro            ✅ Maintenance management
+│   ├── member-documents.astro       ✅ Member document uploads
+│   ├── news.astro                   ✅ News management
+│   ├── public-documents.astro       ✅ Public document uploads
+│   ├── sms-requests.astro           ✅ SMS opt-in requests
+│   ├── test-email.astro             ✅ Email testing
+│   ├── usage.astro                  ✅ Site analytics
+│   └── vendors.astro                ✅ Vendor management
+│
+├── 📁 assessments/                   [Member - /portal/assessments/*]
+│   └── 📁 receipt/
+│       └── [id].astro               ✅ Payment receipt
+│
+├── 📁 arb-request/                   [Member - /portal/arb-request/*]
+│   └── 📁 edit/
+│       └── [id].astro               ✅ Edit ARB request
+│
+├── admin.astro                      ✅ Admin landing zone
+├── arb.astro                        ✅ ARB landing zone
+├── arb-dashboard.astro              ✅ ARB request review
+├── arb-request.astro                ✅ New ARB request form
+├── assessments.astro                ✅ My dues & payments
+├── assume-role-help.astro           ✅ PIM role assumption help
+├── dashboard.astro                  ✅ Member home
+├── directory.astro                  ✅ Member directory
+├── docs.astro                       ✅ Documentation
+├── documents.astro                  ✅ Protected documents
+├── elevation-audit.astro            ✅ Elevation audit log
+├── faq.astro                        ✅ FAQ
+├── feedback.astro                   ✅ Submit feedback
+├── library.astro                    ✅ Pre-approval library
+├── login.astro                      ✅ Login page
+├── maintenance.astro                ✅ Maintenance schedule
+├── meetings.astro                   ✅ Meeting calendar
+├── my-activity.astro                ✅ Activity log
+├── my-info.astro                    ✅ User info (legacy)
+├── my-requests.astro                ✅ My ARB requests
+├── news.astro                       ✅ News & announcements
+├── preferences.astro                ✅ User preferences
+├── profile.astro                    ✅ User profile
+├── request-elevated-access.astro    ✅ PIM elevation request
+├── requests.astro                   ✅ ARB request overview
+├── search.astro                     ✅ Portal search
+├── usage.astro                      ✅ Usage analytics
+└── vendors.astro                    ✅ Vendor directory
+
+/board/                               [Board/ARB - Top-Level Routes]
+│
+├── 📁 assessments/                   [Board Only]
+│   └── (needs index page)           🔨 Payment tracking & recording
+│
+├── 📁 audit-logs/                    [Board Only]
+│   └── (needs index page)           🔨 Audit log review
+│
+├── 📁 backups/                       [Board/ARB]
+│   └── (needs index page)           🔨 Database backups
+│
+├── 📁 contacts/                      [Board/ARB]
+│   └── (needs index page)           🔨 Board contact management
+│
+├── 📁 directory/                     [Board Only]
+│   └── (needs index page)           🔨 Full directory CRUD
+│
+├── 📁 feedback/                      [Board/ARB]
+│   └── (needs index page)           🔨 Member feedback review
+│
+├── 📁 library/                       [Board/ARB]
+│   └── (needs index page)           🔨 Pre-approval library mgmt
+│
+├── 📁 maintenance/                   [Board/ARB]
+│   └── (needs index page)           🔨 Maintenance tracking
+│
+├── 📁 meetings/                      [Board/ARB]
+│   └── (needs index page)           🔨 Meeting management
+│
+├── 📁 member-documents/              [Board/ARB]
+│   └── (needs index page)           🔨 Member document uploads
+│
+├── 📁 news/                          [Board/ARB]
+│   └── (needs index page)           🔨 News publishing
+│
+├── 📁 public-documents/              [Board/ARB]
+│   └── (needs index page)           🔨 Public document uploads
+│
+└── 📁 vendors/                       [Board/ARB]
+    └── (needs index page)           🔨 Vendor approvals
+
+Legend:
+-------
+✅ = Exists and implemented
+🔨 = Needs to be created
+📁 = Folder/directory
+[Role] = Required role for access
+
+
+Role Access Summary:
+--------------------
+Member Routes:     /portal/* (19 pages) - ✅ Complete
+Admin Routes:      /portal/admin/* (14 pages) - ✅ Complete
+Board Routes:      /board/* (14 pages) - 🔨 Needs Implementation
+ARB Routes:        /portal/arb* (2 pages) - ✅ Complete
+PIM Routes:        /portal/*-access, *-audit (3 pages) - ✅ Complete
+
+
+Quick Stats:
+------------
+Total Routes:      52
+Implemented:       38 (73%)
+To Create:         14 (27%)
+Member Routes:     19 ✅
+Admin Routes:      14 ✅
+Board Routes:       0 🔨
+ARB Routes:         2 ✅
+PIM Routes:         3 ✅
+
+All middleware protection is in place. Board routes only need page files created.
+Use templates from docs/ROUTE_BOILERPLATE.md to generate pages quickly.
