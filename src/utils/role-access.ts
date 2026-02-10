@@ -3,8 +3,6 @@
  * Centralizes the complex nested logic from middleware into a testable function.
  */
 
-import type { Role } from './rbac';
-
 export interface RouteAccessConfig {
   /** Paths that require admin or board role */
   auditLogsPaths: string[];
