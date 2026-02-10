@@ -18,7 +18,7 @@ interface Props {
 
 const { effectiveRole, staffRole, elevatedUntil, assumedRole, assumedUntil } = Astro.props;
 
-const isElevated = effectiveRole !== 'member' && effectiveRole !== staffRole?.toLowerCase();
+const isElevated = effectiveRole !== 'member';
 const roleInfo = getRoleInfo(effectiveRole);
 
 // Calculate time remaining for elevation
