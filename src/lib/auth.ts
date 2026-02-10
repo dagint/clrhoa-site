@@ -361,11 +361,39 @@ export async function getSessionFromCookie(
     const ok = await crypto.subtle.verify('HMAC', key, sig, data);
     if (!ok) return null;
 
-    // Verify session fingerprint (if present)
-    if (payload.fingerprint && userAgent !== undefined && ipAddress !== undefined) {
-      if (!(await verifySessionFingerprint(payload.fingerprint, userAgent, ipAddress))) {
-        // Fingerprint mismatch - possible session hijacking
-        return null;
+    // Verify session fingerprint
+    if (userAgent !== undefined && ipAddress !== undefined) {
+      if (payload.fingerprint) {
+        // Fingerprint exists - verify it
+        if (!(await verifySessionFingerprint(payload.fingerprint, userAgent, ipAddress))) {
+          // Fingerprint mismatch - possible session hijacking
+          console.warn('[auth] Session fingerprint mismatch', {
+            email: payload.email,
+            sessionId: payload.sessionId,
+          });
+          return null;
+        }
+      } else {
+        // Legacy session without fingerprint
+        // DEPRECATION: Sessions without fingerprints will be rejected after 2026-05-10
+        const FINGERPRINT_DEPRECATION_DATE = new Date('2026-05-10T00:00:00Z').getTime();
+        const now = Date.now();
+
+        if (now >= FINGERPRINT_DEPRECATION_DATE) {
+          // Deprecation period ended - reject legacy sessions
+          console.warn('[auth] Legacy session rejected (no fingerprint)', {
+            email: payload.email,
+            sessionId: payload.sessionId,
+          });
+          return null;
+        } else {
+          // Still in grace period - allow but log
+          console.warn('[auth] Legacy session allowed (no fingerprint) - will be rejected after 2026-05-10', {
+            email: payload.email,
+            sessionId: payload.sessionId,
+            daysRemaining: Math.ceil((FINGERPRINT_DEPRECATION_DATE - now) / (1000 * 60 * 60 * 24)),
+          });
+        }
       }
     }
 
