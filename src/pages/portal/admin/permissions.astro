@@ -1,0 +1,216 @@
+---
+/**
+ * Admin: Role Permission Management
+ *
+ * Admin-only page for managing RBAC permissions across all portal routes.
+ * Define per-page permissions for each role (None, Read, Write).
+ */
+export const prerender = false;
+
+import BoardLayout from '../../../layouts/BoardLayout.astro';
+import { getAdminContext } from '../../../lib/board-context';
+import PermissionGrid from '../../../components/PermissionGrid.astro';
+import { getAllPermissions } from '../../../lib/permissions-db';
+import { PROTECTED_ROUTES } from '../../../utils/rbac';
+
+const ctx = await getAdminContext(Astro);
+if ('redirect' in ctx) return Astro.redirect(ctx.redirect);
+const { env, session, effectiveRole } = ctx;
+
+const db = env?.DB;
+
+// Load current permissions from database
+let permissions: Record<string, Record<string, string>> = {};
+if (db) {
+  try {
+    permissions = await getAllPermissions(db);
+  } catch (err) {
+    console.error('Failed to load permissions:', err);
+  }
+}
+
+// Get all unique routes from PROTECTED_ROUTES
+const allRoutes = Array.from(new Set(PROTECTED_ROUTES.map((r) => r.path))).sort();
+
+// If no permissions in DB, initialize with defaults from PROTECTED_ROUTES
+if (Object.keys(permissions).length === 0) {
+  for (const route of PROTECTED_ROUTES) {
+    if (!permissions[route.path]) {
+      permissions[route.path] = {};
+    }
+    const roles: Array<'member' | 'arb' | 'board' | 'admin'> = ['member', 'arb', 'board', 'admin'];
+    for (const role of roles) {
+      // Default: write if in allowedRoles, else none
+      permissions[route.path][role] = route.allowedRoles.includes(role) ? 'write' : 'none';
+    }
+  }
+}
+
+const statsData = {
+  totalRoutes: allRoutes.length,
+  rolesManaged: 4,
+  totalPermissions: allRoutes.length * 4,
+  lastUpdated: 'Never',
+};
+
+// Calculate permissions distribution
+const permissionCounts = { none: 0, read: 0, write: 0 };
+Object.values(permissions).forEach((rolePerms) => {
+  Object.values(rolePerms).forEach((level) => {
+    if (level in permissionCounts) {
+      permissionCounts[level as keyof typeof permissionCounts]++;
+    }
+  });
+});
+---
+
+<BoardLayout
+  title="Role Permission Management"
+  subtitle="Define per-page permissions for each role (None, Read, Write)."
+  draftCount={0}
+  role={effectiveRole}
+  session={session}
+  elevatedUntil={session.elevated_until}
+  mainWide
+  showRoleBanner={false}
+>
+  <!-- Info Banner -->
+  <div class="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-4">
+    <div class="flex items-start gap-3">
+      <svg class="w-5 h-5 text-blue-600 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+      <div class="flex-1">
+        <h3 class="text-sm font-semibold text-blue-900 mb-1">Permission Levels</h3>
+        <div class="text-sm text-blue-800 space-y-1">
+          <p><strong>None:</strong> No access to route (redirected to login/dashboard)</p>
+          <p><strong>Read:</strong> View-only access (no create, edit, or delete operations)</p>
+          <p><strong>Write:</strong> Full access (view, create, edit, delete)</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div class="rounded-lg border border-gray-200 bg-white p-4">
+      <div class="text-sm text-gray-600">Total Routes</div>
+      <div class="text-2xl font-bold text-gray-900">{statsData.totalRoutes}</div>
+    </div>
+    <div class="rounded-lg border border-gray-200 bg-white p-4">
+      <div class="text-sm text-gray-600">Roles Managed</div>
+      <div class="text-2xl font-bold text-gray-900">{statsData.rolesManaged}</div>
+    </div>
+    <div class="rounded-lg border border-gray-200 bg-white p-4">
+      <div class="text-sm text-gray-600">Total Permissions</div>
+      <div class="text-2xl font-bold text-gray-900">{statsData.totalPermissions}</div>
+    </div>
+    <div class="rounded-lg border border-gray-200 bg-white p-4">
+      <div class="text-sm text-gray-600">Permission Distribution</div>
+      <div class="text-xs text-gray-700 mt-1">
+        <span class="inline-block mr-2">✗ {permissionCounts.none}</span>
+        <span class="inline-block mr-2 text-blue-600">👁 {permissionCounts.read}</span>
+        <span class="inline-block text-green-600">✓ {permissionCounts.write}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Warning -->
+  <div class="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4">
+    <div class="flex items-start gap-3">
+      <svg class="w-5 h-5 text-amber-600 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+      </svg>
+      <div class="flex-1">
+        <h3 class="text-sm font-semibold text-amber-900 mb-1">⚠️ Caution</h3>
+        <p class="text-sm text-amber-800">
+          Changes to permissions affect all users immediately after saving. Ensure you understand the
+          implications before restricting access. All permission changes are audited and logged.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Permission Grid -->
+  <PermissionGrid permissions={permissions} routes={allRoutes} />
+
+  <!-- Help Section -->
+  <details class="mt-6 rounded-lg border border-gray-200 bg-gray-50">
+    <summary class="cursor-pointer p-4 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg">
+      📖 How to Use This Page
+    </summary>
+    <div class="p-4 pt-0 space-y-3 text-sm text-gray-600">
+      <div>
+        <h4 class="font-semibold text-gray-900 mb-1">Changing Permissions</h4>
+        <p>
+          Use the dropdowns to set permission levels for each route and role combination.
+          Changed cells are highlighted in amber. Click <strong>Save Changes</strong> to persist updates.
+        </p>
+      </div>
+      <div>
+        <h4 class="font-semibold text-gray-900 mb-1">Quick Actions</h4>
+        <p>
+          Use the bulk action buttons to set all visible routes to a specific permission level.
+          Use the filter to narrow down routes before applying bulk actions.
+        </p>
+      </div>
+      <div>
+        <h4 class="font-semibold text-gray-900 mb-1">Filtering Routes</h4>
+        <p>
+          Type in the filter box to search for specific routes. Only visible routes will be affected
+          by bulk actions. Example searches: "/board", "/admin", "/portal/arb"
+        </p>
+      </div>
+      <div>
+        <h4 class="font-semibold text-gray-900 mb-1">Reverting Changes</h4>
+        <p>
+          Click <strong>Revert</strong> to undo all pending changes and restore original values.
+          This does not affect previously saved changes.
+        </p>
+      </div>
+      <div>
+        <h4 class="font-semibold text-gray-900 mb-1">Audit Trail</h4>
+        <p>
+          All permission changes are logged with timestamp, admin email, and IP address for security
+          and compliance. Changes take effect immediately for all users upon save.
+        </p>
+      </div>
+      <div class="pt-2 border-t border-gray-300">
+        <h4 class="font-semibold text-gray-900 mb-1">⚡ Best Practices</h4>
+        <ul class="list-disc list-inside space-y-1 text-xs">
+          <li>Test permission changes with a non-admin account in incognito mode</li>
+          <li>Document significant permission changes in your change log</li>
+          <li>Avoid giving "none" permission to critical routes like /portal/dashboard</li>
+          <li>Use "read" permission for informational pages that don't require write actions</li>
+          <li>Reserve "write" permission for roles that need full CRUD operations</li>
+        </ul>
+      </div>
+    </div>
+  </details>
+
+  <!-- Debug Info (Admin Only) -->
+  {!db && (
+    <div class="mt-6 rounded-lg border border-red-200 bg-red-50 p-4">
+      <p class="text-sm text-red-800">
+        ⚠️ <strong>Database not available.</strong> Permissions cannot be saved. Check your D1 binding configuration.
+      </p>
+    </div>
+  )}
+</BoardLayout>
+
+<style>
+  details summary::-webkit-details-marker {
+    display: none;
+  }
+  details summary::marker {
+    content: '';
+  }
+  details summary::before {
+    content: '▸ ';
+    display: inline-block;
+    transition: transform 0.2s;
+  }
+  details[open] summary::before {
+    transform: rotate(90deg);
+  }
+</style>

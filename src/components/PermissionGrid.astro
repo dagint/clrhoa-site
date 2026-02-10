@@ -1,0 +1,329 @@
+---
+/**
+ * Permission Grid Component
+ *
+ * Displays and manages role-based permissions for portal routes.
+ * Shows routes in rows, roles in columns, with dropdowns for permission levels.
+ * Changes are staged client-side until Save is clicked.
+ */
+
+interface Props {
+  permissions: Record<string, Record<string, string>>;
+  routes: string[];
+}
+
+const { permissions, routes } = Astro.props;
+
+const roles = ['member', 'arb', 'board', 'admin'];
+const roleLabels: Record<string, string> = {
+  member: 'Member',
+  arb: 'ARB',
+  board: 'Board',
+  admin: 'Admin',
+};
+
+const levelColors: Record<string, string> = {
+  none: 'bg-gray-100 text-gray-600',
+  read: 'bg-blue-100 text-blue-700',
+  write: 'bg-green-100 text-green-700',
+};
+---
+
+<div class="permission-grid-container">
+  <!-- Controls Bar -->
+  <div class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 bg-gray-50 p-4">
+    <div class="flex items-center gap-3">
+      <button
+        type="button"
+        id="save-permissions"
+        class="rounded-lg bg-clr-green px-4 py-2 text-sm font-medium text-white hover:bg-clr-green/90 disabled:opacity-50 disabled:cursor-not-allowed"
+        disabled
+      >
+        Save Changes
+      </button>
+      <button
+        type="button"
+        id="revert-permissions"
+        class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+        disabled
+      >
+        Revert
+      </button>
+      <span id="change-count" class="text-sm text-gray-600"></span>
+    </div>
+
+    <div class="flex items-center gap-2">
+      <label for="filter-route" class="text-sm font-medium text-gray-700">Filter:</label>
+      <input
+        type="text"
+        id="filter-route"
+        placeholder="Search routes..."
+        class="rounded border border-gray-300 px-3 py-1.5 text-sm focus:border-clr-green focus:outline-none focus:ring-1 focus:ring-clr-green"
+      />
+    </div>
+  </div>
+
+  <!-- Bulk Actions -->
+  <div class="mb-4 flex flex-wrap items-center gap-3 text-sm">
+    <span class="font-medium text-gray-700">Quick Actions:</span>
+    <button
+      type="button"
+      class="bulk-action rounded border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+      data-action="set-all-read"
+    >
+      Set All to Read
+    </button>
+    <button
+      type="button"
+      class="bulk-action rounded border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+      data-action="set-all-write"
+    >
+      Set All to Write
+    </button>
+    <button
+      type="button"
+      class="bulk-action rounded border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+      data-action="set-all-none"
+    >
+      Set All to None
+    </button>
+  </div>
+
+  <!-- Permission Table -->
+  <div class="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50 border-b border-gray-200 sticky top-0">
+        <tr>
+          <th class="text-left py-3 px-4 font-semibold text-gray-700 w-1/2">Route Path</th>
+          {roles.map((role) => (
+            <th class="text-center py-3 px-3 font-semibold text-gray-700">{roleLabels[role]}</th>
+          ))}
+        </tr>
+      </thead>
+      <tbody id="permission-table-body">
+        {routes.sort().map((route) => (
+          <tr class="border-b border-gray-100 hover:bg-gray-50/50 permission-row" data-route={route}>
+            <td class="py-2 px-4 font-mono text-xs text-gray-600">{route}</td>
+            {roles.map((role) => {
+              const currentLevel = permissions[route]?.[role] || 'none';
+              return (
+                <td class="py-2 px-3 text-center">
+                  <select
+                    class="permission-select w-full rounded border border-gray-300 px-2 py-1.5 text-xs focus:border-clr-green focus:outline-none focus:ring-1 focus:ring-clr-green"
+                    data-route={route}
+                    data-role={role}
+                    data-original={currentLevel}
+                  >
+                    <option value="none" selected={currentLevel === 'none'}>None</option>
+                    <option value="read" selected={currentLevel === 'read'}>Read</option>
+                    <option value="write" selected={currentLevel === 'write'}>Write</option>
+                  </select>
+                </td>
+              );
+            })}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Status Message -->
+  <div id="status-message" class="mt-4 hidden rounded-lg p-3 text-sm"></div>
+</div>
+
+<style>
+  .permission-grid-container {
+    max-width: 100%;
+  }
+
+  .permission-select {
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .permission-select.changed {
+    border-color: #f59e0b;
+    background-color: #fffbeb;
+    font-weight: 600;
+  }
+
+  .permission-row.hidden {
+    display: none;
+  }
+
+  #status-message.success {
+    background-color: #d1fae5;
+    border: 1px solid #10b981;
+    color: #065f46;
+  }
+
+  #status-message.error {
+    background-color: #fee2e2;
+    border: 1px solid #ef4444;
+    color: #991b1b;
+  }
+
+  #status-message.warning {
+    background-color: #fef3c7;
+    border: 1px solid #f59e0b;
+    color: #92400e;
+  }
+</style>
+
+<script is:inline>
+  (function () {
+    const originalPermissions = new Map();
+    const changedPermissions = new Map();
+
+    // Initialize original permissions
+    document.querySelectorAll('.permission-select').forEach((select) => {
+      const route = select.dataset.route;
+      const role = select.dataset.role;
+      const level = select.dataset.original;
+      originalPermissions.set(`${route}:${role}`, level);
+    });
+
+    function updateChangeCount() {
+      const count = changedPermissions.size;
+      const countEl = document.getElementById('change-count');
+      const saveBtn = document.getElementById('save-permissions');
+      const revertBtn = document.getElementById('revert-permissions');
+
+      if (count > 0) {
+        countEl.textContent = `${count} change${count !== 1 ? 's' : ''} pending`;
+        saveBtn.disabled = false;
+        revertBtn.disabled = false;
+      } else {
+        countEl.textContent = '';
+        saveBtn.disabled = true;
+        revertBtn.disabled = true;
+      }
+    }
+
+    function showStatus(message, type) {
+      const statusEl = document.getElementById('status-message');
+      statusEl.textContent = message;
+      statusEl.className = `mt-4 rounded-lg p-3 text-sm ${type}`;
+      statusEl.classList.remove('hidden');
+      setTimeout(() => {
+        statusEl.classList.add('hidden');
+      }, 5000);
+    }
+
+    // Handle permission changes
+    document.querySelectorAll('.permission-select').forEach((select) => {
+      select.addEventListener('change', function () {
+        const route = this.dataset.route;
+        const role = this.dataset.role;
+        const key = `${route}:${role}`;
+        const newValue = this.value;
+        const originalValue = originalPermissions.get(key);
+
+        if (newValue !== originalValue) {
+          changedPermissions.set(key, { route, role, level: newValue });
+          this.classList.add('changed');
+        } else {
+          changedPermissions.delete(key);
+          this.classList.remove('changed');
+        }
+
+        updateChangeCount();
+      });
+    });
+
+    // Revert button
+    document.getElementById('revert-permissions')?.addEventListener('click', function () {
+      document.querySelectorAll('.permission-select').forEach((select) => {
+        const key = `${select.dataset.route}:${select.dataset.role}`;
+        select.value = originalPermissions.get(key);
+        select.classList.remove('changed');
+      });
+      changedPermissions.clear();
+      updateChangeCount();
+      showStatus('Changes reverted', 'success');
+    });
+
+    // Save button
+    document.getElementById('save-permissions')?.addEventListener('click', async function () {
+      if (changedPermissions.size === 0) return;
+
+      this.disabled = true;
+      this.textContent = 'Saving...';
+
+      // Build permission map
+      const permissionMap = {};
+      changedPermissions.forEach(({ route, role, level }) => {
+        if (!permissionMap[route]) {
+          permissionMap[route] = {};
+        }
+        permissionMap[route][role] = level;
+      });
+
+      try {
+        const response = await fetch('/api/admin/permissions', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ permissions: permissionMap }),
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+          // Update original permissions
+          changedPermissions.forEach(({ route, role, level }) => {
+            const key = `${route}:${role}`;
+            originalPermissions.set(key, level);
+            const select = document.querySelector(`.permission-select[data-route="${route}"][data-role="${role}"]`);
+            if (select) {
+              select.dataset.original = level;
+              select.classList.remove('changed');
+            }
+          });
+
+          changedPermissions.clear();
+          updateChangeCount();
+          showStatus(`Success: ${result.message || 'Permissions saved'}`, 'success');
+        } else {
+          showStatus(`Error: ${result.error || 'Failed to save permissions'}`, 'error');
+        }
+      } catch (err) {
+        showStatus(`Error: ${err.message || 'Network error'}`, 'error');
+      } finally {
+        this.disabled = false;
+        this.textContent = 'Save Changes';
+      }
+    });
+
+    // Filter routes
+    document.getElementById('filter-route')?.addEventListener('input', function () {
+      const filter = this.value.toLowerCase();
+      document.querySelectorAll('.permission-row').forEach((row) => {
+        const route = row.dataset.route.toLowerCase();
+        if (route.includes(filter)) {
+          row.classList.remove('hidden');
+        } else {
+          row.classList.add('hidden');
+        }
+      });
+    });
+
+    // Bulk actions
+    document.querySelectorAll('.bulk-action').forEach((btn) => {
+      btn.addEventListener('click', function () {
+        const action = this.dataset.action;
+        let level = 'none';
+
+        if (action === 'set-all-read') level = 'read';
+        else if (action === 'set-all-write') level = 'write';
+        else if (action === 'set-all-none') level = 'none';
+
+        document.querySelectorAll('.permission-select').forEach((select) => {
+          if (!select.closest('.permission-row').classList.contains('hidden')) {
+            select.value = level;
+            select.dispatchEvent(new Event('change'));
+          }
+        });
+      });
+    });
+  })();
+</script>
