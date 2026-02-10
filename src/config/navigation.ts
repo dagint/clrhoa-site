@@ -104,12 +104,13 @@ export const footerResourceLinks: NavLink[] = [
 
 // ─── Role landing zones (RBAC) ───────────────────────────────────────
 
-/** Landing zone per elevated role. Redirect here after PIM elevation. */
+/** Landing zone per role. Redirect here after PIM elevation or de-elevation. */
 export const ROLE_LANDING: Record<string, string> = {
   admin: '/portal/admin',
   board: '/portal/board',
   arb: '/portal/arb',
   arb_board: '/portal/board', // arb_board elevates to board or arb; default landing is board
+  member: '/portal/dashboard', // Baseline member role landing zone
 };
 
 // ─── Admin only ─────────────────────────────────────────────────────

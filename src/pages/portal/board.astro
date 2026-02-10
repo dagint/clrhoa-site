@@ -1,22 +1,33 @@
 ---
+/**
+ * BOARD Landing Zone: /portal/board
+ *
+ * Required permissions: effectiveRole === 'board' or 'arb_board'
+ *
+ * Route-level guard: Uses getBoardContext() to enforce board-only access.
+ * Redirects non-board users to their appropriate landing zone:
+ * - admin → /portal/admin
+ * - arb → /portal/arb
+ * - board/arb_board whitelist but not elevated → /portal/request-elevated-access
+ * - member → /portal/dashboard
+ *
+ * When a user elevates to board role (via PIM), they are redirected here.
+ * When a user de-elevates or PIM expires, they revert to member role and see /portal/dashboard.
+ */
 export const prerender = false;
 
 import PortalLayout from '../../layouts/PortalLayout.astro';
 import ProtectedPage from '../../components/ProtectedPage.astro';
 import PortalNav from '../../components/PortalNav.astro';
 import BoardNav from '../../components/BoardNav.astro';
-import { getPortalContext } from '../../lib/portal-context';
+import { getBoardContext } from '../../lib/board-context';
 import { getArbRequestCountsByStatus, listArbRequestsByHousehold } from '../../lib/arb-db';
 import { listPendingSubmissions } from '../../lib/vendor-submissions-db';
 
-const { env, session, effectiveRole } = await getPortalContext(Astro, { fingerprint: true });
-if (!session) return Astro.redirect('/portal/login');
-// Middleware restricts /portal/board to board or arb_board; redirect if reached otherwise
-if (effectiveRole !== 'board' && effectiveRole !== 'arb_board') {
-  if (effectiveRole === 'admin') return Astro.redirect('/portal/admin');
-  if (effectiveRole === 'arb') return Astro.redirect('/portal/arb');
-  return Astro.redirect('/portal/request-elevated-access?return=' + encodeURIComponent('/portal/board'));
-}
+// Route-level guard: enforce board-only access
+const ctx = await getBoardContext(Astro);
+if ('redirect' in ctx) return Astro.redirect(ctx.redirect);
+const { env, session, effectiveRole } = ctx;
 
 const db = env?.DB;
 const allRequests = db ? await listArbRequestsByHousehold(db, session.email) : [];

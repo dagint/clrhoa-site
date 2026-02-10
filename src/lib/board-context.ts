@@ -1,40 +1,64 @@
 /**
- * Board page context: env + session with elevated role.
- * Use getBoardContext(Astro) so board pages don't repeat cookie/session/redirect logic.
+ * Role-based page context helpers: env + session with role-specific access control.
+ *
+ * These helpers enforce lazy loading and route-level guards for protected routes.
+ * Each helper validates the session and required role, returning either context data
+ * or a redirect URL. Pages should check for redirect and call Astro.redirect() immediately.
+ *
+ * Usage pattern:
+ * ```typescript
+ * const ctx = await getAdminContext(Astro);
+ * if ('redirect' in ctx) return Astro.redirect(ctx.redirect);
+ * const { env, session, effectiveRole } = ctx;
+ * ```
+ *
+ * Role landing zones (redirect targets):
+ * - Admin: /portal/admin
+ * - Board: /portal/board
+ * - ARB: /portal/arb
+ * - Member: /portal/dashboard
  */
 
 import type { SessionPayload } from './auth';
-import { getSessionFromCookie, isElevatedRole, getEffectiveRole } from './auth';
+import { getSessionFromCookie, isElevatedRole, getEffectiveRole, isAdminRole, isArbRole } from './auth';
+import { ROLE_LANDING } from '../config/navigation';
 
-/** Env shape for board pages (after SESSION_SECRET guard). */
-export interface BoardEnv {
+/** Env shape for role-based pages (after SESSION_SECRET guard). */
+export interface RoleEnv {
   SESSION_SECRET?: string;
   DB?: D1Database;
   CLOURHOA_USERS?: KVNamespace;
 }
 
-/** Minimal Astro-like context for board pages. */
-export interface BoardContextAstro {
+/** Minimal Astro-like context for role-based pages. */
+export interface RoleContextAstro {
   request: Request;
-  locals: { runtime?: { env?: BoardEnv } };
+  locals: { runtime?: { env?: RoleEnv } };
 }
 
-export interface BoardContextResult {
-  env: BoardEnv;
+export interface RoleContextResult {
+  env: RoleEnv;
   session: SessionPayload;
   effectiveRole: string;
 }
 
-export type GetBoardContextResult =
-  | BoardContextResult
+export type GetRoleContextResult =
+  | RoleContextResult
   | { redirect: string };
 
 /**
- * Get env and session for a board page. Returns redirect URL if no session
- * or session is not elevated (board, admin, arb, arb_board). Caller should
- * do: if ('redirect' in r) return Astro.redirect(r.redirect);
+ * Get env and session for an ADMIN page.
+ *
+ * Required permissions: effectiveRole === 'admin'
+ *
+ * Returns redirect URL if:
+ * - No session → /portal/login
+ * - Session but not admin → redirects to appropriate landing zone based on effectiveRole
+ * - Admin whitelist but not elevated → /portal/request-elevated-access
+ *
+ * Caller should check: if ('redirect' in r) return Astro.redirect(r.redirect);
  */
-export async function getBoardContext(astro: BoardContextAstro): Promise<GetBoardContextResult> {
+export async function getAdminContext(astro: RoleContextAstro): Promise<GetRoleContextResult> {
   const env = astro.locals.runtime?.env;
   const cookieHeader = astro.request.headers.get('cookie') ?? undefined;
 
@@ -47,9 +71,118 @@ export async function getBoardContext(astro: BoardContextAstro): Promise<GetBoar
     return { redirect: '/portal/login' };
   }
 
-  if (!isElevatedRole(getEffectiveRole(session))) {
-    return { redirect: '/portal/dashboard' };
+  const effectiveRole = getEffectiveRole(session);
+  const staffRole = session.role?.toLowerCase() ?? '';
+
+  if (!isAdminRole(effectiveRole)) {
+    // Redirect to appropriate landing zone based on effective role
+    if (effectiveRole === 'board' || effectiveRole === 'arb_board') {
+      return { redirect: ROLE_LANDING.board };
+    }
+    if (effectiveRole === 'arb') {
+      return { redirect: ROLE_LANDING.arb };
+    }
+    // Admin whitelist but not elevated (PIM required)
+    if (staffRole === 'admin') {
+      return { redirect: `/portal/request-elevated-access?return=${encodeURIComponent('/portal/admin')}` };
+    }
+    // Not admin, redirect to member dashboard
+    return { redirect: ROLE_LANDING.member || '/portal/dashboard' };
   }
 
-  return { env, session, effectiveRole: getEffectiveRole(session) };
+  return { env, session, effectiveRole };
+}
+
+/**
+ * Get env and session for a BOARD page.
+ *
+ * Required permissions: effectiveRole === 'board' or 'arb_board'
+ *
+ * Returns redirect URL if:
+ * - No session → /portal/login
+ * - Session but not board/arb_board → redirects to appropriate landing zone
+ * - Board whitelist but not elevated → /portal/request-elevated-access
+ *
+ * Caller should check: if ('redirect' in r) return Astro.redirect(r.redirect);
+ */
+export async function getBoardContext(astro: RoleContextAstro): Promise<GetRoleContextResult> {
+  const env = astro.locals.runtime?.env;
+  const cookieHeader = astro.request.headers.get('cookie') ?? undefined;
+
+  if (!env?.SESSION_SECRET) {
+    return { redirect: '/portal/login' };
+  }
+
+  const session = await getSessionFromCookie(cookieHeader, env.SESSION_SECRET);
+  if (!session) {
+    return { redirect: '/portal/login' };
+  }
+
+  const effectiveRole = getEffectiveRole(session);
+  const staffRole = session.role?.toLowerCase() ?? '';
+
+  if (effectiveRole !== 'board' && effectiveRole !== 'arb_board') {
+    // Redirect to appropriate landing zone
+    if (effectiveRole === 'admin') {
+      return { redirect: ROLE_LANDING.admin };
+    }
+    if (effectiveRole === 'arb') {
+      return { redirect: ROLE_LANDING.arb };
+    }
+    // Board/arb_board whitelist but not elevated (PIM required)
+    if (staffRole === 'board' || staffRole === 'arb_board') {
+      return { redirect: `/portal/request-elevated-access?return=${encodeURIComponent('/portal/board')}` };
+    }
+    // Not board, redirect to member dashboard
+    return { redirect: ROLE_LANDING.member || '/portal/dashboard' };
+  }
+
+  return { env, session, effectiveRole };
+}
+
+/**
+ * Get env and session for an ARB page.
+ *
+ * Required permissions: effectiveRole === 'arb' or 'arb_board'
+ *
+ * Returns redirect URL if:
+ * - No session → /portal/login
+ * - Session but not arb/arb_board → redirects to appropriate landing zone
+ * - ARB whitelist but not elevated → /portal/request-elevated-access
+ *
+ * Caller should check: if ('redirect' in r) return Astro.redirect(r.redirect);
+ */
+export async function getArbContext(astro: RoleContextAstro): Promise<GetRoleContextResult> {
+  const env = astro.locals.runtime?.env;
+  const cookieHeader = astro.request.headers.get('cookie') ?? undefined;
+
+  if (!env?.SESSION_SECRET) {
+    return { redirect: '/portal/login' };
+  }
+
+  const session = await getSessionFromCookie(cookieHeader, env.SESSION_SECRET);
+  if (!session) {
+    return { redirect: '/portal/login' };
+  }
+
+  const effectiveRole = getEffectiveRole(session);
+  const staffRole = session.role?.toLowerCase() ?? '';
+
+  if (!isArbRole(effectiveRole) && effectiveRole !== 'arb_board') {
+    // Redirect to appropriate landing zone
+    if (effectiveRole === 'admin') {
+      return { redirect: ROLE_LANDING.admin };
+    }
+    if (effectiveRole === 'board') {
+      return { redirect: ROLE_LANDING.board };
+    }
+    // ARB/arb_board whitelist but not elevated (PIM required)
+    if (staffRole === 'arb' || staffRole === 'arb_board') {
+      return { redirect: `/portal/request-elevated-access?return=${encodeURIComponent('/portal/arb')}` };
+    }
+    // Not ARB, redirect to member dashboard
+    return { redirect: ROLE_LANDING.member || '/portal/dashboard' };
+  }
+
+  return { env, session, effectiveRole };
 }

@@ -1,19 +1,31 @@
 ---
+/**
+ * ADMIN-ONLY: Site Usage Analytics
+ *
+ * Required permissions: effectiveRole === 'admin'
+ *
+ * Route-level guard: Uses getAdminContext() to enforce admin-only access.
+ * This page shows site-wide usage statistics, page views, and per-user analytics.
+ *
+ * Redirects non-admin users to their appropriate landing zone:
+ * - board/arb_board → /portal/board
+ * - arb → /portal/arb
+ * - admin whitelist but not elevated → /portal/request-elevated-access
+ * - member → /portal/dashboard
+ */
 export const prerender = false;
 
 import PortalLayout from '../../layouts/PortalLayout.astro';
 import ProtectedPage from '../../components/ProtectedPage.astro';
 import PortalNav from '../../components/PortalNav.astro';
-import { getPortalContext } from '../../lib/portal-context';
+import { getAdminContext } from '../../lib/board-context';
 import { listArbRequestsByHousehold } from '../../lib/arb-db';
 import { getDailyStats, getWeeklyStats, getAdminPageViews, getAdminPageViewsCount, getTopPagesByViews } from '../../lib/usage-db';
 
-const ctx = await getPortalContext(Astro, { fingerprint: true });
-if (!ctx.session) return Astro.redirect('/portal/login?return=' + encodeURIComponent('/portal/usage'));
-
+// Route-level guard: enforce admin-only access
+const ctx = await getAdminContext(Astro);
+if ('redirect' in ctx) return Astro.redirect(ctx.redirect);
 const { env, session, effectiveRole } = ctx;
-const isElevated = effectiveRole === 'arb' || effectiveRole === 'board' || effectiveRole === 'admin' || effectiveRole === 'arb_board';
-if (!isElevated) return Astro.redirect('/portal/dashboard');
 
 const db = env?.DB;
 const url = Astro.url;
