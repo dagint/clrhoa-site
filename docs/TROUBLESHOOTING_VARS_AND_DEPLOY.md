@@ -90,12 +90,34 @@ See **vars:update** in the repo scripts and [GITHUB_SECRETS_SETUP.md](./GITHUB_S
 
 ---
 
-## 6. Summary
+## 6. "Sync Secrets to Cloudflare Pages" fails with API 500
+
+If the workflow step **Sync Secrets to Cloudflare Pages** fails with:
+
+```text
+❌ Failed to sync env: API error 500: { "errors": [{ "code": 8000000, "message": "An unknown error occurred..." }] }
+```
+
+Cloudflare’s API sometimes returns 500 for large or burst requests. The sync script now:
+
+- **Retries** up to 3 times with backoff (0s, 2s, 4s) on 500.
+- **Batches** env vars (20 per request) so each PATCH is smaller.
+
+**What you can do:**
+
+1. **Re-run the workflow** — Often the next run succeeds (transient 500).
+2. **Check token** — Use a token with **Cloudflare Pages → Edit** (and Account → Read). See [GITHUB_SECRETS_SETUP.md](./GITHUB_SECRETS_SETUP.md).
+3. **If it keeps failing** — Temporarily remove or comment out the “Sync Secrets to Cloudflare Pages” step and set secrets/vars once in **Cloudflare Dashboard → Pages → your project → Settings → Environment variables**, then rely on build-time vars from GitHub for `PUBLIC_*`.
+
+---
+
+## 7. Summary
 
 | Symptom | Cause | Fix |
 |--------|--------|-----|
 | Dues / address / waste / meeting data missing or wrong on live site | Build didn’t get vars | Add as **GitHub Variables** (not Secrets), re-run deploy |
 | “Verify public env vars” shows **missing** for key names | Those names aren’t set as Variables (or are only in Secrets) | Add them in **Variables** (or production env vars), re-run |
 | Cloudflare dashboard only shows some vars | Expected; PUBLIC_* are build-time only | No change needed; fix is in GitHub Variables + new build |
+| Sync step fails with API 500 | Cloudflare API transient or payload size | Re-run workflow; script retries and batches; or set vars manually in Cloudflare |
 
 The live site is built **in GitHub Actions**. Whatever **Variables** the workflow has when it runs `npm run build` are what get baked into the site. Cloudflare only receives the built `dist` and runtime secrets; it does not re-run the build or inject `PUBLIC_*` from the Cloudflare UI.

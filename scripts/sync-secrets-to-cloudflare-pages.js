@@ -82,12 +82,18 @@ const PAGES_VARS = [
 const PROJECT_NAME = 'clrhoa-site';
 const API_BASE = 'https://api.cloudflare.com/client/v4';
 
+/** Max env vars per PATCH request to avoid Cloudflare 500 on large payloads. */
+const ENV_VARS_BATCH_SIZE = 20;
+
+/** Retry delays in ms (transient 500s). */
+const RETRY_DELAYS_MS = [0, 2000, 4000];
+
 async function fetchWithAuth(url, options = {}) {
   const token = process.env.CLOUDFLARE_DEPLOY_API_TOKEN || process.env.CLOUDFLARE_API_TOKEN;
   if (!token) {
     throw new Error('CLOUDFLARE_API_TOKEN or CLOUDFLARE_DEPLOY_API_TOKEN not set');
   }
-  
+
   const response = await fetch(url, {
     ...options,
     headers: {
@@ -96,12 +102,12 @@ async function fetchWithAuth(url, options = {}) {
       ...options.headers,
     },
   });
-  
+
   if (!response.ok) {
     const text = await response.text();
     throw new Error(`API error ${response.status}: ${text}`);
   }
-  
+
   return response.json();
 }
 
@@ -109,22 +115,22 @@ async function fetchWithAuth(url, options = {}) {
 async function setPagesSecret(accountId, projectName, name, value, environment = 'production') {
   // Cloudflare Pages API: PATCH /accounts/:account_id/pages/projects/:project_name
   // Update deployment_configs.env_vars for the specified environment
-  
+
   // Get current project config
   const projectData = await fetchWithAuth(`${API_BASE}/accounts/${accountId}/pages/projects/${projectName}`);
   const currentConfigs = projectData.result?.deployment_configs || {};
-  
+
   // Update the environment-specific config
   const envConfig = currentConfigs[environment] || {};
   const envVars = { ...(envConfig.env_vars || {}) };
-  
+
   // Set the secret (type: "secret" for encrypted, "plain_text" for regular vars)
   // All secrets should be encrypted
   envVars[name] = {
     type: 'secret',
     value: value,
   };
-  
+
   const updatedConfigs = {
     ...currentConfigs,
     [environment]: {
@@ -132,7 +138,7 @@ async function setPagesSecret(accountId, projectName, name, value, environment =
       env_vars: envVars,
     },
   };
-  
+
   // Update the project
   await fetchWithAuth(`${API_BASE}/accounts/${accountId}/pages/projects/${projectName}`, {
     method: 'PATCH',
@@ -140,7 +146,7 @@ async function setPagesSecret(accountId, projectName, name, value, environment =
       deployment_configs: updatedConfigs,
     }),
   });
-  
+
   console.log(`✅ Set ${name} for ${environment}`);
 }
 
@@ -151,31 +157,87 @@ async function getPagesProjectConfig(accountId, projectName) {
   return projectData.result;
 }
 
-/** Set all env vars (secrets + plain_text) for an environment in one PATCH. */
+/**
+ * Run a PATCH to set deployment_configs. Retries on 500 with backoff; optionally batches env vars.
+ */
+async function patchPagesConfig(accountId, projectName, deploymentConfigs, attempt = 0) {
+  const url = `${API_BASE}/accounts/${accountId}/pages/projects/${projectName}`;
+  const body = JSON.stringify({ deployment_configs: deploymentConfigs });
+  const token = process.env.CLOUDFLARE_DEPLOY_API_TOKEN || process.env.CLOUDFLARE_API_TOKEN;
+  const delay = RETRY_DELAYS_MS[attempt] ?? RETRY_DELAYS_MS[RETRY_DELAYS_MS.length - 1];
+  if (delay > 0) {
+    console.log(`   Retry in ${delay / 1000}s (attempt ${attempt + 1})...`);
+    await new Promise((r) => setTimeout(r, delay));
+  }
+  const response = await fetch(url, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body,
+  });
+  const data = response.json ? await response.json().catch(() => ({})) : {};
+  if (!response.ok) {
+    const errMsg = data?.errors?.[0]?.message || data?.message || response.statusText;
+    const err = new Error(`API error ${response.status}: ${JSON.stringify(data.errors || data) || errMsg}`);
+    err.status = response.status;
+    err.data = data;
+    throw err;
+  }
+  return data;
+}
+
+/** Set all env vars (secrets + plain_text) for an environment. Retries on 500; batches if many vars. */
 async function setPagesEnvVars(accountId, projectName, envVarsToSet, environment = 'production') {
+  const entries = Object.entries(envVarsToSet);
+  if (entries.length === 0) return;
+
   const project = await getPagesProjectConfig(accountId, projectName);
   const currentConfigs = project.deployment_configs || {};
   const envConfig = currentConfigs[environment] || {};
-  const envVars = { ...(envConfig.env_vars || {}) };
+  let envVars = { ...(envConfig.env_vars || {}) };
 
-  for (const [name, entry] of Object.entries(envVarsToSet)) {
-    envVars[name] = entry;
+  const batches = [];
+  for (let i = 0; i < entries.length; i += ENV_VARS_BATCH_SIZE) {
+    batches.push(entries.slice(i, i + ENV_VARS_BATCH_SIZE));
   }
 
-  const updatedConfigs = {
-    ...currentConfigs,
-    [environment]: {
-      ...envConfig,
-      env_vars: envVars,
-    },
-  };
-
-  await fetchWithAuth(`${API_BASE}/accounts/${accountId}/pages/projects/${projectName}`, {
-    method: 'PATCH',
-    body: JSON.stringify({
-      deployment_configs: updatedConfigs,
-    }),
-  });
+  for (let b = 0; b < batches.length; b++) {
+    for (const [name, entry] of batches[b]) {
+      envVars[name] = entry;
+    }
+    const updatedConfigs = {
+      ...currentConfigs,
+      [environment]: {
+        ...envConfig,
+        env_vars: envVars,
+      },
+    };
+    let lastErr;
+    for (let attempt = 0; attempt < RETRY_DELAYS_MS.length; attempt++) {
+      try {
+        await patchPagesConfig(accountId, projectName, updatedConfigs, attempt);
+        if (batches.length > 1) {
+          console.log(`   Batch ${b + 1}/${batches.length} applied.`);
+        }
+        lastErr = null;
+        break;
+      } catch (err) {
+        lastErr = err;
+        const is500 = err.status === 500;
+        if (is500 && attempt < RETRY_DELAYS_MS.length - 1) continue;
+        throw err;
+      }
+    }
+    if (lastErr) throw lastErr;
+    // Refresh project config for next batch so we don't overwrite
+    if (b < batches.length - 1) {
+      const updated = await getPagesProjectConfig(accountId, projectName);
+      const nextEnvConfig = updated.deployment_configs?.[environment] || {};
+      envVars = { ...(nextEnvConfig.env_vars || {}) };
+    }
+  }
 }
 
 async function main() {
@@ -258,7 +320,7 @@ async function main() {
     failed.forEach(s => console.log(`   - ${s}`));
     process.exit(1);
   }
-  
+
   console.log('\n✅ All secrets synced successfully');
 }
 
