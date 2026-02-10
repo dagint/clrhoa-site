@@ -1,0 +1,116 @@
+---
+/**
+ * Reusable form field: label, optional required asterisk, optional (i) hint, input or textarea, optional error div and description.
+ * Use for contact, ARB, profile, and other forms to keep patterns consistent.
+ */
+interface Props {
+  id: string;
+  name: string;
+  label: string;
+  type?: 'text' | 'email' | 'tel' | 'textarea';
+  required?: boolean;
+  placeholder?: string;
+  value?: string;
+  /** Help text for the (i) icon; title attribute. */
+  hint?: string;
+  /** Id for the error element; also used for aria-describedby on the input. */
+  errorId?: string;
+  /** Short description or hint below the input (e.g. format hint). */
+  description?: string;
+  labelClass?: string;
+  inputClass?: string;
+  /** Class for the error div (default: text-red-600 text-sm mt-1 hidden). */
+  errorClass?: string;
+  rows?: number;
+  minlength?: number;
+  maxlength?: number;
+  pattern?: string;
+  readonly?: boolean;
+  /** Extra attributes for the input (e.g. inputmode). */
+  extra?: Record<string, string | number | boolean | undefined>;
+}
+
+const {
+  id,
+  name,
+  label,
+  type = 'text',
+  required = false,
+  placeholder,
+  value,
+  hint,
+  errorId,
+  description,
+  labelClass = 'block text-sm font-medium text-gray-700 mb-1',
+  inputClass = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-400 focus:border-clr-green focus:ring-1 focus:ring-clr-green',
+  errorClass = 'text-red-600 text-sm mt-1 hidden',
+  rows = 4,
+  minlength,
+  maxlength,
+  pattern,
+  readonly,
+  extra = {},
+} = Astro.props;
+
+const baseInputClass = type === 'textarea' ? `${inputClass} resize-y`.trim() : inputClass;
+const describedBy = [errorId].filter(Boolean).join(' ') || undefined;
+---
+
+<div>
+  <label for={id} class={labelClass}>
+    {label}
+    {required && <span class="text-red-600" aria-label="required">*</span>}
+    {hint && (
+      <span
+        class="ml-1 text-gray-400 cursor-help"
+        title={hint}
+        aria-label={`Help: ${label}`}
+      >
+        (i)
+      </span>
+    )}
+  </label>
+  {type === 'textarea' ? (
+    <textarea
+      id={id}
+      name={name}
+      rows={rows}
+      required={required}
+      aria-required={required}
+      aria-describedby={describedBy}
+      minlength={minlength}
+      maxlength={maxlength}
+      class={baseInputClass}
+      placeholder={placeholder}
+      {...extra}
+    >
+      {value ?? ''}
+    </textarea>
+  ) : (
+    <input
+      type={type}
+      id={id}
+      name={name}
+      required={required}
+      aria-required={required}
+      aria-describedby={describedBy}
+      minlength={minlength}
+      maxlength={maxlength}
+      pattern={pattern}
+      readonly={readonly}
+      class={baseInputClass}
+      placeholder={placeholder}
+      value={value}
+      {...extra}
+    />
+  )}
+  {errorId && (
+    <div
+      id={errorId}
+      class={errorClass}
+      role="alert"
+      aria-live="polite"
+    ></div>
+  )}
+  {description && <p class="mt-1 text-xs text-gray-500">{description}</p>}
+</div>

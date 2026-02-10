@@ -4,6 +4,7 @@ export const prerender = false;
 import PortalLayout from '../../layouts/PortalLayout.astro';
 import ProtectedPage from '../../components/ProtectedPage.astro';
 import PortalNav from '../../components/PortalNav.astro';
+import FormField from '../../components/FormField.astro';
 import { getPortalContext } from '../../lib/portal-context';
 import { SESSION_COOKIE_NAME } from '../../lib/auth';
 import { listArbRequestsByHousehold } from '../../lib/arb-db';
@@ -22,14 +23,14 @@ if (!session.csrfToken && env?.SESSION_SECRET) {
   const array = new Uint8Array(32);
   crypto.getRandomValues(array);
   const csrfToken = Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
-  
+
   // Update session payload with CSRF token
   const updatedPayload = {
     ...session,
     csrfToken,
     lastActivity: Math.floor(Date.now() / 1000),
   };
-  
+
   // Sign the updated payload
   const encoder = new TextEncoder();
   const data = encoder.encode(JSON.stringify(updatedPayload));
@@ -50,7 +51,7 @@ if (!session.csrfToken && env?.SESSION_SECRET) {
     .replace(/\//g, '_')
     .replace(/=+$/, '');
   const newCookieValue = `${payloadB64}.${sigB64}`;
-  
+
   // Update session object and set cookie
   session = updatedPayload;
   const isSecure = Astro.url.protocol === 'https:';
@@ -88,6 +89,9 @@ if (db && templateId) {
     prefillDescription = `Requesting: ${title}.${rules ? ` Notes: ${rules}` : ''}`;
   }
 }
+
+const arbLabelClass = 'block text-sm font-semibold text-gray-700 mb-1';
+const arbInputClass = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-clr-green focus:ring-1 focus:ring-clr-green';
 ---
 
 <PortalLayout title="New ARB Request | Member Portal | Crooked Lake Reserve HOA">
@@ -139,26 +143,50 @@ if (db && templateId) {
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label for="applicant_name" class="block text-sm font-semibold text-gray-700 mb-1">
-              Applicant's name <span class="text-red-600" aria-label="required">*</span>
-              <span class="ml-1 text-gray-400 cursor-help" title="The name of the person submitting this application. If different from property owner, provide owner's name in description." aria-label="Help: Applicant name">(i)</span>
-            </label>
-            <input id="applicant_name" name="applicant_name" type="text" required class="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-clr-green focus:ring-1 focus:ring-clr-green" placeholder="Your full name" value={prefillName} />
+            <FormField
+              id="applicant_name"
+              name="applicant_name"
+              label="Applicant's name"
+              type="text"
+              required
+              placeholder="Your full name"
+              value={prefillName}
+              hint="The name of the person submitting this application. If different from property owner, provide owner's name in description."
+              labelClass={arbLabelClass}
+              inputClass={arbInputClass}
+            />
           </div>
           <div>
-            <label for="phone" class="block text-sm font-semibold text-gray-700 mb-1">Phone number <span class="text-red-600" aria-label="required">*</span></label>
-            <input id="phone" name="phone" type="tel" required pattern="[0-9 ()+\-.]+" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-clr-green focus:ring-1 focus:ring-clr-green" placeholder="(555) 555-5555" value={prefillPhone} aria-describedby="phone-help" />
-            <p id="phone-help" class="mt-1 text-xs text-gray-500">Format: (555) 555-5555 or 555-555-5555</p>
+            <FormField
+              id="phone"
+              name="phone"
+              label="Phone number"
+              type="tel"
+              required
+              pattern="[0-9 ()+\-.]+"
+              placeholder="(555) 555-5555"
+              value={prefillPhone}
+              description="Format: (555) 555-5555 or 555-555-5555"
+              labelClass={arbLabelClass}
+              inputClass={arbInputClass}
+            />
           </div>
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label for="property_address" class="block text-sm font-semibold text-gray-700 mb-1">
-              Property address <span class="text-red-600" aria-label="required">*</span>
-              <span class="ml-1 text-gray-400 cursor-help" title="Street address, lot number, or property identifier for the location of the proposed changes" aria-label="Help: Property address">(i)</span>
-            </label>
-            <input id="property_address" name="property_address" type="text" required class="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-clr-green focus:ring-1 focus:ring-clr-green" placeholder="Street, lot or address" value={prefillAddress} />
+            <FormField
+              id="property_address"
+              name="property_address"
+              label="Property address"
+              type="text"
+              required
+              placeholder="Street, lot or address"
+              value={prefillAddress}
+              hint="Street address, lot number, or property identifier for the location of the proposed changes"
+              labelClass={arbLabelClass}
+              inputClass={arbInputClass}
+            />
           </div>
           <div>
             <label class="block text-sm font-semibold text-gray-700 mb-1">Email address</label>
@@ -197,21 +225,20 @@ if (db && templateId) {
         </div>
 
         <div>
-          <label for="description" class="block text-sm font-semibold text-gray-700 mb-2">
-            Description of changes <span class="text-red-600" aria-label="required">*</span>
-            <span class="ml-1 text-gray-400 cursor-help" title="Provide detailed information about your proposed changes. Include dimensions, materials, colors, and any other relevant details. Attach supporting documents as files." aria-label="Help: Description">(i)</span>
-          </label>
-          <p class="text-sm text-gray-500 mb-2">
-            Include lot surveys, site plans, diagrams, color chips, material specifications, sample products, photographs, and any information that describes the finished project. Landscaping plans must include size, number, and type of plants.
-          </p>
-          <textarea
+          <FormField
             id="description"
             name="description"
-            rows="5"
+            label="Description of changes"
+            type="textarea"
             required
-            class="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-clr-green focus:ring-1 focus:ring-clr-green"
+            rows={5}
             placeholder="Describe the modification or project in detail..."
-          >{prefillDescription}</textarea>
+            value={prefillDescription}
+            hint="Provide detailed information about your proposed changes. Include dimensions, materials, colors, and any other relevant details. Attach supporting documents as files."
+            description="Include lot surveys, site plans, diagrams, color chips, material specifications, sample products, photographs, and any information that describes the finished project. Landscaping plans must include size, number, and type of plants."
+            labelClass={arbLabelClass}
+            inputClass={arbInputClass}
+          />
           <p class="mt-1 text-sm font-semibold text-amber-800">Failure to provide complete information will delay the approval process.</p>
         </div>
 
@@ -286,7 +313,7 @@ if (db && templateId) {
       const lastSavedText = document.getElementById('last-saved-text');
       const lastSavedTime = document.getElementById('last-saved-time');
       const autoSaveIndicator = document.getElementById('auto-save-indicator');
-      
+
       let currentRequestId = null;
       let autoSaveInterval = null;
       let _lastSaveTime = null;
@@ -343,7 +370,7 @@ if (db && templateId) {
         const i = Math.floor(Math.log(bytes) / Math.log(k));
         return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
       }
-      
+
       function formatTimestamp(timestamp) {
         if (!timestamp) return '';
         const date = new Date(timestamp);
@@ -351,13 +378,13 @@ if (db && templateId) {
         const diffMs = now - date;
         const diffMins = Math.floor(diffMs / 60000);
         const diffHours = Math.floor(diffMs / 3600000);
-        
+
         if (diffMins < 1) return 'just now';
         if (diffMins < 60) return `${diffMins} minute${diffMins === 1 ? '' : 's'} ago`;
         if (diffHours < 24) return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`;
         return date.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
       }
-      
+
       function updateLastSaved(timestamp) {
         if (lastSavedTime && timestamp) {
           lastSaveTime = timestamp;
@@ -365,16 +392,16 @@ if (db && templateId) {
           lastSavedText.classList.remove('hidden');
         }
       }
-      
+
       // Auto-save function
       async function autoSave() {
         if (isAutoSaving) return;
         const description = form.querySelector('[name="description"]')?.value ?? '';
         if (!description || description.trim().length < 10) return; // Don't auto-save if description is too short
-        
+
         isAutoSaving = true;
         if (autoSaveIndicator) autoSaveIndicator.classList.remove('hidden');
-        
+
         const formData = new FormData();
         const csrfTokenInput = form.querySelector('[name="csrf_token"]');
         const csrfToken = (csrfTokenInput && csrfTokenInput.value) || (typeof window !== 'undefined' && window.csrfToken) || '';
@@ -383,7 +410,7 @@ if (db && templateId) {
           if (autoSaveIndicator) autoSaveIndicator.classList.add('hidden');
           return;
         }
-        
+
         formData.set('csrf_token', csrfToken);
         if (currentRequestId) formData.set('request_id', currentRequestId);
         formData.set('description', description);
@@ -391,14 +418,14 @@ if (db && templateId) {
         const phone = form.querySelector('[name="phone"]')?.value?.trim() ?? '';
         const propertyAddress = form.querySelector('[name="property_address"]')?.value?.trim() ?? '';
         const applicationTypeEls = form.querySelectorAll('[name="application_type"]:checked');
-        
+
         if (applicantName) formData.set('applicant_name', applicantName);
         if (phone) formData.set('phone', phone);
         if (propertyAddress) formData.set('property_address', propertyAddress);
         applicationTypeEls.forEach(function (el) {
           if (el.value) formData.append('application_type', el.value);
         });
-        
+
         try {
           const res = await fetch('/api/arb-auto-save', { method: 'POST', body: formData });
           const data = await res.json().catch(() => ({}));
@@ -414,7 +441,7 @@ if (db && templateId) {
           if (autoSaveIndicator) autoSaveIndicator.classList.add('hidden');
         }
       }
-      
+
       // Start auto-save interval (every 30 seconds)
       if (form) {
         let lastInputTime = Date.now();
@@ -424,7 +451,7 @@ if (db && templateId) {
             lastInputTime = Date.now();
           });
         });
-        
+
         // Auto-save every 30 seconds if there's been recent input
         autoSaveInterval = setInterval(function() {
           const timeSinceLastInput = Date.now() - lastInputTime;
@@ -471,11 +498,11 @@ if (db && templateId) {
           hideErr(formError);
           hideErr(fileError);
           formSuccess.classList.add('hidden');
-          
+
           const isSubmit = action === 'submit';
           const _isDraft = action === 'draft';
           const activeBtn = isSubmit ? submitBtn : document.getElementById('save-draft-btn');
-          
+
           // Validate esign for submit action
           const esign = form.querySelector('[name="esign"]')?.checked ?? false;
           if (isSubmit && !esign) {
@@ -484,7 +511,7 @@ if (db && templateId) {
             if (esignRequired) esignRequired.classList.remove('hidden');
             return;
           }
-          
+
           if (activeBtn) activeBtn.disabled = true;
           if (activeBtn) activeBtn.textContent = isSubmit ? 'Preparing files…' : 'Saving…';
 
@@ -494,7 +521,7 @@ if (db && templateId) {
           const propertyAddress = form.querySelector('[name="property_address"]')?.value?.trim() ?? '';
           const applicationTypeEls = form.querySelectorAll('[name="application_type"]:checked');
           const formData = new FormData();
-          
+
           // Include CSRF token from hidden input or window variable
           const csrfTokenInput = form.querySelector('[name="csrf_token"]');
           const csrfToken = (csrfTokenInput && csrfTokenInput.value) || (typeof window !== 'undefined' && window.csrfToken) || '';
@@ -503,7 +530,7 @@ if (db && templateId) {
             if (activeBtn) { activeBtn.disabled = false; activeBtn.textContent = isSubmit ? 'Submit for Review' : 'Save as Draft'; }
             return;
           }
-          
+
           formData.set('csrf_token', csrfToken);
           formData.set('action', action); // 'draft' or 'submit'
           formData.set('description', description);
@@ -554,7 +581,7 @@ if (db && templateId) {
                 clearInterval(autoSaveInterval);
                 autoSaveInterval = null;
               }
-              
+
               if (isSubmit) {
                 formSuccess.textContent = '';
                 const strong1 = document.createElement('strong');
@@ -610,7 +637,7 @@ if (db && templateId) {
       if (form) {
         // Remove default submit handler - we'll use button click handlers instead
         form.addEventListener('submit', function(e) { e.preventDefault(); });
-        
+
         // Add click handlers for both buttons
         const saveDraftBtn = document.getElementById('save-draft-btn');
         if (saveDraftBtn) {
@@ -620,11 +647,11 @@ if (db && templateId) {
           submitBtn.addEventListener('click', submitForm('submit'));
         }
       }
-      
+
       // Update esign label visibility based on which button is focused/hovered
       const esignRequired = document.getElementById('esign-required');
       const esignSubmitNote = document.getElementById('esign-submit-note');
-      
+
       if (submitBtn && esignRequired && esignSubmitNote) {
         // Show required indicator when hovering/focusing submit button
         submitBtn.addEventListener('mouseenter', function() {
@@ -640,7 +667,7 @@ if (db && templateId) {
           esignRequired.classList.remove('hidden');
           esignSubmitNote.classList.remove('hidden');
         });
-        
+
         const saveDraftBtn = document.getElementById('save-draft-btn');
         if (saveDraftBtn) {
           // Hide required indicator when hovering/focusing draft button
@@ -667,27 +694,27 @@ if (db && templateId) {
       if (typeof window !== 'undefined') {
         window.csrfToken = csrfToken;
       }
-      
+
       // Session timeout: Auto-logout after 30 minutes of inactivity
       const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
       let lastActivity = Date.now();
       let timeoutWarningShown = false;
-      
+
       function resetActivity() {
         lastActivity = Date.now();
         timeoutWarningShown = false;
       }
-      
+
       function checkSessionTimeout() {
         const elapsed = Date.now() - lastActivity;
         const remaining = SESSION_TIMEOUT_MS - elapsed;
-        
+
         if (remaining <= 0) {
           alert('Your session has expired due to inactivity. You will be redirected to the login page.');
           window.location.href = '/portal/login';
           return;
         }
-        
+
         if (remaining <= 2 * 60 * 1000 && !timeoutWarningShown) {
           timeoutWarningShown = true;
           const confirmed = confirm('Your session will expire in 2 minutes due to inactivity. Click OK to stay logged in, or Cancel to log out now.');
@@ -700,11 +727,11 @@ if (db && templateId) {
           }
         }
       }
-      
+
       ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'].forEach(function (event) {
         document.addEventListener(event, resetActivity, { passive: true });
       });
-      
+
       setInterval(checkSessionTimeout, 60 * 1000);
     })();
   </script>
