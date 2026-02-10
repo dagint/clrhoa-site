@@ -48,6 +48,8 @@ if (key.startsWith('member-docs/')) {
   const ct = object.httpMetadata?.contentType;
   if (ct) headers.set('Content-Type', ct);
   headers.set('Content-Disposition', `attachment; filename="${key.split('/').pop() ?? 'download'}"`);
+  // Cache for 1 hour (private = user-specific, must-revalidate = check with server after expiry)
+  headers.set('Cache-Control', 'private, max-age=3600, must-revalidate');
   return new Response(object.body as ReadableStream, { headers });
 }
 
@@ -85,5 +87,7 @@ if (ct) headers.set('Content-Type', ct);
 const disp = object.httpMetadata?.contentDisposition;
 if (disp) headers.set('Content-Disposition', disp);
 else headers.set('Content-Disposition', `attachment; filename="${key.split('/').pop() ?? 'download'}"`);
+// Cache for 1 hour (private = user-specific, must-revalidate = check with server after expiry)
+headers.set('Cache-Control', 'private, max-age=3600, must-revalidate');
 
 return new Response(object.body as ReadableStream, { headers });

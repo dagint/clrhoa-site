@@ -59,12 +59,37 @@ export interface R2BucketLike {
 
 /**
  * Soft delete a request (marks as deleted but keeps data).
+ * When r2 is provided, also deletes associated R2 files immediately.
  */
 export async function softDeleteRequest(
   db: D1Database,
-  requestId: string
+  requestId: string,
+  r2?: R2BucketLike
 ): Promise<boolean> {
   try {
+    // Delete R2 files first if r2 bucket provided
+    if (r2) {
+      try {
+        const { results: files } = await db
+          .prepare('SELECT r2_keys FROM arb_files WHERE request_id = ?')
+          .bind(requestId)
+          .all<{ r2_keys: string }>();
+
+        for (const file of files ?? []) {
+          const keys = parseR2Keys(file.r2_keys);
+          for (const key of keys) {
+            try {
+              await r2.delete(key);
+            } catch (e) {
+              console.warn('[data-retention] R2 delete failed for ARB file:', key, e);
+            }
+          }
+        }
+      } catch (e) {
+        console.error('[data-retention] Failed to delete R2 files for request:', requestId, e);
+      }
+    }
+
     const result = await db
       .prepare('UPDATE arb_requests SET deleted_at = datetime("now") WHERE id = ?')
       .bind(requestId)
@@ -138,20 +163,61 @@ export async function applyRetentionPolicies(db: D1Database): Promise<{ deleted:
 /**
  * Permanently delete soft-deleted records older than grace period (30 days).
  * This is a destructive operation - use with caution!
+ * When r2 is provided, also deletes associated R2 files for ARB requests.
  */
 export async function permanentlyDeleteOldRecords(
   db: D1Database,
-  gracePeriodDays: number = 30
-): Promise<{ requests: number; auditLogs: number; errors: number }> {
+  options: {
+    gracePeriodDays?: number;
+    /** When provided, R2 files for ARB requests are deleted before removing DB rows. */
+    r2?: R2BucketLike;
+  } = {}
+): Promise<{ requests: number; auditLogs: number; r2Errors: number; errors: number }> {
+  const gracePeriodDays = options.gracePeriodDays ?? 30;
+  const r2 = options.r2;
+
   const cutoffDate = new Date();
   cutoffDate.setDate(cutoffDate.getDate() - gracePeriodDays);
   const cutoff = cutoffDate.toISOString();
 
   let requestsDeleted = 0;
   let auditLogsDeleted = 0;
+  let r2Errors = 0;
   let errors = 0;
 
   try {
+    // If R2 provided, delete files for old soft-deleted requests first
+    if (r2) {
+      const { results: requests } = await db
+        .prepare('SELECT id FROM arb_requests WHERE deleted_at < ? AND deleted_at IS NOT NULL AND deleted_at != ""')
+        .bind(cutoff)
+        .all<{ id: string }>();
+
+      for (const req of requests ?? []) {
+        try {
+          const { results: files } = await db
+            .prepare('SELECT r2_keys FROM arb_files WHERE request_id = ?')
+            .bind(req.id)
+            .all<{ r2_keys: string }>();
+
+          for (const file of files ?? []) {
+            const keys = parseR2Keys(file.r2_keys);
+            for (const key of keys) {
+              try {
+                await r2.delete(key);
+              } catch (e) {
+                console.warn('[data-retention] R2 delete failed for ARB file:', key, e);
+                r2Errors++;
+              }
+            }
+          }
+        } catch (e) {
+          console.error('[data-retention] Failed to delete R2 files for request:', req.id, e);
+          r2Errors++;
+        }
+      }
+    }
+
     // Delete old soft-deleted requests
     const requestsResult = await db
       .prepare('DELETE FROM arb_requests WHERE deleted_at < ? AND deleted_at IS NOT NULL AND deleted_at != ""')
@@ -175,7 +241,7 @@ export async function permanentlyDeleteOldRecords(
     errors++;
   }
 
-  return { requests: requestsDeleted, auditLogs: auditLogsDeleted, errors };
+  return { requests: requestsDeleted, auditLogs: auditLogsDeleted, r2Errors, errors };
 }
 
 function parsePhotoKeys(photos: string | null): string[] {
@@ -184,6 +250,24 @@ function parsePhotoKeys(photos: string | null): string[] {
     const arr = JSON.parse(photos);
     if (!Array.isArray(arr)) return [];
     return arr.filter((k): k is string => typeof k === 'string' && k.length > 0);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Parse R2 keys from arb_files.r2_keys JSON column.
+ * Format: {"originals": ["key1"], "review": ["key2"], "archive": ["key3"]}
+ */
+function parseR2Keys(r2KeysJson: string | null): string[] {
+  if (!r2KeysJson) return [];
+  try {
+    const obj = JSON.parse(r2KeysJson) as { originals?: string[]; review?: string[]; archive?: string[] };
+    const keys: string[] = [];
+    if (obj.originals) keys.push(...obj.originals);
+    if (obj.review) keys.push(...obj.review);
+    if (obj.archive) keys.push(...obj.archive);
+    return keys.filter((k): k is string => typeof k === 'string' && k.length > 0);
   } catch {
     return [];
   }
