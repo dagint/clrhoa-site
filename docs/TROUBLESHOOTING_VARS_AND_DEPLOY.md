@@ -53,7 +53,25 @@ So:
 
 ---
 
-## 4. Checklist to get back to a working state
+## 4. Cloudflare Pages might be building from Git (very common)
+
+**If your GitHub Variables are set and “Verify public env vars” shows them as set, but the live site still shows wrong or empty dues/address/etc., Cloudflare is likely building the site itself and overwriting the deployment from GitHub Actions.**
+
+When Cloudflare Pages is connected to your Git repo and has **Build** enabled, every push triggers a **Cloudflare** build. That build runs on Cloudflare’s servers and does **not** have access to your GitHub Variables. When that build finishes, it deploys and can **overwrite** the deployment that GitHub Actions just uploaded (the one built with your Variables). So the live site ends up being the Cloudflare build (no vars), not the GitHub build (with vars).
+
+**Fix:**
+
+1. In **Cloudflare Dashboard** go to **Workers & Pages** → **clrhoa-site** → **Settings** (or **Builds & deployments**).
+2. If you see **Build configuration** with a **Build command** and a **Branch** (e.g. `main`) connected:
+   - Either **disable** the Cloudflare build (e.g. “Do not build” or disconnect the branch), so that **only** the GitHub Actions deployment (upload of `dist`) is used, **or**
+   - Stop using GitHub Actions to deploy and instead add all `PUBLIC_*` and `SITE` as **Cloudflare Pages → Environment variables** so Cloudflare’s build has them (more work and you hit the sync 500 issue).
+3. Recommended: **Use only GitHub Actions to build and deploy.** In Cloudflare Pages settings, set the project to accept **Direct Uploads** only (no Git-based build). The `cloudflare/pages-action` in your workflow uploads the pre-built `dist` folder; that deployment should be the one that’s live.
+
+After disabling Cloudflare’s build, trigger a new deploy from GitHub Actions (push a commit or “Run workflow”). The live site should then show the values from your GitHub Variables.
+
+---
+
+## 5. Checklist to get back to a working state
 
 1. **List what you need**
    See **Minimum for Dues page and Local Resources** in [ENVIRONMENT_VARIABLES.md](./ENVIRONMENT_VARIABLES.md#why-the-live-site-shows-wrong-address-dues-amount-or-missing-recycling-data).
@@ -74,7 +92,25 @@ So:
 
 ---
 
-## 5. Optional: use local files to repopulate GitHub Variables
+## 6. “Environment variables are being managed through wrangler.toml”
+
+If Cloudflare Pages shows: **“Environment variables for this project are being managed through wrangler.toml. Only Secrets (encrypted variables) can be managed via the Dashboard.”**
+
+That’s expected when the project uses a `wrangler.toml` (or is linked to one). In that mode:
+
+- **Secrets** (encrypted) **can** be added in the Dashboard: e.g. `SESSION_SECRET`, `D1_DATABASE_ID`, `RESEND_API_KEY`, `NOTIFY_BOARD_EMAIL`, `RECAPTCHA_SECRET_KEY`, etc. Add those under **Pages → clrhoa-site → Settings → Environment variables** as **Encrypt** (Secrets).
+- **Plain-text variables** (e.g. `PUBLIC_QUARTERLY_DUES_AMOUNT`) **cannot** be added or edited in the Dashboard; Cloudflare expects them from `wrangler.toml` when that config is in use.
+
+For this project that’s fine:
+
+- **PUBLIC_*** and **SITE** are only needed at **build time**. The build runs in **GitHub Actions** and reads **GitHub Variables**, so those values are baked into the deployed site. They do **not** need to exist in Cloudflare for the live site to show the right dues/address/etc., as long as the deploy is the one from GitHub (see §4).
+- **Runtime secrets** are what the app needs in Cloudflare. Add those as **Secrets** in the Dashboard; the “only Secrets” restriction does not block that.
+
+So: add **Secrets** in the Dashboard; keep **PUBLIC_*** and **SITE** in **GitHub Variables** only. No need to put `PUBLIC_*` in wrangler.toml unless you later switch to building on Cloudflare.
+
+---
+
+## 7. Optional: use local files to repopulate GitHub Variables
 
 If you have a working `.vars.local` (or `.env.local` with `PUBLIC_*` and `SITE`):
 
@@ -90,7 +126,7 @@ See **vars:update** in the repo scripts and [GITHUB_SECRETS_SETUP.md](./GITHUB_S
 
 ---
 
-## 6. "Sync Secrets to Cloudflare Pages" fails with API 500
+## 8. "Sync Secrets to Cloudflare Pages" fails with API 500
 
 If the workflow step **Sync Secrets to Cloudflare Pages** fails with:
 
@@ -113,7 +149,7 @@ Cloudflare’s API sometimes returns 500 for large or burst requests. The sync s
 
 ---
 
-## 7. Summary
+## 9. Summary
 
 | Symptom | Cause | Fix |
 |--------|--------|-----|
@@ -121,5 +157,6 @@ Cloudflare’s API sometimes returns 500 for large or burst requests. The sync s
 | “Verify public env vars” shows **missing** for key names | Those names aren’t set as Variables (or are only in Secrets) | Add them in **Variables** (or production env vars), re-run |
 | Cloudflare dashboard only shows some vars | Expected; PUBLIC_* are build-time only | No change needed; fix is in GitHub Variables + new build |
 | Sync step fails with API 500 | Cloudflare API transient or payload size | Re-run workflow; script retries and batches; or set vars manually in Cloudflare |
+| Vars show “set” in Verify but live site still wrong | Cloudflare Pages is building from Git and overwriting GitHub’s deploy | Disable Cloudflare’s build; use only GitHub Actions to build and deploy (Direct Upload) |
 
 The live site is built **in GitHub Actions**. Whatever **Variables** the workflow has when it runs `npm run build` are what get baked into the site. Cloudflare only receives the built `dist` and runtime secrets; it does not re-run the build or inject `PUBLIC_*` from the Cloudflare UI.
