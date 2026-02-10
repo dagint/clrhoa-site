@@ -98,6 +98,47 @@ CREATE TABLE route_permissions_audit (
 }
 ```
 
+---
+
+### GET `/api/permissions/for-role?role=<role>`
+
+**Purpose**: Get all permissions for a specific role
+
+**Auth**: Authenticated users can query their own role. Admins can query any role.
+
+**Query Parameters**:
+- `role` (required): One of `member`, `arb`, `board`, `admin`
+
+**Request Example**:
+```
+GET /api/permissions/for-role?role=member
+```
+
+**Response**:
+```json
+{
+  "role": "member",
+  "permissions": {
+    "/portal/dashboard": "write",
+    "/portal/directory": "write",
+    "/portal/admin": "none",
+    "/board/meetings": "none"
+  },
+  "count": 52
+}
+```
+
+**Authorization Rules**:
+- Members can only query `?role=member`
+- ARB can only query `?role=arb`
+- Board can only query `?role=board`
+- Admins can query any role
+
+**Error Responses**:
+- `400 Bad Request`: Missing or invalid role parameter
+- `401 Unauthorized`: No session
+- `403 Forbidden`: Trying to query another role (non-admin)
+
 **Error Responses**:
 - `401 Unauthorized`: No session
 - `403 Forbidden`: Not admin
@@ -223,6 +264,161 @@ import { PROTECTED_ROUTES } from '../utils/rbac';
 const seeded = await seedDefaultPermissions(db, PROTECTED_ROUTES);
 // 208 (52 routes × 4 roles)
 ```
+
+### Helper Utilities (`src/utils/permissions.ts`)
+
+#### `canAccess(role, path, required, db?): Promise<boolean>`
+Check if a role can access a path with the required permission level.
+
+```typescript
+import { canAccess } from '../utils/permissions';
+
+// Check if member can read dashboard
+const canView = await canAccess('member', '/portal/dashboard', 'read', db);
+
+// Check if board can write to meetings
+const canEdit = await canAccess('board', '/board/meetings', 'write', db);
+
+// Defaults to 'read' if not specified
+const hasAccess = await canAccess('arb', '/portal/arb-dashboard', undefined, db);
+```
+
+**Fallback**: If `db` is not provided, uses static `PROTECTED_ROUTES` configuration.
+
+#### `getRolePermissions(role, db?): Promise<Record<string, PermissionLevel>>`
+Get all permissions for a specific role.
+
+```typescript
+import { getRolePermissions } from '../utils/permissions';
+
+const memberPerms = await getRolePermissions('member', db);
+// {
+//   "/portal/dashboard": "write",
+//   "/portal/directory": "write",
+//   "/portal/admin": "none",
+//   ...
+// }
+```
+
+#### `canPerformAction(role, path, action, db?): Promise<boolean>`
+Check if a role can perform a specific action on a path.
+
+```typescript
+import { canPerformAction } from '../utils/permissions';
+
+// Actions: 'view', 'create', 'edit', 'delete'
+const canView = await canPerformAction('member', '/portal/dashboard', 'view', db);
+const canEdit = await canPerformAction('board', '/board/meetings', 'edit', db);
+const canDelete = await canPerformAction('admin', '/portal/admin', 'delete', db);
+```
+
+**Action Mapping**:
+- `view` → requires `read` permission
+- `create`, `edit`, `delete` → require `write` permission
+
+#### `getAccessiblePaths(role, minLevel, db?): Promise<string[]>`
+Get all paths accessible by a role at a given permission level.
+
+```typescript
+import { getAccessiblePaths } from '../utils/permissions';
+
+// Get all readable paths for member
+const readablePaths = await getAccessiblePaths('member', 'read', db);
+// ["/portal/dashboard", "/portal/directory", ...]
+
+// Get all writable paths for board
+const writablePaths = await getAccessiblePaths('board', 'write', db);
+// ["/board/meetings", "/board/directory", ...]
+```
+
+#### Validation Helpers
+
+```typescript
+import { isValidPermissionLevel, isValidRole, getPermissionLevelLabel, getRoleLabel } from '../utils/permissions';
+
+// Validate input
+if (!isValidRole(userInput)) {
+  throw new Error('Invalid role');
+}
+
+if (!isValidPermissionLevel(level)) {
+  throw new Error('Invalid permission level');
+}
+
+// Get display labels
+const label = getPermissionLevelLabel('read'); // "Read Only"
+const roleLabel = getRoleLabel('admin'); // "Administrator"
+```
+
+### Admin Authorization Middleware (`src/middleware/withAdminAuthorization.ts`)
+
+#### `withAdminAuthorization(Astro): Promise<AdminAuthCheck>`
+Reusable middleware for protecting admin-only endpoints.
+
+```typescript
+import { withAdminAuthorization } from '../middleware/withAdminAuthorization';
+
+// In API endpoint
+const auth = await withAdminAuthorization(Astro);
+if (!auth.authorized) return auth.response;
+
+// Now TypeScript knows auth has session and env
+const { session, env } = auth;
+const db = env.DB;
+```
+
+**Returns**:
+- If authorized: `{ authorized: true, session, env }`
+- If not authorized: `{ authorized: false, response }` (401/403 response ready to return)
+
+#### `isAdmin(Astro): Promise<boolean>`
+Simple boolean check for admin status.
+
+```typescript
+import { isAdmin } from '../middleware/withAdminAuthorization';
+
+if (!await isAdmin(Astro)) {
+  return new Response('Forbidden', { status: 403 });
+}
+```
+
+#### `requireAdmin(Astro): Promise<{ session, env }>`
+Throws response if not admin (for endpoints that always require admin).
+
+```typescript
+import { requireAdmin } from '../middleware/withAdminAuthorization';
+
+// Will throw 401/403 response if not admin
+const { session, env } = await requireAdmin(Astro);
+
+// Code here only runs if admin
+const db = env.DB;
+```
+
+### Static Fallback (`data/permissions.json`)
+
+When database is not available (local development, testing), the system falls back to static permissions:
+
+```json
+{
+  "permissions": {
+    "/portal/dashboard": {
+      "member": "write",
+      "arb": "write",
+      "board": "write",
+      "admin": "write"
+    },
+    "/portal/admin": {
+      "member": "none",
+      "arb": "none",
+      "board": "none",
+      "admin": "write"
+    }
+  }
+}
+```
+
+Helper functions automatically use this fallback when `db` parameter is undefined.
 
 ## Security
 
