@@ -239,6 +239,7 @@ export function getRoleLabel(role: RoleType): string {
     arb: 'ARB Committee',
     board: 'Board Member',
     admin: 'Administrator',
+    arb_board: 'ARB & Board Member',
   };
   return labels[role];
 }

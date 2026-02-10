@@ -6,7 +6,7 @@
  */
 
 export type PermissionLevel = 'none' | 'read' | 'write';
-export type RoleType = 'member' | 'arb' | 'board' | 'admin';
+export type RoleType = 'member' | 'arb' | 'board' | 'admin' | 'arb_board';
 
 export interface RoutePermission {
   id: number;
