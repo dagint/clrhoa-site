@@ -7,7 +7,7 @@
  */
 
 import type { MiddlewareHandler } from 'astro';
-import { getSessionFromCookie, SESSION_COOKIE_NAME, isElevatedRole, getEffectiveRole } from './lib/auth';
+import { getSessionFromCookie, SESSION_COOKIE_NAME, isElevatedRole, getEffectiveRole, isAdminRole } from './lib/auth';
 import { getOwnerByEmail, getPhonesArray } from './lib/directory-db';
 import { generateCorrelationId } from './lib/logging';
 
@@ -60,8 +60,8 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
   const env = context.locals.runtime?.env;
   const cookieHeader = context.request.headers.get('cookie') ?? undefined;
 
-  // Board admin (/board/*): require session and effective elevated role (PIM: JIT elevation).
-  // The exact path /board (and /board/) is the public Board & Committees page — do not redirect.
+  // Board routes (/board/*): require session and role-based access.
+  // Public /board (exact) is the public Board & Committees page — do not redirect.
   const isPublicBoardPage = pathname === '/board' || pathname === '/board/';
   if (!isPublicBoardPage && pathname.startsWith('/board')) {
     if (!context.cookies.has(SESSION_COOKIE_NAME)) {
@@ -72,14 +72,34 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
       if (!session) {
         return context.redirect('/portal/login');
       }
-      if (!isElevatedRole(getEffectiveRole(session))) {
-        const returnUrl = encodeURIComponent(pathname);
-        return context.redirect(`/portal/request-elevated-access?return=${returnUrl}`);
+      const effectiveRole = getEffectiveRole(session);
+      if (!isElevatedRole(effectiveRole)) {
+        return context.redirect(`/portal/request-elevated-access?return=${encodeURIComponent(pathname)}`);
+      }
+      // Role-based: audit-logs → admin or board; library → board or arb; rest → board only
+      const isAuditLogs = pathname === '/board/audit-logs' || pathname.startsWith('/board/audit-logs/');
+      const isLibrary = pathname === '/board/library' || pathname.startsWith('/board/library/');
+      const allowedAudit = isAdminRole(effectiveRole) || effectiveRole === 'board';
+      const allowedLibrary = effectiveRole === 'board' || effectiveRole === 'arb';
+      const allowedBoardOnly = effectiveRole === 'board';
+      if (isAuditLogs && !allowedAudit) {
+        if (effectiveRole === 'admin') return context.redirect('/portal/admin');
+        if (effectiveRole === 'arb') return context.redirect('/portal/arb');
+        return context.redirect('/portal/board');
+      }
+      if (isLibrary && !allowedLibrary) {
+        if (effectiveRole === 'admin') return context.redirect('/portal/admin');
+        return context.redirect('/portal/board');
+      }
+      if (!isAuditLogs && !isLibrary && !allowedBoardOnly) {
+        if (effectiveRole === 'admin') return context.redirect('/portal/admin');
+        if (effectiveRole === 'arb') return context.redirect('/portal/arb');
+        return context.redirect('/portal/board');
       }
     }
   }
 
-  // Admin (e.g. /admin/feedback): same as board — session + effective elevated role
+  // Admin routes (/admin/*): admin role only
   if (pathname.startsWith('/admin')) {
     if (!context.cookies.has(SESSION_COOKIE_NAME)) {
       return context.redirect('/portal/login');
@@ -89,9 +109,12 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
       if (!session) {
         return context.redirect('/portal/login');
       }
-      if (!isElevatedRole(getEffectiveRole(session))) {
-        const returnUrl = encodeURIComponent(pathname);
-        return context.redirect(`/portal/request-elevated-access?return=${returnUrl}`);
+      const effectiveRole = getEffectiveRole(session);
+      if (!isAdminRole(effectiveRole)) {
+        if (effectiveRole === 'board' || effectiveRole === 'arb_board') return context.redirect('/portal/board');
+        if (effectiveRole === 'arb') return context.redirect('/portal/arb');
+        if (isElevatedRole(effectiveRole)) return context.redirect('/portal/request-elevated-access?return=' + encodeURIComponent(pathname));
+        return context.redirect('/portal/dashboard');
       }
     }
   }
@@ -126,19 +149,46 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
       if (!context.cookies.has(SESSION_COOKIE_NAME)) {
         return context.redirect('/portal/login');
       }
-      // Profile completeness: redirect before any response is sent (avoids "response already sent" when component would redirect)
       const isProfilePage = pathname === '/portal/profile' || pathname === '/portal/profile/';
-      if (!isProfilePage) {
-        const env = context.locals.runtime?.env;
-        if (env?.SESSION_SECRET && env?.DB) {
-          const cookieHeader = context.request.headers.get('cookie') ?? undefined;
-          const session = await getSessionFromCookie(cookieHeader, env.SESSION_SECRET);
-          if (!session) {
-            return context.redirect('/portal/login');
+      if (env?.SESSION_SECRET) {
+        const portalSession = await getSessionFromCookie(cookieHeader, env.SESSION_SECRET);
+        if (!portalSession) {
+          return context.redirect('/portal/login');
+        }
+        const effectiveRole = getEffectiveRole(portalSession);
+        const staffRole = portalSession.role?.toLowerCase() ?? '';
+
+        // Role-based landing zones and admin-only routes
+        if (pathname === '/portal/admin' || pathname === '/portal/admin/') {
+          if (effectiveRole !== 'admin') {
+            if (staffRole === 'admin') return context.redirect('/portal/request-elevated-access?return=' + encodeURIComponent('/portal/admin'));
+            return context.redirect('/portal/dashboard');
           }
-          const owner = await getOwnerByEmail(env.DB, session.email);
+        } else if (pathname === '/portal/board' || pathname === '/portal/board/') {
+          if (effectiveRole !== 'board' && effectiveRole !== 'arb_board') {
+            if (effectiveRole === 'admin') return context.redirect('/portal/admin');
+            if (effectiveRole === 'arb') return context.redirect('/portal/arb');
+            if (isElevatedRole(staffRole)) return context.redirect('/portal/request-elevated-access?return=' + encodeURIComponent('/portal/board'));
+            return context.redirect('/portal/dashboard');
+          }
+        } else if (pathname === '/portal/arb' || pathname === '/portal/arb/') {
+          if (effectiveRole !== 'arb') {
+            if (effectiveRole === 'admin') return context.redirect('/portal/admin');
+            if (effectiveRole === 'board') return context.redirect('/portal/board');
+            if (isElevatedRole(staffRole)) return context.redirect('/portal/request-elevated-access?return=' + encodeURIComponent('/portal/arb'));
+            return context.redirect('/portal/dashboard');
+          }
+        } else if (pathname === '/portal/usage' || pathname.startsWith('/portal/usage')) {
+          if (effectiveRole !== 'admin') {
+            if (staffRole === 'admin') return context.redirect('/portal/request-elevated-access?return=' + encodeURIComponent(pathname));
+            return context.redirect('/portal/dashboard');
+          }
+        }
+
+        // Profile completeness (avoids "response already sent" when component would redirect)
+        if (!isProfilePage && env?.DB) {
+          const owner = await getOwnerByEmail(env.DB, portalSession.email);
           const phones = owner ? getPhonesArray(owner) : [];
-          const effectiveRole = getEffectiveRole(session);
           const profileComplete = isProfileComplete(owner, phones, effectiveRole);
           if (!profileComplete) {
             return context.redirect('/portal/profile?required=1');

@@ -20,12 +20,14 @@ if (!hasStaffWhitelistRole) {
   return Astro.redirect('/portal/dashboard');
 }
 
-// Already elevated: send to return URL or dashboard
+// Already elevated: send to return URL or role landing zone
 if (isCurrentlyElevated) {
   const returnTo = Astro.url.searchParams.get('return');
-  return Astro.redirect(
-    (returnTo && returnTo.startsWith('/') && !returnTo.startsWith('//') ? returnTo : null) ?? '/portal/dashboard'
-  );
+  const safeReturn = returnTo && returnTo.startsWith('/') && !returnTo.startsWith('//') ? returnTo : null;
+  if (safeReturn) return Astro.redirect(safeReturn);
+  const { ROLE_LANDING } = await import('../../config/navigation');
+  const landing = ROLE_LANDING[whitelistRole] ?? '/portal/dashboard';
+  return Astro.redirect(landing);
 }
 
 const db = env?.DB;
@@ -64,7 +66,7 @@ const returnLabel = returnParam && returnParam.startsWith('/board') ? 'Board' : 
       </div>
     </main>
   </div>
-  <script is:inline define:vars={{ returnParam }}>
+  <script is:inline define:vars={{ returnParam, staffRole: whitelistRole, adminLanding: '/portal/admin', boardLanding: '/portal/board', arbLanding: '/portal/arb' }}>
     (function () {
       var btn = document.getElementById('pim-elevate-btn');
       if (!btn) return;
@@ -76,7 +78,7 @@ const returnLabel = returnParam && returnParam.startsWith('/board') ? 'Board' : 
             if (r.ok) {
               var go = (typeof returnParam === 'string' && returnParam.startsWith('/') && !returnParam.startsWith('//'))
                 ? returnParam
-                : '/portal/dashboard';
+                : (staffRole === 'admin' ? adminLanding : staffRole === 'arb' ? arbLanding : boardLanding) || '/portal/dashboard';
               window.location.href = go;
             } else {
               b.disabled = false;

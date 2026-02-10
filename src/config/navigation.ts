@@ -102,9 +102,31 @@ export const footerResourceLinks: NavLink[] = [
   { label: 'About', href: '/about' },
 ];
 
-// ─── Board admin ─────────────────────────────────────────────────────
+// ─── Role landing zones (RBAC) ───────────────────────────────────────
 
-/** Secondary nav links for board/admin role. */
+/** Landing zone per elevated role. Redirect here after PIM elevation. */
+export const ROLE_LANDING: Record<string, string> = {
+  admin: '/portal/admin',
+  board: '/portal/board',
+  arb: '/portal/arb',
+  arb_board: '/portal/board', // arb_board elevates to board or arb; default landing is board
+};
+
+// ─── Admin only ─────────────────────────────────────────────────────
+
+/** Admin-only nav: site feedback, SMS requests, test email, site usage, audit logs. */
+export const adminLinks: NavLink[] = [
+  { label: 'Admin', href: '/portal/admin' },
+  { label: 'Site feedback', href: '/admin/feedback' },
+  { label: 'SMS requests', href: '/admin/sms-requests' },
+  { label: 'Test email', href: '/admin/test-email' },
+  { label: 'Site usage', href: '/portal/usage' },
+  { label: 'Audit logs', href: '/board/audit-logs' },
+];
+
+// ─── Board only ─────────────────────────────────────────────────────
+
+/** Board-only nav: board dashboard, ARB dashboard, directory, dues, vendors, meetings, maintenance, feedback, contacts, news, library, documents, audit logs. */
 export const boardLinks: NavLink[] = [
   { label: 'Board', href: '/portal/board' },
   { label: 'ARB Dashboard', href: '/portal/arb-dashboard' },
@@ -121,17 +143,13 @@ export const boardLinks: NavLink[] = [
   { label: 'Member documents', href: '/board/member-documents' },
   { label: 'Audit logs', href: '/board/audit-logs' },
   { label: 'Backups', href: '/board/backups' },
-  { label: 'Site feedback', href: '/admin/feedback' },
-  { label: 'SMS requests', href: '/admin/sms-requests' },
-  { label: 'Test email', href: '/admin/test-email' },
-  { label: 'Site usage', href: '/portal/usage' },
 ];
 
-// ─── ARB role ────────────────────────────────────────────────────────
+// ─── ARB only ────────────────────────────────────────────────────────
 
-/** Secondary nav links for ARB-only role. */
+/** ARB-only nav: ARB dashboard, pre-approval library. */
 export const arbLinks: NavLink[] = [
-  { label: 'ARB', href: '/portal/board' },
+  { label: 'ARB', href: '/portal/arb' },
   { label: 'ARB Dashboard', href: '/portal/arb-dashboard' },
   { label: 'Pre-approval library', href: '/board/library' },
 ];
@@ -167,11 +185,14 @@ export const portalHelpLinks: NavLink[] = [
   { label: 'FAQ', href: '/portal/faq' },
 ];
 
-/** Portal elevated links (shown when staffRole is elevated, requires elevation to access). */
-export const portalElevatedLinks: NavLink[] = [
-  { label: 'ARB Dashboard', href: '/portal/arb-dashboard' },
-  { label: 'Board', href: '/portal/board' },
-  { label: 'Public documents', href: '/board/public-documents' },
-  { label: 'Member documents', href: '/board/member-documents' },
-  { label: 'Audit logs', href: '/board/audit-logs' },
-];
+/**
+ * Portal elevated link: one per staff role. Shown when user has elevated whitelist role.
+ * Href is role's landing zone; when not elevated, link goes to request-elevated-access?return=<landing>.
+ */
+export function getPortalElevatedLink(staffRole: string): { label: string; href: string } | null {
+  const r = staffRole?.toLowerCase();
+  if (r === 'admin') return { label: 'Admin', href: ROLE_LANDING.admin };
+  if (r === 'board') return { label: 'Board', href: ROLE_LANDING.board };
+  if (r === 'arb' || r === 'arb_board') return { label: r === 'arb' ? 'ARB' : 'Board / ARB', href: ROLE_LANDING[r] ?? ROLE_LANDING.board };
+  return null;
+}
