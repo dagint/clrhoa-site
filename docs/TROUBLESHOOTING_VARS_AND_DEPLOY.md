@@ -101,13 +101,15 @@ If the workflow step **Sync Secrets to Cloudflare Pages** fails with:
 Cloudflare’s API sometimes returns 500 for large or burst requests. The sync script now:
 
 - **Retries** up to 3 times with backoff (0s, 2s, 4s) on 500.
-- **Batches** env vars (20 per request) so each PATCH is smaller.
+- **Batches** env vars (20 per request) when syncing many vars.
+- **Syncs only runtime secrets by default** — `PUBLIC_*` and `SITE` are **not** sent to Cloudflare (they are build-time only in GitHub). This keeps the payload small and usually avoids 500s.
 
 **What you can do:**
 
-1. **Re-run the workflow** — Often the next run succeeds (transient 500).
+1. **Re-run the workflow** — With secrets-only sync, the payload is small; the step should succeed.
 2. **Check token** — Use a token with **Cloudflare Pages → Edit** (and Account → Read). See [GITHUB_SECRETS_SETUP.md](./GITHUB_SECRETS_SETUP.md).
-3. **If it keeps failing** — Temporarily remove or comment out the “Sync Secrets to Cloudflare Pages” step and set secrets/vars once in **Cloudflare Dashboard → Pages → your project → Settings → Environment variables**, then rely on build-time vars from GitHub for `PUBLIC_*`.
+3. **If you need PUBLIC_* in Cloudflare** — Set `SYNC_PAGES_VARS=1` in the workflow env for that step (optional; may increase chance of 500 again).
+4. **If it still fails** — Set secrets once in **Cloudflare Dashboard → Pages → your project → Settings → Environment variables** and optionally skip the sync step.
 
 ---
 
