@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 /**
- * Sync GitHub Secrets and Variables to Cloudflare Pages.
- * Sets both secrets (encrypted) and plain-text env vars so they appear in the
- * dashboard and are available at build + runtime.
+ * Sync GitHub Secrets (and optionally Variables) to Cloudflare Pages.
+ * By default only runtime secrets are synced to avoid API 500s from large payloads.
+ * PUBLIC_* are build-time only (used in GitHub Actions build); they are not needed in
+ * Cloudflare when the build runs in GitHub.
  *
  * Usage: node scripts/sync-secrets-to-cloudflare-pages.js
+ * Optional: SYNC_PAGES_VARS=1 to also sync PUBLIC_* and SITE (larger payload, may 500).
  * Requires: CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN (or CLOUDFLARE_DEPLOY_API_TOKEN)
  */
 
@@ -289,12 +291,18 @@ async function main() {
     setSecrets.push(name);
   }
 
-  for (const name of PAGES_VARS) {
-    const value = process.env[name];
-    if (value !== undefined && value !== null && String(value).trim() !== '') {
-      envVarsToSet[name] = { type: 'plain_text', value: String(value) };
-      setVars.push(name);
+  // Only sync PUBLIC_* / SITE if opted in (large payload can trigger Cloudflare API 500)
+  const syncPagesVars = process.env.SYNC_PAGES_VARS === '1' || process.env.SYNC_PAGES_VARS === 'true';
+  if (syncPagesVars) {
+    for (const name of PAGES_VARS) {
+      const value = process.env[name];
+      if (value !== undefined && value !== null && String(value).trim() !== '') {
+        envVarsToSet[name] = { type: 'plain_text', value: String(value) };
+        setVars.push(name);
+      }
     }
+  } else {
+    console.log('Skipping PUBLIC_* vars (build-time only in GitHub). Set SYNC_PAGES_VARS=1 to sync them.\n');
   }
 
   try {
