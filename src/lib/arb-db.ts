@@ -4,6 +4,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import { listEmailsAtSameAddress } from './directory-db.js';
+import { generateId } from '../utils/id-generator.js';
 
 export interface ArbRequest {
   id: string;
@@ -46,21 +47,6 @@ export interface ArbAuditLogRow {
   notes: string | null;
   created: string | null;
   ip_address: string | null;
-}
-
-const ID_LEN = 21; // nanoid-like length
-
-function generateId(): string {
-  const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
-  let id = '';
-  const bytes = new Uint8Array(ID_LEN);
-  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
-    crypto.getRandomValues(bytes);
-    for (let i = 0; i < ID_LEN; i++) id += chars[bytes[i]! % chars.length];
-  } else {
-    for (let i = 0; i < ID_LEN; i++) id += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return id;
 }
 
 /** Human-readable request number: ARB-YYYY-NNNN (e.g. ARB-2026-0001). Requires DB to get next sequence. */

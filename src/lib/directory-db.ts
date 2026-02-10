@@ -2,20 +2,7 @@
  * D1 helpers for Phase 3: Homeowner directory (owners + directory_logs).
  */
 
-const ID_LEN = 21;
-
-function generateId(): string {
-  const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
-  let id = '';
-  const bytes = new Uint8Array(ID_LEN);
-  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
-    crypto.getRandomValues(bytes);
-    for (let i = 0; i < ID_LEN; i++) id += chars[bytes[i]! % chars.length];
-  } else {
-    for (let i = 0; i < ID_LEN; i++) id += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return id;
-}
+import { generateId } from '../utils/id-generator.js';
 
 export interface Owner {
   id: string;

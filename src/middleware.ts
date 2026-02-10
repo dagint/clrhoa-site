@@ -10,6 +10,7 @@ import type { MiddlewareHandler } from 'astro';
 import { getSessionFromCookie, SESSION_COOKIE_NAME, isElevatedRole, getEffectiveRole, isAdminRole } from './lib/auth';
 import { getOwnerByEmail, getPhonesArray } from './lib/directory-db';
 import { generateCorrelationId } from './lib/logging';
+import { hasRouteAccess, getAccessDeniedRedirect } from './utils/role-access';
 
 /** Admin accounts (e.g. service providers) are not required to have an address in the directory. */
 function isProfileComplete(
@@ -76,31 +77,10 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
       if (!isElevatedRole(effectiveRole)) {
         return context.redirect(`/portal/request-elevated-access?return=${encodeURIComponent(pathname)}`);
       }
-      // Role-based: audit-logs → admin or board; directory/assessments → board (and arb_board) only; ARB-allowed paths → board or arb; admin also allowed on board paths that have /portal/admin/* counterparts
-      const isAuditLogs = pathname === '/board/audit-logs' || pathname.startsWith('/board/audit-logs/');
-      const isBoardOnlyPath = pathname === '/board/directory' || pathname.startsWith('/board/directory/') || pathname === '/board/assessments' || pathname.startsWith('/board/assessments/');
-      const arbAllowedPaths = ['/board/vendors', '/board/meetings', '/board/maintenance', '/board/feedback', '/board/contacts', '/board/news', '/board/library', '/board/member-documents', '/board/public-documents', '/board/backups'];
-      const isArbAllowed = arbAllowedPaths.some((p) => pathname === p || pathname.startsWith(p + '/'));
-      const adminAllowedBoardPaths = ['/board/audit-logs', '/board/backups', '/board/vendors', '/board/maintenance', '/board/directory', '/board/contacts', '/board/news', '/board/member-documents', '/board/public-documents'];
-      const isAdminAllowedHere = isAdminRole(effectiveRole) && adminAllowedBoardPaths.some((p) => pathname === p || pathname.startsWith(p + '/'));
-      if (isAdminAllowedHere) {
-        // admin can access these board routes (e.g. when redirected from /portal/admin/backups)
-      } else if (isAuditLogs) {
-        if (!isAdminRole(effectiveRole) && effectiveRole !== 'board') {
-          return context.redirect(effectiveRole === 'arb' ? '/portal/arb' : '/portal/admin');
-        }
-      } else if (isBoardOnlyPath) {
-        if (effectiveRole !== 'board' && effectiveRole !== 'arb_board') {
-          return context.redirect(effectiveRole === 'admin' ? '/portal/admin' : '/portal/arb');
-        }
-      } else if (isArbAllowed) {
-        if (effectiveRole !== 'board' && effectiveRole !== 'arb_board' && effectiveRole !== 'arb') {
-          return context.redirect('/portal/admin');
-        }
-      } else {
-        if (effectiveRole !== 'board' && effectiveRole !== 'arb_board') {
-          return context.redirect(effectiveRole === 'admin' ? '/portal/admin' : '/portal/arb');
-        }
+
+      // Check role-based access using centralized logic
+      if (!hasRouteAccess(effectiveRole, pathname)) {
+        return context.redirect(getAccessDeniedRedirect(effectiveRole));
       }
     }
   }
