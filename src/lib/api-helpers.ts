@@ -2,6 +2,7 @@
  * Shared helpers for API routes: JSON responses and session requirement.
  * Use requireSession() to avoid repeating cookie + secret + 401 handling.
  */
+/// <reference types="@cloudflare/workers-types" />
 
 import type { SessionPayload } from './auth';
 import { getSessionFromCookie } from './auth';

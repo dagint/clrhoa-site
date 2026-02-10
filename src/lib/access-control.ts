@@ -2,6 +2,7 @@
  * Centralized access control for resource ownership and role-based access.
  * Use these helpers so ownership checks are consistent and no route forgets them.
  */
+/// <reference types="@cloudflare/workers-types" />
 
 import type { SessionPayload } from './auth';
 import { isElevatedRole } from './auth';

@@ -41,11 +41,11 @@
 <script is:inline>
   (function () {
     var form = document.getElementById('arb-export-form');
-    var csvLink = document.getElementById('export-csv-link');
-    var htmlLink = document.getElementById('export-html-link');
-    var fromInput = document.getElementById('export-from-date');
-    var toInput = document.getElementById('export-to-date');
-    var statusSelect = document.getElementById('export-status');
+    var csvLink = /** @type {HTMLAnchorElement | null} */ (document.getElementById('export-csv-link'));
+    var htmlLink = /** @type {HTMLAnchorElement | null} */ (document.getElementById('export-html-link'));
+    var fromInput = /** @type {HTMLInputElement | null} */ (document.getElementById('export-from-date'));
+    var toInput = /** @type {HTMLInputElement | null} */ (document.getElementById('export-to-date'));
+    var statusSelect = /** @type {HTMLSelectElement | null} */ (document.getElementById('export-status'));
     function updateExportLinks() {
       var params = new URLSearchParams();
       params.set('format', 'csv');
