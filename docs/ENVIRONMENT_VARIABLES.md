@@ -4,6 +4,17 @@ This site uses environment variables to store sensitive information and configur
 
 ---
 
+## Variables vs Secrets (important for deploy)
+
+| Store in GitHub as | Used for | Where to set |
+|--------------------|----------|--------------|
+| **Variables** | `PUBLIC_*`, `SITE`, `SITE_LAST_MODIFIED` — **build-time** (dues, address, waste, meeting, etc.) | Settings → Secrets and variables → **Actions → Variables** tab, or **Environments → production → Environment variables** |
+| **Secrets** | `SESSION_SECRET`, API keys, tokens — **runtime** (login, email, Cloudflare sync) | Settings → Secrets and variables → **Actions → Secrets** tab |
+
+**If the live site is missing dues, address, waste management, or other content:** those values must be **Variables**, not Secrets. The deploy workflow only passes `vars.*` into the build; it does not pass `secrets.*` into the build step. See [TROUBLESHOOTING_VARS_AND_DEPLOY.md](./TROUBLESHOOTING_VARS_AND_DEPLOY.md) for step-by-step fixes.
+
+---
+
 ## Why the live site shows wrong address, dues amount, or missing recycling data
 
 **The site is built in GitHub Actions**, not on Cloudflare. The workflow runs `npm run build` and passes **GitHub Variables** into that step. Those values are baked into the static pages at build time. Cloudflare only receives the built `dist` folder.
@@ -11,7 +22,7 @@ This site uses environment variables to store sensitive information and configur
 - **If the Dues page shows wrong address, wrong amount, or placeholder text** → the Build step did not have those values. Set them as **GitHub Variables** (not Secrets).
 - **If Local Resources is missing waste management / recycling links and data** → same: add the recycling and waste vars as **GitHub Variables**.
 
-**Where to set them:** Repo → **Settings** → **Secrets and variables** → **Actions** → **Variables** tab → add (or edit) each variable.  
+**Where to set them:** Repo → **Settings** → **Secrets and variables** → **Actions** → **Variables** tab → add (or edit) each variable.
 If you use **Environments** (e.g. production): Repo → **Settings** → **Environments** → **production** → **Environment variables**. The deploy workflow uses `environment: production` so it can read both repository Variables and production environment variables.
 
 **Minimum for Dues page and Local Resources:**

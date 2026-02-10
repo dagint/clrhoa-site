@@ -19,3 +19,49 @@ Already paged: **Board audit logs**, **Portal My activity** (directory + ARB), *
 
 ### 1. Auth + MFA + Password Management ⭐⭐⭐⭐
 Full auth: email/pass login/register. JWT 15min sliding. MFA TOTP toggle (encrypted KV). Roles user/elevated/admin. Admins only assign admins. Password update/reset/forgot with rate limiting. Lucia. Protect admin routes.
+
+Medium-Priority Improvements
+  #: 11
+  Recommendation: Extract reusable FormField component - form patterns are duplicated across contact, ARB, profile
+    pages
+  Impact: Code quality
+  ────────────────────────────────────────
+  #: 12
+  Recommendation: Consolidate navigation link definitions into a config file instead of repeating across
+  BaseLayout,
+     BoardNav, PortalNav
+  Impact: Maintainability
+  ────────────────────────────────────────
+  #: 13
+  Recommendation: Add a staging/preview environment - currently only production deploy exists
+  Impact: DevOps
+  ────────────────────────────────────────
+  #: 14
+  Recommendation: Implement service worker caching - PWA manifest exists but no offline strategy
+  Impact: UX
+  ────────────────────────────────────────
+  #: 15
+  Recommendation: Server-side image resizing - Sharp is a devDep but not used on uploads
+  Impact: Performance
+  ────────────────────────────────────────
+  #: 16
+  Recommendation: Granularize elevated role checks - some endpoints treat all elevated roles the same (ARB
+  shouldn't
+     have Board-level feedback control)
+  Impact: Security
+  ────────────────────────────────────────
+  #: 17
+  Recommendation: Add request correlation IDs for log tracing across middleware/API/DB
+  Impact: Observability
+  ────────────────────────────────────────
+  #: 18
+  Recommendation: Replace simple hash fingerprinting with crypto.subtle.digest
+  Impact: Security
+  ────────────────────────────────────────
+  #: 19
+  Recommendation: Add meta http-equiv redirect fallback cleanup - ProtectedPage uses archaic meta refresh
+  Impact: Code quality
+  ────────────────────────────────────────
+  #: 20
+  Recommendation: Document the security model - the auth/RBAC/PIM system is sophisticated and deserves written docs
+  Impact: Maintainability
