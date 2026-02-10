@@ -13,8 +13,8 @@ const { currentPath } = Astro.props;
 const links = adminLinks;
 
 function isCurrent(href: string): boolean {
-  if (href === '/portal/admin') return currentPath === '/portal/admin';
-  return currentPath.startsWith(href);
+  if (href === '/portal/admin') return currentPath === '/portal/admin' || currentPath === '/portal/admin/';
+  return currentPath === href || currentPath.startsWith(href + '/');
 }
 ---
 

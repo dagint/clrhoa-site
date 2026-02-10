@@ -4,7 +4,7 @@
  */
 
 import type { SessionPayload } from './auth';
-import { getSessionFromCookie, isElevatedRole, getEffectiveRole } from './auth';
+import { getSessionFromCookie, isElevatedRole, getEffectiveRole, isAdminRole } from './auth';
 
 /** Env shape for board pages (after SESSION_SECRET guard). */
 export interface BoardEnv {
@@ -52,4 +52,19 @@ export async function getBoardContext(astro: BoardContextAstro): Promise<GetBoar
   }
 
   return { env, session, effectiveRole: getEffectiveRole(session) };
+}
+
+/**
+ * Get context for admin-only pages. Redirects if not admin.
+ * Use for /portal/admin/* pages.
+ */
+export async function getAdminContext(astro: BoardContextAstro): Promise<GetBoardContextResult> {
+  const result = await getBoardContext(astro);
+  if ('redirect' in result) return result;
+  if (!isAdminRole(result.effectiveRole)) {
+    if (result.effectiveRole === 'board' || result.effectiveRole === 'arb_board') return { redirect: '/portal/board' };
+    if (result.effectiveRole === 'arb') return { redirect: '/portal/arb' };
+    return { redirect: '/portal/dashboard' };
+  }
+  return result;
 }
