@@ -9,6 +9,7 @@
 - **SMS (Disabled + Request Tracking)** — Profile: “Request SMS (costs HOA money)” button; no sending. D1 `sms_feature_requests` by lot_number. Admin `/admin/sms-requests`: “X users want SMS”, report for planning.
 - **Usage Metrics Dashboard** — `/dashboard`: public daily/weekly views + unique sessions (Chart.js). Admin section: user_id → path → timestamp. `/api/usage/record` beacon, `/api/usage/stats`, `/api/usage/admin`. D1 `page_views`.
 - **Dark Mode Fixes** — theme.css: `--text-primary-dark` / `--text-muted-dark`; all `select`s in dark get 4.5:1 (color + bg); `text-gray-400` override; inputs/textareas; Tailwind `text-portal-primary-dark` / `portal-muted-dark`.
+- **FormField component** — Reusable `FormField.astro` (label, required, hint (i), input/textarea, error div, description). Contact, profile, and ARB request pages refactored to use it.
 
 ---
 
@@ -21,11 +22,7 @@ Already paged: **Board audit logs**, **Portal My activity** (directory + ARB), *
 Full auth: email/pass login/register. JWT 15min sliding. MFA TOTP toggle (encrypted KV). Roles user/elevated/admin. Admins only assign admins. Password update/reset/forgot with rate limiting. Lucia. Protect admin routes.
 
 Medium-Priority Improvements
-  #: 11
-  Recommendation: Extract reusable FormField component - form patterns are duplicated across contact, ARB, profile
-    pages
-  Impact: Code quality
-  ────────────────────────────────────────
+  #: 11 — Done: FormField.astro added; contact, profile, arb-request refactored.
   #: 12
   Recommendation: Consolidate navigation link definitions into a config file instead of repeating across
   BaseLayout,
