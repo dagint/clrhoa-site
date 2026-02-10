@@ -29,6 +29,10 @@ function safeForSubject(s: string): string {
   return s.replace(/[\r\n\x00-\x1f]+/g, ' ').trim().slice(0, 100);
 }
 
+if (Astro.request.method !== 'POST') {
+  return new Response(null, { status: 405, headers: { Allow: 'POST' } });
+}
+
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
 const db = env?.DB;
@@ -40,10 +44,6 @@ const ip =
   Astro.request.headers.get('cf-connecting-ip') ??
   Astro.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
   null;
-
-if (Astro.request.method !== 'POST') {
-  return new Response(null, { status: 405, headers: { Allow: 'POST' } });
-}
 
 // Rate limit (per IP)
 const kv = env?.KV;
