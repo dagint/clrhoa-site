@@ -85,8 +85,9 @@ if (method === 'PUT') {
       });
     }
 
-    // Validate permission levels
+    // Validate permission levels and roles
     const validLevels = ['none', 'read', 'write'];
+    const validRoles = ['member', 'arb', 'board', 'admin'];
     for (const [routePath, rolePerms] of Object.entries(permissionMap)) {
       if (typeof rolePerms !== 'object') {
         return new Response(
@@ -99,6 +100,18 @@ if (method === 'PUT') {
       }
 
       for (const [role, level] of Object.entries(rolePerms)) {
+        if (!validRoles.includes(role)) {
+          return new Response(
+            JSON.stringify({
+              error: `Invalid role "${role}" for route ${routePath}`,
+            }),
+            {
+              status: 400,
+              headers: { 'Content-Type': 'application/json' },
+            }
+          );
+        }
+
         if (!validLevels.includes(level)) {
           return new Response(
             JSON.stringify({
