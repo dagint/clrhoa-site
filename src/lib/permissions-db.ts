@@ -6,7 +6,7 @@
  */
 
 export type PermissionLevel = 'none' | 'read' | 'write';
-export type RoleType = 'member' | 'arb' | 'board' | 'admin';
+export type RoleType = 'member' | 'arb' | 'board' | 'admin' | 'arb_board';
 
 export interface RoutePermission {
   id: number;
@@ -229,7 +229,7 @@ export async function seedDefaultPermissions(
   let seeded = 0;
 
   for (const route of routes) {
-    for (const role of ['member', 'arb', 'board', 'admin'] as RoleType[]) {
+    for (const role of ['member', 'arb', 'board', 'admin', 'arb_board'] as RoleType[]) {
       // Check if already exists
       const existing = await db
         .prepare('SELECT id FROM route_permissions WHERE route_path = ? AND role = ?')

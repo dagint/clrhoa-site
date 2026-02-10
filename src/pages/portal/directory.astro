@@ -18,7 +18,8 @@ const db = env?.DB;
 // Pagination
 const ITEMS_PER_PAGE = 50;
 const pageParam = Astro.url.searchParams.get('page');
-const currentPage = pageParam ? Math.max(1, parseInt(pageParam, 10)) : 1;
+const parsed = parseInt(pageParam ?? '', 10);
+const currentPage = Number.isNaN(parsed) ? 1 : Math.max(1, parsed);
 const totalOwners = db ? await countOwners(db) : 0;
 const pagination = calculatePagination(totalOwners, currentPage, ITEMS_PER_PAGE);
 const offset = getOffset(currentPage, ITEMS_PER_PAGE);
