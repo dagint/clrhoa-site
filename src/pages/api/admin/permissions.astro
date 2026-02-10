@@ -1,0 +1,188 @@
+---
+/**
+ * GET /api/admin/permissions — Load all route permissions (Admin only)
+ * PUT /api/admin/permissions — Save route permissions (Admin only)
+ *
+ * Security: Admin-only access enforced server-side.
+ * Returns permission map: { route_path: { role: permission_level } }
+ */
+export const prerender = false;
+
+import { getSessionFromCookie, getEffectiveRole } from '../../../lib/auth';
+import {
+  getAllPermissions,
+  bulkUpdatePermissions,
+  type PermissionMap,
+} from '../../../lib/permissions-db';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const db = env?.DB;
+
+// Auth check
+const session = await getSessionFromCookie(
+  Astro.request.headers.get('cookie') ?? undefined,
+  env?.SESSION_SECRET
+);
+
+if (!session) {
+  return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+    status: 401,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const effectiveRole = getEffectiveRole(session);
+if (effectiveRole !== 'admin') {
+  return new Response(JSON.stringify({ error: 'Forbidden. Admin only.' }), {
+    status: 403,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+if (!db) {
+  return new Response(JSON.stringify({ error: 'Database not available' }), {
+    status: 500,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const method = Astro.request.method;
+
+// GET: Load all permissions
+if (method === 'GET') {
+  try {
+    const permissions = await getAllPermissions(db);
+    return new Response(JSON.stringify(permissions), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  } catch (err) {
+    console.error('Failed to load permissions:', err);
+    return new Response(
+      JSON.stringify({
+        error: 'Failed to load permissions',
+        details: err instanceof Error ? err.message : String(err),
+      }),
+      {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
+  }
+}
+
+// PUT: Save permissions
+if (method === 'PUT') {
+  try {
+    const body = await Astro.request.json() as { permissions?: unknown };
+    const permissionMap = body.permissions as PermissionMap;
+
+    if (!permissionMap || typeof permissionMap !== 'object') {
+      return new Response(JSON.stringify({ error: 'Invalid permissions object' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Validate permission levels and roles
+    const validLevels = ['none', 'read', 'write'];
+    const validRoles = ['member', 'arb', 'board', 'admin'];
+    for (const [routePath, rolePerms] of Object.entries(permissionMap)) {
+      if (typeof rolePerms !== 'object') {
+        return new Response(
+          JSON.stringify({ error: `Invalid permissions for route: ${routePath}` }),
+          {
+            status: 400,
+            headers: { 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
+      for (const [role, level] of Object.entries(rolePerms)) {
+        if (!validRoles.includes(role)) {
+          return new Response(
+            JSON.stringify({
+              error: `Invalid role "${role}" for route ${routePath}`,
+            }),
+            {
+              status: 400,
+              headers: { 'Content-Type': 'application/json' },
+            }
+          );
+        }
+
+        if (!validLevels.includes(level)) {
+          return new Response(
+            JSON.stringify({
+              error: `Invalid permission level "${level}" for route ${routePath}, role ${role}`,
+            }),
+            {
+              status: 400,
+              headers: { 'Content-Type': 'application/json' },
+            }
+          );
+        }
+      }
+    }
+
+    // Get IP address for audit log
+    const ipAddress = Astro.request.headers.get('cf-connecting-ip') ||
+                      Astro.request.headers.get('x-forwarded-for') ||
+                      'unknown';
+
+    // Save permissions
+    const result = await bulkUpdatePermissions(
+      db,
+      permissionMap,
+      session.email,
+      ipAddress
+    );
+
+    if (result.errors.length > 0) {
+      return new Response(
+        JSON.stringify({
+          success: true,
+          updated: result.updated,
+          errors: result.errors,
+          warning: 'Some updates failed',
+        }),
+        {
+          status: 207, // Multi-Status
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        updated: result.updated,
+        message: `Updated ${result.updated} permissions`,
+      }),
+      {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
+  } catch (err) {
+    console.error('Failed to save permissions:', err);
+    return new Response(
+      JSON.stringify({
+        error: 'Failed to save permissions',
+        details: err instanceof Error ? err.message : String(err),
+      }),
+      {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
+  }
+}
+
+// Method not allowed
+return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+  status: 405,
+  headers: { 'Content-Type': 'application/json', Allow: 'GET, PUT' },
+});
+---

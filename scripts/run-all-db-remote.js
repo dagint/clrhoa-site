@@ -104,6 +104,7 @@ run('db:vendor-audit', 'schema-vendor-audit.sql');
 run('db:vendor-audit-ip', 'schema-vendor-audit-ip.sql');
 run('db:notification-dismissals', 'schema-notification-dismissals.sql');
 run('db:assessment-payments-method-check', 'schema-assessment-payments-method-check.sql');
+run('db:route-permissions', 'schema-route-permissions.sql');
 
 console.log('\nAll remote DB migrations completed.');
 process.exit(0);
