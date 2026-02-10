@@ -87,6 +87,22 @@ export async function listOwners(db: D1Database, limit = LIST_OWNERS_MAX, offset
 }
 
 /**
+ * Count total number of owners in the database.
+ * Used for pagination calculations.
+ */
+export async function countOwners(db: D1Database): Promise<number> {
+  try {
+    const result = await db
+      .prepare('SELECT COUNT(*) as count FROM owners')
+      .first<{ count: number }>();
+    return result?.count ?? 0;
+  } catch (e) {
+    console.error('[directory-db] Failed to count owners:', e);
+    return 0;
+  }
+}
+
+/**
  * One primary owner per property (address) for dues/assessments. Groups by normalized address and returns
  * the primary contact (is_primary = 1) or the first owner at that address. Use this for the board
  * assessments spreadsheet so there is one row per address.

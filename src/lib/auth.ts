@@ -215,24 +215,59 @@ const DISPLAY_ROLES = new Set<string>(['board', 'admin', 'arb', 'arb_board']);
  */
 export async function getRolesForEmails(
   kv: KVNamespace | undefined,
-  emails: (string | null | undefined)[]
+  emails: (string | null | undefined)[],
+  options: { useCache?: boolean; cacheKey?: string } = {}
 ): Promise<Map<string, string>> {
   const out = new Map<string, string>();
   if (!kv) return out;
+
+  const { useCache = true, cacheKey = 'default' } = options;
   const unique = [...new Set(emails.filter((e): e is string => Boolean(e?.trim())).map((e) => e!.trim().toLowerCase()))];
-  await Promise.all(
-    unique.map(async (email) => {
-      const value = await kv.get(email);
-      if (value == null) return;
-      try {
-        const data = JSON.parse(value) as { role?: string };
-        const role = typeof data.role === 'string' ? data.role.toLowerCase() : 'member';
-        if (DISPLAY_ROLES.has(role)) out.set(email, role);
-      } catch {
-        // ignore
+
+  // Import cache utilities dynamically to avoid circular dependencies
+  let cache: Map<string, string> | undefined;
+  if (useCache) {
+    try {
+      const { getRoleCache } = await import('./role-cache.js');
+      cache = getRoleCache(cacheKey);
+    } catch {
+      // Cache not available, continue without it
+    }
+  }
+
+  // Separate cached and uncached emails
+  const uncached: string[] = [];
+  for (const email of unique) {
+    if (cache?.has(email)) {
+      const role = cache.get(email)!;
+      if (DISPLAY_ROLES.has(role)) {
+        out.set(email, role);
       }
-    })
-  );
+    } else {
+      uncached.push(email);
+    }
+  }
+
+  // Fetch uncached roles from KV
+  if (uncached.length > 0) {
+    await Promise.all(
+      uncached.map(async (email) => {
+        const value = await kv.get(email);
+        if (value == null) return;
+        try {
+          const data = JSON.parse(value) as { role?: string };
+          const role = typeof data.role === 'string' ? data.role.toLowerCase() : 'member';
+          if (DISPLAY_ROLES.has(role)) {
+            out.set(email, role);
+            cache?.set(email, role); // Cache for subsequent calls
+          }
+        } catch {
+          // ignore
+        }
+      })
+    );
+  }
+
   return out;
 }
 

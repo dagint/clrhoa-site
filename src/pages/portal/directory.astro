@@ -6,17 +6,31 @@ import ProtectedPage from '../../components/ProtectedPage.astro';
 import PortalNav from '../../components/PortalNav.astro';
 import { getPortalContext } from '../../lib/portal-context';
 import { getRolesForEmails, isElevatedRole } from '../../lib/auth';
-import { listOwners } from '../../lib/directory-db';
+import { listOwners, countOwners } from '../../lib/directory-db';
 import { listArbRequestsByHousehold } from '../../lib/arb-db';
+import { calculatePagination, getOffset, getPageNumbers } from '../../utils/pagination';
 
 const { env, session, effectiveRole } = await getPortalContext(Astro, { fingerprint: true });
 if (!session) return Astro.redirect('/portal/login');
 
 const db = env?.DB;
-const owners = db ? await listOwners(db) : [];
+
+// Pagination
+const ITEMS_PER_PAGE = 50;
+const pageParam = Astro.url.searchParams.get('page');
+const parsed = parseInt(pageParam ?? '', 10);
+const currentPage = Number.isNaN(parsed) ? 1 : Math.max(1, parsed);
+const totalOwners = db ? await countOwners(db) : 0;
+const pagination = calculatePagination(totalOwners, currentPage, ITEMS_PER_PAGE);
+const offset = getOffset(currentPage, ITEMS_PER_PAGE);
+
+// Load only current page of owners
+const owners = db ? await listOwners(db, ITEMS_PER_PAGE, offset) : [];
 const ownerRoles = await getRolesForEmails(env?.CLOURHOA_USERS as KVNamespace<string> | undefined, owners.map((o) => o.email));
 const allRequests = db ? await listArbRequestsByHousehold(db, session.email) : [];
 const draftCount = allRequests.filter((r) => r.status === 'pending').length;
+
+const pageNumbers = getPageNumbers(pagination.currentPage, pagination.totalPages);
 
 /** Display label for HOA role in directory (board, admin, arb only). */
 function roleLabel(role: string): string {
@@ -128,6 +142,73 @@ function canRevealContact(owner: { share_contact_with_members?: number | null })
               </tbody>
             </table>
           </div>
+
+          {/* Pagination controls */}
+          {pagination.totalPages > 1 && (
+            <div class="px-4 py-4 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div class="text-sm text-gray-600">
+                Showing {pagination.startIndex + 1}-{pagination.endIndex} of {pagination.totalItems} owners
+              </div>
+
+              <nav class="flex items-center gap-1" aria-label="Pagination">
+                {/* Previous button */}
+                {pagination.hasPrevPage ? (
+                  <a
+                    href={`?page=${pagination.currentPage - 1}`}
+                    class="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                    aria-label="Previous page"
+                  >
+                    ← Prev
+                  </a>
+                ) : (
+                  <span class="px-3 py-2 text-sm font-medium text-gray-400 bg-gray-100 border border-gray-200 rounded-lg cursor-not-allowed">
+                    ← Prev
+                  </span>
+                )}
+
+                {/* Page numbers */}
+                {pageNumbers.map((pageNum, idx) => {
+                  if (pageNum === 'ellipsis') {
+                    return (
+                      <span class="px-2 text-gray-400">
+                        ...
+                      </span>
+                    );
+                  }
+
+                  const isActive = pageNum === pagination.currentPage;
+                  return (
+                    <a
+                      href={`?page=${pageNum}`}
+                      class={isActive
+                        ? "px-3 py-2 text-sm font-medium text-white bg-clr-green rounded-lg"
+                        : "px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                      }
+                      aria-label={`Page ${pageNum}`}
+                      aria-current={isActive ? "page" : undefined}
+                    >
+                      {pageNum}
+                    </a>
+                  );
+                })}
+
+                {/* Next button */}
+                {pagination.hasNextPage ? (
+                  <a
+                    href={`?page=${pagination.currentPage + 1}`}
+                    class="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                    aria-label="Next page"
+                  >
+                    Next →
+                  </a>
+                ) : (
+                  <span class="px-3 py-2 text-sm font-medium text-gray-400 bg-gray-100 border border-gray-200 rounded-lg cursor-not-allowed">
+                    Next →
+                  </span>
+                )}
+              </nav>
+            </div>
+          )}
         </div>
       )}
     </main>
