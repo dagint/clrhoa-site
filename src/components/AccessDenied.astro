@@ -1,0 +1,148 @@
+---
+/**
+ * Access Denied Component
+ *
+ * Reusable component for displaying unauthorized access message.
+ * Shows why access was denied and provides helpful next steps.
+ */
+
+interface Props {
+  path?: string;
+  requiredLevel?: string;
+  currentRole?: string;
+  reason?: string;
+}
+
+const {
+  path = 'this page',
+  requiredLevel = 'appropriate',
+  currentRole = 'your current role',
+  reason,
+} = Astro.props;
+
+const levelLabels: Record<string, string> = {
+  none: 'no access',
+  read: 'read-only access',
+  write: 'full access',
+};
+
+const displayLevel = levelLabels[requiredLevel] || requiredLevel;
+---
+
+<div class="max-w-2xl mx-auto px-4 py-12">
+  <div class="rounded-xl border-2 border-red-200 bg-red-50 p-8 text-center">
+    <!-- Icon -->
+    <div class="flex justify-center mb-4">
+      <svg
+        class="w-16 h-16 text-red-500"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+        />
+      </svg>
+    </div>
+
+    <!-- Title -->
+    <h1 class="text-2xl font-bold text-red-900 mb-2">Access Denied</h1>
+
+    <!-- Message -->
+    <p class="text-red-800 mb-6">
+      {reason ? (
+        reason
+      ) : (
+        <>
+          You don't have permission to access{' '}
+          <span class="font-semibold">{path}</span>.
+        </>
+      )}
+    </p>
+
+    <!-- Details -->
+    <div class="bg-white rounded-lg border border-red-200 p-4 mb-6 text-left">
+      <dl class="space-y-2 text-sm">
+        <div class="flex justify-between">
+          <dt class="text-gray-600 font-medium">Your Role:</dt>
+          <dd class="text-gray-900">{currentRole}</dd>
+        </div>
+        <div class="flex justify-between">
+          <dt class="text-gray-600 font-medium">Required Access:</dt>
+          <dd class="text-gray-900 capitalize">{displayLevel}</dd>
+        </div>
+        <div class="flex justify-between">
+          <dt class="text-gray-600 font-medium">Requested Path:</dt>
+          <dd class="text-gray-900 font-mono text-xs truncate max-w-xs" title={path}>
+            {path}
+          </dd>
+        </div>
+      </dl>
+    </div>
+
+    <!-- Actions -->
+    <div class="space-y-3">
+      <a
+        href="/portal/dashboard"
+        class="inline-block w-full sm:w-auto px-6 py-3 bg-clr-green text-white font-medium rounded-lg hover:bg-clr-green/90 transition-colors"
+      >
+        Go to Dashboard
+      </a>
+      <button
+        onclick="history.back()"
+        class="inline-block w-full sm:w-auto px-6 py-3 bg-white text-gray-700 font-medium rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors ml-0 sm:ml-3"
+      >
+        Go Back
+      </button>
+    </div>
+
+    <!-- Help Text -->
+    <details class="mt-8 text-left">
+      <summary class="text-sm text-red-700 cursor-pointer hover:text-red-800 font-medium">
+        Why am I seeing this?
+      </summary>
+      <div class="mt-4 text-sm text-red-800 space-y-2 bg-red-100 rounded-lg p-4">
+        <p>
+          <strong>Access denied</strong> means your current role ({currentRole}) doesn't have the required permissions for this page.
+        </p>
+
+        <p class="pt-2 border-t border-red-300">
+          <strong>What you can do:</strong>
+        </p>
+        <ul class="list-disc list-inside space-y-1 ml-2">
+          {currentRole === 'member' && (
+            <>
+              <li>If you're a staff member, <a href="/portal/request-elevated-access" class="underline hover:no-underline">request elevation</a> to access board/admin features</li>
+              <li>Contact a board member or administrator for access</li>
+            </>
+          )}
+          {currentRole !== 'member' && currentRole !== 'admin' && (
+            <li>This page may be restricted to a different role or admin-only</li>
+          )}
+          <li>Return to the <a href="/portal/dashboard" class="underline hover:no-underline">dashboard</a> to see available options</li>
+          <li>If you believe this is an error, contact the site administrator</li>
+        </ul>
+      </div>
+    </details>
+  </div>
+</div>
+
+<style>
+  details summary::-webkit-details-marker {
+    display: none;
+  }
+  details summary::marker {
+    content: '';
+  }
+  details summary::before {
+    content: '▸ ';
+    display: inline-block;
+    transition: transform 0.2s;
+  }
+  details[open] summary::before {
+    transform: rotate(90deg);
+  }
+</style>

@@ -452,6 +452,45 @@ export async function listArbFilesByRequest(
   return results ?? [];
 }
 
+/**
+ * Batch load files for multiple requests (avoids N+1 query problem).
+ * Returns a map of requestId -> files array.
+ */
+export async function batchLoadArbFilesByRequests(
+  db: D1Database,
+  requestIds: string[]
+): Promise<Record<string, ArbFile[]>> {
+  if (requestIds.length === 0) {
+    return {};
+  }
+
+  // Build placeholders for IN clause
+  const placeholders = requestIds.map(() => '?').join(',');
+  const query = `SELECT id, request_id, filename, r2_keys, original_size, reference_only
+                 FROM arb_files
+                 WHERE request_id IN (${placeholders})`;
+
+  const { results } = await db
+    .prepare(query)
+    .bind(...requestIds)
+    .all<ArbFile>();
+
+  // Group files by request_id
+  const filesByRequestId: Record<string, ArbFile[]> = {};
+  for (const requestId of requestIds) {
+    filesByRequestId[requestId] = [];
+  }
+
+  for (const file of results ?? []) {
+    if (!filesByRequestId[file.request_id]) {
+      filesByRequestId[file.request_id] = [];
+    }
+    filesByRequestId[file.request_id].push(file);
+  }
+
+  return filesByRequestId;
+}
+
 /** List ARB audit log entries (newest first) for the board audit-logs page. */
 export async function listArbAuditLog(
   db: D1Database,

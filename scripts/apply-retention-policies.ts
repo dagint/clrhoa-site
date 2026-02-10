@@ -48,8 +48,9 @@ export default {
     console.log(`Maintenance rows: deleted ${maint.deleted} old completed requests, R2 errors ${maint.r2Errors}, errors ${maint.errors}`);
 
     // Optional, destructive: permanently delete soft-deleted ARB/audit records after grace period
-    // const permanent = await permanentlyDeleteOldRecords(db);
-    // console.log(`Permanent: ${permanent.requests} requests, ${permanent.auditLogs} audit logs`);
+    // Pass r2 to also delete associated R2 files
+    // const permanent = await permanentlyDeleteOldRecords(db, { r2 });
+    // console.log(`Permanent: ${permanent.requests} requests, ${permanent.auditLogs} audit logs, ${permanent.r2Errors} R2 errors`);
   }
 }
 */

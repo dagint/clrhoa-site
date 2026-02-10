@@ -5,7 +5,7 @@ import PortalLayout from '../../layouts/PortalLayout.astro';
 import ProtectedPage from '../../components/ProtectedPage.astro';
 import PortalNav from '../../components/PortalNav.astro';
 import { getPortalContext } from '../../lib/portal-context';
-import { listArbRequestsByHousehold, listArbFilesByRequest } from '../../lib/arb-db';
+import { listArbRequestsByHousehold, batchLoadArbFilesByRequests } from '../../lib/arb-db';
 import type { ArbFile } from '../../lib/arb-db';
 import { sanitizeForDisplay } from '../../lib/sanitize';
 
@@ -14,14 +14,13 @@ if (!session) return Astro.redirect('/portal/login');
 
 const db = env?.DB;
 const requests = db ? await listArbRequestsByHousehold(db, session.email) : [];
-const filesByRequestId: Record<string, ArbFile[]> = {};
 const draftCount = requests.filter(r => r.status === 'pending').length;
 const arbInReviewCount = requests.filter(r => r.status === 'in_review').length;
-if (db) {
-  for (const req of requests) {
-    filesByRequestId[req.id] = await listArbFilesByRequest(db, req.id);
-  }
-}
+
+// Batch load all files for all requests in a single query (avoids N+1 problem)
+const filesByRequestId: Record<string, ArbFile[]> = db
+  ? await batchLoadArbFilesByRequests(db, requests.map(r => r.id))
+  : {};
 
 function getFileViewUrl(r2KeysJson: string): string | null {
   try {
@@ -367,10 +366,10 @@ function formatApproval(arbEsign: string | null, esignTimestamp: string | null):
       .print-this-card .request-details-screen { display: block !important; }
       .print-this-card .print-form-view { display: block !important; }
       body:not(.print-with-attachments) .print-attachments-section { display: none !important; }
-      .print-this-card { 
-        break-inside: avoid; 
-        box-shadow: none; 
-        border: 1px solid #e5e7eb; 
+      .print-this-card {
+        break-inside: avoid;
+        box-shadow: none;
+        border: 1px solid #e5e7eb;
         page-break-inside: avoid;
         margin-bottom: 1rem;
         padding: 1rem;
@@ -449,12 +448,12 @@ function formatApproval(arbEsign: string | null, esignTimestamp: string | null):
         const requestId = this.getAttribute('data-request-id');
         if (!requestId) return;
         if (!confirm('Cancel this request? All attachments will be removed. Your form details (name, address, description, etc.) will be kept so you can reference or reuse them.')) return;
-        
+
         const originalText = this.textContent;
         const originalDisabled = this.disabled;
         this.disabled = true;
         this.textContent = 'Cancelling…';
-        
+
         try {
           const csrfToken = (typeof window !== 'undefined' && window.csrfToken) || '';
           if (!csrfToken) {
@@ -463,17 +462,17 @@ function formatApproval(arbEsign: string | null, esignTimestamp: string | null):
             this.textContent = originalText;
             return;
           }
-          
+
           const res = await fetch('/api/arb-cancel', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ requestId, csrfToken }),
           });
-          
-          const data = await res.json().catch(function () { 
-            return { error: 'Invalid response from server.' }; 
+
+          const data = await res.json().catch(function () {
+            return { error: 'Invalid response from server.' };
           });
-          
+
           if (res.ok && data.success) {
             // Success - reload to show updated status
             window.location.reload();
@@ -532,12 +531,12 @@ function formatApproval(arbEsign: string | null, esignTimestamp: string | null):
         if (checked.length === 0) return;
         const requestIds = checked.map(function(cb) { return cb.value; });
         if (!confirm(`Cancel ${requestIds.length} request(s)? All attachments will be removed. Form details will be kept for reference.`)) return;
-        
+
         const originalText = this.textContent;
         const originalDisabled = this.disabled;
         this.disabled = true;
         this.textContent = 'Cancelling…';
-        
+
         try {
           const csrfToken = (typeof window !== 'undefined' && window.csrfToken) || '';
           if (!csrfToken) {
@@ -546,7 +545,7 @@ function formatApproval(arbEsign: string | null, esignTimestamp: string | null):
             this.textContent = originalText;
             return;
           }
-          
+
           const results = await Promise.all(requestIds.map(function (id) {
             return fetch('/api/arb-cancel', {
               method: 'POST',
@@ -554,15 +553,15 @@ function formatApproval(arbEsign: string | null, esignTimestamp: string | null):
               body: JSON.stringify({ requestId: id, csrfToken }),
             });
           }));
-          
+
           const resultsData = await Promise.all(results.map(function(r) {
             return r.json().catch(function() { return { error: 'Invalid response' }; });
           }));
-          
+
           const allOk = results.every(function(r, i) {
             return r.ok && resultsData[i]?.success;
           });
-          
+
           if (allOk) {
             // All succeeded - reload to show updated status
             window.location.reload();
@@ -571,7 +570,7 @@ function formatApproval(arbEsign: string | null, esignTimestamp: string | null):
             const failedCount = results.filter(function(r, i) {
               return !r.ok || !resultsData[i]?.success;
             }).length;
-            const errorMsg = failedCount === requestIds.length 
+            const errorMsg = failedCount === requestIds.length
               ? 'All requests failed to cancel. Please try again.'
               : `${failedCount} of ${requestIds.length} request(s) failed to cancel. Please try again.`;
             alert(errorMsg);
@@ -625,7 +624,7 @@ function formatApproval(arbEsign: string | null, esignTimestamp: string | null):
       if (typeof window !== 'undefined') {
         window.csrfToken = csrfToken;
       }
-      
+
       // Export data button handler
       const exportBtn = document.getElementById('export-data-btn');
       if (exportBtn) {
@@ -633,11 +632,11 @@ function formatApproval(arbEsign: string | null, esignTimestamp: string | null):
           if (!confirm('This will download a JSON file containing all your ARB request data. Continue?')) {
             return;
           }
-          
+
           try {
             exportBtn.disabled = true;
             exportBtn.textContent = 'Generating export...';
-            
+
             const url = `/api/arb-export-data?csrf_token=${encodeURIComponent(csrfToken)}`;
             const response = await fetch(url, {
               method: 'GET',
@@ -645,12 +644,12 @@ function formatApproval(arbEsign: string | null, esignTimestamp: string | null):
                 'X-CSRF-Token': csrfToken,
               },
             });
-            
+
             if (!response.ok) {
               const error = await response.json();
               throw new Error(error.error || 'Export failed');
             }
-            
+
             // Download the file
             const blob = await response.blob();
             const downloadUrl = window.URL.createObjectURL(blob);
@@ -661,7 +660,7 @@ function formatApproval(arbEsign: string | null, esignTimestamp: string | null):
             a.click();
             document.body.removeChild(a);
             window.URL.revokeObjectURL(downloadUrl);
-            
+
             exportBtn.textContent = 'Export My Data';
             alert('Data export downloaded successfully!');
           } catch (error) {
@@ -673,28 +672,28 @@ function formatApproval(arbEsign: string | null, esignTimestamp: string | null):
           }
         });
       }
-      
+
       // Session timeout: Auto-logout after 30 minutes of inactivity
       const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
       let lastActivity = Date.now();
       let timeoutWarningShown = false;
-      
+
       function resetActivity() {
         lastActivity = Date.now();
         timeoutWarningShown = false;
       }
-      
+
       function checkSessionTimeout() {
         const elapsed = Date.now() - lastActivity;
         const remaining = SESSION_TIMEOUT_MS - elapsed;
-        
+
         if (remaining <= 0) {
           // Session expired
           alert('Your session has expired due to inactivity. You will be redirected to the login page.');
           window.location.href = '/portal/login';
           return;
         }
-        
+
         // Show warning 2 minutes before timeout
         if (remaining <= 2 * 60 * 1000 && !timeoutWarningShown) {
           timeoutWarningShown = true;
@@ -709,12 +708,12 @@ function formatApproval(arbEsign: string | null, esignTimestamp: string | null):
           }
         }
       }
-      
+
       // Track user activity
       ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'].forEach(function (event) {
         document.addEventListener(event, resetActivity, { passive: true });
       });
-      
+
       // Check timeout every minute
       setInterval(checkSessionTimeout, 60 * 1000);
     })();
