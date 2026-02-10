@@ -87,7 +87,7 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
         // admin can access these board routes (e.g. when redirected from /portal/admin/backups)
       } else if (isAuditLogs) {
         if (!isAdminRole(effectiveRole) && effectiveRole !== 'board') {
-          return context.redirect(effectiveRole === 'arb' ? '/portal/arb' : '/portal/admin');
+          return context.redirect(effectiveRole === 'arb' || effectiveRole === 'arb_board' ? '/portal/arb' : '/portal/admin');
         }
       } else if (isBoardOnlyPath) {
         if (effectiveRole !== 'board' && effectiveRole !== 'arb_board') {
@@ -116,10 +116,11 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
         return context.redirect('/portal/login');
       }
       const effectiveRole = getEffectiveRole(session);
+      const staffRole = session.role?.toLowerCase() ?? 'member';
       if (!isAdminRole(effectiveRole)) {
         if (effectiveRole === 'board' || effectiveRole === 'arb_board') return context.redirect('/portal/board');
         if (effectiveRole === 'arb') return context.redirect('/portal/arb');
-        if (isElevatedRole(effectiveRole)) return context.redirect('/portal/request-elevated-access?return=' + encodeURIComponent(pathname));
+        if (staffRole === 'admin') return context.redirect('/portal/request-elevated-access?return=' + encodeURIComponent(pathname));
         return context.redirect('/portal/dashboard');
       }
     }
@@ -178,7 +179,7 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
             return context.redirect('/portal/dashboard');
           }
         } else if (pathname === '/portal/arb' || pathname === '/portal/arb/') {
-          if (effectiveRole !== 'arb') {
+          if (effectiveRole !== 'arb' && effectiveRole !== 'arb_board') {
             if (effectiveRole === 'admin') return context.redirect('/portal/admin');
             if (effectiveRole === 'board') return context.redirect('/portal/board');
             if (isElevatedRole(staffRole)) return context.redirect('/portal/request-elevated-access?return=' + encodeURIComponent('/portal/arb'));
