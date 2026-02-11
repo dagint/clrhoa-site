@@ -132,6 +132,8 @@
     "db:indexes-performance:local": "wrangler d1 execute clrhoa_db --local --file=./scripts/schema-indexes-performance.sql",
     "db:auth:migrate": "bash scripts/migrate-auth-all.sh remote",
     "db:auth:migrate:local": "bash scripts/migrate-auth-all.sh local",
+    "db:rate-limits": "wrangler d1 execute clrhoa_db --remote --file=./scripts/schema-rate-limits.sql",
+    "db:rate-limits:local": "wrangler d1 execute clrhoa_db --local --file=./scripts/schema-rate-limits.sql",
     "db:auth:verify": "bash scripts/verify-auth-schema.sh remote",
     "db:auth:verify:local": "bash scripts/verify-auth-schema.sh local",
     "db:local:all": "node scripts/run-all-db-local.js",
