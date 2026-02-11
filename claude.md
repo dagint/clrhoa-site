@@ -19,10 +19,13 @@ Sharp.js for images (5MB→800KB auto-resize)
 NO paid services, NO external CMS
 
 ## AUTHENTICATION (Phase 1)
-Email whitelist only (NO passwords) - working on implementing
-- KV clrhoa_users → {email: {role: "member|arb|board", name: "..."}}
-- HttpOnly session cookie
+Password-based authentication with Lucia v3 session management
+- Users table in D1 (email, password_hash, role, status)
+- Password setup flow for new users (email invitation with secure tokens)
+- Bcrypt password hashing (cost factor 10)
+- HttpOnly session cookies with fingerprinting
 - Astro.locals.user = {email, role}
+- Session storage in D1, managed by Lucia
 
 ## FILE STRUCTURE (Preserve Existing)
 src/public/*.pdf ← EXISTING public docs (DO NOT TOUCH)
@@ -41,7 +44,7 @@ vendors: name, category, phone, notes, files
 ALWAYS use env vars - NO HARDCODED EMAILS:
 env.NOTIFY_BOARD_EMAIL = "testing@gmail.com" → production: "board@clrhoa.com"
 env.NOTIFY_ARB_EMAIL = "arb@clrhoa.com"
-MailChannels binding + Twilio SMS opt-in
+Email: Resend (primary) with MailChannels fallback + Twilio SMS opt-in
 
 ## SECURITY RULES
 NO client-side D1/R2 access
@@ -64,6 +67,7 @@ Phase 6: Smart Search + Pre-approval Library
 ALWAYS ASK: "Which phase are we extending? Show me existing auth/db/notifications first."
 
 ## DEPLOYMENT
-wrangler.toml bindings: D1 clrhoa_db, R2 clrhoa_files, KV clrhoa_users, MAILCHANNELS
+wrangler.toml bindings: D1 clrhoa_db, R2 clrhoa_files, KV clrhoa_users
+Secrets: RESEND_API_KEY (primary), MAILCHANNELS_API_KEY (fallback), SESSION_SECRET
 GitHub Actions → Cloudflare Pages
 Test local: npm run dev → wrangler dev --remote

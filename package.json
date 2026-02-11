@@ -181,8 +181,11 @@
   "dependencies": {
     "@astrojs/cloudflare": "^12.0.0",
     "@astrojs/tailwind": "^5.1.0",
+    "@lucia-auth/adapter-sqlite": "^3.0.2",
     "astro": "^5.17.1",
+    "bcryptjs": "^3.0.3",
     "chart.js": "^4.4.1",
+    "lucia": "^3.2.2",
     "tailwindcss": "^3.4.1",
     "twilio": "^5.3.0"
   },
@@ -190,6 +193,7 @@
     "@astrojs/check": "^0.9.6",
     "@cloudflare/workers-types": "^4.20241022.0",
     "@playwright/test": "^1.58.2",
+    "@types/bcryptjs": "^2.4.6",
     "@types/node": "^25.2.2",
     "@vitest/ui": "^4.0.18",
     "dotenv": "^17.2.4",
