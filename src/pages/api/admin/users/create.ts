@@ -34,6 +34,7 @@ import type { APIRoute } from 'astro';
 import { requireRole } from '../../../../lib/auth/middleware';
 import { generateSetupToken, sendSetupEmail } from '../../../../lib/auth/setup-tokens';
 import { logAuditEvent } from '../../../../lib/audit-log';
+import { validateAndNormalizeEmail } from '../../../../lib/email-validation';
 
 const VALID_ROLES = ['member', 'arb', 'board', 'arb_board', 'admin'];
 const VALID_STATUSES = ['active', 'pending_setup', 'inactive'];
@@ -46,13 +47,7 @@ interface CreateUserRequest {
   sendEmail?: boolean;
 }
 
-/**
- * Validate email format
- */
-function isValidEmail(email: string): boolean {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
-}
+// Email validation now handled by validateAndNormalizeEmail() utility
 
 export const POST: APIRoute = async (context) => {
   // 1. Check authentication and admin role
@@ -95,10 +90,11 @@ export const POST: APIRoute = async (context) => {
       );
     }
 
-    // Validate email format
-    if (!isValidEmail(email)) {
+    // Validate and normalize email format
+    const normalizedEmail = validateAndNormalizeEmail(email);
+    if (!normalizedEmail) {
       return new Response(
-        JSON.stringify({ error: 'Invalid email format' }),
+        JSON.stringify({ error: 'Invalid email format. Please provide a valid email address.' }),
         { status: 400, headers: { 'Content-Type': 'application/json' } }
       );
     }
@@ -113,8 +109,7 @@ export const POST: APIRoute = async (context) => {
       );
     }
 
-    // Normalize email to lowercase
-    const normalizedEmail = email.toLowerCase().trim();
+    // Email already normalized by validateAndNormalizeEmail() above
     const normalizedRole = role.toLowerCase();
 
     // 3. Check if user already exists
