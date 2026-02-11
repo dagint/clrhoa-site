@@ -1,21 +1,29 @@
 ---
+/**
+ * Password-based login page with MFA support
+ *
+ * Flow:
+ * 1. User enters email + password
+ * 2. POST to /api/auth/login
+ * 3. If MFA required: show MFA code input with temp token
+ * 4. POST to /api/auth/mfa/verify-login with code + temp token
+ * 5. Redirect to dashboard on success
+ */
 export const prerender = false;
+
+// Redirect if already logged in
+if (Astro.locals.user) {
+  return Astro.redirect('/portal/dashboard');
+}
 
 const url = Astro.url;
 const error = url.searchParams.get('error');
-const minutes = url.searchParams.get('minutes');
 const errorMessage =
-  error === 'missing'
-    ? 'Please enter your email address.'
+  error === 'session_expired'
+    ? 'Your session has expired. Please log in again.'
     : error === 'unauthorized'
-      ? 'This email is not on the member list. Contact the board if you believe this is an error.'
-      : error === 'locked'
-        ? `Account temporarily locked due to too many failed login attempts. Please try again in ${minutes || '15'} minutes.`
-        : error === 'too_many_attempts'
-          ? 'Too many login attempts from this device or network. Please try again in 15 minutes.'
-          : error === 'invalid' || error === 'config'
-            ? 'Something went wrong. Please try again.'
-            : null;
+      ? 'Please log in to access this page.'
+      : null;
 ---
 
 <!doctype html>
@@ -45,32 +53,87 @@ const errorMessage =
       input:focus { outline: none; border-color: #1e5f38; box-shadow: 0 0 0 3px rgba(30,95,56,.15); }
       .btn { display: block; width: 100%; padding: 0.75rem 1rem; background: #1e5f38; color: #fff; border: none; border-radius: 0.5rem; font-size: 1rem; font-weight: 600; cursor: pointer; margin-top: 1rem; }
       .btn:hover { filter: brightness(1.1); }
+      .btn:disabled { opacity: 0.5; cursor: not-allowed; }
       .err { background: #fef2f2; color: #b91c1c; padding: 0.75rem; border-radius: 0.5rem; font-size: 0.875rem; margin-bottom: 1rem; }
+      .success { background: #f0fdf4; color: #15803d; padding: 0.75rem; border-radius: 0.5rem; font-size: 0.875rem; margin-bottom: 1rem; }
       .back { margin-top: 1.5rem; text-align: center; }
       .back a { color: #1e5f38; font-weight: 500; text-decoration: none; }
       .back a:hover { text-decoration: underline; }
+      .field { margin-bottom: 1rem; }
+      .hidden { display: none; }
+      .forgot { text-align: right; margin-top: 0.5rem; }
+      .forgot a { color: #1e5f38; font-size: 0.875rem; text-decoration: none; }
+      .forgot a:hover { text-decoration: underline; }
     </style>
   </head>
   <body>
     <div class="container">
       <div class="card">
         <h1>Member Portal</h1>
-        <p class="sub">Crooked Lake Reserve HOA - sign in with your registered email.</p>
+        <p class="sub">Crooked Lake Reserve HOA</p>
 
         {errorMessage && <div class="err" role="alert">{errorMessage}</div>}
 
-        <form action="/api/login" method="post" autocomplete="on">
-          <label for="email">Email address</label>
-          <input
-            id="email"
-            type="email"
-            name="email"
-            required
-            autocomplete="email"
-            placeholder="you@example.com"
-          />
-          <input type="hidden" name="name" value="" />
-          <button type="submit" class="btn">Sign in</button>
+        <div id="error-message" class="err hidden" role="alert"></div>
+        <div id="success-message" class="success hidden" role="alert"></div>
+
+        <!-- Step 1: Email + Password -->
+        <form id="login-form">
+          <div class="field">
+            <label for="email">Email address</label>
+            <input
+              id="email"
+              type="email"
+              name="email"
+              required
+              autocomplete="email"
+              placeholder="you@example.com"
+            />
+          </div>
+
+          <div class="field">
+            <label for="password">Password</label>
+            <input
+              id="password"
+              type="password"
+              name="password"
+              required
+              autocomplete="current-password"
+              placeholder="Enter your password"
+            />
+          </div>
+
+          <div class="forgot">
+            <a href="/auth/forgot-password">Forgot password?</a>
+          </div>
+
+          <button type="submit" id="login-btn" class="btn">Sign in</button>
+        </form>
+
+        <!-- Step 2: MFA Code (shown if MFA required) -->
+        <form id="mfa-form" class="hidden">
+          <div class="field">
+            <label for="mfa-code">Verification Code</label>
+            <input
+              id="mfa-code"
+              type="text"
+              name="code"
+              required
+              autocomplete="one-time-code"
+              placeholder="Enter 6-digit code or backup code"
+              pattern="[0-9]{6}|[A-Za-z0-9]{8}"
+              maxlength="8"
+            />
+            <p class="sub" style="margin-top: 0.5rem; margin-bottom: 0;">
+              Enter the 6-digit code from your authenticator app, or use a backup code.
+            </p>
+          </div>
+
+          <input type="hidden" id="temp-token" name="tempToken" />
+          <input type="hidden" id="mfa-email" name="email" />
+
+          <button type="submit" id="mfa-btn" class="btn">Verify</button>
+          <button type="button" id="mfa-back-btn" class="btn" style="background: #6b7280; margin-top: 0.5rem;">Back</button>
         </form>
 
         <div class="back">
@@ -78,5 +141,152 @@ const errorMessage =
         </div>
       </div>
     </div>
+
+    <script>
+      const loginForm = document.getElementById('login-form') as HTMLFormElement | null;
+      const mfaForm = document.getElementById('mfa-form') as HTMLFormElement | null;
+      const loginBtn = document.getElementById('login-btn') as HTMLButtonElement | null;
+      const mfaBtn = document.getElementById('mfa-btn') as HTMLButtonElement | null;
+      const mfaBackBtn = document.getElementById('mfa-back-btn') as HTMLButtonElement | null;
+      const errorDiv = document.getElementById('error-message') as HTMLDivElement | null;
+      const successDiv = document.getElementById('success-message') as HTMLDivElement | null;
+
+      function showError(message: string): void {
+        if (!errorDiv || !successDiv) return;
+        errorDiv.textContent = message;
+        errorDiv.classList.remove('hidden');
+        successDiv.classList.add('hidden');
+      }
+
+      function showSuccess(message: string): void {
+        if (!successDiv || !errorDiv) return;
+        successDiv.textContent = message;
+        successDiv.classList.remove('hidden');
+        errorDiv.classList.add('hidden');
+      }
+
+      function hideMessages(): void {
+        if (!errorDiv || !successDiv) return;
+        errorDiv.classList.add('hidden');
+        successDiv.classList.add('hidden');
+      }
+
+      // Step 1: Handle password login
+      loginForm?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        hideMessages();
+
+        const emailInput = document.getElementById('email') as HTMLInputElement | null;
+        const passwordInput = document.getElementById('password') as HTMLInputElement | null;
+
+        if (!emailInput || !passwordInput || !loginBtn) return;
+
+        const email = emailInput.value;
+        const password = passwordInput.value;
+
+        loginBtn.disabled = true;
+        loginBtn.textContent = 'Signing in...';
+
+        try {
+          const response = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password }),
+          });
+
+          const data = await response.json() as { success: boolean; message?: string; mfaRequired?: boolean; tempToken?: string; redirectTo?: string };
+
+          if (data.success) {
+            if (data.mfaRequired) {
+              // Show MFA form
+              showSuccess(data.message || 'Password verified. Please enter your MFA code.');
+              const tempTokenInput = document.getElementById('temp-token') as HTMLInputElement | null;
+              const mfaEmailInput = document.getElementById('mfa-email') as HTMLInputElement | null;
+              const mfaCodeInput = document.getElementById('mfa-code') as HTMLInputElement | null;
+              if (tempTokenInput && mfaEmailInput && data.tempToken) {
+                tempTokenInput.value = data.tempToken;
+                mfaEmailInput.value = email;
+              }
+              loginForm?.classList.add('hidden');
+              mfaForm?.classList.remove('hidden');
+              mfaCodeInput?.focus();
+            } else {
+              // Login successful, redirect
+              showSuccess(data.message || 'Login successful!');
+              setTimeout(() => {
+                window.location.href = data.redirectTo || '/portal/dashboard';
+              }, 500);
+            }
+          } else {
+            showError(data.message || 'Login failed. Please try again.');
+          }
+        } catch (error) {
+          console.error('Login error:', error);
+          showError('An error occurred. Please try again.');
+        } finally {
+          loginBtn.disabled = false;
+          loginBtn.textContent = 'Sign in';
+        }
+      });
+
+      // Step 2: Handle MFA verification
+      mfaForm?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        hideMessages();
+
+        const mfaCodeInput = document.getElementById('mfa-code') as HTMLInputElement | null;
+        const tempTokenInput = document.getElementById('temp-token') as HTMLInputElement | null;
+        const mfaEmailInput = document.getElementById('mfa-email') as HTMLInputElement | null;
+
+        if (!mfaCodeInput || !tempTokenInput || !mfaEmailInput || !mfaBtn) return;
+
+        const code = mfaCodeInput.value;
+        const tempToken = tempTokenInput.value;
+        const email = mfaEmailInput.value;
+
+        mfaBtn.disabled = true;
+        mfaBtn.textContent = 'Verifying...';
+
+        try {
+          const response = await fetch('/api/auth/mfa/verify-login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, code, tempToken }),
+          });
+
+          const data = await response.json() as { success: boolean; message?: string; redirectTo?: string };
+
+          if (data.success) {
+            showSuccess(data.message || 'MFA verified! Logging in...');
+            setTimeout(() => {
+              window.location.href = data.redirectTo || '/portal/dashboard';
+            }, 500);
+          } else {
+            showError(data.message || 'Invalid verification code. Please try again.');
+            mfaCodeInput.value = '';
+            mfaCodeInput.focus();
+          }
+        } catch (error) {
+          console.error('MFA verification error:', error);
+          showError('An error occurred. Please try again.');
+        } finally {
+          mfaBtn.disabled = false;
+          mfaBtn.textContent = 'Verify';
+        }
+      });
+
+      // Back button: return to password login
+      mfaBackBtn?.addEventListener('click', () => {
+        hideMessages();
+        mfaForm?.classList.add('hidden');
+        loginForm?.classList.remove('hidden');
+        const mfaCodeInput = document.getElementById('mfa-code') as HTMLInputElement | null;
+        const passwordInput = document.getElementById('password') as HTMLInputElement | null;
+        const emailInput = document.getElementById('email') as HTMLInputElement | null;
+        if (mfaCodeInput) mfaCodeInput.value = '';
+        if (passwordInput) passwordInput.value = '';
+        emailInput?.focus();
+      });
+    </script>
   </body>
 </html>
