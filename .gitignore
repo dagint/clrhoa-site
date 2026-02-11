@@ -69,3 +69,9 @@ $RECYCLE.BIN/
 
 
 .claude
+
+# Playwright E2E tests
+playwright-report/
+test-results/
+/playwright/.cache/
+.tmp-sql-*.sql

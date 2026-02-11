@@ -1,7 +1,7 @@
 /**
  * Vitest setup file
  * This file runs before all tests
- * 
+ *
  * Add global test utilities and mocks here
  */
 

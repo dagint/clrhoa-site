@@ -10,7 +10,7 @@ import {
   isImageFilename,
   getFileViewUrl,
   getFileViewerUrl,
-} from '../src/lib/arb-dashboard';
+} from '../../src/lib/arb-dashboard';
 
 describe('getYearQuarter', () => {
   it('returns YYYY-Qn from date string', () => {

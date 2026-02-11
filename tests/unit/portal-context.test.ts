@@ -3,11 +3,11 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { getSessionFromCookie } from '../src/lib/auth';
-import { getPortalContext } from '../src/lib/portal-context';
+import { getSessionFromCookie } from '../../src/lib/auth';
+import { getPortalContext } from '../../src/lib/portal-context';
 
-vi.mock('../src/lib/auth', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../src/lib/auth')>();
+vi.mock('../../src/lib/auth', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/lib/auth')>();
   return {
     ...actual,
     getSessionFromCookie: vi.fn(),

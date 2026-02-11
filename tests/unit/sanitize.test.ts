@@ -11,7 +11,7 @@ import {
   sanitizeEmail,
   sanitizePhone,
   sanitizeForScriptInjection,
-} from '../src/lib/sanitize';
+} from '../../src/lib/sanitize';
 
 describe('escapeHtml', () => {
   it('escapes & < > " and single quote', () => {
