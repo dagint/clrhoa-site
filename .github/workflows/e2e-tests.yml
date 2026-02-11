@@ -40,6 +40,10 @@ jobs:
         run: |
           npm run db:init:local
           npm run db:phase3:local
+          npm run db:owners-audit-contact:local
+          npm run db:owners-created-at:local
+          npm run db:owners-lot-number:local
+          npm run db:owners-primary:local
           npm run db:phase35:local
           npm run db:phase4:local
           npm run db:phase5:local
@@ -110,6 +114,10 @@ jobs:
         run: |
           npm run db:init:local
           npm run db:phase3:local
+          npm run db:owners-audit-contact:local
+          npm run db:owners-created-at:local
+          npm run db:owners-lot-number:local
+          npm run db:owners-primary:local
           npm run db:phase35:local
           npm run db:phase4:local
           npm run db:phase5:local
