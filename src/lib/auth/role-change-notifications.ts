@@ -27,6 +27,7 @@
  */
 
 import { escapeHtml } from '../sanitize';
+import type { ResendClient } from '../../types/resend';
 
 /**
  * Role descriptions and permissions for email template
@@ -115,7 +116,7 @@ function getRoleInfo(role: string): { title: string; description: string; permis
  * @param siteUrl - Base URL of the site
  */
 export async function sendRoleChangeEmail(
-  resend: any,
+  resend: ResendClient,
   userEmail: string,
   userName: string | null,
   previousRole: string,

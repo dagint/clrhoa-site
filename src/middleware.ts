@@ -18,6 +18,7 @@ import {
 } from './lib/auth/middleware';
 import { getOwnerByEmail, getPhonesArray } from './lib/directory-db';
 import { generateCorrelationId } from './lib/logging';
+import { getUserEmail, getUserRole } from './types/auth';
 import { hasRouteAccess, getAccessDeniedRedirect } from './utils/role-access';
 
 /** Admin accounts (e.g. service providers) are not required to have an address in the directory. */
@@ -90,7 +91,7 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
 
       if (session && user) {
         // Valid session - redirect to appropriate landing zone
-        const userRole = (user as any).role?.toLowerCase() || 'member';
+        const userRole = getUserRole(user)?.toLowerCase() || 'member';
         return context.redirect(getRoleLandingZone(userRole));
       }
     }
@@ -111,7 +112,7 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
         return context.redirect(`/auth/login?return=${encodeURIComponent(pathname)}`);
       }
 
-      const userRole = (user as any).role?.toLowerCase() || 'member';
+      const userRole = getUserRole(user)?.toLowerCase() || 'member';
 
       if (!isElevatedRole(userRole)) {
         return context.redirect(`/portal/request-elevated-access?return=${encodeURIComponent(pathname)}`);
@@ -141,7 +142,7 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
         return context.redirect(`/auth/login?return=${encodeURIComponent(pathname)}`);
       }
 
-      const userRole = (user as any).role?.toLowerCase() || 'member';
+      const userRole = getUserRole(user)?.toLowerCase() || 'member';
 
       if (!isAdminRole(userRole)) {
         return context.redirect(getRoleLandingZone(userRole));
@@ -166,7 +167,7 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
       const { session, user } = await validateSession(env.DB, sessionId);
 
       if (session && user) {
-        const userRole = (user as any).role?.toLowerCase() || 'member';
+        const userRole = getUserRole(user)?.toLowerCase() || 'member';
 
         if (!isElevatedRole(userRole)) {
           return new Response(JSON.stringify({ error: 'Forbidden', success: false }), {
@@ -205,7 +206,7 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
       }
 
       // Get user role from Lucia user object
-      const userRole = (user as any).role?.toLowerCase() || 'member';
+      const userRole = getUserRole(user)?.toLowerCase() || 'member';
       const isProfilePage = pathname === '/portal/profile' || pathname === '/portal/profile/';
 
       // Role-based landing zones and admin-only routes
@@ -229,7 +230,10 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
 
       // Profile completeness check (avoids "response already sent" when component would redirect)
       if (!isProfilePage) {
-        const userEmail = (user as any).email;
+        const userEmail = getUserEmail(user);
+        if (!userEmail) {
+          return context.redirect('/auth/login');
+        }
         const owner = await getOwnerByEmail(env.DB, userEmail);
         const phones = owner ? getPhonesArray(owner) : [];
         const profileComplete = isProfileComplete(owner, phones, userRole);

@@ -29,6 +29,8 @@ import type { APIRoute } from 'astro';
 import { requireRole } from '../../../../lib/auth/middleware';
 import { resendSetupToken, sendSetupEmail } from '../../../../lib/auth/setup-tokens';
 import { logAuditEvent } from '../../../../lib/audit-log';
+import { getUserEmail } from '../../../../types/auth';
+import type { ResendClient } from '../../../../types/resend';
 
 interface ResendSetupRequest {
   email: string;
@@ -42,7 +44,7 @@ export const POST: APIRoute = async (context) => {
   }
 
   const db = context.locals.runtime?.env?.DB;
-  const resend = context.locals.runtime?.env?.RESEND;
+  const resend = context.locals.runtime?.env?.RESEND as ResendClient | undefined;
 
   if (!db) {
     return new Response(
@@ -58,7 +60,7 @@ export const POST: APIRoute = async (context) => {
     );
   }
 
-  const adminEmail = (authResult.user as any).email;
+  const adminEmail = getUserEmail(authResult.user) || 'unknown';
 
   try {
     // 2. Parse and validate request body

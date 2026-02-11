@@ -46,6 +46,7 @@ import {
 } from '../../../../lib/mfa';
 import { logSecurityEvent } from '../../../../lib/audit-log';
 import { checkRateLimit } from '../../../../lib/rate-limit';
+import { getUserEmail } from '../../../../types/auth';
 import crypto from 'node:crypto';
 
 interface EnableMFARequest {
@@ -60,7 +61,7 @@ export const POST: APIRoute = async (context) => {
   }
 
   const { user } = authResult;
-  const userEmail = (user as any).email;
+  const userEmail = getUserEmail(user) || 'unknown';
 
   const db = context.locals.runtime?.env?.DB;
   const kv = context.locals.runtime?.env?.CLRHOA_USERS as KVNamespace | undefined;

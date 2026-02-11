@@ -34,6 +34,9 @@ import type { APIRoute } from 'astro';
 import { requireRole } from '../../../../lib/auth/middleware';
 import { generateSetupToken, sendSetupEmail } from '../../../../lib/auth/setup-tokens';
 import { logAuditEvent } from '../../../../lib/audit-log';
+import { getUserEmail } from '../../../../types/auth';
+import type { ResendClient } from '../../../../types/resend';
+import { handleDatabaseError, getDatabaseErrorStatus, isDuplicateKeyError } from '../../../../lib/db-errors';
 import { validateAndNormalizeEmail } from '../../../../lib/email-validation';
 
 const VALID_ROLES = ['member', 'arb', 'board', 'arb_board', 'admin'];
@@ -57,7 +60,7 @@ export const POST: APIRoute = async (context) => {
   }
 
   const db = context.locals.runtime?.env?.DB;
-  const resend = context.locals.runtime?.env?.RESEND;
+  const resend = context.locals.runtime?.env?.RESEND as ResendClient | undefined;
 
   if (!db) {
     return new Response(
@@ -66,7 +69,7 @@ export const POST: APIRoute = async (context) => {
     );
   }
 
-  const adminEmail = (authResult.user as any).email;
+  const adminEmail = getUserEmail(authResult.user) || 'unknown';
 
   try {
     // 2. Parse and validate request body
@@ -222,12 +225,17 @@ export const POST: APIRoute = async (context) => {
       outcome: 'failure',
       details: {
         error: error instanceof Error ? error.message : 'Unknown error',
+        isDuplicate: isDuplicateKeyError(error),
       },
     });
 
+    // Provide user-friendly error message based on database error type
+    const errorMessage = handleDatabaseError(error, 'user');
+    const statusCode = getDatabaseErrorStatus(error);
+
     return new Response(
-      JSON.stringify({ error: 'Failed to create user' }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
+      JSON.stringify({ error: errorMessage }),
+      { status: statusCode, headers: { 'Content-Type': 'application/json' } }
     );
   }
 };

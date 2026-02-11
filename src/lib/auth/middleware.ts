@@ -18,6 +18,7 @@
 import type { APIContext } from 'astro';
 import { createLucia } from '../lucia';
 import type { Session, User } from 'lucia';
+import { getUserRole } from '../../types/auth';
 
 export const SESSION_COOKIE_NAME = 'clrhoa_session';
 
@@ -147,7 +148,7 @@ export async function requireRole(
   }
 
   const { session, user } = authResult;
-  const userRole = (user as any).role?.toLowerCase() || 'member';
+  const userRole = getUserRole(user)?.toLowerCase() || 'member';
 
   // Normalize allowed roles to lowercase
   const normalizedAllowedRoles = allowedRoles.map((r) => r.toLowerCase());

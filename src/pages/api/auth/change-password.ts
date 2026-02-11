@@ -36,6 +36,8 @@ import { logSecurityEvent } from '../../../lib/audit-log';
 import { checkRateLimit } from '../../../lib/rate-limit';
 import { createLucia } from '../../../lib/lucia';
 import { getUserByEmail } from '../../../lib/db';
+import type { AuthenticatedUser } from '../../../types/auth';
+import type { ResendClient } from '../../../types/resend';
 
 // Password validation constants
 const MIN_PASSWORD_LENGTH = 8;
@@ -79,9 +81,9 @@ export const prerender = false;
 export const POST: APIRoute = async ({ request, locals, cookies }) => {
   const db = locals.runtime?.env?.DB as D1Database | undefined;
   const kv = locals.runtime?.env?.CLRHOA_USERS as KVNamespace | undefined;
-  const resend = locals.runtime?.env?.RESEND;
+  const resend = locals.runtime?.env?.RESEND as ResendClient | undefined;
   const session = locals.session;
-  const user = locals.user;
+  const user = locals.user as AuthenticatedUser | null;
 
   const ipAddress =
     request.headers.get('CF-Connecting-IP') ||
@@ -287,7 +289,7 @@ export const POST: APIRoute = async ({ request, locals, cookies }) => {
 
     // 10. Send confirmation email (optional but recommended)
     try {
-      await (resend as any)?.emails?.send({
+      await resend?.emails?.send({
         from: 'CLRHOA Portal <portal@clrhoa.com>',
         to: user.email,
         subject: 'Your password has been changed',
