@@ -1,0 +1,452 @@
+---
+export const prerender = false;
+
+import BoardLayout from '../../../layouts/BoardLayout.astro';
+import { getBoardContext } from '../../../lib/board-context';
+import { isBoardOnly } from '../../../lib/auth';
+import {
+  getComplianceRequirement,
+  getRequirementStatus,
+  listComplianceDocuments,
+  listComplianceAuditLogs,
+  type ComplianceDocument,
+} from '../../../lib/compliance-db';
+
+const ctx = await getBoardContext(Astro);
+if ('redirect' in ctx) return Astro.redirect(ctx.redirect);
+const { env, session, effectiveRole } = ctx;
+
+const isBoard = isBoardOnly(effectiveRole) || effectiveRole === 'admin';
+if (!isBoard) return Astro.redirect('/portal/dashboard');
+
+const requirementId = Astro.params.requirementId;
+if (!requirementId) return Astro.redirect('/board/compliance');
+
+const db = env?.DB;
+if (!db) return Astro.redirect('/board/compliance');
+
+// Fetch requirement and status
+const requirement = await getComplianceRequirement(db, requirementId);
+if (!requirement) {
+  return new Response('Requirement not found', { status: 404 });
+}
+
+const status = await getRequirementStatus(db, requirementId);
+const allDocuments = await listComplianceDocuments(db, requirementId);
+const currentDocument = allDocuments.find((d) => d.is_current === 1);
+const archivedDocuments = allDocuments.filter((d) => d.is_current === 0);
+const auditLogs = await listComplianceAuditLogs(db, requirementId);
+
+function formatDate(s: string | null): string {
+  if (!s) return '—';
+  try {
+    return new Date(s).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+  } catch {
+    return s;
+  }
+}
+
+function formatDateShort(s: string | null): string {
+  if (!s) return '—';
+  try {
+    return new Date(s).toLocaleString(undefined, { dateStyle: 'medium' });
+  } catch {
+    return s;
+  }
+}
+
+function getStatusBadgeClass(statusStr: string): string {
+  switch (statusStr) {
+    case 'COMPLIANT':
+      return 'bg-green-100 text-green-800 border-green-200';
+    case 'PARTIAL':
+      return 'bg-amber-100 text-amber-800 border-amber-200';
+    case 'MISSING':
+      return 'bg-red-100 text-red-800 border-red-200';
+    default:
+      return 'bg-gray-100 text-gray-800 border-gray-200';
+  }
+}
+
+function getStatusLabel(statusStr: string): string {
+  switch (statusStr) {
+    case 'COMPLIANT':
+      return '✅ Compliant';
+    case 'PARTIAL':
+      return '⚠️ Needs Review';
+    case 'MISSING':
+      return '❌ Missing';
+    default:
+      return statusStr;
+  }
+}
+
+function getCategoryLabel(category: string): string {
+  const labels: Record<string, string> = {
+    'governing_docs': 'Governing Documents',
+    'financial': 'Financial',
+    'meetings': 'Meetings',
+    'contracts': 'Contracts',
+    'insurance': 'Insurance',
+    'governance': 'Governance',
+    'other': 'Other'
+  };
+  return labels[category] ?? category;
+}
+
+function getActionLabel(action: string): string {
+  const labels: Record<string, string> = {
+    'DOCUMENT_UPLOADED': 'Document Uploaded',
+    'DOCUMENT_REPLACED': 'Document Replaced',
+    'DOCUMENT_ARCHIVED': 'Document Archived',
+    'REQUIREMENT_REVIEWED': 'Requirement Reviewed',
+  };
+  return labels[action] ?? action;
+}
+
+const pageTitle = `${requirement.id}: ${requirement.title}`;
+---
+
+<BoardLayout
+  title={pageTitle}
+  subtitle={requirement.statute_ref}
+  role={effectiveRole}
+  session={session}
+  elevatedUntil={session.elevated_until}
+>
+  <!-- Back Button -->
+  <div class="mb-4">
+    <a
+      href="/board/compliance"
+      class="inline-flex items-center text-sm text-clr-green hover:underline"
+    >
+      ← Back to Compliance Dashboard
+    </a>
+  </div>
+
+  <!-- Requirement Header -->
+  <div class="mb-6 p-6 rounded-2xl bg-white shadow-sm border border-gray-100">
+    <div class="flex items-start justify-between flex-wrap gap-4 mb-4">
+      <div class="flex-1">
+        <div class="flex items-center gap-3 mb-2">
+          <span class="text-lg font-bold text-clr-green">{requirement.id}</span>
+          <span class={`px-3 py-1 rounded-lg text-sm font-medium border ${getStatusBadgeClass(status?.status ?? 'MISSING')}`}>
+            {getStatusLabel(status?.status ?? 'MISSING')}
+          </span>
+        </div>
+        <h2 class="text-2xl font-heading font-bold text-gray-900 mb-2">{requirement.title}</h2>
+        <p class="text-sm text-gray-600 mb-3">{requirement.statute_ref}</p>
+      </div>
+      <div class="text-right">
+        <div class="text-sm text-gray-600 mb-1">Category</div>
+        <div class="px-3 py-1 rounded-lg bg-gray-100 text-gray-800 text-sm font-medium inline-block">
+          {getCategoryLabel(requirement.category)}
+        </div>
+      </div>
+    </div>
+
+    <div class="p-4 rounded-lg bg-gray-50 border border-gray-200">
+      <p class="text-sm text-gray-700 leading-relaxed">{requirement.description}</p>
+    </div>
+
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 text-sm">
+      <div>
+        <div class="text-gray-600 mb-1">Posting Location</div>
+        <div class="font-medium text-gray-900 capitalize">{requirement.posting_location}</div>
+      </div>
+      <div>
+        <div class="text-gray-600 mb-1">Retention Period</div>
+        <div class="font-medium text-gray-900">
+          {requirement.retention_years === 9999 ? 'Permanent' : `${requirement.retention_years} years`}
+        </div>
+      </div>
+      <div>
+        <div class="text-gray-600 mb-1">Annual Update Required</div>
+        <div class="font-medium text-gray-900">{requirement.requires_annual_update ? 'Yes' : 'No'}</div>
+      </div>
+      <div>
+        <div class="text-gray-600 mb-1">Recurring</div>
+        <div class="font-medium text-gray-900">{requirement.is_repeating ? 'Yes' : 'No'}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Current Document Section -->
+  {currentDocument ? (
+    <div class="mb-6 p-6 rounded-2xl bg-white shadow-sm border border-gray-100">
+      <h3 class="text-lg font-heading font-semibold text-clr-green mb-4">Current Document</h3>
+      <div class="space-y-3">
+        <div>
+          <div class="text-sm text-gray-600 mb-1">Title</div>
+          <div class="font-medium text-gray-900">{currentDocument.title}</div>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <div class="text-sm text-gray-600 mb-1">Uploaded</div>
+            <div class="text-gray-900">{formatDate(currentDocument.uploaded_at)}</div>
+          </div>
+          <div>
+            <div class="text-sm text-gray-600 mb-1">Uploaded By</div>
+            <div class="text-gray-900">{currentDocument.uploaded_by}</div>
+          </div>
+          {currentDocument.document_date && (
+            <div>
+              <div class="text-sm text-gray-600 mb-1">Document Date</div>
+              <div class="text-gray-900">{formatDateShort(currentDocument.document_date)}</div>
+            </div>
+          )}
+        </div>
+        {currentDocument.notes && (
+          <div>
+            <div class="text-sm text-gray-600 mb-1">Notes</div>
+            <div class="text-gray-700 text-sm">{currentDocument.notes}</div>
+          </div>
+        )}
+        <div class="flex gap-3 pt-2">
+          {currentDocument.file_key && (
+            <a
+              href={`/api/compliance/file/${encodeURIComponent(currentDocument.file_key)}`}
+              class="px-4 py-2 bg-clr-green text-white rounded-lg font-medium hover:brightness-110 text-sm"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Download Document
+            </a>
+          )}
+          {currentDocument.file_url && (
+            <a
+              href={currentDocument.file_url}
+              class="px-4 py-2 bg-clr-green text-white rounded-lg font-medium hover:brightness-110 text-sm"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              View Document
+            </a>
+          )}
+          <button
+            type="button"
+            id="replace-document-btn"
+            class="px-4 py-2 bg-white text-clr-green border border-clr-green rounded-lg font-medium hover:bg-clr-green/5 text-sm"
+          >
+            Replace Document
+          </button>
+        </div>
+      </div>
+    </div>
+  ) : (
+    <div class="mb-6 p-6 rounded-2xl bg-amber-50 border border-amber-200">
+      <p class="text-amber-900 font-medium">
+        ⚠️ No document has been uploaded for this requirement yet. Upload one below to achieve compliance.
+      </p>
+    </div>
+  )}
+
+  <!-- Upload Form -->
+  <div id="upload-section" class="mb-6 p-6 rounded-2xl bg-white shadow-sm border border-gray-100">
+    <h3 class="text-lg font-heading font-semibold text-clr-green mb-4">
+      {currentDocument ? 'Upload New Version' : 'Upload Document'}
+    </h3>
+
+    <div id="upload-message" class="hidden mb-4 p-4 rounded-xl border" role="status" aria-live="polite"></div>
+
+    <form id="upload-form" class="space-y-4">
+      <input type="hidden" name="csrf_token" value={session.csrfToken ?? ''} />
+      <input type="hidden" name="requirement_id" value={requirementId} />
+
+      <div>
+        <label for="title" class="block text-sm font-medium text-gray-700 mb-1">
+          Document Title *
+        </label>
+        <input
+          type="text"
+          id="title"
+          name="title"
+          required
+          placeholder="e.g., 2026 Annual Budget"
+          class="w-full rounded-lg border border-gray-200 px-3 py-2"
+        />
+      </div>
+
+      {requirement.requires_annual_update === 1 && (
+        <div>
+          <label for="document_date" class="block text-sm font-medium text-gray-700 mb-1">
+            Document Date * <span class="text-xs text-gray-500">(for annual tracking)</span>
+          </label>
+          <input
+            type="date"
+            id="document_date"
+            name="document_date"
+            required
+            class="w-full rounded-lg border border-gray-200 px-3 py-2"
+          />
+        </div>
+      )}
+
+      <div>
+        <label for="file" class="block text-sm font-medium text-gray-700 mb-1">
+          File * <span class="text-xs text-gray-500">(PDF, Word, Excel, or images)</span>
+        </label>
+        <input
+          type="file"
+          id="file"
+          name="file"
+          accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,image/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
+          required
+          class="w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border file:border-gray-300 file:bg-gray-50 file:text-gray-700 hover:file:bg-gray-100"
+        />
+        <p class="text-xs text-gray-500 mt-1">Maximum file size: 10MB</p>
+      </div>
+
+      <div>
+        <label for="notes" class="block text-sm font-medium text-gray-700 mb-1">
+          Notes <span class="text-xs text-gray-500">(optional)</span>
+        </label>
+        <textarea
+          id="notes"
+          name="notes"
+          rows="3"
+          placeholder="Additional information about this document..."
+          class="w-full rounded-lg border border-gray-200 px-3 py-2"
+        ></textarea>
+      </div>
+
+      <button
+        type="submit"
+        id="upload-submit"
+        class="px-4 py-2 bg-clr-green text-white rounded-lg font-medium hover:brightness-110 disabled:opacity-70 disabled:cursor-not-allowed"
+      >
+        {currentDocument ? 'Upload New Version' : 'Upload Document'}
+      </button>
+    </form>
+  </div>
+
+  <!-- Document History -->
+  {archivedDocuments.length > 0 && (
+    <div class="mb-6 p-6 rounded-2xl bg-white shadow-sm border border-gray-100">
+      <h3 class="text-lg font-heading font-semibold text-clr-green mb-4">Document History</h3>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50 border-b border-gray-200">
+            <tr>
+              <th class="px-4 py-3 font-semibold text-gray-700 text-left">Title</th>
+              <th class="px-4 py-3 font-semibold text-gray-700 text-left">Uploaded</th>
+              <th class="px-4 py-3 font-semibold text-gray-700 text-left">Uploaded By</th>
+              <th class="px-4 py-3 font-semibold text-gray-700 text-left">Effective Period</th>
+            </tr>
+          </thead>
+          <tbody>
+            {archivedDocuments.map((doc) => (
+              <tr class="border-b border-gray-100">
+                <td class="px-4 py-3 text-gray-900">{doc.title}</td>
+                <td class="px-4 py-3 text-gray-600">{formatDate(doc.uploaded_at)}</td>
+                <td class="px-4 py-3 text-gray-600">{doc.uploaded_by}</td>
+                <td class="px-4 py-3 text-gray-600">
+                  {formatDateShort(doc.effective_from)} — {formatDateShort(doc.effective_until)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )}
+
+  <!-- Audit Log -->
+  {auditLogs.length > 0 && (
+    <details class="mb-6 p-6 rounded-2xl bg-white shadow-sm border border-gray-100">
+      <summary class="text-lg font-heading font-semibold text-clr-green cursor-pointer select-none">
+        Audit Log ({auditLogs.length} events)
+      </summary>
+      <div class="mt-4 overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50 border-b border-gray-200">
+            <tr>
+              <th class="px-4 py-3 font-semibold text-gray-700 text-left">Timestamp</th>
+              <th class="px-4 py-3 font-semibold text-gray-700 text-left">Action</th>
+              <th class="px-4 py-3 font-semibold text-gray-700 text-left">Actor</th>
+            </tr>
+          </thead>
+          <tbody>
+            {auditLogs.map((log) => (
+              <tr class="border-b border-gray-100">
+                <td class="px-4 py-3 text-gray-600 whitespace-nowrap">{formatDate(log.created_at)}</td>
+                <td class="px-4 py-3 text-gray-900">{getActionLabel(log.action)}</td>
+                <td class="px-4 py-3 text-gray-600">{log.actor_email}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </details>
+  )}
+</BoardLayout>
+
+<script>
+  // Show/hide upload form based on "Replace Document" button
+  document.getElementById('replace-document-btn')?.addEventListener('click', () => {
+    const uploadSection = document.getElementById('upload-section');
+    if (uploadSection) {
+      uploadSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      const titleInput = document.getElementById('title') as HTMLInputElement;
+      if (titleInput) titleInput.focus();
+    }
+  });
+
+  // Handle upload form submission
+  const uploadForm = document.getElementById('upload-form') as HTMLFormElement;
+  const uploadSubmit = document.getElementById('upload-submit') as HTMLButtonElement;
+  const uploadMessage = document.getElementById('upload-message') as HTMLDivElement;
+
+  if (uploadForm && uploadSubmit && uploadMessage) {
+    uploadForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      uploadSubmit.disabled = true;
+      uploadSubmit.textContent = 'Uploading...';
+      uploadMessage.className = 'hidden';
+
+      try {
+        const formData = new FormData(uploadForm);
+        const response = await fetch('/api/compliance/upload', {
+          method: 'POST',
+          body: formData,
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+          uploadMessage.className = 'mb-4 p-4 rounded-xl border bg-green-50 border-green-200 text-green-900';
+          uploadMessage.textContent = result.message || 'Document uploaded successfully!';
+          uploadForm.reset();
+
+          // Reload page after 2 seconds to show updated status
+          setTimeout(() => {
+            window.location.reload();
+          }, 2000);
+        } else {
+          uploadMessage.className = 'mb-4 p-4 rounded-xl border bg-red-50 border-red-200 text-red-900';
+          uploadMessage.textContent = result.error || 'Upload failed. Please try again.';
+          uploadSubmit.disabled = false;
+          uploadSubmit.textContent = 'Upload Document';
+        }
+      } catch (error) {
+        uploadMessage.className = 'mb-4 p-4 rounded-xl border bg-red-50 border-red-200 text-red-900';
+        uploadMessage.textContent = 'Network error. Please try again.';
+        uploadSubmit.disabled = false;
+        uploadSubmit.textContent = 'Upload Document';
+      }
+    });
+  }
+
+  // Auto-scroll to upload section if #upload hash is present
+  if (window.location.hash === '#upload') {
+    setTimeout(() => {
+      const uploadSection = document.getElementById('upload-section');
+      if (uploadSection) {
+        uploadSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        const titleInput = document.getElementById('title') as HTMLInputElement;
+        if (titleInput) titleInput.focus();
+      }
+    }, 100);
+  }
+</script>
