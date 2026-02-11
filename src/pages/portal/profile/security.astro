@@ -1,0 +1,530 @@
+---
+/**
+ * Security Settings Page
+ *
+ * Allows users to manage their account security:
+ * - Enable/disable MFA (TOTP)
+ * - View/download backup codes
+ * - Change password
+ * - View active sessions (future)
+ */
+export const prerender = false;
+
+import PortalLayout from '../../../layouts/PortalLayout.astro';
+import ProtectedPage from '../../../components/ProtectedPage.astro';
+import PortalNav from '../../../components/PortalNav.astro';
+import { getPortalContext } from '../../../lib/portal-context';
+import { getUserByEmail } from '../../../lib/db';
+
+const { env, session, effectiveRole } = await getPortalContext(Astro);
+if (!session) return Astro.redirect('/portal/login');
+
+const db = env?.DB;
+
+// Query MFA status directly (getUserByEmail doesn't include MFA fields)
+const mfaUser = db
+  ? await db
+      .prepare('SELECT mfa_enabled, mfa_enabled_at FROM users WHERE email = ?')
+      .bind(session.email)
+      .first<{ mfa_enabled: number; mfa_enabled_at: string | null }>()
+  : null;
+
+const mfaEnabled = mfaUser?.mfa_enabled === 1;
+const mfaEnabledAt = mfaUser?.mfa_enabled_at;
+
+// Get backup codes count (unused ones)
+let unusedBackupCodesCount = 0;
+if (db && mfaEnabled) {
+  const result = await db
+    .prepare('SELECT COUNT(*) as count FROM mfa_backup_codes WHERE user_id = ? AND used = 0')
+    .bind(session.email)
+    .first<{ count: number }>();
+  unusedBackupCodesCount = result?.count || 0;
+}
+
+function formatDate(iso: string | null | undefined): string {
+  if (!iso) return 'Never';
+  try {
+    const d = new Date(iso);
+    return Number.isNaN(d.getTime()) ? iso : d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+  } catch {
+    return iso ?? 'Never';
+  }
+}
+---
+
+<PortalLayout title="Security Settings | Member Portal | Crooked Lake Reserve HOA">
+  <ProtectedPage>
+  <div class="min-h-screen portal-theme-bg font-body">
+    <PortalNav currentPath="/portal/profile/security" role={effectiveRole} staffRole={session?.role ?? ''} />
+
+    <main class="max-w-3xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+      <!-- Header -->
+      <div class="mb-8">
+        <h2 class="text-2xl font-heading font-bold text-clr-green mb-2">Security Settings</h2>
+        <p class="text-gray-600">
+          Manage your account security and two-factor authentication.
+        </p>
+      </div>
+
+      <!-- Messages -->
+      <div id="success-message" class="hidden mb-6 bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg" role="alert"></div>
+      <div id="error-message" class="hidden mb-6 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg" role="alert"></div>
+
+      <!-- Two-Factor Authentication Section -->
+      <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+        <div class="flex items-start justify-between mb-4">
+          <div>
+            <h3 class="text-lg font-semibold text-gray-900 mb-1">Two-Factor Authentication (2FA)</h3>
+            <p class="text-sm text-gray-600">
+              Add an extra layer of security to your account by requiring a verification code when logging in.
+            </p>
+          </div>
+          <span class={`px-3 py-1 rounded-full text-sm font-medium ${mfaEnabled ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+            {mfaEnabled ? 'Enabled' : 'Disabled'}
+          </span>
+        </div>
+
+        {mfaEnabled ? (
+          <!-- MFA Enabled State -->
+          <div>
+            <div class="bg-gray-50 rounded-lg p-4 mb-4">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-sm font-medium text-gray-700">Status</span>
+                <span class="text-sm text-gray-900">Active since {formatDate(mfaEnabledAt)}</span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-medium text-gray-700">Backup codes</span>
+                <span class="text-sm text-gray-900">{unusedBackupCodesCount} unused</span>
+              </div>
+            </div>
+
+            <div class="flex gap-3">
+              <button
+                type="button"
+                id="regenerate-codes-btn"
+                class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm transition-colors"
+              >
+                Regenerate Backup Codes
+              </button>
+              <button
+                type="button"
+                id="disable-mfa-btn"
+                class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium text-sm transition-colors"
+              >
+                Disable 2FA
+              </button>
+            </div>
+          </div>
+        ) : (
+          <!-- MFA Disabled State -->
+          <div>
+            <p class="text-sm text-gray-600 mb-4">
+              Protect your account with time-based one-time passwords (TOTP) using an authenticator app like Google Authenticator, Authy, or 1Password.
+            </p>
+            <button
+              type="button"
+              id="enable-mfa-btn"
+              class="px-4 py-2 bg-clr-green text-white rounded-lg hover:bg-clr-green-dark font-medium transition-colors"
+            >
+              Enable Two-Factor Authentication
+            </button>
+          </div>
+        )}
+      </div>
+
+      <!-- MFA Setup Modal -->
+      <div id="mfa-setup-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+          <div class="p-6">
+            <h3 class="text-xl font-semibold text-gray-900 mb-4">Enable Two-Factor Authentication</h3>
+
+            <!-- Step 1: Scan QR Code -->
+            <div id="setup-step-1" class="mb-6">
+              <div class="mb-4">
+                <span class="inline-block px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium mb-4">Step 1 of 2</span>
+                <h4 class="font-semibold text-gray-900 mb-2">Scan QR Code</h4>
+                <p class="text-sm text-gray-600 mb-4">
+                  Use your authenticator app to scan this QR code:
+                </p>
+                <div class="flex justify-center mb-4 bg-white p-4 rounded-lg border border-gray-200">
+                  <img id="qr-code-image" src="" alt="QR Code" class="w-64 h-64" />
+                </div>
+                <div class="bg-gray-50 rounded-lg p-3">
+                  <p class="text-xs text-gray-600 mb-1">Or enter this code manually:</p>
+                  <code id="manual-secret" class="text-sm font-mono text-gray-900 break-all"></code>
+                </div>
+              </div>
+              <button
+                type="button"
+                id="continue-to-verify-btn"
+                class="w-full px-4 py-2 bg-clr-green text-white rounded-lg hover:bg-clr-green-dark font-medium transition-colors"
+              >
+                Continue to Verification
+              </button>
+            </div>
+
+            <!-- Step 2: Verify Code -->
+            <div id="setup-step-2" class="hidden mb-6">
+              <div class="mb-4">
+                <span class="inline-block px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium mb-4">Step 2 of 2</span>
+                <h4 class="font-semibold text-gray-900 mb-2">Verify Your Code</h4>
+                <p class="text-sm text-gray-600 mb-4">
+                  Enter the 6-digit code from your authenticator app to confirm setup:
+                </p>
+                <input
+                  type="text"
+                  id="verify-code-input"
+                  maxlength="6"
+                  pattern="[0-9]{6}"
+                  placeholder="000000"
+                  class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-clr-green focus:border-transparent text-center text-2xl font-mono tracking-widest"
+                />
+              </div>
+              <div class="flex gap-3">
+                <button
+                  type="button"
+                  id="back-to-qr-btn"
+                  class="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium transition-colors"
+                >
+                  Back
+                </button>
+                <button
+                  type="button"
+                  id="verify-and-enable-btn"
+                  class="flex-1 px-4 py-2 bg-clr-green text-white rounded-lg hover:bg-clr-green-dark font-medium transition-colors"
+                >
+                  Verify & Enable
+                </button>
+              </div>
+            </div>
+
+            <!-- Backup Codes Display -->
+            <div id="setup-step-3" class="hidden mb-6">
+              <div class="mb-4">
+                <h4 class="font-semibold text-gray-900 mb-2">Save Your Backup Codes</h4>
+                <p class="text-sm text-red-600 mb-4">
+                  ⚠️ Save these codes in a safe place. You won't see them again!
+                </p>
+                <div class="bg-gray-50 rounded-lg p-4 mb-4">
+                  <div id="backup-codes-list" class="grid grid-cols-2 gap-2 font-mono text-sm"></div>
+                </div>
+                <button
+                  type="button"
+                  id="download-codes-btn"
+                  class="w-full px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium mb-3 transition-colors"
+                >
+                  📥 Download Codes
+                </button>
+              </div>
+              <button
+                type="button"
+                id="finish-setup-btn"
+                class="w-full px-4 py-2 bg-clr-green text-white rounded-lg hover:bg-clr-green-dark font-medium transition-colors"
+              >
+                I've Saved My Codes
+              </button>
+            </div>
+
+            <button
+              type="button"
+              id="close-setup-modal-btn"
+              class="w-full px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Disable MFA Modal -->
+      <div id="disable-mfa-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-lg shadow-xl max-w-md w-full">
+          <div class="p-6">
+            <h3 class="text-xl font-semibold text-gray-900 mb-4">Disable Two-Factor Authentication</h3>
+            <p class="text-sm text-gray-600 mb-4">
+              To disable 2FA, please enter your password and optionally provide a verification code:
+            </p>
+            <div class="space-y-4 mb-6">
+              <div>
+                <label for="disable-password" class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                <input
+                  type="password"
+                  id="disable-password"
+                  required
+                  class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-clr-green focus:border-transparent"
+                  placeholder="Enter your password"
+                />
+              </div>
+              <div>
+                <label for="disable-code" class="block text-sm font-medium text-gray-700 mb-1">
+                  Verification Code <span class="text-gray-500">(optional)</span>
+                </label>
+                <input
+                  type="text"
+                  id="disable-code"
+                  maxlength="8"
+                  class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-clr-green focus:border-transparent"
+                  placeholder="6-digit code or backup code"
+                />
+              </div>
+            </div>
+            <div class="flex gap-3">
+              <button
+                type="button"
+                id="cancel-disable-btn"
+                class="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                id="confirm-disable-btn"
+                class="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium transition-colors"
+              >
+                Disable 2FA
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Change Password Section -->
+      <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-1">Change Password</h3>
+        <p class="text-sm text-gray-600 mb-4">
+          Update your password to keep your account secure.
+        </p>
+        <a
+          href="/auth/reset-password?from=settings"
+          class="inline-block px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium text-sm transition-colors"
+        >
+          Change Password
+        </a>
+      </div>
+    </main>
+  </div>
+  </ProtectedPage>
+</PortalLayout>
+
+<script>
+  // Type definitions for API responses
+  interface MFASetupResponse {
+    success: boolean;
+    qrCode?: string;
+    secret?: string;
+    message?: string;
+  }
+
+  interface MFAEnableResponse {
+    success: boolean;
+    backupCodes?: string[];
+    message?: string;
+  }
+
+  interface MFADisableResponse {
+    success: boolean;
+    message?: string;
+  }
+
+  // State
+  let qrCodeData = '';
+  let secretKey = '';
+  let backupCodes: string[] = [];
+
+  // Elements
+  const successMsg = document.getElementById('success-message')!;
+  const errorMsg = document.getElementById('error-message')!;
+  const enableBtn = document.getElementById('enable-mfa-btn');
+  const disableBtn = document.getElementById('disable-mfa-btn');
+  const regenerateBtn = document.getElementById('regenerate-codes-btn');
+  const setupModal = document.getElementById('mfa-setup-modal')!;
+  const disableModal = document.getElementById('disable-mfa-modal')!;
+
+  // Setup modal elements
+  const step1 = document.getElementById('setup-step-1')!;
+  const step2 = document.getElementById('setup-step-2')!;
+  const step3 = document.getElementById('setup-step-3')!;
+  const qrImage = document.getElementById('qr-code-image') as HTMLImageElement;
+  const manualSecret = document.getElementById('manual-secret')!;
+  const verifyInput = document.getElementById('verify-code-input') as HTMLInputElement;
+  const backupCodesList = document.getElementById('backup-codes-list')!;
+
+  // Utility functions
+  function showSuccess(message: string) {
+    successMsg.textContent = message;
+    successMsg.classList.remove('hidden');
+    errorMsg.classList.add('hidden');
+    setTimeout(() => successMsg.classList.add('hidden'), 5000);
+  }
+
+  function showError(message: string) {
+    errorMsg.textContent = message;
+    errorMsg.classList.remove('hidden');
+    successMsg.classList.add('hidden');
+  }
+
+  function hideMessages() {
+    successMsg.classList.add('hidden');
+    errorMsg.classList.add('hidden');
+  }
+
+  // Enable MFA Flow
+  enableBtn?.addEventListener('click', async () => {
+    hideMessages();
+    try {
+      const response = await fetch('/api/auth/mfa/setup', { method: 'POST' });
+      const data = await response.json() as MFASetupResponse;
+
+      if (data.success) {
+        qrCodeData = data.qrCode ?? '';
+        secretKey = data.secret ?? '';
+        qrImage.src = qrCodeData;
+        manualSecret.textContent = secretKey;
+
+        // Show modal at step 1
+        step1.classList.remove('hidden');
+        step2.classList.add('hidden');
+        step3.classList.add('hidden');
+        setupModal.classList.remove('hidden');
+      } else {
+        showError(data.message || 'Failed to initialize MFA setup');
+      }
+    } catch (error) {
+      showError('An error occurred. Please try again.');
+    }
+  });
+
+  // Continue to verification
+  document.getElementById('continue-to-verify-btn')?.addEventListener('click', () => {
+    step1.classList.add('hidden');
+    step2.classList.remove('hidden');
+    verifyInput.value = '';
+    verifyInput.focus();
+  });
+
+  // Back to QR
+  document.getElementById('back-to-qr-btn')?.addEventListener('click', () => {
+    step2.classList.add('hidden');
+    step1.classList.remove('hidden');
+  });
+
+  // Verify and enable
+  document.getElementById('verify-and-enable-btn')?.addEventListener('click', async () => {
+    const code = verifyInput.value.trim();
+    if (!/^\d{6}$/.test(code)) {
+      showError('Please enter a valid 6-digit code');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/auth/mfa/enable', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code }),
+      });
+      const data = await response.json() as MFAEnableResponse;
+
+      if (data.success) {
+        backupCodes = data.backupCodes ?? [];
+
+        // Show backup codes
+        backupCodesList.innerHTML = backupCodes
+          .map(code => `<div class="text-gray-900">${code}</div>`)
+          .join('');
+
+        step2.classList.add('hidden');
+        step3.classList.remove('hidden');
+      } else {
+        showError(data.message || 'Invalid verification code');
+      }
+    } catch (error) {
+      showError('An error occurred. Please try again.');
+    }
+  });
+
+  // Download backup codes
+  document.getElementById('download-codes-btn')?.addEventListener('click', () => {
+    const text = backupCodes.join('\n');
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'clrhoa-mfa-backup-codes.txt';
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  // Finish setup
+  document.getElementById('finish-setup-btn')?.addEventListener('click', () => {
+    setupModal.classList.add('hidden');
+    showSuccess('Two-factor authentication enabled successfully!');
+    setTimeout(() => window.location.reload(), 1500);
+  });
+
+  // Close modal
+  document.getElementById('close-setup-modal-btn')?.addEventListener('click', () => {
+    setupModal.classList.add('hidden');
+  });
+
+  // Disable MFA
+  disableBtn?.addEventListener('click', () => {
+    hideMessages();
+    disableModal.classList.remove('hidden');
+  });
+
+  document.getElementById('cancel-disable-btn')?.addEventListener('click', () => {
+    disableModal.classList.add('hidden');
+    (document.getElementById('disable-password') as HTMLInputElement).value = '';
+    (document.getElementById('disable-code') as HTMLInputElement).value = '';
+  });
+
+  document.getElementById('confirm-disable-btn')?.addEventListener('click', async () => {
+    const password = (document.getElementById('disable-password') as HTMLInputElement).value;
+    const code = (document.getElementById('disable-code') as HTMLInputElement).value;
+
+    if (!password) {
+      showError('Password is required');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/auth/mfa/disable', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password, code }),
+      });
+      const data = await response.json() as MFADisableResponse;
+
+      if (data.success) {
+        disableModal.classList.add('hidden');
+        showSuccess('Two-factor authentication disabled successfully');
+        setTimeout(() => window.location.reload(), 1500);
+      } else {
+        showError(data.message || 'Failed to disable 2FA');
+      }
+    } catch (error) {
+      showError('An error occurred. Please try again.');
+    }
+  });
+
+  // Regenerate backup codes (future implementation)
+  regenerateBtn?.addEventListener('click', () => {
+    showError('Regenerate backup codes feature coming soon!');
+  });
+</script>
+
+<style>
+  .portal-theme-bg {
+    background-color: #f9fafb;
+  }
+  .clr-green {
+    color: #1e5f38;
+  }
+  .bg-clr-green {
+    background-color: #1e5f38;
+  }
+  .bg-clr-green-dark {
+    background-color: #164529;
+  }
+</style>

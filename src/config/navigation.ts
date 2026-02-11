@@ -187,6 +187,7 @@ export const portalMoreLinks: NavLink[] = [
   { label: 'Requests', href: '/portal/requests' },
   { label: 'My requests (ARB)', href: '/portal/my-requests' },
   { label: 'My activity', href: '/portal/my-activity' },
+  { label: 'Security settings', href: '/portal/profile/security' },
   { label: 'New ARB request', href: '/portal/arb-request' },
   { label: 'Maintenance', href: '/portal/maintenance' },
   { label: 'Meetings', href: '/portal/meetings' },
