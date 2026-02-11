@@ -55,8 +55,24 @@ export async function checkRateLimit(
  * Rate limit configuration for different endpoints.
  */
 export const RATE_LIMITS = {
+  // Authentication endpoints - strict rate limits to prevent brute force and abuse
   '/api/login': { maxRequests: 5, windowSeconds: 15 * 60 }, // per-email lockout (used in auth.ts)
   '/api/login:ip': { maxRequests: 20, windowSeconds: 15 * 60 }, // per-IP cap to prevent email enumeration
+  '/api/auth/login': { maxRequests: 5, windowSeconds: 15 * 60 }, // Legacy auth endpoint
+  '/api/auth/forgot-password': { maxRequests: 3, windowSeconds: 60 * 60 }, // 3 password reset requests per hour
+  '/api/auth/reset-password': { maxRequests: 5, windowSeconds: 60 * 60 }, // 5 password reset attempts per hour
+  '/api/auth/setup-password': { maxRequests: 5, windowSeconds: 60 * 60 }, // 5 setup attempts per hour
+  '/api/auth/mfa/enable': { maxRequests: 10, windowSeconds: 60 * 60 }, // 10 MFA enable attempts per hour
+  '/api/auth/mfa/disable': { maxRequests: 10, windowSeconds: 60 * 60 }, // 10 MFA disable attempts per hour
+  '/api/auth/mfa/verify-login': { maxRequests: 10, windowSeconds: 15 * 60 }, // 10 MFA verification attempts per 15 min
+  '/api/auth/mfa/setup': { maxRequests: 10, windowSeconds: 60 * 60 }, // 10 MFA setup attempts per hour
+
+  // Admin user management endpoints - prevent abuse
+  '/api/admin/users/create': { maxRequests: 20, windowSeconds: 60 * 60 }, // 20 user creations per hour
+  '/api/admin/users/resend-setup': { maxRequests: 30, windowSeconds: 60 * 60 }, // 30 resends per hour
+  '/api/admin/users/trigger-reset': { maxRequests: 30, windowSeconds: 60 * 60 }, // 30 resets per hour
+
+  // ARB endpoints
   '/api/arb-upload': { maxRequests: 10, windowSeconds: 60 * 60 }, // 10 uploads per hour
   '/api/arb-approve': { maxRequests: 100, windowSeconds: 60 }, // 100 requests per minute
   '/api/arb-update': { maxRequests: 20, windowSeconds: 60 }, // 20 updates per minute
@@ -67,9 +83,13 @@ export const RATE_LIMITS = {
   '/api/arb-deadline': { maxRequests: 20, windowSeconds: 60 }, // 20 deadline updates per minute
   '/api/arb-add-files': { maxRequests: 10, windowSeconds: 60 * 60 }, // 10 file additions per hour
   '/api/arb-copy': { maxRequests: 10, windowSeconds: 60 }, // 10 copies per minute
+
+  // Directory and data management
   '/api/owners/upload-csv': { maxRequests: 10, windowSeconds: 60 * 60 }, // 10 uploads per hour per IP
   '/api/vendors/upload-csv': { maxRequests: 10, windowSeconds: 60 * 60 }, // 10 uploads per hour per IP
   '/api/log-phone-view': { maxRequests: 60, windowSeconds: 60 }, // 60 reveals (phone or email) per minute per IP
+
+  // Public endpoints - prevent spam
   '/api/site-feedback': { maxRequests: 3, windowSeconds: 86400 }, // 3 site feedback submissions per day per IP
   '/api/contact': { maxRequests: 10, windowSeconds: 60 * 60 }, // 10 contact form submissions per hour per IP
 } as const;
