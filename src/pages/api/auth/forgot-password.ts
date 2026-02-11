@@ -43,6 +43,8 @@ function isValidEmail(email: string): boolean {
   return emailRegex.test(email);
 }
 
+export const prerender = false;
+
 export const POST: APIRoute = async ({ request, locals }) => {
   const db = locals.runtime.env.DB;
   const kv = locals.runtime?.env?.CLRHOA_USERS as KVNamespace | undefined;
