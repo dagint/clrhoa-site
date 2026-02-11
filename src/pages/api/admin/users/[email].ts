@@ -203,7 +203,7 @@ export const PATCH: APIRoute = async (context) => {
 
     await logAuditEvent(db, {
       eventType: role ? 'role_changed' : 'user_updated',
-      eventCategory: 'user_management',
+      eventCategory: 'administrative',
       userId: adminEmail,
       targetUserId: targetEmail,
       action: 'update_user',
@@ -263,7 +263,7 @@ export const PATCH: APIRoute = async (context) => {
     // Log failed attempt
     await logAuditEvent(db, {
       eventType: 'user_update_failed',
-      eventCategory: 'user_management',
+      eventCategory: 'administrative',
       userId: adminEmail,
       targetUserId: targetEmail,
       action: 'update_user',

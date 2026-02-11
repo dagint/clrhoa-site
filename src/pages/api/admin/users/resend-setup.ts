@@ -135,7 +135,7 @@ export const POST: APIRoute = async (context) => {
       // Log failed email attempt
       await logAuditEvent(db, {
         eventType: 'setup_email_failed',
-        eventCategory: 'user_management',
+        eventCategory: 'administrative',
         userId: adminEmail,
         targetUserId: normalizedEmail,
         action: 'resend_setup_email',
@@ -155,7 +155,7 @@ export const POST: APIRoute = async (context) => {
     // 6. Log successful audit event
     await logAuditEvent(db, {
       eventType: 'setup_email_resent',
-      eventCategory: 'user_management',
+      eventCategory: 'administrative',
       userId: adminEmail,
       targetUserId: normalizedEmail,
       action: 'resend_setup_email',
@@ -190,7 +190,7 @@ export const POST: APIRoute = async (context) => {
     // Log failed attempt
     await logAuditEvent(db, {
       eventType: 'setup_email_resend_failed',
-      eventCategory: 'user_management',
+      eventCategory: 'administrative',
       userId: adminEmail,
       action: 'resend_setup_email',
       outcome: 'failure',

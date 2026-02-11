@@ -179,7 +179,7 @@ export const POST: APIRoute = async (context) => {
     // 7. Log audit event
     await logAuditEvent(db, {
       eventType: 'user_created',
-      eventCategory: 'user_management',
+      eventCategory: 'administrative',
       userId: adminEmail,
       targetUserId: normalizedEmail,
       action: 'create_user',
@@ -221,7 +221,7 @@ export const POST: APIRoute = async (context) => {
     // Log failed attempt
     await logAuditEvent(db, {
       eventType: 'user_creation_failed',
-      eventCategory: 'user_management',
+      eventCategory: 'administrative',
       userId: adminEmail,
       action: 'create_user',
       outcome: 'failure',
