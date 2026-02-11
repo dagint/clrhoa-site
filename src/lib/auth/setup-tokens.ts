@@ -79,27 +79,52 @@ export async function generateSetupToken(
   expiresAt.setHours(expiresAt.getHours() + TOKEN_EXPIRATION_HOURS);
 
   // Store hashed token in database
-  await db
-    .prepare(
-      `INSERT INTO password_setup_tokens (
-        id,
-        user_id,
-        token_hash,
-        expires_at,
-        sent_count,
-        sent_by,
-        created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`
-    )
-    .bind(
-      tokenId,
-      userId,
-      tokenHash,
-      expiresAt.toISOString(),
-      1, // First send
-      sentBy || null
-    )
-    .run();
+  // Check if sent_count and sent_by columns exist (newer schema)
+  // If not, fall back to created_by (older schema)
+  try {
+    await db
+      .prepare(
+        `INSERT INTO password_setup_tokens (
+          id,
+          user_id,
+          token_hash,
+          expires_at,
+          sent_count,
+          sent_by,
+          created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`
+      )
+      .bind(
+        tokenId,
+        userId,
+        tokenHash,
+        expiresAt.toISOString(),
+        1, // First send
+        sentBy || null
+      )
+      .run();
+  } catch (error) {
+    // Fallback for older schema without sent_count/sent_by
+    await db
+      .prepare(
+        `INSERT INTO password_setup_tokens (
+          id,
+          user_id,
+          token_hash,
+          expires_at,
+          created_by,
+          created_at
+        ) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`
+      )
+      .bind(
+        tokenId,
+        userId,
+        tokenHash,
+        expiresAt.toISOString(),
+        sentBy || null
+      )
+      .run();
+  }
 
   // Log token generation
   await logSecurityEvent(db, {
