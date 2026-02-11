@@ -3,15 +3,15 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { getArbRequest } from '../src/lib/arb-db';
-import { listEmailsAtSameAddress } from '../src/lib/directory-db';
-import { requireArbRequestAccess, requireArbRequestOwner } from '../src/lib/access-control';
+import { getArbRequest } from '../../src/lib/arb-db';
+import { listEmailsAtSameAddress } from '../../src/lib/directory-db';
+import { requireArbRequestAccess, requireArbRequestOwner } from '../../src/lib/access-control';
 
-vi.mock('../src/lib/arb-db', () => ({
+vi.mock('../../src/lib/arb-db', () => ({
   getArbRequest: vi.fn(),
 }));
 
-vi.mock('../src/lib/directory-db', () => ({
+vi.mock('../../src/lib/directory-db', () => ({
   listEmailsAtSameAddress: vi.fn(),
 }));
 

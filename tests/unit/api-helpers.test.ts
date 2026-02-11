@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { jsonResponse, requireDb } from '../src/lib/api-helpers';
+import { jsonResponse, requireDb } from '../../src/lib/api-helpers';
 
 
 describe('jsonResponse', () => {

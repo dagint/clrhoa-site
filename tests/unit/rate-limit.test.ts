@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { getRateLimitConfig, RATE_LIMITS } from '../src/lib/rate-limit';
+import { getRateLimitConfig, RATE_LIMITS } from '../../src/lib/rate-limit';
 
 describe('getRateLimitConfig', () => {
   it('returns config for exact match', () => {

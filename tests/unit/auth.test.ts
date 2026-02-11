@@ -9,7 +9,7 @@ import {
   VALID_ROLES,
   generateSessionFingerprint,
   verifySessionFingerprint,
-} from '../src/lib/auth';
+} from '../../src/lib/auth';
 
 describe('isElevatedRole', () => {
   it('returns true for arb, board, arb_board, admin', () => {

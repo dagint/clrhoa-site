@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { escapeCsv } from '../src/lib/csv-utils';
+import { escapeCsv } from '../../src/lib/csv-utils';
 
 describe('escapeCsv', () => {
   it('returns empty string for null', () => {
