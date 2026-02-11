@@ -35,6 +35,7 @@ export const prerender = false;
 import type { APIRoute } from 'astro';
 import { requireRole } from '../../../../lib/auth/middleware';
 import { logAuditEvent } from '../../../../lib/audit-log';
+import { sendRoleChangeEmail } from '../../../../lib/auth/role-change-notifications';
 
 const VALID_ROLES = ['member', 'arb', 'board', 'arb_board', 'admin'];
 const VALID_STATUSES = ['active', 'pending_setup', 'inactive', 'locked'];
@@ -217,21 +218,16 @@ export const PATCH: APIRoute = async (context) => {
     // 7. Send role change notification email (if role changed and Resend available)
     if (role && role.toLowerCase() !== currentUser.role && resend) {
       try {
-        await (resend as any)?.emails?.send({
-          from: 'CLRHOA Portal <portal@clrhoa.com>',
-          to: targetEmail,
-          subject: 'Your CLRHOA account role has been updated',
-          html: `
-            <p>Hi ${currentUser.name || 'there'},</p>
-            <p>Your CLRHOA portal account role has been updated by an administrator.</p>
-            <p><strong>Previous Role:</strong> ${currentUser.role}</p>
-            <p><strong>New Role:</strong> ${role.toLowerCase()}</p>
-            <p>This change was made by: ${adminEmail}</p>
-            <p>If you have questions about this change, please contact the administrator.</p>
-            <p>Thanks,<br>CLRHOA Team</p>
-          `,
-          text: `Hi ${currentUser.name || 'there'},\n\nYour CLRHOA portal account role has been updated by an administrator.\n\nPrevious Role: ${currentUser.role}\nNew Role: ${role.toLowerCase()}\n\nThis change was made by: ${adminEmail}\n\nIf you have questions about this change, please contact the administrator.\n\nThanks,\nCLRHOA Team`,
-        });
+        const siteUrl = context.url.origin;
+        await sendRoleChangeEmail(
+          resend,
+          targetEmail,
+          currentUser.name,
+          currentUser.role,
+          role.toLowerCase(),
+          adminEmail,
+          siteUrl
+        );
       } catch (emailError) {
         console.error('Failed to send role change notification email:', emailError);
         // Don't fail the request - update was successful
