@@ -182,13 +182,8 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
     }
   }
 
-  // Portal: require session for all routes except login (which redirects to /auth/login)
+  // Portal: require session for all protected routes
   if (pathname.startsWith('/portal')) {
-    // Legacy /portal/login redirect to new /auth/login
-    if (pathname === '/portal/login' || pathname === '/portal/login/') {
-      return context.redirect('/auth/login');
-    }
-
     // Protected portal route: no cookie => redirect to login
     if (!context.cookies.has(SESSION_COOKIE_NAME)) {
       return context.redirect(`/auth/login?return=${encodeURIComponent(pathname)}`);
