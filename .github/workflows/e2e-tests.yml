@@ -39,8 +39,10 @@ jobs:
       - name: Initialize local D1 database
         run: |
           npm run db:init:local
+          npm run db:phase3:local
+          npm run db:phase4:local
+          npm run db:phase5:local
           npm run db:route-permissions:local
-        continue-on-error: true
 
       - name: Start wrangler dev server
         run: npm run preview:test &
@@ -106,8 +108,10 @@ jobs:
       - name: Initialize local D1 database
         run: |
           npm run db:init:local
+          npm run db:phase3:local
+          npm run db:phase4:local
+          npm run db:phase5:local
           npm run db:route-permissions:local
-        continue-on-error: true
 
       - name: Start wrangler dev server
         run: npm run preview:test &
