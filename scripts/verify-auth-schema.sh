@@ -58,7 +58,7 @@ echo ""
 
 # Check indexes were created
 echo "Checking indexes..."
-INDEXES=$(npx wrangler d1 execute $DB_NAME $LOCAL_FLAG --command="SELECT name FROM sqlite_master WHERE type='index' AND name LIKE 'idx_%auth%' OR name LIKE 'idx_password%' OR name LIKE 'idx_session%' OR name LIKE 'idx_audit%' OR name LIKE 'idx_security%' OR name LIKE 'idx_mfa%' ORDER BY name;" --json)
+INDEXES=$(npx wrangler d1 execute $DB_NAME $LOCAL_FLAG --command="SELECT name FROM sqlite_master WHERE type='index' AND (name LIKE 'idx_%auth%' OR name LIKE 'idx_password%' OR name LIKE 'idx_session%' OR name LIKE 'idx_audit%' OR name LIKE 'idx_security%' OR name LIKE 'idx_mfa%') ORDER BY name;" --json)
 
 INDEX_COUNT=$(echo "$INDEXES" | grep -o '"name"' | wc -l)
 
