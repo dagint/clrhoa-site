@@ -19,7 +19,7 @@ Sharp.js for images (5MB→800KB auto-resize)
 NO paid services, NO external CMS
 
 ## AUTHENTICATION (Phase 1)
-Email whitelist only (NO passwords)
+Email whitelist only (NO passwords) - working on implementing
 - KV clrhoa_users → {email: {role: "member|arb|board", name: "..."}}
 - HttpOnly session cookie
 - Astro.locals.user = {email, role}
