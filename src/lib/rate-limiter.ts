@@ -160,7 +160,7 @@ export async function checkRateLimit(
     }
 
     // Calculate when the window resets
-    const resetAt = new Date(windowStart.getTime() + config.windowMs);
+    const resetAt = new Date(now.getTime() + config.windowMs);
 
     return {
       isLimited: attemptCount >= config.maxAttempts,
