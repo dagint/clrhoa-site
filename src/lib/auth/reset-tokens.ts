@@ -25,6 +25,8 @@
 
 import crypto from 'node:crypto';
 import { logSecurityEvent } from '../audit-log';
+import { createEmailTemplate, p } from '../email/templates';
+import { escapeHtml } from '../sanitize';
 
 const TOKEN_EXPIRATION_HOURS = 2; // Reset tokens expire faster than setup tokens
 const TOKEN_BYTES = 32; // 256 bits
@@ -140,106 +142,37 @@ export async function sendResetEmail(
 ): Promise<void> {
   const resetUrl = `${siteUrl}/auth/reset-password?token=${token}`;
 
-  const htmlBody = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Reset Your Password</title>
-</head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-  <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
-    <h1 style="color: white; margin: 0; font-size: 28px;">Reset Your Password</h1>
-  </div>
+  // Build email content using template helpers
+  const greeting = userName ? `Hi ${escapeHtml(userName)},` : 'Hello,';
 
-  <div style="background: #fff; padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px;">
-    <p style="font-size: 16px; margin-top: 0;">
-      ${userName ? `Hi ${userName},` : 'Hello,'}
-    </p>
+  const content =
+    p(greeting) +
+    p('We received a request to reset your CLRHOA portal password. If you didn\'t make this request, you can safely ignore this email.') +
+    p('To reset your password, click the button below:');
 
-    <p style="font-size: 16px;">
-      We received a request to reset your CLRHOA portal password. If you didn't make this request, you can safely ignore this email.
-    </p>
+  const securityWarning =
+    '<strong>⚠️ Didn\'t request a password reset?</strong><br>' +
+    'If you didn\'t request this, please ignore this email. Your password will not be changed. ' +
+    'If you\'re concerned about your account security, contact us immediately.';
 
-    <p style="font-size: 16px;">
-      To reset your password, click the button below:
-    </p>
-
-    <div style="text-align: center; margin: 30px 0;">
-      <a href="${resetUrl}" style="display: inline-block; background: #667eea; color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px;">
-        Reset Password
-      </a>
-    </div>
-
-    <p style="font-size: 14px; color: #666;">
-      If the button doesn't work, copy and paste this link into your browser:
-    </p>
-    <p style="font-size: 13px; color: #667eea; word-break: break-all; background: #f5f5f5; padding: 10px; border-radius: 4px;">
-      ${resetUrl}
-    </p>
-
-    <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 6px; padding: 15px; margin: 20px 0;">
-      <p style="margin: 0; font-size: 14px; color: #856404;">
-        <strong>⏰ This link expires in 2 hours.</strong><br>
-        For your security, this reset link can only be used once.
-      </p>
-    </div>
-
-    <div style="background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 6px; padding: 15px; margin: 20px 0;">
-      <p style="margin: 0; font-size: 14px; color: #721c24;">
-        <strong>⚠️ Didn't request a password reset?</strong><br>
-        If you didn't request this, please ignore this email. Your password will not be changed.
-        If you're concerned about your account security, contact us immediately.
-      </p>
-    </div>
-
-    <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 30px 0;">
-
-    <p style="font-size: 13px; color: #999; margin-bottom: 5px;">
-      Need help? Contact us at <a href="mailto:support@clrhoa.com" style="color: #667eea; text-decoration: none;">support@clrhoa.com</a>
-    </p>
-
-    <p style="font-size: 12px; color: #999; margin-top: 20px;">
-      This password reset was requested from IP address: ${/* IP info could go here */''}.
-    </p>
-  </div>
-
-  <div style="text-align: center; padding: 20px; color: #999; font-size: 12px;">
-    <p style="margin: 0;">
-      &copy; ${new Date().getFullYear()} CLRHOA. All rights reserved.
-    </p>
-  </div>
-</body>
-</html>
-  `.trim();
-
-  const textBody = `
-Reset Your Password
-
-${userName ? `Hi ${userName},` : 'Hello,'}
-
-We received a request to reset your CLRHOA portal password. If you didn't make this request, you can safely ignore this email.
-
-To reset your password, visit this link:
-${resetUrl}
-
-⏰ This link expires in 2 hours. For your security, this reset link can only be used once.
-
-⚠️ Didn't request a password reset?
-If you didn't request this, please ignore this email. Your password will not be changed.
-If you're concerned about your account security, contact us immediately.
-
-Need help? Contact us at support@clrhoa.com
-
-© ${new Date().getFullYear()} CLRHOA. All rights reserved.
-  `.trim();
+  // Create email using branded template
+  const { html, text } = createEmailTemplate({
+    title: 'Reset Your Password',
+    preheader: 'Reset your CLRHOA portal password',
+    heading: 'Reset Your Password',
+    content: content + p(securityWarning, { color: '#721c24' }),
+    ctaText: 'Reset Password',
+    ctaUrl: resetUrl,
+    alertContent: '<strong>This link expires in 2 hours.</strong><br>For your security, this reset link can only be used once.',
+    alertType: 'warning',
+    footerText: '',
+  });
 
   await resend.emails.send({
     from: 'CLRHOA Portal <portal@clrhoa.com>',
     to: userEmail,
     subject: 'Reset your CLRHOA password',
-    html: htmlBody,
-    text: textBody,
+    html,
+    text,
   });
 }

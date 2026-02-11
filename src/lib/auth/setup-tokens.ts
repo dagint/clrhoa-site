@@ -26,6 +26,7 @@
 import crypto from 'node:crypto';
 import { logSecurityEvent } from '../audit-log';
 import { escapeHtml } from '../sanitize';
+import { createEmailTemplate, p, ul } from '../email/templates';
 
 const TOKEN_EXPIRATION_HOURS = 48;
 const TOKEN_BYTES = 32; // 256 bits
@@ -210,114 +211,44 @@ export async function sendSetupEmail(
 ): Promise<void> {
   const setupUrl = `${siteUrl}/auth/setup-password?token=${token}`;
 
-  const htmlBody = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Set Up Your CLRHOA Portal Account</title>
-</head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-  <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
-    <h1 style="color: white; margin: 0; font-size: 28px;">Welcome to CLRHOA</h1>
-  </div>
+  // Build email content using template helpers
+  const greeting = userName ? `Hi ${escapeHtml(userName)},` : 'Hello,';
 
-  <div style="background: #fff; padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px;">
-    <p style="font-size: 16px; margin-top: 0;">
-      ${userName ? `Hi ${escapeHtml(userName)},` : 'Hello,'}
-    </p>
+  const content =
+    p(greeting) +
+    p('Your CLRHOA member portal account has been created! To get started, you need to set up your password.') +
+    p('Click the button below to create your password and activate your account:');
 
-    <p style="font-size: 16px;">
-      Your CLRHOA member portal account has been created! To get started, you need to set up your password.
-    </p>
+  const portalFeatures = [
+    'View and download HOA documents',
+    'Access the member directory',
+    'Submit ARB requests',
+    'View meeting minutes and schedules',
+    'And much more!',
+  ];
 
-    <p style="font-size: 16px;">
-      Click the button below to create your password and activate your account:
-    </p>
+  const featuresContent =
+    p('Once you\'ve set up your password, you\'ll have full access to the member portal where you can:') +
+    ul(portalFeatures);
 
-    <div style="text-align: center; margin: 30px 0;">
-      <a href="${setupUrl}" style="display: inline-block; background: #667eea; color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px;">
-        Set Up Your Password
-      </a>
-    </div>
-
-    <p style="font-size: 14px; color: #666;">
-      If the button doesn't work, copy and paste this link into your browser:
-    </p>
-    <p style="font-size: 13px; color: #667eea; word-break: break-all; background: #f5f5f5; padding: 10px; border-radius: 4px;">
-      ${setupUrl}
-    </p>
-
-    <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 6px; padding: 15px; margin: 20px 0;">
-      <p style="margin: 0; font-size: 14px; color: #856404;">
-        <strong>⏰ This link expires in 48 hours.</strong><br>
-        Please set up your password as soon as possible.
-      </p>
-    </div>
-
-    <p style="font-size: 14px; color: #666; margin-bottom: 0;">
-      Once you've set up your password, you'll have full access to the member portal where you can:
-    </p>
-    <ul style="font-size: 14px; color: #666;">
-      <li>View and download HOA documents</li>
-      <li>Access the member directory</li>
-      <li>Submit ARB requests</li>
-      <li>View meeting minutes and schedules</li>
-      <li>And much more!</li>
-    </ul>
-
-    <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 30px 0;">
-
-    <p style="font-size: 13px; color: #999; margin-bottom: 5px;">
-      Need help? Contact us at <a href="mailto:support@clrhoa.com" style="color: #667eea; text-decoration: none;">support@clrhoa.com</a>
-    </p>
-
-    <p style="font-size: 12px; color: #999; margin-top: 20px;">
-      If you didn't expect this email, please contact our support team immediately.
-    </p>
-  </div>
-
-  <div style="text-align: center; padding: 20px; color: #999; font-size: 12px;">
-    <p style="margin: 0;">
-      &copy; ${new Date().getFullYear()} CLRHOA. All rights reserved.
-    </p>
-  </div>
-</body>
-</html>
-  `.trim();
-
-  const textBody = `
-Welcome to CLRHOA!
-
-${userName ? `Hi ${userName},` : 'Hello,'}
-
-Your CLRHOA member portal account has been created! To get started, you need to set up your password.
-
-Set up your password by visiting this link:
-${setupUrl}
-
-⏰ This link expires in 48 hours. Please set up your password as soon as possible.
-
-Once you've set up your password, you'll have full access to the member portal where you can:
-- View and download HOA documents
-- Access the member directory
-- Submit ARB requests
-- View meeting minutes and schedules
-- And much more!
-
-Need help? Contact us at support@clrhoa.com
-
-If you didn't expect this email, please contact our support team immediately.
-
-© ${new Date().getFullYear()} CLRHOA. All rights reserved.
-  `.trim();
+  // Create email using branded template
+  const { html, text } = createEmailTemplate({
+    title: 'Set Up Your CLRHOA Portal Account',
+    preheader: 'Create your password and activate your account',
+    heading: 'Welcome to CLRHOA',
+    content: content + featuresContent,
+    ctaText: 'Set Up Your Password',
+    ctaUrl: setupUrl,
+    alertContent: '<strong>This link expires in 48 hours.</strong><br>Please set up your password as soon as possible.',
+    alertType: 'warning',
+    footerText: 'If you didn\'t expect this email, please contact our support team immediately.',
+  });
 
   await resend.emails.send({
     from: 'CLRHOA Portal <portal@clrhoa.com>',
     to: userEmail,
     subject: 'Set up your CLRHOA portal account',
-    html: htmlBody,
-    text: textBody,
+    html,
+    text,
   });
 }
