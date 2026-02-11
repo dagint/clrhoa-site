@@ -208,7 +208,7 @@ export const POST: APIRoute = async ({ request, locals, cookies }) => {
     }
 
     // 5. Verify current password
-    const isCurrentPasswordValid = await verifyPassword(passwordResult.password_hash, currentPassword);
+    const isCurrentPasswordValid = await verifyPassword(currentPassword, passwordResult.password_hash);
     if (!isCurrentPasswordValid) {
       await logSecurityEvent(db, {
         eventType: 'password_change_invalid_current_password',
