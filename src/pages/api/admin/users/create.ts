@@ -37,6 +37,7 @@ import { logAuditEvent } from '../../../../lib/audit-log';
 import { getUserEmail } from '../../../../types/auth';
 import type { ResendClient } from '../../../../types/resend';
 import { handleDatabaseError, getDatabaseErrorStatus, isDuplicateKeyError } from '../../../../lib/db-errors';
+import { validateAndNormalizeEmail } from '../../../../lib/email-validation';
 
 const VALID_ROLES = ['member', 'arb', 'board', 'arb_board', 'admin'];
 const VALID_STATUSES = ['active', 'pending_setup', 'inactive'];
