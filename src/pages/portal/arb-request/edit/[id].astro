@@ -11,7 +11,7 @@ import { listEmailsAtSameAddress } from '../../../../lib/directory-db.js';
 import type { ArbFile } from '../../../../lib/arb-db';
 
 const { id } = Astro.params;
-const { env, session: sessionFromContext, effectiveRole } = await getPortalContext(Astro, { fingerprint: true });
+const { env, session: sessionFromContext, effectiveRole } = await getPortalContext(Astro);
 if (!sessionFromContext) return Astro.redirect('/portal/login');
 let session = sessionFromContext;
 

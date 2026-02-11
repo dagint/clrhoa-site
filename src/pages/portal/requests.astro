@@ -9,7 +9,7 @@ import { listArbRequestsByHousehold, listArbAuditLogForRequest, getSubmittedForR
 import type { ArbRequest, ArbAuditLogRow } from '../../lib/arb-db';
 import { sanitizeForDisplay } from '../../lib/sanitize';
 
-const { env, session, effectiveRole } = await getPortalContext(Astro, { fingerprint: true });
+const { env, session, effectiveRole } = await getPortalContext(Astro);
 if (!session) return Astro.redirect('/portal/login');
 
 const db = env?.DB;

@@ -10,7 +10,7 @@ import { listOwners, countOwners } from '../../lib/directory-db';
 import { listArbRequestsByHousehold } from '../../lib/arb-db';
 import { calculatePagination, getOffset, getPageNumbers } from '../../utils/pagination';
 
-const { env, session, effectiveRole } = await getPortalContext(Astro, { fingerprint: true });
+const { env, session, effectiveRole } = await getPortalContext(Astro);
 if (!session) return Astro.redirect('/portal/login');
 
 const db = env?.DB;

@@ -8,7 +8,7 @@ import { getPortalContext } from '../../lib/portal-context';
 import { listArbRequestsByHousehold } from '../../lib/arb-db';
 import { listMaintenanceByHousehold, parsePhotosJson, MAINTENANCE_CATEGORIES } from '../../lib/maintenance-db';
 
-const { env, session, effectiveRole } = await getPortalContext(Astro, { fingerprint: true });
+const { env, session, effectiveRole } = await getPortalContext(Astro);
 if (!session) return Astro.redirect('/portal/login');
 
 const db = env?.DB;

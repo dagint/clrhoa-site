@@ -9,7 +9,7 @@ import { listPortalVendors } from '../../lib/vendors-db';
 import { listArbRequestsByHousehold } from '../../lib/arb-db';
 import { listVendorSubmissionsByHousehold } from '../../lib/vendor-submissions-db';
 
-const { env, session, effectiveRole } = await getPortalContext(Astro, { fingerprint: true });
+const { env, session, effectiveRole } = await getPortalContext(Astro);
 if (!session) return Astro.redirect('/portal/login');
 
 const db = env?.DB;
