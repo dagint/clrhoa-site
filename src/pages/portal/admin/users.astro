@@ -382,7 +382,15 @@ if (db) {
                       >
                         Resend Email
                       </button>
-                    ` : ''}
+                    ` : `
+                      <button
+                        class="text-sm text-orange-600 hover:text-orange-800 mr-2"
+                        onclick="triggerPasswordReset('${escapeHtml(user.email)}', '${escapeHtml(user.name || '')}')"
+                        title="Send password reset email"
+                      >
+                        Reset Password
+                      </button>
+                    `}
                     <button
                       class="text-sm text-blue-600 hover:text-blue-800"
                       onclick="editUser('${escapeHtml(user.email)}')"
@@ -563,6 +571,29 @@ if (db) {
         }
 
         alert('Password setup email sent successfully!');
+      } catch (error) {
+        alert(`Error: ${error.message}`);
+      }
+    };
+
+    window.triggerPasswordReset = async function(email, userName) {
+      const displayName = userName || email;
+      if (!confirm(`Send password reset email to ${displayName}?\n\nThis will allow the user to reset their password via email.`)) return;
+
+      try {
+        const response = await fetch('/api/admin/users/trigger-reset', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email }),
+        });
+
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+          throw new Error(result.error || result.details || 'Failed to send reset email');
+        }
+
+        alert(`Password reset email sent successfully to ${email}!\n\nThe reset link will expire in 2 hours.`);
       } catch (error) {
         alert(`Error: ${error.message}`);
       }
