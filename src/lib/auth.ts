@@ -4,6 +4,8 @@
  */
 /// <reference types="@cloudflare/workers-types" />
 
+import { logger } from './logger';
+
 export const SESSION_COOKIE_NAME = 'clrhoa_session';
 const SESSION_MAX_AGE_SEC = 60 * 60 * 24 * 7; // 7 days
 
@@ -416,17 +418,19 @@ export async function getSessionFromCookie(
 
         if (now >= FINGERPRINT_DEPRECATION_DATE) {
           // Deprecation period ended - reject legacy sessions
-          console.warn('[auth] Legacy session rejected (no fingerprint)', {
+          logger.security('Legacy session rejected (no fingerprint)', {
             email: payload.email,
             sessionId: payload.sessionId,
+            deprecationDate: '2026-05-10',
           });
           return null;
         } else {
           // Still in grace period - allow but log
-          console.warn('[auth] Legacy session allowed (no fingerprint) - will be rejected after 2026-05-10', {
+          logger.warn('Legacy session allowed (no fingerprint) - will be rejected after 2026-05-10', {
             email: payload.email,
             sessionId: payload.sessionId,
             daysRemaining: Math.ceil((FINGERPRINT_DEPRECATION_DATE - now) / (1000 * 60 * 60 * 24)),
+            deprecationDate: '2026-05-10',
           });
         }
       }
