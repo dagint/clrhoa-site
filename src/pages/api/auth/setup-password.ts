@@ -37,6 +37,7 @@ import { createLucia } from '../../../lib/lucia';
 import { logSecurityEvent } from '../../../lib/audit-log';
 import { checkRateLimit } from '../../../lib/rate-limit';
 import crypto from 'node:crypto';
+import { handleDatabaseError, getDatabaseErrorStatus } from '../../../lib/db-errors';
 
 // Password validation constants
 const MIN_PASSWORD_LENGTH = 8;
@@ -335,9 +336,13 @@ export const POST: APIRoute = async ({ request, locals, cookies }) => {
       },
     });
 
+    // Provide user-friendly error message based on database error type
+    const errorMessage = handleDatabaseError(error, 'user');
+    const statusCode = getDatabaseErrorStatus(error);
+
     return new Response(
-      JSON.stringify({ error: 'An error occurred during password setup. Please try again.' }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
+      JSON.stringify({ error: errorMessage }),
+      { status: statusCode, headers: { 'Content-Type': 'application/json' } }
     );
   }
 };

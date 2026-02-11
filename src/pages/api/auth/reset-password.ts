@@ -39,6 +39,7 @@ import { hashPassword } from '../../../lib/password';
 import { logSecurityEvent } from '../../../lib/audit-log';
 import { checkRateLimit } from '../../../lib/rate-limit';
 import type { ResendClient } from '../../../types/resend';
+import { handleDatabaseError, getDatabaseErrorStatus } from '../../../lib/db-errors';
 import { createLucia } from '../../../lib/lucia';
 import crypto from 'node:crypto';
 
@@ -352,9 +353,13 @@ export const POST: APIRoute = async ({ request, locals }) => {
       },
     });
 
+    // Provide user-friendly error message based on database error type
+    const errorMessage = handleDatabaseError(error, 'user');
+    const statusCode = getDatabaseErrorStatus(error);
+
     return new Response(
-      JSON.stringify({ error: 'An error occurred during password reset. Please try again.' }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
+      JSON.stringify({ error: errorMessage }),
+      { status: statusCode, headers: { 'Content-Type': 'application/json' } }
     );
   }
 };
