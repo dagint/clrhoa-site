@@ -95,7 +95,6 @@ export async function revokeSession(
   await lucia.invalidateSession(sessionId);
 
   // Log revocation in security_events for audit trail
-  const now = Math.floor(Date.now() / 1000);
   await db
     .prepare(
       `INSERT INTO security_events (
@@ -104,16 +103,15 @@ export async function revokeSession(
         severity,
         session_id,
         details,
-        created_at
-      ) VALUES (?, ?, ?, ?, ?, ?)`
+        timestamp
+      ) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`
     )
     .bind(
       globalThis.crypto.randomUUID(),
       'session_revoked',
       'info',
       sessionId,
-      JSON.stringify({ revoked_by: revokedBy, reason }),
-      now
+      JSON.stringify({ revoked_by: revokedBy, reason })
     )
     .run();
 }
@@ -129,7 +127,6 @@ export async function revokeAllUserSessions(db: D1Database, lucia: Lucia, userId
   await lucia.invalidateUserSessions(userId);
 
   // Log revocation in security_events for audit trail
-  const now = Math.floor(Date.now() / 1000);
   await db
     .prepare(
       `INSERT INTO security_events (
@@ -138,16 +135,15 @@ export async function revokeAllUserSessions(db: D1Database, lucia: Lucia, userId
         severity,
         user_id,
         details,
-        created_at
-      ) VALUES (?, ?, ?, ?, ?, ?)`
+        timestamp
+      ) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`
     )
     .bind(
       globalThis.crypto.randomUUID(),
       'all_sessions_revoked',
       'info',
       userId,
-      JSON.stringify({ reason: 'admin_action' }),
-      now
+      JSON.stringify({ reason: 'admin_action' })
     )
     .run();
 }

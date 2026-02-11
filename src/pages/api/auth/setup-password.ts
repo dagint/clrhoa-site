@@ -170,7 +170,7 @@ export const POST: APIRoute = async ({ request, locals, cookies }) => {
           u.status,
           u.password_hash
         FROM password_setup_tokens st
-        JOIN users u ON u.id = st.user_id
+        JOIN users u ON u.email = st.user_id
         WHERE st.token_hash = ?`
       )
       .bind(tokenHash)
@@ -260,28 +260,26 @@ export const POST: APIRoute = async ({ request, locals, cookies }) => {
     // 7. Hash password
     const passwordHash = await hashPassword(password);
 
-    // 8. Update user record - set password and activate account
-    await db
-      .prepare(
-        `UPDATE users
-         SET password_hash = ?,
-             status = 'active',
-             updated_at = CURRENT_TIMESTAMP
-         WHERE email = ?`
-      )
-      .bind(passwordHash, setupTokenResult.user_id)
-      .run();
-
-    // 9. Mark token as used
-    await db
-      .prepare(
-        `UPDATE password_setup_tokens
-         SET used = 1,
-             used_at = CURRENT_TIMESTAMP
-         WHERE id = ?`
-      )
-      .bind(setupTokenResult.id)
-      .run();
+    // 8. Update user record and mark token as used (atomic transaction)
+    await db.batch([
+      db
+        .prepare(
+          `UPDATE users
+           SET password_hash = ?,
+               status = 'active',
+               updated_at = CURRENT_TIMESTAMP
+           WHERE email = ?`
+        )
+        .bind(passwordHash, setupTokenResult.user_id),
+      db
+        .prepare(
+          `UPDATE password_setup_tokens
+           SET used = 1,
+               used_at = CURRENT_TIMESTAMP
+           WHERE id = ?`
+        )
+        .bind(setupTokenResult.id)
+    ]);
 
     // 10. Create session and log user in automatically
     const lucia = createLucia(db);

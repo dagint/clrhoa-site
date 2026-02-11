@@ -19,10 +19,13 @@ Sharp.js for images (5MB→800KB auto-resize)
 NO paid services, NO external CMS
 
 ## AUTHENTICATION (Phase 1)
-Email whitelist only (NO passwords) - working on implementing
-- KV clrhoa_users → {email: {role: "member|arb|board", name: "..."}}
-- HttpOnly session cookie
+Password-based authentication with Lucia v3 session management
+- Users table in D1 (email, password_hash, role, status)
+- Password setup flow for new users (email invitation with secure tokens)
+- Bcrypt password hashing (cost factor 10)
+- HttpOnly session cookies with fingerprinting
 - Astro.locals.user = {email, role}
+- Session storage in D1, managed by Lucia
 
 ## FILE STRUCTURE (Preserve Existing)
 src/public/*.pdf ← EXISTING public docs (DO NOT TOUCH)

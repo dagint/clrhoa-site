@@ -25,6 +25,7 @@
 
 import crypto from 'node:crypto';
 import { logSecurityEvent } from '../audit-log';
+import { escapeHtml } from '../sanitize';
 
 const TOKEN_EXPIRATION_HOURS = 48;
 const TOKEN_BYTES = 32; // 256 bits
@@ -199,7 +200,7 @@ export async function sendSetupEmail(
 
   <div style="background: #fff; padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px;">
     <p style="font-size: 16px; margin-top: 0;">
-      ${userName ? `Hi ${userName},` : 'Hello,'}
+      ${userName ? `Hi ${escapeHtml(userName)},` : 'Hello,'}
     </p>
 
     <p style="font-size: 16px;">
