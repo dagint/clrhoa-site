@@ -42,6 +42,7 @@ import {
   hashBackupCode,
   formatBackupCode,
   storeMFASecret,
+  decryptSecret,
 } from '../../../../lib/mfa';
 import { logSecurityEvent } from '../../../../lib/audit-log';
 import { checkRateLimit } from '../../../../lib/rate-limit';
@@ -135,7 +136,21 @@ export const POST: APIRoute = async (context) => {
       );
     }
 
-    const { secret } = JSON.parse(pendingData);
+    const { secret: encryptedSecret } = JSON.parse(pendingData);
+
+    // Decrypt the secret
+    let secret: string;
+    try {
+      secret = decryptSecret(encryptedSecret, sessionSecret);
+    } catch (error) {
+      console.error('Failed to decrypt pending MFA secret:', error);
+      return new Response(
+        JSON.stringify({
+          error: 'Invalid MFA setup. Please start MFA setup again.',
+        }),
+        { status: 500, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
 
     // 5. Verify TOTP code
     const isValid = verifyTOTP(secret, code);

@@ -314,7 +314,8 @@ export const POST: APIRoute = async (context) => {
       eventType: 'mfa_login_successful',
       userId: normalizedEmail,
       sessionId: session.id,
-      success: true,
+      action: 'MFA login verified',
+      outcome: 'success',
       ipAddress,
       userAgent,
       details: {

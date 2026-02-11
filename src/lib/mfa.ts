@@ -189,9 +189,11 @@ export function generateBackupCodes(count: number = BACKUP_CODE_COUNT): string[]
  * @returns Hashed code (hex)
  */
 export function hashBackupCode(code: string): string {
+  // Strip hyphens and spaces so that formatted codes (ABCD-1234) match
+  const cleanCode = code.replace(/[-\s]/g, '').toUpperCase();
   return crypto
     .createHash('sha256')
-    .update(code.toUpperCase())
+    .update(cleanCode)
     .digest('hex');
 }
 

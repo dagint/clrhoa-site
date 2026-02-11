@@ -33,6 +33,7 @@ import {
   generateQRCode,
   generateBackupCodes,
   storeMFASecret,
+  encryptSecret,
 } from '../../../../lib/mfa';
 import { logSecurityEvent } from '../../../../lib/audit-log';
 import { checkRateLimit } from '../../../../lib/rate-limit';
@@ -97,10 +98,12 @@ export const POST: APIRoute = async (context) => {
 
     // 5. Store secret in KV (temporary, not enabled yet)
     // Store with "_pending" suffix to indicate it's not verified
+    // Encrypt the secret for security
+    const encryptedSecret = encryptSecret(secret, sessionSecret);
     await kv.put(
       `mfa_secret_pending:${userEmail}`,
       JSON.stringify({
-        secret,
+        secret: encryptedSecret,
         createdAt: new Date().toISOString(),
       }),
       { expirationTtl: 60 * 15 } // 15 minutes to complete setup

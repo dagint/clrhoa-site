@@ -309,6 +309,23 @@ describe('MFA/TOTP System', () => {
         // Edge case: wrong length should return as-is
         expect(formatBackupCode('SHORT')).toBe('SHORT');
       });
+
+      it('should verify formatted backup codes (with hyphens)', () => {
+        const code = 'ABCD1234';
+        const hash = hashBackupCode(code);
+
+        // Should accept code with hyphen (as displayed to users)
+        expect(verifyBackupCode('ABCD-1234', hash)).toBe(true);
+
+        // Should also still accept code without hyphen
+        expect(verifyBackupCode('ABCD1234', hash)).toBe(true);
+
+        // Should work with spaces too
+        expect(verifyBackupCode('ABCD 1234', hash)).toBe(true);
+
+        // Should work case-insensitive with hyphens
+        expect(verifyBackupCode('abcd-1234', hash)).toBe(true);
+      });
     });
   });
 
