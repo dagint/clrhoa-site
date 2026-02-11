@@ -21,6 +21,7 @@
  */
 
 import bcrypt from 'bcryptjs';
+import { logger } from './logger';
 
 /**
  * Cost factor for bcrypt hashing.
@@ -52,7 +53,9 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
     return await bcrypt.compare(password, hash);
   } catch (error) {
     // If hash is invalid or comparison fails, return false
-    console.error('Password verification error:', error);
+    logger.error('Password verification error', {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return false;
   }
 }
