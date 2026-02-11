@@ -201,6 +201,34 @@ describe('Audit Logging', () => {
         null
       );
     });
+
+    it('should set severity to warning for denied auth', async () => {
+      await logAuthEvent(mockDb, {
+        eventType: 'access_denied',
+        userId: 'user@example.com',
+        action: 'Access denied',
+        outcome: 'denied',
+      });
+
+      expect(preparedStatement.bind).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.any(String),
+        'access_denied',
+        'authentication',
+        'warning', // auto-set (denied = warning)
+        'user@example.com',
+        null,
+        null,
+        null,
+        null,
+        expect.any(String),
+        'Access denied',
+        'denied',
+        null,
+        null,
+        null
+      );
+    });
   });
 
   describe('logAuthorizationEvent', () => {
@@ -330,6 +358,20 @@ describe('Audit Logging', () => {
 
       expect(preparedStatement.bind).toHaveBeenCalledWith(100, 0);
     });
+
+    it('should return empty array and log error on database failure', async () => {
+      preparedStatement.all.mockRejectedValue(new Error('Database error'));
+
+      const result = await queryAuditLogs(mockDb, {
+        userId: 'user@example.com',
+      });
+
+      expect(result).toEqual([]);
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        '[audit] Failed to query audit logs:',
+        expect.any(Error)
+      );
+    });
   });
 
   describe('querySecurityEvents', () => {
@@ -344,6 +386,20 @@ describe('Audit Logging', () => {
         expect.stringContaining('WHERE severity = ? AND resolved = ?')
       );
       expect(preparedStatement.bind).toHaveBeenCalledWith('critical', 0, 25, 0);
+    });
+
+    it('should return empty array and log error on database failure', async () => {
+      preparedStatement.all.mockRejectedValue(new Error('Database error'));
+
+      const result = await querySecurityEvents(mockDb, {
+        severity: 'critical',
+      });
+
+      expect(result).toEqual([]);
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        '[audit] Failed to query security events:',
+        expect.any(Error)
+      );
     });
   });
 

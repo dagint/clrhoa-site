@@ -173,7 +173,7 @@ export async function logAuthEvent(
   await logAuditEvent(db, {
     ...event,
     eventCategory: 'authentication',
-    severity: event.outcome === 'failure' ? 'warning' : 'info',
+    severity: event.outcome === 'failure' || event.outcome === 'denied' ? 'warning' : 'info',
   });
 }
 
@@ -371,12 +371,18 @@ export async function queryAuditLogs(
     LIMIT ? OFFSET ?
   `;
 
-  const result = await db
-    .prepare(query)
-    .bind(...bindings, limit, offset)
-    .all();
+  try {
+    const result = await db
+      .prepare(query)
+      .bind(...bindings, limit, offset)
+      .all();
 
-  return result.results || [];
+    return result.results || [];
+  } catch (error) {
+    console.error('[audit] Failed to query audit logs:', error);
+    console.error('[audit] Filters:', filters);
+    return [];
+  }
 }
 
 /**
@@ -443,12 +449,18 @@ export async function querySecurityEvents(
     LIMIT ? OFFSET ?
   `;
 
-  const result = await db
-    .prepare(query)
-    .bind(...bindings, limit, offset)
-    .all();
+  try {
+    const result = await db
+      .prepare(query)
+      .bind(...bindings, limit, offset)
+      .all();
 
-  return result.results || [];
+    return result.results || [];
+  } catch (error) {
+    console.error('[audit] Failed to query security events:', error);
+    console.error('[audit] Filters:', filters);
+    return [];
+  }
 }
 
 /**
