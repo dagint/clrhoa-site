@@ -7,7 +7,6 @@
 
 import type { Lucia } from 'lucia';
 import { createLucia } from './index';
-import crypto from 'node:crypto';
 
 /**
  * Session creation options
@@ -22,13 +21,21 @@ export interface SessionOptions {
 }
 
 /**
- * Session fingerprint for security validation
+ * Session fingerprint for security validation using Web Crypto API
  */
-function generateSessionFingerprint(ipAddress: string, userAgent: string): string {
-  return crypto
-    .createHash('sha256')
-    .update(`${ipAddress}:${userAgent}`)
-    .digest('hex');
+async function generateSessionFingerprint(ipAddress: string, userAgent: string): Promise<string> {
+  const data = `${ipAddress}:${userAgent}`;
+  const encoder = new TextEncoder();
+  const dataBuffer = encoder.encode(data);
+
+  // Use Web Crypto API (available in Cloudflare Workers)
+  const hashBuffer = await crypto.subtle.digest('SHA-256', dataBuffer);
+
+  // Convert ArrayBuffer to hex string
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
+  return hashHex;
 }
 
 /**
@@ -50,7 +57,7 @@ export async function createSession(
 ) {
   // Create session with Lucia
   const session = await lucia.createSession(userId, {
-    fingerprint: generateSessionFingerprint(ipAddress || 'unknown', userAgent || 'unknown'),
+    fingerprint: await generateSessionFingerprint(ipAddress || 'unknown', userAgent || 'unknown'),
     ipAddress: ipAddress || null,
     userAgent: userAgent || null,
     createdAt: Math.floor(Date.now() / 1000),
@@ -101,7 +108,7 @@ export async function revokeSession(
       ) VALUES (?, ?, ?, ?, ?, ?)`
     )
     .bind(
-      crypto.randomUUID(),
+      globalThis.crypto.randomUUID(),
       'session_revoked',
       'info',
       sessionId,
@@ -135,7 +142,7 @@ export async function revokeAllUserSessions(db: D1Database, lucia: Lucia, userId
       ) VALUES (?, ?, ?, ?, ?, ?)`
     )
     .bind(
-      crypto.randomUUID(),
+      globalThis.crypto.randomUUID(),
       'all_sessions_revoked',
       'info',
       userId,
