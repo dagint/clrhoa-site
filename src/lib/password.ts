@@ -290,6 +290,18 @@ export async function rehashIfNeeded(
 }
 
 /**
+ * Generate a cryptographically secure random integer in range [0, max).
+ *
+ * @param max - Upper bound (exclusive)
+ * @returns Random integer
+ */
+function getSecureRandomInt(max: number): number {
+  const array = new Uint32Array(1);
+  crypto.getRandomValues(array);
+  return array[0] % max;
+}
+
+/**
  * Generate a temporary password for new user setup.
  *
  * Format: [Word]-[Word]-[4 digits]-[Symbol]
@@ -311,16 +323,16 @@ export async function generateTemporaryPassword(): Promise<string> {
   const symbols = ['!', '@', '#', '$', '%', '&', '*'];
 
   // Random word 1
-  const word1 = words[Math.floor(Math.random() * words.length)];
+  const word1 = words[getSecureRandomInt(words.length)];
 
   // Random word 2
-  const word2 = words[Math.floor(Math.random() * words.length)];
+  const word2 = words[getSecureRandomInt(words.length)];
 
   // Random 4 digits
-  const digits = Math.floor(1000 + Math.random() * 9000);
+  const digits = 1000 + getSecureRandomInt(9000);
 
   // Random symbol
-  const symbol = symbols[Math.floor(Math.random() * symbols.length)];
+  const symbol = symbols[getSecureRandomInt(symbols.length)];
 
   return `${word1}-${word2}-${digits}${symbol}`;
 }
