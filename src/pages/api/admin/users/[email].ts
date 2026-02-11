@@ -36,6 +36,8 @@ import type { APIRoute } from 'astro';
 import { requireRole } from '../../../../lib/auth/middleware';
 import { logAuditEvent } from '../../../../lib/audit-log';
 import { sendRoleChangeEmail } from '../../../../lib/auth/role-change-notifications';
+import { getUserEmail } from '../../../../types/auth';
+import type { ResendClient } from '../../../../types/resend';
 
 const VALID_ROLES = ['member', 'arb', 'board', 'arb_board', 'admin'];
 const VALID_STATUSES = ['active', 'pending_setup', 'inactive', 'locked'];
@@ -56,7 +58,7 @@ export const PATCH: APIRoute = async (context) => {
   }
 
   const db = context.locals.runtime?.env?.DB;
-  const resend = context.locals.runtime?.env?.RESEND;
+  const resend = context.locals.runtime?.env?.RESEND as ResendClient | undefined;
 
   if (!db) {
     return new Response(
@@ -65,7 +67,7 @@ export const PATCH: APIRoute = async (context) => {
     );
   }
 
-  const adminEmail = (authResult.user as any).email;
+  const adminEmail = getUserEmail(authResult.user) || 'unknown';
   const targetEmail = decodeURIComponent(context.params.email || '');
 
   try {

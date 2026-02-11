@@ -27,6 +27,7 @@ import crypto from 'node:crypto';
 import { logSecurityEvent } from '../audit-log';
 import { escapeHtml } from '../sanitize';
 import { createEmailTemplate, p, ul } from '../email/templates';
+import type { ResendClient } from '../../types/resend';
 
 const TOKEN_EXPIRATION_HOURS = 48;
 const TOKEN_BYTES = 32; // 256 bits
@@ -203,7 +204,7 @@ export async function resendSetupToken(
  * @param siteUrl - Base URL of the site
  */
 export async function sendSetupEmail(
-  resend: any, // Resend client type
+  resend: ResendClient,
   userEmail: string,
   token: string,
   userName?: string,

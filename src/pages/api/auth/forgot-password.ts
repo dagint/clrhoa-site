@@ -32,6 +32,7 @@ import { checkRateLimit } from '../../../lib/rate-limit';
 import { logSecurityEvent } from '../../../lib/audit-log';
 import { generateResetToken, sendResetEmail } from '../../../lib/auth/reset-tokens';
 import crypto from 'node:crypto';
+import type { ResendClient } from '../../../types/resend';
 
 /**
  * Simple email validation regex.
@@ -45,7 +46,7 @@ function isValidEmail(email: string): boolean {
 export const POST: APIRoute = async ({ request, locals }) => {
   const db = locals.runtime.env.DB;
   const kv = locals.runtime?.env?.CLRHOA_USERS as KVNamespace | undefined;
-  const resend = locals.runtime?.env?.RESEND;
+  const resend = locals.runtime?.env?.RESEND as ResendClient | undefined;
   const ipAddress = request.headers.get('cf-connecting-ip') || 'unknown';
   const userAgent = request.headers.get('user-agent') || 'unknown';
 
@@ -169,27 +170,28 @@ export const POST: APIRoute = async ({ request, locals }) => {
     );
 
     // 6. Send reset email
-    try {
-      await sendResetEmail(
-        resend,
-        user.email,
-        token,
-        user.name || undefined
-      );
+    if (resend) {
+      try {
+        await sendResetEmail(
+          resend,
+          user.email,
+          token,
+          user.name || undefined
+        );
 
-      // Log successful reset request
-      await logSecurityEvent(db, {
-        eventType: 'forgot_password_email_sent',
-        severity: 'info',
-        userId: user.email,
-        details: {
-          token_id: tokenId,
-          ip_address: ipAddress,
-          user_agent: userAgent,
-          expires_at: expiresAt,
-        },
-      });
-    } catch (emailError) {
+        // Log successful reset request
+        await logSecurityEvent(db, {
+          eventType: 'forgot_password_email_sent',
+          severity: 'info',
+          userId: user.email,
+          details: {
+            token_id: tokenId,
+            ip_address: ipAddress,
+            user_agent: userAgent,
+            expires_at: expiresAt,
+          },
+        });
+      } catch (emailError) {
       // Log email failure but still return success to user
       // (prevents attackers from using email failures to enumerate accounts)
       console.error('Failed to send reset email:', emailError);
@@ -205,8 +207,9 @@ export const POST: APIRoute = async ({ request, locals }) => {
         },
       });
 
-      // Still return generic success - user won't know email failed
-      // Admin monitoring will catch the critical security event
+        // Still return generic success - user won't know email failed
+        // Admin monitoring will catch the critical security event
+      }
     }
 
     return genericSuccessResponse;
