@@ -252,7 +252,8 @@ export const POST: APIRoute = async ({ request, locals, cookies }) => {
     await logAuthEvent(db, {
       eventType: 'login_failed',
       userId: normalizedEmail,
-      success: false,
+      outcome: 'failure',
+      action: 'User login attempt',
       ipAddress,
       userAgent,
       details: {
@@ -277,7 +278,8 @@ export const POST: APIRoute = async ({ request, locals, cookies }) => {
     await logAuthEvent(db, {
       eventType: 'login_failed',
       userId: normalizedEmail,
-      success: false,
+      outcome: 'failure',
+      action: 'User login attempt',
       ipAddress,
       userAgent,
       details: {
@@ -331,7 +333,8 @@ export const POST: APIRoute = async ({ request, locals, cookies }) => {
     await logAuthEvent(db, {
       eventType: 'login_failed',
       userId: normalizedEmail,
-      success: false,
+      outcome: 'failure',
+      action: 'User login attempt',
       ipAddress,
       userAgent,
       details: {
@@ -414,7 +417,8 @@ export const POST: APIRoute = async ({ request, locals, cookies }) => {
     eventType: 'login_successful',
     userId: normalizedEmail,
     sessionId: session.id,
-    success: true,
+    outcome: 'success',
+    action: 'User login',
     ipAddress,
     userAgent,
     details: {

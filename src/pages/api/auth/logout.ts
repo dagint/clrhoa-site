@@ -86,7 +86,8 @@ export const POST: APIRoute = async ({ request, locals, cookies }) => {
           eventType: 'logout',
           userId: sessionData.user_id,
           sessionId,
-          success: true,
+          outcome: 'success',
+          action: 'User logout',
           ipAddress,
           userAgent,
           details: {

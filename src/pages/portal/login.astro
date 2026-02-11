@@ -143,38 +143,46 @@ const errorMessage =
     </div>
 
     <script>
-      const loginForm = document.getElementById('login-form');
-      const mfaForm = document.getElementById('mfa-form');
-      const loginBtn = document.getElementById('login-btn');
-      const mfaBtn = document.getElementById('mfa-btn');
-      const mfaBackBtn = document.getElementById('mfa-back-btn');
-      const errorDiv = document.getElementById('error-message');
-      const successDiv = document.getElementById('success-message');
+      const loginForm = document.getElementById('login-form') as HTMLFormElement | null;
+      const mfaForm = document.getElementById('mfa-form') as HTMLFormElement | null;
+      const loginBtn = document.getElementById('login-btn') as HTMLButtonElement | null;
+      const mfaBtn = document.getElementById('mfa-btn') as HTMLButtonElement | null;
+      const mfaBackBtn = document.getElementById('mfa-back-btn') as HTMLButtonElement | null;
+      const errorDiv = document.getElementById('error-message') as HTMLDivElement | null;
+      const successDiv = document.getElementById('success-message') as HTMLDivElement | null;
 
-      function showError(message) {
+      function showError(message: string): void {
+        if (!errorDiv || !successDiv) return;
         errorDiv.textContent = message;
         errorDiv.classList.remove('hidden');
         successDiv.classList.add('hidden');
       }
 
-      function showSuccess(message) {
+      function showSuccess(message: string): void {
+        if (!successDiv || !errorDiv) return;
         successDiv.textContent = message;
         successDiv.classList.remove('hidden');
         errorDiv.classList.add('hidden');
       }
 
-      function hideMessages() {
+      function hideMessages(): void {
+        if (!errorDiv || !successDiv) return;
         errorDiv.classList.add('hidden');
         successDiv.classList.add('hidden');
       }
 
       // Step 1: Handle password login
-      loginForm.addEventListener('submit', async (e) => {
+      loginForm?.addEventListener('submit', async (e) => {
         e.preventDefault();
         hideMessages();
 
-        const email = document.getElementById('email').value;
-        const password = document.getElementById('password').value;
+        const emailInput = document.getElementById('email') as HTMLInputElement | null;
+        const passwordInput = document.getElementById('password') as HTMLInputElement | null;
+
+        if (!emailInput || !passwordInput || !loginBtn) return;
+
+        const email = emailInput.value;
+        const password = passwordInput.value;
 
         loginBtn.disabled = true;
         loginBtn.textContent = 'Signing in...';
@@ -186,17 +194,22 @@ const errorMessage =
             body: JSON.stringify({ email, password }),
           });
 
-          const data = await response.json();
+          const data = await response.json() as { success: boolean; message?: string; mfaRequired?: boolean; tempToken?: string; redirectTo?: string };
 
           if (data.success) {
             if (data.mfaRequired) {
               // Show MFA form
               showSuccess(data.message || 'Password verified. Please enter your MFA code.');
-              document.getElementById('temp-token').value = data.tempToken;
-              document.getElementById('mfa-email').value = email;
-              loginForm.classList.add('hidden');
-              mfaForm.classList.remove('hidden');
-              document.getElementById('mfa-code').focus();
+              const tempTokenInput = document.getElementById('temp-token') as HTMLInputElement | null;
+              const mfaEmailInput = document.getElementById('mfa-email') as HTMLInputElement | null;
+              const mfaCodeInput = document.getElementById('mfa-code') as HTMLInputElement | null;
+              if (tempTokenInput && mfaEmailInput && data.tempToken) {
+                tempTokenInput.value = data.tempToken;
+                mfaEmailInput.value = email;
+              }
+              loginForm?.classList.add('hidden');
+              mfaForm?.classList.remove('hidden');
+              mfaCodeInput?.focus();
             } else {
               // Login successful, redirect
               showSuccess(data.message || 'Login successful!');
@@ -217,13 +230,19 @@ const errorMessage =
       });
 
       // Step 2: Handle MFA verification
-      mfaForm.addEventListener('submit', async (e) => {
+      mfaForm?.addEventListener('submit', async (e) => {
         e.preventDefault();
         hideMessages();
 
-        const code = document.getElementById('mfa-code').value;
-        const tempToken = document.getElementById('temp-token').value;
-        const email = document.getElementById('mfa-email').value;
+        const mfaCodeInput = document.getElementById('mfa-code') as HTMLInputElement | null;
+        const tempTokenInput = document.getElementById('temp-token') as HTMLInputElement | null;
+        const mfaEmailInput = document.getElementById('mfa-email') as HTMLInputElement | null;
+
+        if (!mfaCodeInput || !tempTokenInput || !mfaEmailInput || !mfaBtn) return;
+
+        const code = mfaCodeInput.value;
+        const tempToken = tempTokenInput.value;
+        const email = mfaEmailInput.value;
 
         mfaBtn.disabled = true;
         mfaBtn.textContent = 'Verifying...';
@@ -235,7 +254,7 @@ const errorMessage =
             body: JSON.stringify({ email, code, tempToken }),
           });
 
-          const data = await response.json();
+          const data = await response.json() as { success: boolean; message?: string; redirectTo?: string };
 
           if (data.success) {
             showSuccess(data.message || 'MFA verified! Logging in...');
@@ -244,8 +263,8 @@ const errorMessage =
             }, 500);
           } else {
             showError(data.message || 'Invalid verification code. Please try again.');
-            document.getElementById('mfa-code').value = '';
-            document.getElementById('mfa-code').focus();
+            mfaCodeInput.value = '';
+            mfaCodeInput.focus();
           }
         } catch (error) {
           console.error('MFA verification error:', error);
@@ -257,13 +276,16 @@ const errorMessage =
       });
 
       // Back button: return to password login
-      mfaBackBtn.addEventListener('click', () => {
+      mfaBackBtn?.addEventListener('click', () => {
         hideMessages();
-        mfaForm.classList.add('hidden');
-        loginForm.classList.remove('hidden');
-        document.getElementById('mfa-code').value = '';
-        document.getElementById('password').value = '';
-        document.getElementById('email').focus();
+        mfaForm?.classList.add('hidden');
+        loginForm?.classList.remove('hidden');
+        const mfaCodeInput = document.getElementById('mfa-code') as HTMLInputElement | null;
+        const passwordInput = document.getElementById('password') as HTMLInputElement | null;
+        const emailInput = document.getElementById('email') as HTMLInputElement | null;
+        if (mfaCodeInput) mfaCodeInput.value = '';
+        if (passwordInput) passwordInput.value = '';
+        emailInput?.focus();
       });
     </script>
   </body>
