@@ -1,0 +1,209 @@
+---
+/**
+ * POST /api/compliance/upload — Board: upload compliance document for a specific requirement.
+ * FormData: requirement_id, title, file, document_date (optional), notes (optional), csrf_token.
+ * Stored in R2 under compliance/{requirement_id}/, metadata in D1.
+ */
+export const prerender = false;
+
+import { getSessionFromCookie, verifyCsrfToken, verifyOrigin, getEffectiveRole, isBoardOnly } from '../../../lib/auth';
+import {
+  getComplianceRequirement,
+  archiveCurrentDocumentsForRequirement,
+  insertComplianceDocument,
+  insertComplianceAuditLog,
+} from '../../../lib/compliance-db';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const session = await getSessionFromCookie(
+  Astro.request.headers.get('cookie') ?? undefined,
+  env?.SESSION_SECRET
+);
+
+if (!session) {
+  return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+    status: 401,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const effectiveRole = getEffectiveRole(session);
+const isBoard = isBoardOnly(effectiveRole) || effectiveRole === 'admin';
+if (!isBoard) {
+  return new Response(JSON.stringify({ error: 'Forbidden. Only Board or Admin can upload compliance documents.' }), {
+    status: 403,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const origin = Astro.request.headers.get('origin');
+const referer = Astro.request.headers.get('referer');
+if (!verifyOrigin(origin, referer, Astro.url.origin)) {
+  return new Response(JSON.stringify({ error: 'Invalid origin' }), { status: 403, headers: { 'Content-Type': 'application/json' } });
+}
+
+if (Astro.request.method !== 'POST') {
+  return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+    status: 405,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+let body: FormData;
+try {
+  body = await Astro.request.formData();
+} catch {
+  return new Response(JSON.stringify({ error: 'Invalid form' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+}
+
+const csrf = body.get('csrf_token')?.toString();
+if (!verifyCsrfToken(session, csrf)) {
+  return new Response(JSON.stringify({ error: 'Invalid CSRF token' }), { status: 403, headers: { 'Content-Type': 'application/json' } });
+}
+
+const requirementId = body.get('requirement_id')?.toString()?.trim();
+if (!requirementId) {
+  return new Response(JSON.stringify({ error: 'Requirement ID is required' }), {
+    status: 400,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const db = env?.DB;
+const r2 = env?.CLOURHOA_FILES;
+if (!db || !r2) {
+  return new Response(JSON.stringify({ error: 'Server configuration error' }), { status: 503, headers: { 'Content-Type': 'application/json' } });
+}
+
+// Verify requirement exists
+const requirement = await getComplianceRequirement(db, requirementId);
+if (!requirement) {
+  return new Response(JSON.stringify({ error: 'Invalid requirement ID' }), {
+    status: 400,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const title = body.get('title')?.toString()?.trim();
+if (!title || title.length > 200) {
+  return new Response(JSON.stringify({ error: 'Title is required (max 200 characters)' }), {
+    status: 400,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const documentDate = body.get('document_date')?.toString()?.trim() || null;
+
+const notes = body.get('notes')?.toString()?.trim() || null;
+
+const file = body.get('file');
+if (!file || !(file instanceof File) || file.size === 0) {
+  return new Response(JSON.stringify({ error: 'No file provided' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+}
+
+// File size limit: 10MB
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
+if (file.size > MAX_FILE_SIZE) {
+  return new Response(JSON.stringify({ error: 'File size exceeds 10MB limit' }), {
+    status: 400,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+// Allowed file types for compliance documents
+const ALLOWED_TYPES = [
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'text/csv',
+  'text/plain', // some CSVs sent as text/plain
+  'application/csv',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+];
+
+const isAllowed = ALLOWED_TYPES.includes(file.type) || (file.type === 'text/plain' && /\.csv$/i.test(file.name));
+if (!isAllowed) {
+  return new Response(JSON.stringify({ error: 'Invalid file type. Use PDF, Word, Excel, CSV, or images.' }), {
+    status: 400,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+function getSafeExt(file: File): string {
+  const name = file.name || '';
+  const ext = name.includes('.') ? name.split('.').pop()?.toLowerCase() ?? '' : '';
+  const fromType: Record<string, string> = {
+    'application/pdf': 'pdf',
+    'application/msword': 'doc',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+    'text/csv': 'csv',
+    'application/csv': 'csv',
+    'application/vnd.ms-excel': 'xls',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
+    'image/jpeg': 'jpg',
+    'image/png': 'png',
+    'image/gif': 'gif',
+    'image/webp': 'webp',
+  };
+  if (fromType[file.type]) return fromType[file.type];
+  if (['pdf', 'doc', 'docx', 'csv', 'xls', 'xlsx', 'jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) return ext === 'jpeg' ? 'jpg' : ext;
+  if (file.type.startsWith('image/')) return 'jpg';
+  return 'bin';
+}
+
+const safeExt = getSafeExt(file);
+const year = new Date().getFullYear();
+const uniqueId = crypto.randomUUID?.() ?? Date.now().toString(36);
+const fileKey = `compliance/${requirementId}/${year}/${uniqueId}.${safeExt}`;
+
+// Upload to R2
+const buf = await file.arrayBuffer();
+await r2.put(fileKey, buf, {
+  httpMetadata: { contentType: file.type },
+});
+
+// Archive old documents for this requirement (set is_current = 0)
+await archiveCurrentDocumentsForRequirement(db, requirementId);
+
+// Insert new document
+const documentId = await insertComplianceDocument(db, {
+  requirementId,
+  title,
+  fileKey,
+  fileSize: file.size,
+  mimeType: file.type,
+  uploadedBy: session.email,
+  documentDate: documentDate ?? undefined,
+  visibility: requirement.posting_location === 'public' ? 'public' : 'members',
+  notes: notes ?? undefined,
+});
+
+// Log audit entry
+await insertComplianceAuditLog(db, {
+  requirementId,
+  documentId,
+  action: 'DOCUMENT_UPLOADED',
+  actorEmail: session.email,
+  metadata: {
+    title,
+    fileKey,
+    fileSize: file.size,
+    mimeType: file.type,
+  },
+});
+
+return new Response(
+  JSON.stringify({
+    success: true,
+    documentId,
+    message: 'Document uploaded successfully and marked as current.',
+  }),
+  { status: 200, headers: { 'Content-Type': 'application/json' } }
+);
+---

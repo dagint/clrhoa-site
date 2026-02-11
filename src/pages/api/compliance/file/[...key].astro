@@ -1,0 +1,72 @@
+---
+/**
+ * GET /api/compliance/file/{...key} — Serve compliance documents from R2.
+ * Access control: Board/Admin only for members-only docs, public for public docs.
+ */
+export const prerender = false;
+
+import { getSessionFromCookie, getEffectiveRole, isBoardOnly } from '../../../../lib/auth';
+import { getComplianceDocumentByFileKey } from '../../../../lib/compliance-db';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+
+if (Astro.request.method !== 'GET') {
+  return new Response('Method not allowed', { status: 405 });
+}
+
+const fileKey = Astro.params.key;
+if (!fileKey) {
+  return new Response('File key required', { status: 400 });
+}
+
+const db = env?.DB;
+const r2 = env?.CLOURHOA_FILES;
+if (!db || !r2) {
+  return new Response('Server configuration error', { status: 503 });
+}
+
+// Check if file exists in compliance_documents table
+const doc = await getComplianceDocumentByFileKey(db, fileKey);
+if (!doc) {
+  return new Response('Document not found', { status: 404 });
+}
+
+// Access control based on visibility
+if (doc.visibility === 'members') {
+  // Members-only document: require board/admin session
+  const session = await getSessionFromCookie(
+    Astro.request.headers.get('cookie') ?? undefined,
+    env?.SESSION_SECRET
+  );
+
+  if (!session) {
+    return new Response('Unauthorized', { status: 401 });
+  }
+
+  const effectiveRole = getEffectiveRole(session);
+  const isBoard = isBoardOnly(effectiveRole) || effectiveRole === 'admin';
+
+  if (!isBoard) {
+    return new Response('Forbidden', { status: 403 });
+  }
+}
+// If visibility is 'public', allow anyone
+
+// Fetch from R2
+const obj = await r2.get(fileKey);
+if (!obj) {
+  return new Response('File not found in storage', { status: 404 });
+}
+
+const contentType = obj.httpMetadata?.contentType ?? doc.mime_type ?? 'application/octet-stream';
+
+return new Response(obj.body, {
+  status: 200,
+  headers: {
+    'Content-Type': contentType,
+    'Content-Disposition': `inline; filename="${doc.title}.${fileKey.split('.').pop()}"`,
+    'Cache-Control': 'private, max-age=3600',
+  },
+});
+---

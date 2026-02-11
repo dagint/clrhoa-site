@@ -1,0 +1,82 @@
+---
+/**
+ * GET /api/compliance/status — Get current compliance status (JSON).
+ * Access: Board/Admin only.
+ * Returns: Compliance score, counts, and detailed status for all requirements.
+ */
+export const prerender = false;
+
+import { getSessionFromCookie, getEffectiveRole, isBoardOnly } from '../../../lib/auth';
+import { getComplianceStatus } from '../../../lib/compliance-db';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+
+if (Astro.request.method !== 'GET') {
+  return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+    status: 405,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const session = await getSessionFromCookie(
+  Astro.request.headers.get('cookie') ?? undefined,
+  env?.SESSION_SECRET
+);
+
+if (!session) {
+  return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+    status: 401,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const effectiveRole = getEffectiveRole(session);
+const isBoard = isBoardOnly(effectiveRole) || effectiveRole === 'admin';
+
+if (!isBoard) {
+  return new Response(JSON.stringify({ error: 'Forbidden. Board or Admin access required.' }), {
+    status: 403,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const db = env?.DB;
+if (!db) {
+  return new Response(JSON.stringify({ error: 'Server configuration error' }), {
+    status: 503,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const complianceData = await getComplianceStatus(db);
+
+// Format response for API consumers
+const response = {
+  score: complianceData.score,
+  compliantCount: complianceData.compliantCount,
+  partialCount: complianceData.partialCount,
+  missingCount: complianceData.missingCount,
+  notApplicableCount: complianceData.notApplicableCount,
+  totalCount: complianceData.totalCount,
+  timestamp: new Date().toISOString(),
+  statuses: complianceData.statuses.map((item) => ({
+    requirementId: item.requirement.id,
+    title: item.requirement.title,
+    statuteRef: item.requirement.statute_ref,
+    category: item.requirement.category,
+    status: item.status,
+    lastUpdated: item.lastUpdated,
+    documentId: item.document?.id ?? null,
+    documentTitle: item.document?.title ?? null,
+  })),
+};
+
+return new Response(JSON.stringify(response), {
+  status: 200,
+  headers: {
+    'Content-Type': 'application/json',
+    'Cache-Control': 'private, no-cache',
+  },
+});
+---
