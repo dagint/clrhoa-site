@@ -83,6 +83,10 @@ if (!db || !kv) {
   });
 }
 
+// Type assertions after validation
+const dbValidated = db as D1Database;
+const kvValidated = kv as KVNamespace;
+
 const logger = createLogger({ endpoint: '/api/arb-vote' });
 const securityMonitor = getSecurityMonitor();
 const ipAddress =
@@ -154,14 +158,14 @@ if ((vote === 'DENY' || vote === 'RETURN') && !comment) {
 
 // First, check and apply any expired deadlines (lazy evaluation pattern)
 try {
-  await checkAndApplyDeadlines(db);
+  await checkAndApplyDeadlines(dbValidated);
 } catch (e) {
   logger.error('Failed to check deadlines', { error: e });
   // Continue - don't fail the vote if deadline check fails
 }
 
 // Get the request
-const request = await getArbRequest(db, requestId);
+const request = await getArbRequest(dbValidated, requestId);
 if (!request) {
   return new Response(JSON.stringify({ error: 'Request not found.' }), {
     status: 404,
@@ -206,8 +210,8 @@ const cycle = request.current_cycle || 1;
 
 // Check if user is eligible to vote
 const eligibility = await isEligibleToVote(
-  db,
-  kv,
+  dbValidated,
+  kvValidated,
   requestId,
   session.email,
   stage,
@@ -232,7 +236,7 @@ if (!eligibility.eligible) {
 // Cast the vote
 try {
   const voteRecord = await castVote(
-    db,
+    dbValidated,
     requestId,
     session.email,
     stage,
@@ -250,7 +254,7 @@ try {
   });
 
   // Resolve votes to check if majority reached
-  const resolution = await resolveVotes(db, kv, requestId, stage, cycle);
+  const resolution = await resolveVotes(dbValidated, kvValidated, requestId, stage, cycle);
 
   let statusChanged = false;
   let newStatus: string | undefined;
@@ -280,7 +284,7 @@ try {
         const reason = `Vote resolved: ${resolution.outcome} (${resolution.approveCount} approve, ${resolution.denyCount} deny, ${resolution.returnCount} return, ${resolution.abstainCount} abstain)`;
 
         const updated = await transitionStatus(
-          db,
+          dbValidated,
           requestId,
           targetStatus,
           targetStage,
@@ -309,7 +313,7 @@ try {
           // If ARC_APPROVED, automatically advance to BOARD_REVIEW
           if (targetStatus === 'ARC_APPROVED') {
             const advanceUpdated = await transitionStatus(
-              db,
+              dbValidated,
               requestId,
               'BOARD_REVIEW',
               'BOARD_REVIEW',
