@@ -1,103 +1,140 @@
-# Contact Form & Cleanup – Deploy Checklist
+# Contact Form – Deploy Checklist
 
-What you need in **.secrets.local**, **.vars.local**, and (for local dev) **.dev.vars** to deploy and run the contact form with captcha and the contact-cleanup worker.
+**Note:** The contact-cleanup worker has been **deprecated** (2026-02-12). Cleanup is now handled by the backup worker. See `BACKUP_DEPLOYMENT_STATUS.md` for details.
 
 ---
 
-## 1. Main site (contact form with reCAPTCHA)
+## Contact Form Setup
 
-### .vars.local (build-time / GitHub Variables)
+The contact form at `/contact` logs submissions to the `contact_submissions` table (backup in case email fails) and sends email notifications.
 
-You already have:
+### Required Secrets
 
-- **PUBLIC_RECAPTCHA_SITE_KEY** – reCAPTCHA v2 **site key** (public)
-- **SITE** – e.g. `https://clrhoa.com` (used for captcha hostname verification)
-
-Nothing else is required in `.vars.local` for the contact form.
-
-### .secrets.local (runtime / GitHub Secrets)
-
-Add the reCAPTCHA **secret** key so the API can verify captcha tokens:
+#### .secrets.local (runtime / GitHub Secrets)
 
 ```bash
-# Get this from the same reCAPTCHA admin as the site key (https://www.google.com/recaptcha/admin)
+# reCAPTCHA secret key (get from https://www.google.com/recaptcha/admin)
 RECAPTCHA_SECRET_KEY=your_recaptcha_secret_key_here
+
+# Email notification (Resend or MailChannels)
+RESEND_API_KEY=your_resend_api_key  # Primary email service
+NOTIFY_BOARD_EMAIL=board@clrhoa.com  # Where contact forms are sent
 ```
 
-- If this is **missing**, the contact form still works but captcha is **not** verified (any token or none is accepted).
-- Once set and synced to Cloudflare, the API will require a valid captcha and check hostname.
+**Sync to GitHub:**
+```bash
+npm run secrets:setup  # Push to GitHub Secrets
+```
 
-**Sync to GitHub:**  
-After editing `.secrets.local`, push secrets to GitHub so the deploy workflow can sync them to Cloudflare:
+**Sync to Cloudflare Pages:**
+```bash
+npm run secrets:sync  # Sync GitHub Secrets → Cloudflare Pages env vars
+```
+
+### Required Variables
+
+#### .vars.local (build-time / GitHub Variables)
 
 ```bash
-npm run secrets:update
+PUBLIC_RECAPTCHA_SITE_KEY=your_site_key_here  # Public reCAPTCHA site key
+SITE=https://clrhoa.com  # Used for captcha hostname verification
 ```
-
-(Or add `RECAPTCHA_SECRET_KEY` manually in GitHub → Settings → Secrets and variables → Actions → Secrets.)
 
 ---
 
-## 2. Local development (contact form with captcha)
+## Database Table
 
-Runtime secrets for **local** runs (`npm run dev` / `wrangler pages dev`) come from **.dev.vars**, not from `.secrets.local`.
+The `contact_submissions` table must exist in D1:
 
-Create or edit **.dev.vars** in the project root (same folder as `package.json`):
+```sql
+CREATE TABLE IF NOT EXISTS contact_submissions (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  email TEXT NOT NULL,
+  message TEXT NOT NULL,
+  recipient TEXT NOT NULL,
+  email_sent INTEGER NOT NULL DEFAULT 0,
+  email_error TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 
-```bash
-# .dev.vars (gitignored – do not commit)
-SESSION_SECRET=your-local-session-secret
-# … other secrets you need locally (NOTIFY_BOARD_EMAIL, RESEND_API_KEY, etc.)
-
-# Required for contact form captcha verification in local dev
-RECAPTCHA_SECRET_KEY=your_recaptcha_secret_key_here
+CREATE INDEX IF NOT EXISTS idx_contact_submissions_created_at ON contact_submissions(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_contact_submissions_email_sent ON contact_submissions(email_sent);
 ```
 
-Then run:
-
+**Create table:**
 ```bash
-npm run dev
+npm run db:contact-submissions  # Remote (production)
+npm run db:contact-submissions:local  # Local dev
 ```
-
-So:
-
-- **.vars.local** + **.secrets.local** → merged into **.env.local** (build-time PUBLIC_* and any merge script use).
-- **.dev.vars** → used by Wrangler at **runtime** for local dev so the contact API sees `RECAPTCHA_SECRET_KEY`.
 
 ---
 
-## 3. Contact-cleanup worker (optional)
+## Cleanup (Automated)
 
-The worker that deletes expired contact submissions is **separate** from the main site. It does **not** use `.vars.local` or `.secrets.local`.
+Contact form submissions older than 1 year are **automatically deleted** by the backup worker.
 
-- **Deploy:**  
-  `npm run contact-cleanup:deploy`  
-  (uses `workers/contact-cleanup/wrangler.toml`; D1 binding is already configured there.)
+**No separate worker needed!** The backup worker (runs daily at 2:00 AM UTC) handles:
+- D1 database backups
+- KV whitelist backups
+- R2 file backups
+- **Data cleanup** (contact submissions >1 year, rate limits >7 days, directory logs >1 year)
 
-- **Optional – manual trigger:**  
-  If you want to call the worker’s `/trigger` endpoint with a secret:
-
-  ```bash
-  npx wrangler secret put CLEANUP_TRIGGER_SECRET --config workers/contact-cleanup/wrangler.toml
-  ```
-
-  You do **not** add this to `.secrets.local`; it’s specific to the worker.
+See: `workers/backup/src/index.ts` → `cleanupOldData()` function
 
 ---
 
-## 4. Summary
+## Viewing Contact Submissions
 
-| What | .vars.local | .secrets.local | .dev.vars (local only) |
-|------|-------------|----------------|-------------------------|
-| Contact form (captcha) | PUBLIC_RECAPTCHA_SITE_KEY, SITE ✓ | **RECAPTCHA_SECRET_KEY** (add this) | **RECAPTCHA_SECRET_KEY** (for local dev) |
-| Contact-cleanup worker | — | — | — |
+Board members can view all contact form submissions at:
+- **URL:** `/board/contacts`
+- **Access:** Board role required
+- **Data:** Shows submissions from the last 1 year (older submissions are auto-deleted)
 
-**Minimum for production contact form + captcha:**
+---
 
-1. Add **RECAPTCHA_SECRET_KEY** to **.secrets.local**.
-2. Run **npm run secrets:update** (or add the secret in GitHub Actions).
-3. Redeploy so the workflow syncs secrets to Cloudflare.
+## Testing
 
-**For local dev with captcha:**
+### Test Contact Form
+1. Visit `/contact`
+2. Fill out form and submit
+3. Check email arrives at `NOTIFY_BOARD_EMAIL`
+4. Verify submission logged in database:
+   ```bash
+   npx wrangler d1 execute clrhoa_db --remote \
+     --command "SELECT * FROM contact_submissions ORDER BY created_at DESC LIMIT 5"
+   ```
 
-- Add **RECAPTCHA_SECRET_KEY** to **.dev.vars**.
+### Test Cleanup
+The cleanup runs automatically with daily backups. To manually trigger:
+```bash
+curl -X POST https://clrhoa-backup.dagint.workers.dev/trigger \
+  -H "Authorization: Bearer test-trigger-2024"
+```
+
+Check logs:
+```bash
+npx wrangler tail clrhoa-backup --format=pretty
+```
+
+---
+
+## Troubleshooting
+
+### Contact form not logging submissions
+- ✅ Verify `contact_submissions` table exists (see Database Table section)
+- ✅ Check D1 binding is configured in `wrangler.toml`
+
+### Email not sending
+- ✅ Verify `RESEND_API_KEY` is set in Cloudflare Pages environment variables
+- ✅ Verify `NOTIFY_BOARD_EMAIL` is set
+- ✅ Check email quota (Resend free tier: 100 emails/day)
+
+### reCAPTCHA not working
+- ✅ Verify `PUBLIC_RECAPTCHA_SITE_KEY` is set (build-time variable)
+- ✅ Verify `RECAPTCHA_SECRET_KEY` is set (runtime secret)
+- ✅ Check hostname matches in reCAPTCHA admin console
+
+---
+
+**Last Updated:** 2026-02-12

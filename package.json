@@ -176,7 +176,6 @@
     "sri": "node scripts/generate-sri.js",
     "optimize:hero": "node scripts/optimize-hero-images.js",
     "backup:deploy": "wrangler deploy --config workers/backup/wrangler.toml",
-    "contact-cleanup:deploy": "wrangler deploy --config workers/contact-cleanup/wrangler.toml",
     "secrets:list": "node scripts/list-required-secrets.js",
     "secrets:setup": "node scripts/setup-github-secrets.js",
     "secrets:sync": "node scripts/sync-secrets-to-cloudflare.js",
@@ -204,7 +203,7 @@
     "twilio": "^5.3.0"
   },
   "devDependencies": {
-    "@astrojs/check": "^0.9.6",
+    "@astrojs/check": "^0.9.2",
     "@cloudflare/workers-types": "^4.20241022.0",
     "@playwright/test": "^1.58.2",
     "@types/bcryptjs": "^2.4.6",

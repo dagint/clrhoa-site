@@ -85,7 +85,7 @@ export async function getPortalBadgeCounts(
     draftCount,
     arbInReviewCount: arbCounts.in_review,
     arbPendingCount: arbCounts.pending,
-    vendorPendingCount,
+    vendorPendingCount: pendingVendorCount,
     maintenanceOpenCount,
     meetingsRsvpCount,
     feedbackDueCount,
