@@ -11,9 +11,12 @@
 #     - To list required secrets: npm run secrets:list
 
 name = "clrhoa-site"
-pages_build_output_dir = "./dist"
 compatibility_date = "2025-02-01"
 compatibility_flags = ["nodejs_compat"]
+pages_build_output_dir = "./dist"
+
+# Bindings for Cloudflare Pages
+# These apply to all Pages Functions (SSR routes)
 
 # D1: portal users (email, role, name, created)
 [[d1_databases]]
@@ -22,18 +25,16 @@ database_name = "clrhoa_db"
 database_id = "a214f9da-3577-4ee7-bc50-bc9b9754a79c"
 
 # KV: email whitelist (key = lowercase email, value = "1" or JSON { "role": "admin" })
-# id = the value printed when you ran: npx wrangler kv namespace create clrhoa_users
 [[kv_namespaces]]
 binding = "CLRHOA_USERS"
 id = "e936ea7760c04b268c4472eb24575d46"
 
-# Adapter expects SESSION KV. id = from: npx wrangler kv namespace create SESSION
+# KV: SESSION storage for Lucia auth
 [[kv_namespaces]]
 binding = "SESSION"
 id = "f2a5e8346928438baa1ca38e40ab200a"
 
-# KV: rate limiting (API) and login lockout. Create: npx wrangler kv namespace create RATE_LIMIT
-# Then set binding = "KV" and id = the printed id (replace placeholder below).
+# KV: rate limiting (API) and login lockout
 [[kv_namespaces]]
 binding = "KV"
 id = "9249762b4c7b483a9785097db451f8e6"

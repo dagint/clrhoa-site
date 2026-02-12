@@ -13,6 +13,8 @@ import { getPortalContext } from '../../lib/portal-context';
 import { canApproveArb } from '../../lib/auth';
 import { getArbDashboardData, formatApproval } from '../../lib/arb-dashboard';
 import { sanitizeForScriptInjection } from '../../lib/sanitize';
+import { batchLoadElectronicSignatures } from '../../lib/esignature-db';
+import type { ElectronicSignature } from '../../lib/esignature-db';
 
 const { env, session, effectiveRole } = await getPortalContext(Astro);
 if (!session) return Astro.redirect('/portal/login');
@@ -51,6 +53,20 @@ const completedPage = dashboardData?.completedPage ?? 1;
 const completedPaginated = dashboardData?.completedPaginated ?? [];
 const totalCompletedPages = dashboardData?.totalCompletedPages ?? 0;
 const periodOptions = dashboardData?.periodOptions ?? [];
+
+// Batch load electronic signatures (avoids N+1 problem)
+const signatureIds = allRequests.map(r => r.signature_id).filter(Boolean) as string[];
+const signaturesById = db && signatureIds.length > 0
+  ? await batchLoadElectronicSignatures(db, signatureIds)
+  : {};
+
+// Map signatures to request IDs
+const signaturesByRequestId: Record<string, ElectronicSignature | null> = {};
+for (const req of allRequests) {
+  if (req.signature_id && signaturesById[req.signature_id]) {
+    signaturesByRequestId[req.id] = signaturesById[req.signature_id];
+  }
+}
 
 // Count all items needing action
 const needsActionCount = inReview.length + pending.length + arcReview.length + boardReview.length + returned.length;
@@ -165,7 +181,7 @@ const needsActionCount = inReview.length + pending.length + arcReview.length + b
                         <div class="flex items-start gap-2 p-2 no-print">
                           {canApprove && <input type="checkbox" class="request-checkbox mt-2 rounded border-gray-300 text-clr-green focus:ring-clr-green" value={req.id} data-status="in_review" />}
                           <div class="flex-1">
-                            <ArbDashboardCard request={req} files={files} approval={approval} canApproveArb={canApprove} />
+                            <ArbDashboardCard request={req} files={files} approval={approval} signature={signaturesByRequestId[req.id] ?? null} canApproveArb={canApprove} />
                           </div>
                         </div>
                       </li>
@@ -183,7 +199,7 @@ const needsActionCount = inReview.length + pending.length + arcReview.length + b
                     const approval = formatApproval(req.arb_esign ?? null, req.esign_timestamp ?? null);
                     return (
                       <li class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden searchable-card" data-search-text={`${req.id} ${req.owner_email} ${req.property_address ?? ''} ${req.applicant_name ?? ''} ${req.phone ?? ''}`.toLowerCase()}>
-                        <ArbDashboardCard request={req} files={files} approval={approval} canApproveArb={canApprove} />
+                        <ArbDashboardCard request={req} files={files} approval={approval} signature={signaturesByRequestId[req.id] ?? null} canApproveArb={canApprove} />
                       </li>
                     );
                   })}
@@ -207,7 +223,7 @@ const needsActionCount = inReview.length + pending.length + arcReview.length + b
                     const approval = formatApproval(req.arb_esign ?? null, req.esign_timestamp ?? null);
                     return (
                       <li class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden searchable-card" data-search-text={`${req.id} ${req.owner_email} ${req.property_address ?? ''} ${req.applicant_name ?? ''} ${req.phone ?? ''}`.toLowerCase()}>
-                        <ArbDashboardCard request={req} files={files} approval={approval} canApproveArb={canApprove} />
+                        <ArbDashboardCard request={req} files={files} approval={approval} signature={signaturesByRequestId[req.id] ?? null} canApproveArb={canApprove} />
                       </li>
                     );
                   })}
@@ -231,7 +247,7 @@ const needsActionCount = inReview.length + pending.length + arcReview.length + b
                     const approval = formatApproval(req.arb_esign ?? null, req.esign_timestamp ?? null);
                     return (
                       <li class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden searchable-card" data-search-text={`${req.id} ${req.owner_email} ${req.property_address ?? ''} ${req.applicant_name ?? ''} ${req.phone ?? ''}`.toLowerCase()}>
-                        <ArbDashboardCard request={req} files={files} approval={approval} canApproveArb={canApprove} />
+                        <ArbDashboardCard request={req} files={files} approval={approval} signature={signaturesByRequestId[req.id] ?? null} canApproveArb={canApprove} />
                       </li>
                     );
                   })}
@@ -255,7 +271,7 @@ const needsActionCount = inReview.length + pending.length + arcReview.length + b
                     const approval = formatApproval(req.arb_esign ?? null, req.esign_timestamp ?? null);
                     return (
                       <li class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden searchable-card" data-search-text={`${req.id} ${req.owner_email} ${req.property_address ?? ''} ${req.applicant_name ?? ''} ${req.phone ?? ''}`.toLowerCase()}>
-                        <ArbDashboardCard request={req} files={files} approval={approval} canApproveArb={canApprove} />
+                        <ArbDashboardCard request={req} files={files} approval={approval} signature={signaturesByRequestId[req.id] ?? null} canApproveArb={canApprove} />
                       </li>
                     );
                   })}
@@ -310,7 +326,7 @@ const needsActionCount = inReview.length + pending.length + arcReview.length + b
                     const approval = formatApproval(req.arb_esign ?? null, req.esign_timestamp ?? null);
                     return (
                       <li class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden completed-card searchable-card" data-year-quarter={req.yearQuarter} data-search-text={`${req.id} ${req.owner_email} ${req.property_address ?? ''} ${req.applicant_name ?? ''} ${req.phone ?? ''}`.toLowerCase()}>
-                        <ArbDashboardCard request={req} files={files} approval={approval} canApproveArb={canApprove} />
+                        <ArbDashboardCard request={req} files={files} approval={approval} signature={signaturesByRequestId[req.id] ?? null} canApproveArb={canApprove} />
                       </li>
                     );
                   })}

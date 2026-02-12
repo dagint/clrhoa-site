@@ -1,16 +1,19 @@
 ---
 import type { ArbRequest, ArbFile } from '../lib/arb-db';
+import type { ElectronicSignature } from '../lib/esignature-db';
+import ESignatureDisplay from './ESignatureDisplay.astro';
 import { sanitizeForDisplay } from '../lib/sanitize';
 
 interface Props {
   request: ArbRequest;
   files: ArbFile[];
   approval: { status: string; by: string; date: string } | null;
+  signature?: ElectronicSignature | null;
   /** When false (e.g. admin), hide Approve/Reject/Request revision/Add notes/Set deadline. */
   canApproveArb?: boolean;
 }
 
-const { request: req, files, approval, canApproveArb = true } = Astro.props;
+const { request: req, files, approval, signature = null, canApproveArb = true } = Astro.props;
 
 function getFileViewUrl(r2KeysJson: string): string | null {
   try {
@@ -166,6 +169,11 @@ function selectedTypes(applicationType: string | null): string[] {
           <p class={`text-sm font-semibold ${approval.status === 'approved' ? 'text-green-900' : 'text-red-900'}`}>
             {approval.status === 'approved' ? 'Approved' : 'Rejected'} on {approval.date} by {approval.by}
           </p>
+        </div>
+      )}
+      {signature && (
+        <div class="mt-4">
+          <ESignatureDisplay signature={signature} showDetails={true} />
         </div>
       )}
       {files.length > 0 && (

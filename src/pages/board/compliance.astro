@@ -5,6 +5,7 @@ import BoardLayout from '../../layouts/BoardLayout.astro';
 import { getBoardContext } from '../../lib/board-context';
 import { isBoardOnly } from '../../lib/auth';
 import { getComplianceStatus } from '../../lib/compliance-db';
+import { getUpcomingMeetingsWithCompliance, formatAdvanceNotice } from '../../lib/meeting-compliance';
 
 const ctx = await getBoardContext(Astro);
 if ('redirect' in ctx) return Astro.redirect(ctx.redirect);
@@ -15,6 +16,7 @@ if (!isBoard) return Astro.redirect('/portal/dashboard');
 
 const db = env?.DB;
 const complianceData = db ? await getComplianceStatus(db) : null;
+const upcomingMeetings = db ? await getUpcomingMeetingsWithCompliance(db, 5) : [];
 
 // Filter by status if specified
 const statusFilter = Astro.url.searchParams.get('status')?.toUpperCase();
@@ -23,12 +25,29 @@ const filteredStatuses = statusFilter && validStatuses.includes(statusFilter)
   ? complianceData?.statuses.filter((s) => s.status === statusFilter)
   : complianceData?.statuses;
 
+// Get items needing immediate action (PARTIAL status)
+const actionRequired = complianceData?.statuses.filter((s) => s.status === 'PARTIAL') ?? [];
+
+// Calculate days until year-end for annual update context
+const now = new Date();
+const yearEnd = new Date(now.getFullYear(), 11, 31);
+const daysUntilYearEnd = Math.ceil((yearEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+
 function formatDate(s: string | null): string {
   if (!s) return '—';
   try {
     return new Date(s).toLocaleString(undefined, { dateStyle: 'medium' });
   } catch {
     return s;
+  }
+}
+
+function getDocumentYear(doc: any): number {
+  if (!doc?.document_date) return 0;
+  try {
+    return new Date(doc.document_date).getFullYear();
+  } catch {
+    return 0;
   }
 }
 
@@ -83,6 +102,47 @@ function getCategoryLabel(category: string): string {
   session={session}
   elevatedUntil={session.elevated_until}
 >
+  <!-- Action Required Alert (if any PARTIAL items) -->
+  {actionRequired.length > 0 && (
+    <div class="mb-6 p-6 rounded-2xl bg-amber-50 border-2 border-amber-300 shadow-md">
+      <div class="flex items-start gap-4">
+        <div class="text-3xl">⚠️</div>
+        <div class="flex-1">
+          <h2 class="text-xl font-heading font-bold text-amber-900 mb-2">
+            Action Required: {actionRequired.length} Document{actionRequired.length > 1 ? 's' : ''} Need{actionRequired.length === 1 ? 's' : ''} Annual Update
+          </h2>
+          <p class="text-sm text-amber-800 mb-4">
+            The following compliance documents require annual updates. Please upload current versions to maintain compliance.
+          </p>
+          <div class="space-y-2">
+            {actionRequired.map((item) => (
+              <div class="flex items-center justify-between p-3 bg-white rounded-lg border border-amber-200">
+                <div class="flex-1">
+                  <div class="font-medium text-gray-900">{item.requirement.title}</div>
+                  <div class="text-sm text-gray-600">
+                    Current document from {getDocumentYear(item.document)}
+                    {item.document?.document_date && ` (uploaded ${formatDate(item.document.uploaded_at)})`}
+                  </div>
+                </div>
+                <a
+                  href={`/board/compliance/${item.requirement.id}#upload`}
+                  class="px-4 py-2 bg-amber-600 text-white rounded-lg font-medium hover:bg-amber-700 text-sm whitespace-nowrap ml-4"
+                >
+                  Update Now
+                </a>
+              </div>
+            ))}
+          </div>
+          {daysUntilYearEnd < 90 && (
+            <p class="text-xs text-amber-700 mt-3">
+              💡 <strong>Year-end reminder:</strong> {daysUntilYearEnd} days until {now.getFullYear() + 1}. Consider updating all annual documents soon.
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  )}
+
   <!-- Summary Card -->
   <div class="mb-8 p-6 rounded-2xl bg-white shadow-sm border border-gray-100">
     <div class="flex items-start justify-between flex-wrap gap-4 mb-4">
@@ -149,6 +209,76 @@ function getCategoryLabel(category: string): string {
       <div class="text-xs text-red-600 mt-1">No document uploaded</div>
     </div>
   </div>
+
+  <!-- Meeting Notice Compliance Widget -->
+  {upcomingMeetings.length > 0 && (
+    <div class="mb-6 p-6 rounded-2xl bg-white shadow-sm border border-gray-100">
+      <h3 class="text-lg font-heading font-semibold text-clr-green mb-4">📅 Upcoming Meeting Notices</h3>
+      <p class="text-sm text-gray-600 mb-4">
+        Florida law requires meeting notices be posted in advance: 48 hours for Board meetings, 14 days for Member meetings.
+      </p>
+      <div class="space-y-3">
+        {upcomingMeetings.map((status) => {
+          const meetingDate = status.meeting.datetime ? new Date(status.meeting.datetime) : null;
+          const isMember = status.meeting.meeting_type?.toLowerCase() === 'member';
+          return (
+            <div class={`p-4 rounded-xl border ${status.overallCompliant ? 'border-green-200 bg-green-50' : 'border-amber-200 bg-amber-50'}`}>
+              <div class="flex items-start justify-between gap-4 flex-wrap">
+                <div class="flex-1">
+                  <div class="flex items-center gap-2 mb-1">
+                    <span class="font-medium text-gray-900">{status.meeting.title || 'Untitled Meeting'}</span>
+                    <span class="px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700 capitalize">
+                      {status.meeting.meeting_type || 'Board'}
+                    </span>
+                    {status.overallCompliant ? (
+                      <span class="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                        ✅ Compliant
+                      </span>
+                    ) : (
+                      <span class="px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800">
+                        ⚠️ Action Needed
+                      </span>
+                    )}
+                  </div>
+                  <div class="text-sm text-gray-600 mb-2">
+                    {meetingDate && meetingDate.toLocaleString('en-US', {
+                      weekday: 'short',
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                      hour: 'numeric',
+                      minute: '2-digit'
+                    })}
+                  </div>
+                  <div class="text-sm space-y-1">
+                    <div class={status.noticeCompliant ? 'text-green-700' : 'text-amber-800'}>
+                      {status.noticeCompliant ? '✓' : '⚠'} Notice: {formatAdvanceNotice(status.noticeHoursEarly, isMember)}
+                      {status.noticeCompliant ? '' : ` (need ${isMember ? '14 days' : '48 hours'})`}
+                    </div>
+                    {status.agendaRequired && (
+                      <div class={status.agendaCompliant ? 'text-green-700' : 'text-amber-800'}>
+                        {status.agendaCompliant ? '✓' : '⚠'} Agenda: {status.meeting.agenda_posted_at ? `${status.agendaDaysEarly} days` : 'Not posted'}
+                        {status.agendaCompliant ? '' : ' (need 7 days)'}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <a
+                  href="/board/meetings"
+                  class="px-3 py-1.5 text-sm bg-clr-green text-white rounded-lg font-medium hover:brightness-110 whitespace-nowrap"
+                >
+                  Manage
+                </a>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <p class="text-xs text-gray-500 mt-4">
+        <a href="/board/meetings" class="text-clr-green hover:underline">View all meetings →</a>
+      </p>
+    </div>
+  )}
 
   <!-- Filter Buttons -->
   <div class="flex flex-wrap gap-2 mb-6">

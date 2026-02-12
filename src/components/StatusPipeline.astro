@@ -58,7 +58,7 @@ const isTerminal = terminalStatuses.includes(currentStage);
             const isFuture = index > currentIndex && !isCurrent;
 
             return (
-              <div class="flex items-center flex-1" key={step.stage}>
+              <div class="flex items-center flex-1">
                 <!-- Step Circle -->
                 <div class="flex flex-col items-center relative">
                   <div
@@ -105,7 +105,7 @@ const isTerminal = terminalStatuses.includes(currentStage);
           const isFuture = index > currentIndex && !isCurrent;
 
           return (
-            <div class="flex items-start" key={step.stage}>
+            <div class="flex items-start">
               <!-- Step Circle -->
               <div class="flex flex-col items-center">
                 <div

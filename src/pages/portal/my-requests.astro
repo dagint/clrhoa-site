@@ -4,9 +4,12 @@ export const prerender = false;
 import PortalLayout from '../../layouts/PortalLayout.astro';
 import ProtectedPage from '../../components/ProtectedPage.astro';
 import PortalNav from '../../components/PortalNav.astro';
+import ESignatureDisplay from '../../components/ESignatureDisplay.astro';
 import { getPortalContext } from '../../lib/portal-context';
 import { listArbRequestsByHousehold, batchLoadArbFilesByRequests } from '../../lib/arb-db';
 import type { ArbFile } from '../../lib/arb-db';
+import { batchLoadElectronicSignatures } from '../../lib/esignature-db';
+import type { ElectronicSignature } from '../../lib/esignature-db';
 import { sanitizeForDisplay } from '../../lib/sanitize';
 
 const { env, session, effectiveRole } = await getPortalContext(Astro, { fingerprint: true });
@@ -21,6 +24,20 @@ const arbInReviewCount = requests.filter(r => r.status === 'in_review').length;
 const filesByRequestId: Record<string, ArbFile[]> = db
   ? await batchLoadArbFilesByRequests(db, requests.map(r => r.id))
   : {};
+
+// Batch load electronic signatures (avoids N+1 problem)
+const signatureIds = requests.map(r => r.signature_id).filter(Boolean) as string[];
+const signaturesById = db && signatureIds.length > 0
+  ? await batchLoadElectronicSignatures(db, signatureIds)
+  : {};
+
+// Map signatures to request IDs
+const signaturesByRequestId: Record<string, ElectronicSignature | null> = {};
+for (const req of requests) {
+  if (req.signature_id && signaturesById[req.signature_id]) {
+    signaturesByRequestId[req.id] = signaturesById[req.signature_id];
+  }
+}
 
 function getFileViewUrl(r2KeysJson: string): string | null {
   try {
@@ -248,6 +265,11 @@ function formatApproval(arbEsign: string | null, esignTimestamp: string | null):
                           <p class={`text-sm font-semibold ${approval.status === 'approved' ? 'text-green-900' : 'text-red-900'}`}>
                             {approval.status === 'approved' ? 'Approved' : 'Rejected'} on {approval.date} by {approval.by}
                           </p>
+                        </div>
+                      )}
+                      {signaturesByRequestId[req.id] && (
+                        <div class="mt-4">
+                          <ESignatureDisplay signature={signaturesByRequestId[req.id]} showDetails={true} />
                         </div>
                       )}
                       {files.length > 0 && (

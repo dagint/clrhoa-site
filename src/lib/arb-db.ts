@@ -17,6 +17,7 @@ export interface ArbRequest {
   status: string;
   esign_timestamp: string | null;
   arb_esign: string | null;
+  signature_id: string | null;
   created: string;
   updated_at: string | null;
   copied_from_id?: string | null;
@@ -25,6 +26,14 @@ export interface ArbRequest {
   owner_notes?: string | null;
   review_deadline?: string | null;
   deleted_at?: string | null;
+  // Voting workflow fields (Phase 6)
+  workflow_version?: number;
+  current_stage?: string;
+  current_cycle?: number;
+  submitted_at?: string | null;
+  resolved_at?: string | null;
+  auto_approved_reason?: string | null;
+  deadline_date?: string | null;
 }
 
 export interface ArbFile {
@@ -86,6 +95,7 @@ export async function insertArbRequest(
     applicationType?: string | null;
     copiedFromId?: string | null;
     ip_address?: string | null;
+    signatureId?: string | null;
   }
 ): Promise<void> {
   const applicantName = options?.applicantName?.trim() || null;
@@ -93,12 +103,13 @@ export async function insertArbRequest(
   const propertyAddress = options?.propertyAddress?.trim() || null;
   const applicationType = options?.applicationType?.trim() || null;
   const copiedFromId = options?.copiedFromId?.trim() || null;
+  const signatureId = options?.signatureId?.trim() || null;
   await db
     .prepare(
-      `INSERT INTO arb_requests (id, owner_email, applicant_name, phone, property_address, application_type, description, status, created, copied_from_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', datetime('now'), ?)`
+      `INSERT INTO arb_requests (id, owner_email, applicant_name, phone, property_address, application_type, description, status, created, copied_from_id, signature_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', datetime('now'), ?, ?)`
     )
-    .bind(id, ownerEmail.trim().toLowerCase(), applicantName, phone, propertyAddress, applicationType, description, copiedFromId)
+    .bind(id, ownerEmail.trim().toLowerCase(), applicantName, phone, propertyAddress, applicationType, description, copiedFromId, signatureId)
     .run();
 
   // Log creation to audit table
@@ -121,7 +132,7 @@ export async function getArbRequest(
 ): Promise<ArbRequest | null> {
   const row = await db
     .prepare(
-      'SELECT id, owner_email, applicant_name, phone, property_address, application_type, description, status, esign_timestamp, arb_esign, created, updated_at, copied_from_id, revision_notes, arb_internal_notes, owner_notes, review_deadline, deleted_at FROM arb_requests WHERE id = ? AND (deleted_at IS NULL OR deleted_at = "") LIMIT 1'
+      'SELECT id, owner_email, applicant_name, phone, property_address, application_type, description, status, esign_timestamp, arb_esign, signature_id, created, updated_at, copied_from_id, revision_notes, arb_internal_notes, owner_notes, review_deadline, deleted_at FROM arb_requests WHERE id = ? AND (deleted_at IS NULL OR deleted_at = "") LIMIT 1'
     )
     .bind(id)
     .first<ArbRequest & { arb_internal_notes?: string | null; owner_notes?: string | null; review_deadline?: string | null; deleted_at?: string | null }>();
@@ -141,7 +152,7 @@ export async function listArbRequestsByOwner(
 ): Promise<ArbRequest[]> {
   const { results } = await db
     .prepare(
-      'SELECT id, owner_email, applicant_name, phone, property_address, application_type, description, status, esign_timestamp, arb_esign, created, updated_at, copied_from_id, revision_notes, arb_internal_notes, owner_notes, review_deadline, deleted_at FROM arb_requests WHERE owner_email = ? AND (deleted_at IS NULL OR deleted_at = "") ORDER BY created DESC'
+      'SELECT id, owner_email, applicant_name, phone, property_address, application_type, description, status, esign_timestamp, arb_esign, signature_id, created, updated_at, copied_from_id, revision_notes, arb_internal_notes, owner_notes, review_deadline, deleted_at FROM arb_requests WHERE owner_email = ? AND (deleted_at IS NULL OR deleted_at = "") ORDER BY created DESC'
     )
     .bind(ownerEmail.trim().toLowerCase())
     .all<ArbRequest & { arb_internal_notes?: string | null; owner_notes?: string | null; review_deadline?: string | null; deleted_at?: string | null }>();
@@ -155,7 +166,7 @@ export async function listArbRequestsByOwner(
 }
 
 const ARB_REQUEST_SELECT =
-  'SELECT id, owner_email, applicant_name, phone, property_address, application_type, description, status, esign_timestamp, arb_esign, created, updated_at, copied_from_id, revision_notes, arb_internal_notes, owner_notes, review_deadline, deleted_at FROM arb_requests';
+  'SELECT id, owner_email, applicant_name, phone, property_address, application_type, description, status, esign_timestamp, arb_esign, signature_id, created, updated_at, copied_from_id, revision_notes, arb_internal_notes, owner_notes, review_deadline, deleted_at FROM arb_requests';
 const ARB_REQUEST_DELETED_COND = ' (deleted_at IS NULL OR deleted_at = "") ';
 type ArbRequestRow = ArbRequest & { arb_internal_notes?: string | null; owner_notes?: string | null; review_deadline?: string | null; deleted_at?: string | null };
 
@@ -198,7 +209,7 @@ export async function listArbRequestsByHousehold(
 export async function listAllArbRequests(db: D1Database): Promise<ArbRequest[]> {
   const { results } = await db
     .prepare(
-      'SELECT id, owner_email, applicant_name, phone, property_address, application_type, description, status, esign_timestamp, arb_esign, created, updated_at, copied_from_id, revision_notes, arb_internal_notes, owner_notes, review_deadline, deleted_at FROM arb_requests WHERE deleted_at IS NULL OR deleted_at = "" ORDER BY created DESC'
+      'SELECT id, owner_email, applicant_name, phone, property_address, application_type, description, status, esign_timestamp, arb_esign, signature_id, created, updated_at, copied_from_id, revision_notes, arb_internal_notes, owner_notes, review_deadline, deleted_at FROM arb_requests WHERE deleted_at IS NULL OR deleted_at = "" ORDER BY created DESC'
     )
     .all<ArbRequest & { arb_internal_notes?: string | null; owner_notes?: string | null; review_deadline?: string | null; deleted_at?: string | null }>();
   return (results ?? []).map(row => ({
@@ -241,7 +252,7 @@ export async function listAllArbRequestsFiltered(
   const where = conditions.join(' AND ');
   const { results } = await db
     .prepare(
-      `SELECT id, owner_email, applicant_name, phone, property_address, application_type, description, status, esign_timestamp, arb_esign, created, updated_at, copied_from_id, revision_notes, arb_internal_notes, owner_notes, review_deadline, deleted_at FROM arb_requests WHERE ${where} ORDER BY created DESC`
+      `SELECT id, owner_email, applicant_name, phone, property_address, application_type, description, status, esign_timestamp, arb_esign, signature_id, created, updated_at, copied_from_id, revision_notes, arb_internal_notes, owner_notes, review_deadline, deleted_at FROM arb_requests WHERE ${where} ORDER BY created DESC`
     )
     .bind(...bind)
     .all<ArbRequest & { arb_internal_notes?: string | null; owner_notes?: string | null; review_deadline?: string | null; deleted_at?: string | null }>();

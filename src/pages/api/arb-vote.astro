@@ -75,13 +75,14 @@ if (Astro.request.method !== 'POST') {
 
 // Check D1 and KV availability
 const db = env?.DB;
-const kv = env?.CLRHOA_USERS;
-if (!db || !kv) {
+const kvNamespace = env?.CLRHOA_USERS;
+if (!db || !kvNamespace) {
   return new Response(JSON.stringify({ error: 'Server configuration error' }), {
     status: 503,
     headers: { 'Content-Type': 'application/json' },
   });
 }
+const kv = kvNamespace as KVNamespace;
 
 const logger = createLogger({ endpoint: '/api/arb-vote' });
 const securityMonitor = getSecurityMonitor();
