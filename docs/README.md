@@ -40,6 +40,7 @@ Complete documentation for the Crooked Lake Reserve HOA portal and management sy
 **Primary:**
 - [SECURITY_MODEL.md](security/SECURITY_MODEL.md) - ⭐ Complete security model
 - [SECURITY_AUDIT_REPORT.md](security/SECURITY_AUDIT_REPORT.md) - Latest audit
+- [SECURITY_GUIDE.md](security/SECURITY_GUIDE.md) - Security overview
 - [SECURITY_IMPLEMENTATION_SUMMARY.md](security/SECURITY_IMPLEMENTATION_SUMMARY.md)
 
 **Specific Topics:**
@@ -48,7 +49,7 @@ Complete documentation for the Crooked Lake Reserve HOA portal and management sy
 - [RATE_LIMITING.md](security/RATE_LIMITING.md) - Rate limiting
 - [SRI.md](security/SRI.md) - Subresource Integrity
 
-### 🔑 [auth-rbac/](auth-rbac/) - Auth & RBAC (6 docs)
+### 🔑 [auth-rbac/](auth-rbac/) - Auth & RBAC (5 docs)
 - [AUTH_IMPLEMENTATION.md](auth-rbac/AUTH_IMPLEMENTATION.md) - Auth system
 - [RBAC_IMPLEMENTATION.md](auth-rbac/RBAC_IMPLEMENTATION.md) - RBAC system
 - [PERMISSION_MANAGEMENT.md](auth-rbac/PERMISSION_MANAGEMENT.md)
@@ -73,8 +74,8 @@ Complete documentation for the Crooked Lake Reserve HOA portal and management sy
 - [E2E_IMPLEMENTATION_SUMMARY.md](implementation/E2E_IMPLEMENTATION_SUMMARY.md)
 - [PORTAL_MIGRATION_GUIDE.md](implementation/PORTAL_MIGRATION_GUIDE.md)
 
-### 📦 [archived/](archived/) - Archived Docs (19 docs)
-Completed phases, old PRs, and resolved fixes.
+### 📦 [archived/](archived/) - Archived Docs (16 docs)
+Completed phases and old PRs. Resolved fixes have been removed.
 
 ---
 
@@ -104,12 +105,13 @@ Completed phases, old PRs, and resolved fixes.
 
 ## 📊 Stats
 
-- **Total Documents:** 85 markdown files
+- **Total Documents:** 81 markdown files
 - **Categories:** 8 main categories
 - **Quick Start Guides:** 15
 - **Security Documents:** 16
-- **Archived:** 19
+- **Auth & RBAC:** 5
+- **Archived:** 16
 
 ---
 
-*Last updated: 2026-02-12 - Phase 2 Documentation Organization*
+*Last updated: 2026-02-12 - Phase 3 Documentation Consolidation*
