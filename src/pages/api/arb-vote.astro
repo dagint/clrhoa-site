@@ -75,17 +75,14 @@ if (Astro.request.method !== 'POST') {
 
 // Check D1 and KV availability
 const db = env?.DB;
-const kv = env?.CLRHOA_USERS;
-if (!db || !kv) {
+const kvNamespace = env?.CLRHOA_USERS;
+if (!db || !kvNamespace) {
   return new Response(JSON.stringify({ error: 'Server configuration error' }), {
     status: 503,
     headers: { 'Content-Type': 'application/json' },
   });
 }
-
-// Type assertions after validation
-const dbValidated = db as D1Database;
-const kvValidated = kv as KVNamespace;
+const kv = kvNamespace as KVNamespace;
 
 const logger = createLogger({ endpoint: '/api/arb-vote' });
 const securityMonitor = getSecurityMonitor();
@@ -158,14 +155,14 @@ if ((vote === 'DENY' || vote === 'RETURN') && !comment) {
 
 // First, check and apply any expired deadlines (lazy evaluation pattern)
 try {
-  await checkAndApplyDeadlines(dbValidated);
+  await checkAndApplyDeadlines(db);
 } catch (e) {
   logger.error('Failed to check deadlines', { error: e });
   // Continue - don't fail the vote if deadline check fails
 }
 
 // Get the request
-const request = await getArbRequest(dbValidated, requestId);
+const request = await getArbRequest(db, requestId);
 if (!request) {
   return new Response(JSON.stringify({ error: 'Request not found.' }), {
     status: 404,
@@ -210,8 +207,8 @@ const cycle = request.current_cycle || 1;
 
 // Check if user is eligible to vote
 const eligibility = await isEligibleToVote(
-  dbValidated,
-  kvValidated,
+  db,
+  kv,
   requestId,
   session.email,
   stage,
@@ -236,7 +233,7 @@ if (!eligibility.eligible) {
 // Cast the vote
 try {
   const voteRecord = await castVote(
-    dbValidated,
+    db,
     requestId,
     session.email,
     stage,
@@ -254,7 +251,7 @@ try {
   });
 
   // Resolve votes to check if majority reached
-  const resolution = await resolveVotes(dbValidated, kvValidated, requestId, stage, cycle);
+  const resolution = await resolveVotes(db, kv, requestId, stage, cycle);
 
   let statusChanged = false;
   let newStatus: string | undefined;
@@ -284,7 +281,7 @@ try {
         const reason = `Vote resolved: ${resolution.outcome} (${resolution.approveCount} approve, ${resolution.denyCount} deny, ${resolution.returnCount} return, ${resolution.abstainCount} abstain)`;
 
         const updated = await transitionStatus(
-          dbValidated,
+          db,
           requestId,
           targetStatus,
           targetStage,
@@ -313,7 +310,7 @@ try {
           // If ARC_APPROVED, automatically advance to BOARD_REVIEW
           if (targetStatus === 'ARC_APPROVED') {
             const advanceUpdated = await transitionStatus(
-              dbValidated,
+              db,
               requestId,
               'BOARD_REVIEW',
               'BOARD_REVIEW',

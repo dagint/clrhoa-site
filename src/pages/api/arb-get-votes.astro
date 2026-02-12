@@ -61,17 +61,14 @@ if (Astro.request.method !== 'GET') {
 
 // Check D1 and KV availability
 const db = env?.DB;
-const kv = env?.CLRHOA_USERS;
-if (!db || !kv) {
+const kvNamespace = env?.CLRHOA_USERS;
+if (!db || !kvNamespace) {
   return new Response(JSON.stringify({ error: 'Server configuration error' }), {
     status: 503,
     headers: { 'Content-Type': 'application/json' },
   });
 }
-
-// Type assertions after validation
-const dbValidated = db as D1Database;
-const kvValidated = kv as KVNamespace;
+const kv = kvNamespace as KVNamespace;
 
 const logger = createLogger({ endpoint: '/api/arb-get-votes' });
 
@@ -88,14 +85,14 @@ if (!requestId) {
 
 // First, check and apply any expired deadlines (lazy evaluation pattern)
 try {
-  await checkAndApplyDeadlines(dbValidated);
+  await checkAndApplyDeadlines(db);
 } catch (e) {
   logger.error('Failed to check deadlines', { error: e });
   // Continue - don't fail the request if deadline check fails
 }
 
 // Get the request
-const request = await getArbRequest(dbValidated, requestId);
+const request = await getArbRequest(db, requestId);
 if (!request) {
   return new Response(JSON.stringify({ error: 'Request not found.' }), {
     status: 404,
@@ -153,16 +150,16 @@ const isReviewer =
   effectiveRole === 'admin';
 
 // Get all votes
-const votes = await getVotesForRequest(dbValidated, requestId, stage, cycle);
+const votes = await getVotesForRequest(db, requestId, stage, cycle);
 
 // Get resolution
-const resolution = await resolveVotes(dbValidated, kvValidated, requestId, stage, cycle);
+const resolution = await resolveVotes(db, kv, requestId, stage, cycle);
 
 // Get user's own vote (if any)
-const myVote = await getVoteByVoter(dbValidated, requestId, session.email, stage, cycle);
+const myVote = await getVoteByVoter(db, requestId, session.email, stage, cycle);
 
 // Get eligible voter count
-const eligibleVoterCount = await getEligibleVoterCount(dbValidated, kvValidated, requestId, stage, cycle);
+const eligibleVoterCount = await getEligibleVoterCount(db, kv, requestId, stage, cycle);
 
 // Determine if individual votes should be shown
 // Show individual votes if:

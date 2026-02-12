@@ -8,7 +8,7 @@ export default defineConfig({
   integrations: [tailwind()],
   output: 'static',
   adapter: cloudflare({
-    platformProxy: { enabled: true },
+    mode: 'directory', // Changed to directory mode for proper Pages deployment
     imageService: 'passthrough',
   }),
   site: 'https://clrhoa.com',

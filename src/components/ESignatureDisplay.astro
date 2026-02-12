@@ -1,0 +1,161 @@
+---
+/**
+ * Electronic Signature Display Component
+ * Shows verification badge and signature details for signed documents
+ *
+ * Usage:
+ * <ESignatureDisplay signature={signatureData} showDetails={true} />
+ */
+
+import type { ElectronicSignature } from '../lib/esignature-db';
+import { parseSignatureData } from '../lib/esignature-db';
+
+interface Props {
+  signature: ElectronicSignature | null;
+  showDetails?: boolean;
+  class?: string;
+}
+
+const { signature, showDetails = false, class: className = '' } = Astro.props;
+
+if (!signature) {
+  return null;
+}
+
+const signatureData = parseSignatureData(signature);
+const isValid = signature.signature_valid === 1 && signature.consent_acknowledged === 1;
+
+function formatDate(dateStr: string): string {
+  try {
+    return new Date(dateStr).toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      timeZoneName: 'short'
+    });
+  } catch {
+    return dateStr;
+  }
+}
+
+function maskIP(ip: string | null): string {
+  if (!ip) return 'Not recorded';
+  // Mask last octet for privacy: 192.168.1.xxx
+  const parts = ip.split('.');
+  if (parts.length === 4) {
+    return `${parts[0]}.${parts[1]}.${parts[2]}.xxx`;
+  }
+  return 'Recorded';
+}
+---
+
+<div class:list={['esignature-display', className]}>
+  <!-- Compact Signature Badge -->
+  {!showDetails && (
+    <div class:list={[
+      'inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium',
+      isValid ? 'bg-green-100 text-green-800 border border-green-200' : 'bg-gray-100 text-gray-600 border border-gray-200'
+    ]}>
+      {isValid ? (
+        <>
+          <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+          </svg>
+          <span>Electronically Signed</span>
+        </>
+      ) : (
+        <>
+          <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
+          </svg>
+          <span>Signature Invalid</span>
+        </>
+      )}
+    </div>
+  )}
+
+  <!-- Detailed Signature Information -->
+  {showDetails && (
+    <div class:list={[
+      'p-4 rounded-xl border-2',
+      isValid ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'
+    ]}>
+      <div class="flex items-start justify-between gap-4 mb-3">
+        <div class="flex items-center gap-2">
+          {isValid ? (
+            <svg class="w-6 h-6 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+            </svg>
+          ) : (
+            <svg class="w-6 h-6 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
+            </svg>
+          )}
+          <h3 class:list={[
+            'font-semibold',
+            isValid ? 'text-green-900' : 'text-gray-700'
+          ]}>
+            {isValid ? 'Electronically Signed' : 'Signature Invalid'}
+          </h3>
+        </div>
+        <span class="px-2 py-1 rounded text-xs font-mono bg-white border border-gray-300 text-gray-600">
+          {signature.verification_code?.substring(0, 8) || 'N/A'}
+        </span>
+      </div>
+
+      <dl class="space-y-2 text-sm">
+        <div class="flex justify-between">
+          <dt class="text-gray-600">Signed by:</dt>
+          <dd class="font-medium text-gray-900">{signature.signer_name}</dd>
+        </div>
+
+        <div class="flex justify-between">
+          <dt class="text-gray-600">Email:</dt>
+          <dd class="font-medium text-gray-700">{signature.signer_email}</dd>
+        </div>
+
+        <div class="flex justify-between">
+          <dt class="text-gray-600">Date & Time:</dt>
+          <dd class="font-medium text-gray-700">{formatDate(signature.signed_at)}</dd>
+        </div>
+
+        {signatureData && (
+          <div class="flex justify-between">
+            <dt class="text-gray-600">Typed Name:</dt>
+            <dd class="font-medium text-gray-700 font-cursive italic">"{signatureData.typedName}"</dd>
+          </div>
+        )}
+
+        <div class="flex justify-between">
+          <dt class="text-gray-600">IP Address:</dt>
+          <dd class="font-mono text-xs text-gray-600">{maskIP(signature.ip_address)}</dd>
+        </div>
+
+        {signature.consent_acknowledged === 1 && (
+          <div class="pt-2 mt-2 border-t border-green-200">
+            <div class="flex items-start gap-2 text-xs text-green-800">
+              <svg class="w-4 h-4 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+              </svg>
+              <span>Signer consented to electronic signature use in accordance with the ESIGN Act</span>
+            </div>
+          </div>
+        )}
+      </dl>
+
+      {signatureData?.intentStatement && (
+        <div class="mt-3 pt-3 border-t border-green-200 text-xs text-gray-600 italic">
+          Intent: {signatureData.intentStatement}
+        </div>
+      )}
+    </div>
+  )}
+</div>
+
+<style>
+  .font-cursive {
+    font-family: 'Brush Script MT', 'Lucida Handwriting', cursive;
+  }
+</style>

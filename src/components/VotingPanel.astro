@@ -359,7 +359,7 @@ const currentVote = myVote?.vote;
             }),
           });
 
-          const result = await response.json() as { success?: boolean; error?: string };
+          const result = (await response.json()) as { success?: boolean; error?: string };
 
           if (response.ok && result.success) {
             if (messageDiv) {

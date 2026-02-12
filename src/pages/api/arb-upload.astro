@@ -18,6 +18,10 @@ import {
   insertArbFile,
   setArbRequestInReview,
 } from '../../lib/arb-db';
+import {
+  createElectronicSignature,
+  type SignatureData,
+} from '../../lib/esignature-db';
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
 const MAX_TOTAL_BYTES = 25 * 1024 * 1024;
@@ -117,12 +121,17 @@ if (!db || !r2) {
 }
 
 let description = '';
-let esign = false;
 let applicantName: string | null = null;
 let phone: string | null = null;
 let propertyAddress: string | null = null;
 let applicationType: string | null = null;
 let action = 'submit';
+// Electronic signature fields
+let esigTypedName: string | null = null;
+let esigConsent = false;
+let esigIntent: string | null = null;
+let esigDocumentType: string | null = null;
+let esigSignerEmail: string | null = null;
 /** Each item: original + optional review/archive (client-side resized) blobs */
 const fileGroups: { name: string; type: string; size: number; original: Blob; review?: Blob; archive?: Blob }[] = [];
 
@@ -190,7 +199,6 @@ try {
 
   description = (formData.get('description') as string)?.trim() ?? '';
   action = (formData.get('action') as string)?.trim() || 'submit'; // 'draft' or 'submit', default to 'submit' for backward compatibility
-  esign = formData.get('esign') === 'on' || formData.get('esign') === '1';
   applicantName = (formData.get('applicant_name') as string)?.trim() || null;
   phone = (formData.get('phone') as string)?.trim() || null;
   propertyAddress = (formData.get('property_address') as string)?.trim() || null;
@@ -198,6 +206,13 @@ try {
   applicationType = Array.isArray(types) && types.length > 0
     ? types.map((t) => String(t).trim()).filter(Boolean).join(', ')
     : null;
+
+  // Extract electronic signature fields
+  esigTypedName = (formData.get('esig_typed_name') as string)?.trim() || null;
+  esigConsent = formData.get('esig_consent') === 'true' || formData.get('esig_consent') === 'on';
+  esigIntent = (formData.get('esig_intent') as string)?.trim() || null;
+  esigDocumentType = (formData.get('esig_document_type') as string)?.trim() || null;
+  esigSignerEmail = (formData.get('esig_signer_email') as string)?.trim() || null;
 
   const indices = new Set<number>();
   for (const key of formData.keys()) {
@@ -288,14 +303,16 @@ if (!isSubmit && !isDraft) {
   );
 }
 
-// E-signature is required only when submitting for review
-if (isSubmit && !esign) {
-  return new Response(
-    JSON.stringify({
-      error: 'You must certify that the information is accurate (e-signature checkbox) to submit for review.',
-    }),
-    { status: 400, headers: { 'Content-Type': 'application/json' } }
-  );
+// Electronic signature is required when submitting for review
+if (isSubmit) {
+  if (!esigTypedName || !esigConsent || !esigIntent) {
+    return new Response(
+      JSON.stringify({
+        error: 'Electronic signature is required to submit for review. Please complete the signature section.',
+      }),
+      { status: 400, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
 }
 
 // Server-side file type validation: check actual MIME type, not just extension
@@ -459,6 +476,41 @@ try {
 }
 
 const clientIp = Astro.clientAddress || Astro.request.headers.get('cf-connecting-ip') || null;
+
+// Create electronic signature record if submitting
+let signatureId: string | null = null;
+if (isSubmit && esigTypedName && esigConsent && esigIntent) {
+  try {
+    const signatureData: SignatureData = {
+      typedName: esigTypedName,
+      consentGiven: esigConsent,
+      intentStatement: esigIntent,
+    };
+
+    signatureId = await createElectronicSignature(db, {
+      documentType: esigDocumentType || 'arb_request',
+      documentId: requestId,
+      signerEmail: esigSignerEmail || session.email,
+      signerName: applicantName || session.email,
+      signatureData,
+      ipAddress: clientIp ?? undefined,
+      userAgent: userAgent ?? undefined,
+    });
+
+    logger.info('Electronic signature created', {
+      signatureId,
+      requestId,
+      documentType: esigDocumentType || 'arb_request',
+    });
+  } catch (e) {
+    logger.error('Failed to create electronic signature', { error: String(e) });
+    return new Response(
+      JSON.stringify({ error: 'Failed to create electronic signature. Please try again.' }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+}
+
 try {
   await insertArbRequest(db, requestId, session.email, description, {
     applicantName,
@@ -466,6 +518,7 @@ try {
     propertyAddress,
     applicationType,
     ip_address: clientIp,
+    signatureId,
   });
 
   // If submitting for review, update status from 'pending' to 'in_review'
@@ -474,6 +527,21 @@ try {
     if (!submitted) {
       logger.warn('Failed to update status to in_review', { requestId });
       // Don't fail the request - it's saved as pending, user can resubmit later
+    }
+
+    // Track ARB submission analytics
+    try {
+      const { trackArbEvent } = await import('../../lib/analytics');
+      await trackArbEvent(db, {
+        eventType: 'submitted',
+        requestId,
+        ownerEmail: session.email,
+        hasSignature: !!signatureId,
+        signatureId: signatureId || undefined,
+        fileCount: fileGroups.length,
+      });
+    } catch (e) {
+      logger.warn('Failed to track ARB analytics', { error: String(e) });
     }
   }
 
@@ -591,11 +659,49 @@ try {
   );
 }
 
-if (isSubmit && env?.NOTIFY_ARB_EMAIL) {
-  const { sendEmail } = await import('../../lib/notifications');
-  const link = `${Astro.url.origin}/portal/arb-dashboard`;
-  const body = `<p>New ARB request <strong>#${requestId}</strong> submitted by ${session.email}.</p><p><a href="${link}">View ARB Dashboard</a></p>`;
-  await sendEmail(env, env.NOTIFY_ARB_EMAIL, `New ARB Request #${requestId}`, body);
+// Send notifications for submitted requests with signatures
+if (isSubmit && env) {
+  const { sendSignatureSubmittedEmail, sendArbNewSignedRequestEmail } = await import('../../lib/notifications');
+
+  // Send confirmation email to user
+  if (signatureId && esigTypedName) {
+    try {
+      const sig = await import('../../lib/esignature-db').then(m => m.getElectronicSignature(db, signatureId));
+      if (sig) {
+        await sendSignatureSubmittedEmail(env, session.email, {
+          requestId,
+          signatureId,
+          signerName: esigTypedName,
+          documentType: esigDocumentType || 'arb_request',
+          verificationCode: sig.verification_code || '',
+          timestamp: sig.signed_at,
+          originUrl: Astro.url.origin,
+        });
+      }
+    } catch (e) {
+      logger.warn('Failed to send signature confirmation email', { error: String(e) });
+    }
+  }
+
+  // Send notification to ARB about new signed request
+  if (env.NOTIFY_ARB_EMAIL && signatureId) {
+    try {
+      const sig = await import('../../lib/esignature-db').then(m => m.getElectronicSignature(db, signatureId));
+      if (sig) {
+        await sendArbNewSignedRequestEmail(env, {
+          requestId,
+          ownerEmail: session.email,
+          ownerName: applicantName || session.email,
+          propertyAddress: propertyAddress || 'Not specified',
+          signatureId,
+          signedAt: sig.signed_at,
+          originUrl: Astro.url.origin,
+        });
+      }
+    } catch (e) {
+      logger.warn('Failed to send ARB notification email', { error: String(e) });
+    }
+  }
 }
 
 return new Response(
