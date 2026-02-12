@@ -103,6 +103,28 @@ const errorParam = url.searchParams.get('error') ?? '';
         <label for="google_drive_folder_id" class="block text-sm font-medium text-gray-700 mb-1">Google Drive folder ID</label>
         <input type="text" id="google_drive_folder_id" name="google_drive_folder_id" placeholder="e.g. from https://drive.google.com/drive/folders/FOLDER_ID" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
       </div>
+      <div class="border-t pt-4">
+        <p class="text-sm font-medium text-gray-700 mb-2">What to backup to Google Drive:</p>
+        <div class="space-y-2 pl-4">
+          <div class="flex items-center gap-2">
+            <input type="checkbox" id="include_r2_manifest" name="include_r2_manifest" class="rounded border-gray-300" checked />
+            <label for="include_r2_manifest" class="text-sm text-gray-700">
+              <span class="font-medium">R2 file manifest</span>
+              <span class="text-gray-500">(JSON inventory of all uploaded files - lightweight, recommended)</span>
+            </label>
+          </div>
+          <div class="flex items-center gap-2">
+            <input type="checkbox" id="include_r2_files" name="include_r2_files" class="rounded border-gray-300" />
+            <label for="include_r2_files" class="text-sm text-gray-700">
+              <span class="font-medium">R2 actual files</span>
+              <span class="text-gray-500">(Incremental - only new/changed files uploaded)</span>
+            </label>
+          </div>
+          <p class="text-xs text-gray-500 italic mt-2">
+            Note: Database and whitelist are always included. R2 files use smart incremental backup - first run uploads all existing files, subsequent runs only upload new/changed files.
+          </p>
+        </div>
+      </div>
       <div class="flex flex-wrap gap-4">
         <div>
           <label for="schedule_type" class="block text-sm font-medium text-gray-700 mb-1">Schedule</label>
@@ -147,10 +169,14 @@ const errorParam = url.searchParams.get('error') ?? '';
           const folderId = document.getElementById('google_drive_folder_id');
           const hour = document.getElementById('schedule_hour_utc');
           const day = document.getElementById('schedule_day_of_week');
+          const r2Manifest = document.getElementById('include_r2_manifest');
+          const r2Files = document.getElementById('include_r2_files');
           if (enabled) enabled.checked = c.google_drive_enabled;
           if (folderId) folderId.value = c.google_drive_folder_id || '';
           if (hour) hour.value = c.schedule_hour_utc ?? 2;
           if (day) day.value = c.schedule_day_of_week ?? 0;
+          if (r2Manifest) r2Manifest.checked = c.include_r2_manifest ?? true;
+          if (r2Files) r2Files.checked = c.include_r2_files ?? false;
           if (scheduleType) scheduleType.value = c.schedule_type || 'daily';
           if (dayWrap) dayWrap.classList.toggle('hidden', scheduleType?.value !== 'weekly');
         } catch (_) {}
@@ -202,14 +228,16 @@ const errorParam = url.searchParams.get('error') ?? '';
         const folderId = document.getElementById('google_drive_folder_id');
         const hour = document.getElementById('schedule_hour_utc');
         const day = document.getElementById('schedule_day_of_week');
+        const r2Manifest = document.getElementById('include_r2_manifest');
+        const r2Files = document.getElementById('include_r2_files');
         const payload = {
           google_drive_enabled: enabled?.checked ?? false,
           google_drive_folder_id: folderId?.value ?? '',
           schedule_type: scheduleType?.value ?? 'daily',
           schedule_hour_utc: parseInt(hour?.value ?? '2', 10),
           schedule_day_of_week: parseInt(day?.value ?? '0', 10),
-          include_r2_manifest: false,
-          include_r2_files: false,
+          include_r2_manifest: r2Manifest?.checked ?? true,
+          include_r2_files: r2Files?.checked ?? false,
         };
         const r = await fetch('/api/board/backup-config', {
           method: 'POST',

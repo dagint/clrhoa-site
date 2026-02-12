@@ -1,6 +1,7 @@
 /**
- * Backup Worker: runs on cron. Exports D1 via Cloudflare API, dumps KV whitelist, uploads to R2.
+ * Backup Worker: runs on cron. Exports D1 via Cloudflare API, dumps KV whitelist, backs up R2 files, uploads to R2.
  * Phase 3: reads backup_config from D1 and uploads same set to Google Drive when configured.
+ * Phase 4: Incremental R2 file backup - only uploads new/changed files to Google Drive.
  */
 
 const CF_API = "https://api.cloudflare.com/client/v4";
@@ -22,6 +23,20 @@ interface ExportResult {
   result?: { signed_url?: string; filename?: string };
   error?: string;
   success?: boolean;
+}
+
+interface R2FileMetadata {
+  key: string;
+  size: number;
+  etag: string;
+  uploaded: string;
+}
+
+interface R2BackupState {
+  lastBackupDate: string;
+  files: Record<string, { etag: string; size: number; uploaded: string }>;
+  totalFiles: number;
+  totalBytes: number;
 }
 
 export default {
@@ -91,13 +106,22 @@ async function runBackup(env: Env, date: string): Promise<void> {
     customMetadata: { source: "kv", date },
   });
 
-  // 3. Backup R2 files (copy all non-backup files to backup location)
-  const manifest = await backupR2Files(env, date);
-  const manifestKey = `backups/r2/${date}/manifest.json`;
+  // Create R2 file manifest (inventory of all user-uploaded files)
+  const r2Files = await listAllR2Files(env);
+  const manifest = {
+    date,
+    totalFiles: r2Files.length,
+    totalBytes: r2Files.reduce((sum, f) => sum + f.size, 0),
+    files: r2Files,
+  };
+  const manifestKey = `backups/manifests/r2-manifest-${date}.json`;
   await env.BACKUP_R2.put(manifestKey, JSON.stringify(manifest, null, 2), {
     httpMetadata: { contentType: "application/json" },
     customMetadata: { source: "r2-manifest", date },
   });
+
+  // Optional: cleanup old data (contact submissions, rate limits, directory logs)
+  await cleanupOldData(env);
 }
 
 async function exportD1(env: Env): Promise<string> {
@@ -337,13 +361,15 @@ async function cleanupOldData(env: Env): Promise<void> {
 async function maybeUploadToGoogleDrive(env: Env, date: string): Promise<void> {
   if (!env.DB) return;
   const row = await env.DB.prepare(
-    "SELECT google_refresh_token_encrypted, google_drive_folder_id, schedule_type, schedule_hour_utc, schedule_day_of_week FROM backup_config WHERE google_drive_enabled = 1 LIMIT 1"
+    "SELECT google_refresh_token_encrypted, google_drive_folder_id, schedule_type, schedule_hour_utc, schedule_day_of_week, include_r2_manifest, include_r2_files FROM backup_config WHERE google_drive_enabled = 1 LIMIT 1"
   ).first<{
     google_refresh_token_encrypted: string | null;
     google_drive_folder_id: string | null;
     schedule_type: string | null;
     schedule_hour_utc: number | null;
     schedule_day_of_week: number | null;
+    include_r2_manifest: number | null;
+    include_r2_files: number | null;
   }>();
   if (!row?.google_drive_folder_id || !row.google_refresh_token_encrypted) return;
 
@@ -364,17 +390,40 @@ async function maybeUploadToGoogleDrive(env: Env, date: string): Promise<void> {
   const accessToken = await getGoogleAccessToken(clientId, clientSecret, refreshToken);
   const folderId = row.google_drive_folder_id;
 
+  // Upload D1 database and KV whitelist (always)
   const d1Key = `backups/d1/${date}.sql.gz`;
   const kvKey = `backups/kv/whitelist-${date}.json`;
   const manifestKey = `backups/r2/${date}/manifest.json`;
 
   const d1Obj = await env.BACKUP_R2.get(d1Key);
   const kvObj = await env.BACKUP_R2.get(kvKey);
-  const manifestObj = await env.BACKUP_R2.get(manifestKey);
+  if (d1Obj) await uploadToDrive(env, accessToken, folderId, `${date}.sql.gz`, d1Obj.body, "application/gzip");
+  if (kvObj) await uploadToDrive(env, accessToken, folderId, `whitelist-${date}.json`, kvObj.body, "application/json");
 
-  if (d1Obj) await uploadToDrive(env, accessToken, folderId, `${date}-database.sql.gz`, d1Obj.body, "application/gzip");
-  if (kvObj) await uploadToDrive(env, accessToken, folderId, `${date}-whitelist.json`, kvObj.body, "application/json");
-  if (manifestObj) await uploadToDrive(env, accessToken, folderId, `${date}-r2-manifest.json`, manifestObj.body, "application/json");
+  // Upload R2 manifest if enabled
+  if (row.include_r2_manifest) {
+    const manifestKey = `backups/manifests/r2-manifest-${date}.json`;
+    const manifestObj = await env.BACKUP_R2.get(manifestKey);
+    if (manifestObj) {
+      await uploadToDrive(
+        env,
+        accessToken,
+        folderId,
+        `r2-manifest-${date}.json`,
+        manifestObj.body,
+        "application/json"
+      );
+      console.log(`Uploaded R2 manifest for ${date}`);
+    }
+  }
+
+  // Upload R2 files incrementally if enabled
+  if (row.include_r2_files) {
+    const result = await uploadR2FilesToDrive(env, accessToken, folderId, date);
+    console.log(
+      `R2 file backup complete: ${result.uploaded} uploaded, ${result.skipped} skipped, ${Math.round(result.totalBytes / 1024 / 1024)}MB transferred`
+    );
+  }
 
   // Retention only after uploads succeed: keep 4 weekly, 4 monthly, 1 yearly
   await applyDriveRetention(accessToken, folderId);
@@ -539,4 +588,334 @@ async function recordLastGoogleBackupTime(env: Env): Promise<void> {
   } catch (e) {
     console.warn("Could not update last_google_backup_at:", e);
   }
+}
+
+/**
+ * List all R2 files (excluding backups/ folder to avoid recursive backup).
+ * Returns metadata for each file: key, size, etag, uploaded timestamp.
+ */
+async function listAllR2Files(env: Env): Promise<R2FileMetadata[]> {
+  const files: R2FileMetadata[] = [];
+  let cursor: string | undefined;
+
+  do {
+    const listed = await env.BACKUP_R2.list({ cursor, limit: 1000 });
+
+    for (const obj of listed.objects) {
+      // Skip backup folders to avoid recursive backup
+      if (obj.key.startsWith("backups/")) continue;
+
+      files.push({
+        key: obj.key,
+        size: obj.size,
+        etag: obj.etag,
+        uploaded: obj.uploaded.toISOString(),
+      });
+    }
+
+    cursor = listed.truncated ? listed.cursor : undefined;
+  } while (cursor);
+
+  return files;
+}
+
+/**
+ * Cleanup old data from D1 database to keep it lean.
+ * - Contact submissions older than 1 year
+ * - Rate limits older than 7 days
+ * - Directory logs older than 1 year
+ */
+async function cleanupOldData(env: Env): Promise<void> {
+  if (!env.DB) return;
+
+  try {
+    // Delete contact submissions >1 year
+    const contactResult = await env.DB.prepare(
+      "DELETE FROM contact_submissions WHERE created_at < datetime('now', '-1 year')"
+    ).run();
+    if (contactResult.meta.changes > 0) {
+      console.log(`Cleaned up ${contactResult.meta.changes} old contact submissions`);
+    }
+
+    // Delete rate limits >7 days
+    const rateLimitResult = await env.DB.prepare(
+      "DELETE FROM rate_limits WHERE created_at < datetime('now', '-7 days')"
+    ).run();
+    if (rateLimitResult.meta.changes > 0) {
+      console.log(`Cleaned up ${rateLimitResult.meta.changes} old rate limits`);
+    }
+
+    // Delete directory logs >1 year
+    const directoryResult = await env.DB.prepare(
+      "DELETE FROM directory_logs WHERE viewed_at < datetime('now', '-1 year')"
+    ).run();
+    if (directoryResult.meta.changes > 0) {
+      console.log(`Cleaned up ${directoryResult.meta.changes} old directory logs`);
+    }
+  } catch (e) {
+    console.warn("Data cleanup encountered an error:", e);
+  }
+}
+
+/**
+ * Get the last R2 backup state from Google Drive.
+ * This tracks which files have already been uploaded to avoid re-uploading unchanged files.
+ */
+async function getR2BackupState(
+  env: Env,
+  accessToken: string,
+  folderId: string
+): Promise<R2BackupState | null> {
+  try {
+    // Look for r2-backup-state.json in the Drive folder
+    const q = `'${folderId}' in parents and name = 'r2-backup-state.json'`;
+    const url = new URL("https://www.googleapis.com/drive/v3/files");
+    url.searchParams.set("q", q);
+    url.searchParams.set("fields", "files(id)");
+
+    const listRes = await fetch(url.toString(), {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    if (!listRes.ok) {
+      console.warn("Failed to list Drive files for state:", await listRes.text());
+      return null;
+    }
+
+    const listData = (await listRes.json()) as { files?: { id: string }[] };
+    if (!listData.files || listData.files.length === 0) {
+      // No state file exists yet (first backup)
+      return null;
+    }
+
+    const fileId = listData.files[0]!.id;
+
+    // Download the state file
+    const downloadRes = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+
+    if (!downloadRes.ok) {
+      console.warn("Failed to download state file:", await downloadRes.text());
+      return null;
+    }
+
+    return (await downloadRes.json()) as R2BackupState;
+  } catch (e) {
+    console.warn("Error getting R2 backup state:", e);
+    return null;
+  }
+}
+
+/**
+ * Save the current R2 backup state to Google Drive.
+ * This allows future backups to be incremental (only upload new/changed files).
+ */
+async function saveR2BackupState(
+  env: Env,
+  accessToken: string,
+  folderId: string,
+  state: R2BackupState
+): Promise<void> {
+  try {
+    // Check if state file already exists
+    const q = `'${folderId}' in parents and name = 'r2-backup-state.json'`;
+    const url = new URL("https://www.googleapis.com/drive/v3/files");
+    url.searchParams.set("q", q);
+    url.searchParams.set("fields", "files(id)");
+
+    const listRes = await fetch(url.toString(), {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    const listData = (await listRes.json()) as { files?: { id: string }[] };
+    const existingFileId = listData.files && listData.files.length > 0 ? listData.files[0]!.id : null;
+
+    const stateJson = JSON.stringify(state, null, 2);
+
+    if (existingFileId) {
+      // Update existing file
+      const updateRes = await fetch(
+        `https://www.googleapis.com/upload/drive/v3/files/${existingFileId}?uploadType=media`,
+        {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+          body: stateJson,
+        }
+      );
+
+      if (!updateRes.ok) {
+        console.warn("Failed to update state file:", await updateRes.text());
+      }
+    } else {
+      // Create new file
+      await uploadToDrive(
+        env,
+        accessToken,
+        folderId,
+        "r2-backup-state.json",
+        new ReadableStream({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode(stateJson));
+            controller.close();
+          },
+        }),
+        "application/json"
+      );
+    }
+  } catch (e) {
+    console.warn("Error saving R2 backup state:", e);
+  }
+}
+
+/**
+ * Upload R2 files to Google Drive incrementally.
+ * Only uploads files that are new or changed since last backup (based on etag).
+ * Creates a nested folder structure in Drive mirroring the R2 structure.
+ */
+async function uploadR2FilesToDrive(
+  env: Env,
+  accessToken: string,
+  folderId: string,
+  date: string
+): Promise<{ uploaded: number; skipped: number; totalBytes: number }> {
+  // Get current R2 files
+  const currentFiles = await listAllR2Files(env);
+
+  // Get last backup state
+  const lastState = await getR2BackupState(env, accessToken, folderId);
+
+  // Determine which files are new or changed
+  const filesToUpload = currentFiles.filter((file) => {
+    if (!lastState) return true; // First backup - upload everything
+
+    const lastFile = lastState.files[file.key];
+    if (!lastFile) return true; // New file
+    if (lastFile.etag !== file.etag) return true; // Changed file
+
+    return false; // File unchanged - skip
+  });
+
+  console.log(
+    `R2 incremental backup: ${filesToUpload.length} new/changed files out of ${currentFiles.length} total`
+  );
+
+  let uploaded = 0;
+  let totalBytes = 0;
+
+  // Create r2-files folder in Drive if it doesn't exist
+  const r2FilesFolderId = await getOrCreateDriveFolder(accessToken, folderId, "r2-files");
+
+  // Upload new/changed files
+  for (const file of filesToUpload) {
+    try {
+      // Get file from R2
+      const r2Obj = await env.BACKUP_R2.get(file.key);
+      if (!r2Obj) {
+        console.warn(`File ${file.key} not found in R2`);
+        continue;
+      }
+
+      // Determine folder structure (e.g., "arb/review/ABC123-photo.jpg" -> folders: ["arb", "review"])
+      const pathParts = file.key.split("/");
+      const fileName = pathParts[pathParts.length - 1]!;
+      const folders = pathParts.slice(0, -1);
+
+      // Create nested folders as needed
+      let currentFolderId = r2FilesFolderId;
+      for (const folder of folders) {
+        currentFolderId = await getOrCreateDriveFolder(accessToken, currentFolderId, folder);
+      }
+
+      // Upload file
+      await uploadToDrive(
+        env,
+        accessToken,
+        currentFolderId,
+        fileName,
+        r2Obj.body,
+        r2Obj.httpMetadata?.contentType || "application/octet-stream"
+      );
+
+      uploaded++;
+      totalBytes += file.size;
+
+      // Log progress every 10 files
+      if (uploaded % 10 === 0) {
+        console.log(`Uploaded ${uploaded}/${filesToUpload.length} files...`);
+      }
+    } catch (e) {
+      console.error(`Failed to upload ${file.key}:`, e);
+    }
+  }
+
+  // Save new backup state
+  const newState: R2BackupState = {
+    lastBackupDate: date,
+    files: Object.fromEntries(
+      currentFiles.map((f) => [f.key, { etag: f.etag, size: f.size, uploaded: f.uploaded }])
+    ),
+    totalFiles: currentFiles.length,
+    totalBytes: currentFiles.reduce((sum, f) => sum + f.size, 0),
+  };
+
+  await saveR2BackupState(env, accessToken, folderId, newState);
+
+  return {
+    uploaded,
+    skipped: currentFiles.length - filesToUpload.length,
+    totalBytes,
+  };
+}
+
+/**
+ * Get or create a folder in Google Drive.
+ * Returns the folder ID.
+ */
+async function getOrCreateDriveFolder(
+  accessToken: string,
+  parentFolderId: string,
+  folderName: string
+): Promise<string> {
+  // Check if folder exists
+  const q = `'${parentFolderId}' in parents and name = '${folderName}' and mimeType = 'application/vnd.google-apps.folder'`;
+  const url = new URL("https://www.googleapis.com/drive/v3/files");
+  url.searchParams.set("q", q);
+  url.searchParams.set("fields", "files(id)");
+
+  const listRes = await fetch(url.toString(), {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+
+  if (listRes.ok) {
+    const listData = (await listRes.json()) as { files?: { id: string }[] };
+    if (listData.files && listData.files.length > 0) {
+      return listData.files[0]!.id;
+    }
+  }
+
+  // Create folder
+  const createRes = await fetch("https://www.googleapis.com/drive/v3/files", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      name: folderName,
+      mimeType: "application/vnd.google-apps.folder",
+      parents: [parentFolderId],
+    }),
+  });
+
+  if (!createRes.ok) {
+    throw new Error(`Failed to create folder ${folderName}: ${await createRes.text()}`);
+  }
+
+  const createData = (await createRes.json()) as { id: string };
+  return createData.id;
 }

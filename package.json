@@ -96,6 +96,8 @@
     "db:backup-config-last-run:local": "wrangler d1 execute clrhoa_db --local --file=./scripts/schema-backup-config-last-run.sql",
     "db:backup-config-google-last": "wrangler d1 execute clrhoa_db --remote --file=./scripts/schema-backup-config-google-last.sql",
     "db:backup-config-google-last:local": "wrangler d1 execute clrhoa_db --local --file=./scripts/schema-backup-config-google-last.sql",
+    "db:backup-config-r2-files": "wrangler d1 execute clrhoa_db --remote --file=./scripts/schema-backup-config-r2-files.sql",
+    "db:backup-config-r2-files:local": "wrangler d1 execute clrhoa_db --local --file=./scripts/schema-backup-config-r2-files.sql",
     "db:assessment-recorded-by": "wrangler d1 execute clrhoa_db --remote --file=./scripts/schema-assessment-payments-recorded-by.sql",
     "db:assessment-recorded-by:local": "wrangler d1 execute clrhoa_db --local --file=./scripts/schema-assessment-payments-recorded-by.sql",
     "db:assessment-paid-through-after": "wrangler d1 execute clrhoa_db --remote --file=./scripts/schema-assessment-payments-paid-through-after.sql",

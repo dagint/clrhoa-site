@@ -448,7 +448,7 @@ const pageTitle = `${requirement.id}: ${requirement.title}`;
           body: formData,
         });
 
-        const result = (await response.json()) as { success?: boolean; message?: string; error?: string };
+        const result = await response.json() as { success?: boolean; message?: string; error?: string };
 
         if (response.ok && result.success) {
           uploadMessage.className = 'mb-4 p-4 rounded-xl border bg-green-50 border-green-200 text-green-900';
