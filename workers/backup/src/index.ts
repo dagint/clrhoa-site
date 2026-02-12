@@ -34,6 +34,8 @@ export default {
       await recordLastBackupTime(env);
       // Phase 3: if backup_config has Google Drive enabled and schedule matches, upload to Drive
       await maybeUploadToGoogleDrive(env, date);
+      // Cleanup old data after backup completes (contact submissions, old logs, etc.)
+      await cleanupOldData(env);
     } catch (err) {
       console.error("Backup failed:", err);
       throw err;
@@ -58,6 +60,7 @@ export default {
       await applyRetention(env);
       await recordLastBackupTime(env);
       await maybeUploadToGoogleDrive(env, date);
+      await cleanupOldData(env);
       return new Response(JSON.stringify({ ok: true, date }), {
         headers: { "Content-Type": "application/json" },
       });
@@ -71,6 +74,7 @@ export default {
 };
 
 async function runBackup(env: Env, date: string): Promise<void> {
+  // 1. Backup D1 database (SQL dump)
   const sql = await exportD1(env);
   const gzip = await gzipBuffer(new TextEncoder().encode(sql));
   const d1Key = `backups/d1/${date}.sql.gz`;
@@ -79,11 +83,20 @@ async function runBackup(env: Env, date: string): Promise<void> {
     customMetadata: { source: "d1", date },
   });
 
+  // 2. Backup KV whitelist (JSON dump)
   const whitelist = await dumpWhitelistKV(env.CLOURHOA_USERS);
   const kvKey = `backups/kv/whitelist-${date}.json`;
   await env.BACKUP_R2.put(kvKey, JSON.stringify(whitelist, null, 2), {
     httpMetadata: { contentType: "application/json" },
     customMetadata: { source: "kv", date },
+  });
+
+  // 3. Backup R2 files (copy all non-backup files to backup location)
+  const manifest = await backupR2Files(env, date);
+  const manifestKey = `backups/r2/${date}/manifest.json`;
+  await env.BACKUP_R2.put(manifestKey, JSON.stringify(manifest, null, 2), {
+    httpMetadata: { contentType: "application/json" },
+    customMetadata: { source: "r2-manifest", date },
   });
 }
 
@@ -105,8 +118,19 @@ async function exportD1(env: Env): Promise<string> {
     throw new Error(`D1 export start failed: ${res.status} ${t}`);
   }
   const start = (await res.json()) as { result?: ExportResult; success?: boolean };
-  if (!start.success || !start.result?.at_bookmark) {
+  if (!start.success || !start.result) {
     throw new Error(`D1 export start invalid: ${JSON.stringify(start)}`);
+  }
+
+  // Check if already complete (small databases complete immediately)
+  if (start.result.status === "complete" && start.result.result?.signed_url) {
+    const sqlRes = await fetch(start.result.result.signed_url);
+    if (!sqlRes.ok) throw new Error(`D1 export fetch SQL failed: ${sqlRes.status}`);
+    return await sqlRes.text();
+  }
+
+  if (!start.result.at_bookmark) {
+    throw new Error(`D1 export missing bookmark: ${JSON.stringify(start)}`);
   }
   let bookmark = start.result.at_bookmark;
 
@@ -154,6 +178,62 @@ async function dumpWhitelistKV(kv: KVNamespace): Promise<Record<string, string>>
 }
 
 /**
+ * Backup all R2 files (except backups/) to backups/r2/{date}/ and return manifest.
+ * Uses server-side copy (no bandwidth costs) and handles pagination.
+ */
+async function backupR2Files(env: Env, date: string): Promise<{
+  date: string;
+  total_files: number;
+  total_bytes: number;
+  files: Array<{ key: string; size: number; uploaded: string; etag: string; backup_key: string }>;
+}> {
+  const files: Array<{ key: string; size: number; uploaded: string; etag: string; backup_key: string }> = [];
+  let totalBytes = 0;
+  let cursor: string | undefined;
+
+  // List all objects in R2, excluding backups/ to avoid recursive backup
+  do {
+    const listed = await env.BACKUP_R2.list({ cursor, limit: 1000 });
+    for (const obj of listed.objects) {
+      // Skip backup directory itself to avoid backing up backups
+      if (obj.key.startsWith("backups/")) continue;
+
+      // Copy file to backup location (server-side copy - no bandwidth)
+      const backupKey = `backups/r2/${date}/${obj.key}`;
+      const sourceObj = await env.BACKUP_R2.get(obj.key);
+      if (sourceObj) {
+        await env.BACKUP_R2.put(backupKey, sourceObj.body, {
+          httpMetadata: sourceObj.httpMetadata,
+          customMetadata: {
+            ...sourceObj.customMetadata,
+            backup_source: obj.key,
+            backup_date: date,
+          },
+        });
+      }
+
+      // Add to manifest
+      files.push({
+        key: obj.key,
+        size: obj.size,
+        uploaded: obj.uploaded.toISOString(),
+        etag: obj.etag,
+        backup_key: backupKey,
+      });
+      totalBytes += obj.size;
+    }
+    cursor = listed.truncated ? listed.cursor : undefined;
+  } while (cursor);
+
+  return {
+    date,
+    total_files: files.length,
+    total_bytes: totalBytes,
+    files,
+  };
+}
+
+/**
  * Remove older R2 backups beyond retention. Must only be called after runBackup() has succeeded
  * so we never delete the oldest until a new backup is safely written.
  */
@@ -163,11 +243,30 @@ async function applyRetention(env: Env): Promise<void> {
   cutoff.setDate(cutoff.getDate() - days);
   const cutoffStr = cutoff.toISOString().slice(0, 10);
 
+  // Clean up D1 and KV backups
   for (const prefix of ["backups/d1/", "backups/kv/"]) {
     const list = await env.BACKUP_R2.list({ prefix });
     for (const obj of list.objects) {
       const keyDate = obj.key.replace(prefix, "").replace(".sql.gz", "").replace("whitelist-", "").replace(".json", "");
       if (keyDate < cutoffStr) await env.BACKUP_R2.delete(obj.key);
+    }
+  }
+
+  // Clean up old R2 file backups (entire date directories)
+  const r2BackupsList = await env.BACKUP_R2.list({ prefix: "backups/r2/", delimiter: "/" });
+  for (const dir of r2BackupsList.delimitedPrefixes || []) {
+    // Extract date from "backups/r2/YYYY-MM-DD/"
+    const match = /backups\/r2\/(\d{4}-\d{2}-\d{2})\//.exec(dir);
+    if (match && match[1]! < cutoffStr) {
+      // Delete all files in this date directory
+      let cursor: string | undefined;
+      do {
+        const objects = await env.BACKUP_R2.list({ prefix: dir, cursor, limit: 1000 });
+        for (const obj of objects.objects) {
+          await env.BACKUP_R2.delete(obj.key);
+        }
+        cursor = objects.truncated ? objects.cursor : undefined;
+      } while (cursor);
     }
   }
 }
@@ -182,6 +281,52 @@ async function recordLastBackupTime(env: Env): Promise<void> {
   } catch (e) {
     // Column may not exist yet; log but don't fail the backup
     console.warn("Could not update last_r2_backup_at:", e);
+  }
+}
+
+/**
+ * Cleanup old data after backup completes. Runs daily but only deletes data older than retention periods.
+ * This consolidates all data cleanup tasks in one place (replaces separate contact-cleanup worker).
+ */
+async function cleanupOldData(env: Env): Promise<void> {
+  if (!env.DB) return;
+
+  try {
+    // 1. Delete contact form submissions older than 1 year
+    // Contact forms are logged as backup in case email fails; board can view at /board/contacts
+    const contactResult = await env.DB.prepare(
+      "DELETE FROM contact_submissions WHERE created_at < datetime('now', '-1 year')"
+    ).run();
+    const contactDeleted = contactResult.meta.changes ?? 0;
+    if (contactDeleted > 0) {
+      console.log(`Cleaned up ${contactDeleted} old contact submission(s) (>1 year)`);
+    }
+
+    // 2. Delete old rate limit entries (>7 days)
+    // Rate limits are only relevant for recent activity
+    const rateLimitResult = await env.DB.prepare(
+      "DELETE FROM rate_limits WHERE created_at < datetime('now', '-7 days')"
+    ).run();
+    const rateLimitDeleted = rateLimitResult.meta.changes ?? 0;
+    if (rateLimitDeleted > 0) {
+      console.log(`Cleaned up ${rateLimitDeleted} old rate limit(s) (>7 days)`);
+    }
+
+    // 3. Delete old directory access logs (>1 year)
+    // Keep 1 year of audit trail for phone number reveals
+    const directoryResult = await env.DB.prepare(
+      "DELETE FROM directory_logs WHERE viewed_at < datetime('now', '-1 year')"
+    ).run();
+    const directoryDeleted = directoryResult.meta.changes ?? 0;
+    if (directoryDeleted > 0) {
+      console.log(`Cleaned up ${directoryDeleted} old directory log(s) (>1 year)`);
+    }
+
+    // Add more cleanup tasks here as needed (login_history, old notifications, etc.)
+
+  } catch (e) {
+    // Log but don't fail the backup if cleanup fails
+    console.warn("Data cleanup encountered an error:", e);
   }
 }
 
@@ -221,10 +366,16 @@ async function maybeUploadToGoogleDrive(env: Env, date: string): Promise<void> {
 
   const d1Key = `backups/d1/${date}.sql.gz`;
   const kvKey = `backups/kv/whitelist-${date}.json`;
+  const manifestKey = `backups/r2/${date}/manifest.json`;
+
   const d1Obj = await env.BACKUP_R2.get(d1Key);
   const kvObj = await env.BACKUP_R2.get(kvKey);
-  if (d1Obj) await uploadToDrive(env, accessToken, folderId, `${date}.sql.gz`, d1Obj.body, "application/gzip");
-  if (kvObj) await uploadToDrive(env, accessToken, folderId, `whitelist-${date}.json`, kvObj.body, "application/json");
+  const manifestObj = await env.BACKUP_R2.get(manifestKey);
+
+  if (d1Obj) await uploadToDrive(env, accessToken, folderId, `${date}-database.sql.gz`, d1Obj.body, "application/gzip");
+  if (kvObj) await uploadToDrive(env, accessToken, folderId, `${date}-whitelist.json`, kvObj.body, "application/json");
+  if (manifestObj) await uploadToDrive(env, accessToken, folderId, `${date}-r2-manifest.json`, manifestObj.body, "application/json");
+
   // Retention only after uploads succeed: keep 4 weekly, 4 monthly, 1 yearly
   await applyDriveRetention(accessToken, folderId);
   await recordLastGoogleBackupTime(env);
