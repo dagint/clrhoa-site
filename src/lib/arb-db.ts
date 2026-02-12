@@ -25,6 +25,14 @@ export interface ArbRequest {
   owner_notes?: string | null;
   review_deadline?: string | null;
   deleted_at?: string | null;
+  // Multi-stage voting workflow fields (Phase 1)
+  workflow_version?: number | null;
+  current_stage?: string | null;
+  current_cycle?: number | null;
+  submitted_at?: string | null;
+  resolved_at?: string | null;
+  auto_approved_reason?: string | null;
+  deadline_date?: string | null;
 }
 
 export interface ArbFile {
@@ -47,6 +55,9 @@ export interface ArbAuditLogRow {
   notes: string | null;
   created: string | null;
   ip_address: string | null;
+  // Multi-stage voting workflow fields (Phase 1)
+  cycle?: number | null;
+  metadata?: string | null;
 }
 
 /** Human-readable request number: ARB-YYYY-NNNN (e.g. ARB-2026-0001). Requires DB to get next sequence. */
