@@ -1,12 +1,46 @@
-# Governing Documents (PDFs)
+# Public Documents
 
-Place the official CLR governing document PDFs here so they are served at the URLs used on the site.
+All public documents (Bylaws, Covenants, Proxy Form, ARB Request Form) are now stored in **R2** and served via `/api/public-doc-file`.
 
-## Required filenames
+## For Board Members
 
-| Your file (or similar name) | Save as (use this filename) | Site URL |
-|----------------------------|-----------------------------|----------|
-| CLR-Covenants-including-Add-A-to-F.pdf | **CLR-Covenants-2024.pdf** | `/docs/CLR-Covenants-2024.pdf` |
-| CLR-Bylaws-including-Add-A.pdf | **CLR-Bylaws-2024.pdf** | `/docs/CLR-Bylaws-2024.pdf` |
+**Manage documents at:** `/board/public-documents`
 
-After copying/renaming the PDFs into this folder, the Documents page download links will work.
+- Upload/replace documents through the web interface
+- Files are stored in R2 bucket: `clrhoa-files/public-docs/`
+- Changes are immediately visible on the `/documents` page
+- No deployment required to update documents
+
+## For Developers
+
+**Storage:**
+- Location: R2 bucket `clrhoa-files/public-docs/`
+- Metadata: D1 table `public_documents`
+- Serve endpoint: `/api/public-doc-file?slug=<slug>`
+
+**Documents:**
+- `bylaws` → `public-docs/bylaws.pdf`
+- `covenants` → `public-docs/covenants.pdf`
+- `proxy-form` → `public-docs/proxy-form.docx`
+- `arb-request-form` → `public-docs/arb-request-form.docx`
+
+**Content collections:**
+- Metadata files remain in `src/content/documents/*.md`
+- These define title, description, category, etc.
+- The `/documents` page checks for R2 overrides first
+
+## Benefits
+
+✅ Update documents without code deployment
+✅ Reduced repository size (~3.9MB saved)
+✅ Centralized storage in R2
+✅ Board self-service document management
+✅ Consistent with protected portal documents
+
+## Migration
+
+Migrated on 2026-02-12:
+- Uploaded 4 documents to R2 (remote)
+- Updated D1 database with file keys
+- Removed static files from repository
+- Maintained content collection metadata
