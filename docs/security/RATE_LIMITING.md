@@ -29,7 +29,7 @@ Implementation lives in `src/lib/rate-limit.ts` (rate limits) and `src/lib/auth.
 ## 2. How rate limiting works
 
 - **Scope:** Per **IP address** and per **endpoint**. The client IP is taken from `cf-connecting-ip` or `x-forwarded-for` (first hop).
-- **Storage:** For each (endpoint, IP) pair, the code uses a **sliding-window style** key:  
+- **Storage:** For each (endpoint, IP) pair, the code uses a **sliding-window style** key:
   `rate_limit:<endpoint>:<ip>:<windowStart>`, where `windowStart` is a time bucket in seconds. The value is the request count in that window.
 - **TTL:** Keys are written with `expirationTtl: windowSeconds + 60` so KV drops them after the window plus a small buffer; no manual cleanup is required.
 - **Behavior:**
@@ -68,9 +68,9 @@ Unknown endpoints use a default of **100 requests per minute** when a config exi
 
 Failed login attempts and lockout state are stored in the **same** `KV` namespace:
 
-- **Keys:**  
-  - `login_lockout:<email>` — lockout expiry (Unix timestamp); present only while the account is locked.  
-  - `login_attempts:<email>` — failed-attempt count (resets after 1 hour or when lockout is applied).  
+- **Keys:**
+  - `login_lockout:<email>` — lockout expiry (Unix timestamp); present only while the account is locked.
+  - `login_attempts:<email>` — failed-attempt count (resets after 1 hour or when lockout is applied).
   - `login_ip:<email>` — last IP used for this email (1 hour TTL), for tracking.
 - **Behavior:** After 5 failed attempts per email, the account is locked for 15 minutes. While locked, login returns an error and does not check the whitelist. Lockout and attempt count are cleared on successful login.
 - **Details:** See `checkAccountLockout`, `recordFailedLoginAttempt`, `clearFailedLoginAttempts` in `src/lib/auth.ts` and usage in `src/pages/api/login.astro`.

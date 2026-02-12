@@ -10,7 +10,7 @@ This site is **static** (no server-side login). To give HOA members only access 
 - A printed letter with the link and a short “keep this private” note
 - After they contact the Board, send the link once you’ve confirmed they’re a member
 
-**Pros:** No code, no OAuth, no list to sync.  
+**Pros:** No code, no OAuth, no list to sync.
 **Cons:** No “Members only” area on the website; you manage access manually in Drive and by email.
 
 ---
@@ -19,7 +19,7 @@ This site is **static** (no server-side login). To give HOA members only access 
 
 **How it works:** Add a page (e.g. `/members`) that asks for a password. If the password matches a value in an env var, the page shows a link to the Google Drive folder (also from env). No real “member list”—anyone with the password can open the link.
 
-**Pros:** One place on the site for “member documents”; password can be changed via env and redeploy.  
+**Pros:** One place on the site for “member documents”; password can be changed via env and redeploy.
 **Cons:** Weak security (shared secret; anyone who has it can share it). Good only for low-sensitivity material.
 
 **Implementation:** Static page + client-side check of a password against a hash or simple secret; if correct, show the Drive URL. The “secret” would be in `PUBLIC_*` or in a client-side hash, so it’s not truly secret—treat as “casual” protection only.
@@ -36,7 +36,7 @@ This site is **static** (no server-side login). To give HOA members only access 
    - Redirects to a **time-limited Drive folder link** (e.g. created via Google Drive API with a short-lived permission), or
    - Returns a list of file links (or embed URLs) from a Drive folder via the Drive API.
 
-**Pros:** Only people you list (or in the group) can access; no shared password.  
+**Pros:** Only people you list (or in the group) can access; no shared password.
 **Cons:** Requires a backend/API, maintaining a member list or Google Group, and Google Cloud / Drive API setup (service account or OAuth).
 
 **Rough pieces:**

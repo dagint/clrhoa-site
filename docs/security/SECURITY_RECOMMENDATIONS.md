@@ -21,8 +21,8 @@ This document outlines additional security posture improvements and best practic
 ## High Priority Recommendations 🔴
 
 ### 1. **Account Lockout After Failed Login Attempts**
-**Risk**: Brute force attacks on login endpoint  
-**Impact**: Unauthorized access to member accounts  
+**Risk**: Brute force attacks on login endpoint
+**Impact**: Unauthorized access to member accounts
 **Implementation**:
 - Track failed login attempts per email/IP in KV store
 - Lock account after 5 failed attempts for 15 minutes
@@ -36,8 +36,8 @@ This document outlines additional security posture improvements and best practic
 ---
 
 ### 2. **PII Masking in Logs**
-**Risk**: Sensitive data exposure in error logs  
-**Impact**: Privacy violation, compliance issues  
+**Risk**: Sensitive data exposure in error logs
+**Impact**: Privacy violation, compliance issues
 **Implementation**:
 - Mask email addresses in logs (e.g., `j***@example.com`)
 - Mask phone numbers (e.g., `***-***-1234`)
@@ -51,8 +51,8 @@ This document outlines additional security posture improvements and best practic
 ---
 
 ### 3. **Structured Error Tracking & Monitoring**
-**Risk**: Security incidents go undetected  
-**Impact**: Delayed response to attacks, data breaches  
+**Risk**: Security incidents go undetected
+**Impact**: Delayed response to attacks, data breaches
 **Implementation**:
 - Integrate with error tracking service (Sentry, LogRocket, or Cloudflare Analytics)
 - Log security events (failed logins, CSRF failures, rate limit hits)
@@ -67,8 +67,8 @@ This document outlines additional security posture improvements and best practic
 ---
 
 ### 4. **Data Backup & Recovery Procedures**
-**Risk**: Data loss from corruption or accidental deletion  
-**Impact**: Loss of ARB request history, legal/audit issues  
+**Risk**: Data loss from corruption or accidental deletion
+**Impact**: Loss of ARB request history, legal/audit issues
 **Implementation**:
 - **D1 Database**: Set up automated backups (Cloudflare D1 supports scheduled backups)
 - **R2 Files**: Enable versioning and lifecycle policies
@@ -90,8 +90,8 @@ wrangler d1 export clrhoa_db --output backup-$(date +%Y%m%d).sql
 ---
 
 ### 5. **Enhanced Input Sanitization**
-**Risk**: XSS attacks via user-generated content  
-**Impact**: Session hijacking, data theft  
+**Risk**: XSS attacks via user-generated content
+**Impact**: Session hijacking, data theft
 **Implementation**:
 - Sanitize all user input before display (description, notes, applicant name)
 - Use DOMPurify or similar for HTML content
@@ -107,8 +107,8 @@ wrangler d1 export clrhoa_db --output backup-$(date +%Y%m%d).sql
 ## Medium Priority Recommendations 🟡
 
 ### 6. **Data Retention & Deletion Policies**
-**Risk**: Storing data longer than necessary, compliance issues  
-**Impact**: Privacy violations, increased attack surface  
+**Risk**: Storing data longer than necessary, compliance issues
+**Impact**: Privacy violations, increased attack surface
 **Implementation**:
 - Define retention periods:
   - **Approved/Rejected requests**: 7 years (legal/audit)
@@ -128,8 +128,8 @@ CREATE INDEX idx_arb_requests_deleted ON arb_requests(deleted_at);
 ---
 
 ### 7. **IP-Based Rate Limiting for API Endpoints**
-**Risk**: DDoS attacks, resource exhaustion  
-**Impact**: Service unavailability  
+**Risk**: DDoS attacks, resource exhaustion
+**Impact**: Service unavailability
 **Implementation**:
 - Use Cloudflare Rate Limiting (built-in)
 - Or implement per-IP rate limiting in KV store
@@ -145,8 +145,8 @@ CREATE INDEX idx_arb_requests_deleted ON arb_requests(deleted_at);
 ---
 
 ### 8. **Two-Factor Authentication (2FA) for ARB/Admin Roles**
-**Risk**: Compromised accounts with elevated privileges  
-**Impact**: Unauthorized approvals/rejections, data manipulation  
+**Risk**: Compromised accounts with elevated privileges
+**Impact**: Unauthorized approvals/rejections, data manipulation
 **Implementation**:
 - Use TOTP (Time-based One-Time Password) via authenticator apps
 - Store 2FA secrets encrypted in D1
@@ -160,8 +160,8 @@ CREATE INDEX idx_arb_requests_deleted ON arb_requests(deleted_at);
 ---
 
 ### 9. **Secure File Deletion**
-**Risk**: Deleted files still accessible via direct URLs  
-**Impact**: Privacy violations, data exposure  
+**Risk**: Deleted files still accessible via direct URLs
+**Impact**: Privacy violations, data exposure
 **Implementation**:
 - When deleting files, mark as deleted in DB but keep R2 objects
 - Implement secure deletion endpoint that requires authentication
@@ -171,8 +171,8 @@ CREATE INDEX idx_arb_requests_deleted ON arb_requests(deleted_at);
 ---
 
 ### 10. **Request Size Limits & Timeout Protection**
-**Risk**: Large file uploads causing DoS  
-**Impact**: Service unavailability  
+**Risk**: Large file uploads causing DoS
+**Impact**: Service unavailability
 **Implementation**:
 - Set Cloudflare Workers request size limit (already 100MB default)
 - Add request timeout (30 seconds for file uploads)
@@ -182,9 +182,9 @@ CREATE INDEX idx_arb_requests_deleted ON arb_requests(deleted_at);
 ---
 
 ### 10.1 **Virus scanning for uploads**
-**Risk**: Malware in uploaded files (ARB attachments, maintenance photos, member docs, feedback PDFs).  
-**Impact**: Stored malware could be served to users or spread; compliance/insurance concerns.  
-**Current state**: Files are validated by type/size and stored in R2; no malware scanning.  
+**Risk**: Malware in uploaded files (ARB attachments, maintenance photos, member docs, feedback PDFs).
+**Impact**: Stored malware could be served to users or spread; compliance/insurance concerns.
+**Current state**: Files are validated by type/size and stored in R2; no malware scanning.
 
 **Options**:
 - **ClamAV**: Self-hosted (e.g. in a Worker or separate service). Scan buffer before or after upload; reject if infected. Requires running ClamAV daemon and updating virus definitions.
@@ -198,8 +198,8 @@ CREATE INDEX idx_arb_requests_deleted ON arb_requests(deleted_at);
 ## Low Priority Recommendations 🟢
 
 ### 11. **Security.txt File**
-**Risk**: No responsible disclosure process  
-**Impact**: Security vulnerabilities not reported properly  
+**Risk**: No responsible disclosure process
+**Impact**: Security vulnerabilities not reported properly
 **Implementation**:
 - Create `public/.well-known/security.txt`
 - Include security contact email
@@ -216,8 +216,8 @@ Canonical: https://clrhoa.com/.well-known/security.txt
 ---
 
 ### 12. **Dependency Security Scanning**
-**Risk**: Vulnerable dependencies  
-**Impact**: Code execution, data breaches  
+**Risk**: Vulnerable dependencies
+**Impact**: Code execution, data breaches
 **Implementation**:
 - Set up Dependabot (GitHub) or similar
 - Run `npm audit` in CI/CD pipeline
@@ -241,8 +241,8 @@ jobs:
 ---
 
 ### 13. **Content Security Policy (CSP) Reporting**
-**Risk**: CSP violations go unnoticed  
-**Impact**: Potential XSS vulnerabilities  
+**Risk**: CSP violations go unnoticed
+**Impact**: Potential XSS vulnerabilities
 **Implementation**:
 - Add CSP `report-uri` or `report-to` directive
 - Set up reporting endpoint or use service (e.g., report-uri.com)
@@ -252,8 +252,8 @@ jobs:
 ---
 
 ### 14. **Data Export Feature for Users**
-**Risk**: Users can't access their own data  
-**Impact**: GDPR/CCPA compliance issues  
+**Risk**: Users can't access their own data
+**Impact**: GDPR/CCPA compliance issues
 **Implementation**:
 - Add "Export my data" button in My Requests
 - Generate JSON/CSV export of user's requests
@@ -263,8 +263,8 @@ jobs:
 ---
 
 ### 15. **Enhanced Session Security**
-**Risk**: Session fixation attacks  
-**Impact**: Unauthorized access  
+**Risk**: Session fixation attacks
+**Impact**: Unauthorized access
 **Implementation**:
 - Regenerate session ID on login (already done via new token)
 - Add session fingerprinting (browser + IP hash)
@@ -274,8 +274,8 @@ jobs:
 ---
 
 ### 16. **API Request Signing (Optional)**
-**Risk**: Replay attacks  
-**Impact**: Unauthorized actions  
+**Risk**: Replay attacks
+**Impact**: Unauthorized actions
 **Implementation**:
 - Add timestamp + nonce to API requests
 - Sign requests with HMAC using session secret

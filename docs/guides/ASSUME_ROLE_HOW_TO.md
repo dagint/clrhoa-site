@@ -13,10 +13,10 @@ This is a short, non-technical guide for **ARB+Board** members and **Administrat
 
 ## When to use “Act as Board” vs “Act as ARB”
 
-- **Act as Board**  
+- **Act as Board**
   Use when you need to do **Board** tasks: record dues payments, manage directory, documents, meetings, vendors, and other board operations. The portal will show you the same options a Board member sees (e.g. “Record payment” on Dues).
 
-- **Act as ARB**  
+- **Act as ARB**
   Use when you need to do **ARB** tasks: review and approve or reject ARB requests. The portal will show you the same options an ARB member sees (e.g. approve/reject on ARB requests).
 
 You can only be in **one** assumed role at a time. To switch, you must **drop** the current role (or wait for the timeout) before choosing the other.
