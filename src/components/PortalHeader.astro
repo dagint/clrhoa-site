@@ -1,0 +1,265 @@
+---
+/**
+ * Gmail-style top header for portal.
+ * Left: Hamburger menu (mobile) + Logo
+ * Right: Profile dropdown with settings
+ */
+interface Props {
+  userName?: string;
+  userEmail: string;
+  effectiveRole?: string;
+}
+
+const { userName, userEmail, effectiveRole = 'member' } = Astro.props;
+
+// Get first letter for avatar
+const avatarLetter = (userName || userEmail || 'M').charAt(0).toUpperCase();
+const displayName = userName || userEmail.split('@')[0];
+---
+
+<header class="portal-header fixed top-0 left-0 right-0 h-16 bg-white border-b border-gray-200 shadow-sm z-30 lg:left-72">
+  <div class="h-full px-4 sm:px-6 flex items-center justify-between gap-4">
+    <!-- Left: Mobile menu button -->
+    <div class="flex items-center gap-3">
+      <button
+        type="button"
+        id="sidebar-toggle"
+        class="lg:hidden p-2 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors"
+        aria-label="Toggle navigation menu"
+      >
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+      </button>
+
+      <!-- Page title - hidden on mobile, shown on desktop -->
+      <h1 class="hidden sm:block text-lg font-heading font-semibold text-gray-800">
+        <slot name="title">Dashboard</slot>
+      </h1>
+    </div>
+
+    <!-- Right: Profile dropdown + theme toggle -->
+    <div class="flex items-center gap-2">
+      <!-- Theme toggle -->
+      <button
+        type="button"
+        id="theme-toggle"
+        class="p-2 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors"
+        aria-label="Toggle dark mode"
+        title="Toggle dark mode"
+      >
+        <span id="theme-icon-light" class="hidden" aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="5" />
+            <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+          </svg>
+        </span>
+        <span id="theme-icon-dark" aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+          </svg>
+        </span>
+      </button>
+
+      <!-- Link to public site -->
+      <a
+        href="/"
+        class="hidden sm:flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-100 transition-colors"
+        title="View public website"
+      >
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+        </svg>
+        <span class="hidden md:inline">Public Site</span>
+      </a>
+
+      <!-- Profile dropdown -->
+      <div class="relative profile-dropdown">
+        <details class="group" id="profile-details">
+          <summary
+            class="list-none cursor-pointer flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+            aria-haspopup="true"
+            aria-expanded="false"
+            aria-controls="profile-menu"
+          >
+            <!-- Avatar -->
+            <div
+              class="w-9 h-9 rounded-full bg-clr-green text-white flex items-center justify-center font-semibold text-sm"
+              aria-hidden="true"
+            >
+              {avatarLetter}
+            </div>
+            <!-- Name (hidden on mobile) -->
+            <span class="hidden md:block text-sm font-medium text-gray-700 max-w-[150px] truncate">
+              {displayName}
+            </span>
+            <!-- Dropdown icon -->
+            <svg
+              class="w-4 h-4 text-gray-500 transition-transform group-open:rotate-180"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </summary>
+
+          <!-- Dropdown menu -->
+          <div
+            id="profile-menu"
+            class="absolute right-0 top-full mt-2 w-64 rounded-xl bg-white border border-gray-200 shadow-lg z-50"
+            role="menu"
+          >
+            <!-- User info header -->
+            <div class="px-4 py-3 border-b border-gray-100">
+              <p class="text-sm font-semibold text-gray-800 truncate">{userName || 'Member'}</p>
+              <p class="text-xs text-gray-500 truncate">{userEmail}</p>
+              <p class="text-xs text-clr-green font-medium mt-1 capitalize">Role: {effectiveRole}</p>
+            </div>
+
+            <!-- Menu items -->
+            <div class="py-2">
+              <a
+                href="/portal/profile"
+                class="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                role="menuitem"
+              >
+                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+                <span>My Profile</span>
+              </a>
+
+              <a
+                href="/portal/profile/security"
+                class="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                role="menuitem"
+              >
+                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+                <span>Security Settings</span>
+              </a>
+
+              <a
+                href="/portal/preferences"
+                class="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                role="menuitem"
+              >
+                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                <span>Preferences</span>
+              </a>
+
+              <a
+                href="/portal/my-activity"
+                class="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                role="menuitem"
+              >
+                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>My Activity</span>
+              </a>
+            </div>
+
+            <!-- Sign out -->
+            <div class="border-t border-gray-100 py-2">
+              <a
+                href="/api/logout"
+                class="flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                role="menuitem"
+              >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+                <span class="font-medium">Sign Out</span>
+              </a>
+            </div>
+          </div>
+        </details>
+      </div>
+    </div>
+  </div>
+</header>
+
+<style>
+  .profile-dropdown details summary::-webkit-details-marker {
+    display: none;
+  }
+</style>
+
+<script is:inline>
+  (function () {
+    // Sidebar toggle
+    const sidebarToggle = document.getElementById('sidebar-toggle');
+    if (sidebarToggle) {
+      sidebarToggle.addEventListener('click', function () {
+        if (window.togglePortalSidebar) {
+          window.togglePortalSidebar();
+        }
+      });
+    }
+
+    // Theme toggle
+    const KEY = 'clrhoa_theme';
+    const root = document.documentElement;
+    const toggle = document.getElementById('theme-toggle');
+    const iconLight = document.getElementById('theme-icon-light');
+    const iconDark = document.getElementById('theme-icon-dark');
+
+    if (toggle && iconLight && iconDark) {
+      function applyTheme(dark) {
+        if (dark) {
+          root.classList.add('dark');
+          iconLight.classList.remove('hidden');
+          iconDark.classList.add('hidden');
+        } else {
+          root.classList.remove('dark');
+          iconLight.classList.add('hidden');
+          iconDark.classList.remove('hidden');
+        }
+      }
+
+      try {
+        const stored = localStorage.getItem(KEY);
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        applyTheme(stored === 'dark' || (stored !== 'light' && prefersDark));
+      } catch (_) {
+        applyTheme(false);
+      }
+
+      toggle.addEventListener('click', function () {
+        const isDark = root.classList.toggle('dark');
+        try {
+          localStorage.setItem(KEY, isDark ? 'dark' : 'light');
+        } catch (_) {}
+        iconLight.classList.toggle('hidden', !isDark);
+        iconDark.classList.toggle('hidden', isDark);
+      });
+    }
+
+    // Profile dropdown aria management
+    const profileDetails = document.getElementById('profile-details');
+    if (profileDetails && profileDetails.tagName === 'DETAILS') {
+      const summary = profileDetails.querySelector('summary');
+      function syncAria() {
+        if (summary) {
+          summary.setAttribute('aria-expanded', String(profileDetails.open));
+        }
+      }
+      profileDetails.addEventListener('toggle', syncAria);
+      syncAria();
+
+      // Close dropdown when clicking outside
+      document.addEventListener('click', function (e) {
+        const target = e.target;
+        if (!profileDetails.contains(target)) {
+          profileDetails.open = false;
+        }
+      });
+    }
+  })();
+</script>

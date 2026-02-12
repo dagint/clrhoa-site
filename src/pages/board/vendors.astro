@@ -1,14 +1,16 @@
 ---
 export const prerender = false;
 
-import BoardLayout from '../../layouts/BoardLayout.astro';
 import { getBoardContext } from '../../lib/board-context';
+import { getPortalBadgeCounts } from '../../lib/portal-badge-counts';
 import { isBoardOnly } from '../../lib/auth';
 import { listVendors } from '../../lib/vendors-db';
 import { listPendingSubmissions } from '../../lib/vendor-submissions-db';
-import { listArbRequestsByHousehold } from '../../lib/arb-db';
 import { escapeHtml } from '../../lib/sanitize';
+import PortalLayout from '../../layouts/PortalLayout.astro';
+import PortalPage from '../../components/PortalPage.astro';
 
+import BoardNav from '../../components/BoardNav.astro';
 const ctx = await getBoardContext(Astro);
 if ('redirect' in ctx) return Astro.redirect(ctx.redirect);
 const { env, session, effectiveRole } = ctx;
@@ -39,10 +41,11 @@ function vendorsPageUrl(value: number): string {
 }
 
 const db = env?.DB;
+const { email, role, name } = session;
+const badges = await getPortalBadgeCounts(db, email, role, name);
 const vendorsList = db ? await listVendors(db, pageSize, (page - 1) * pageSize) : [];
 const pendingSubmissions = db ? await listPendingSubmissions(db) : [];
-const allRequests = db ? await listArbRequestsByHousehold(db, session.email) : [];
-const draftCount = allRequests.filter((r) => r.status === 'pending').length;
+
 
 /** Unique sorted categories from current vendors; always include "Other". */
 const existingCategories = Array.from(
@@ -66,13 +69,30 @@ function parseFiles(filesJson: string | null): { name: string; key: string }[] {
 }
 ---
 
-<BoardLayout title="Vendors" subtitle="Manage recommended vendors" draftCount={draftCount} role={effectiveRole} session={session} elevatedUntil={session.elevated_until}>
-  <div id="csrf-holder" class="hidden" data-csrf={escapeHtml(session.csrfToken ?? '')} aria-hidden="true"></div>
+<PortalLayout title="Vendors | Board | Member Portal | Crooked Lake Reserve HOA">
+  <PortalPage
+    currentPath="/board/vendors"
+    pageTitle="Vendors"
+    userName={badges.displayName ?? undefined}
+    userEmail={email}
+    effectiveRole={effectiveRole}
+    draftCount={badges.draftCount}
+    role={effectiveRole}
+    staffRole={role ?? ''}
+    arbInReviewCount={badges.arbInReviewCount}
+    vendorPendingCount={badges.vendorPendingCount}
+    maintenanceOpenCount={badges.maintenanceOpenCount}
+    meetingsRsvpCount={badges.meetingsRsvpCount}
+  >
+    <BoardNav currentPath="/board/vendors" />
+
+unt}
+<div id="csrf-holder" class="hidden" data-csrf={escapeHtml(session.csrfToken ?? '')} aria-hidden="true"></div>
   <div id="vendors-message" class="hidden mb-4 p-4 rounded-xl border" role="status" aria-live="polite" aria-atomic="true"></div>
       {pendingSubmissions.length > 0 && (
         <section class="mb-8">
-          <h2 class="text-xl font-heading font-bold text-clr-green mb-3">Pending vendor suggestions</h2>
-          <p class="text-sm text-gray-600 mb-4">Members have suggested these vendors. Approve to add them to the list, or reject with an optional note.</p>
+          <h2 class="text-3xl font-heading font-bold text-clr-green mb-3">Pending vendor suggestions</h2>
+          <p class="text-base text-gray-600 mb-4">Members have suggested these vendors. Approve to add them to the list, or reject with an optional note.</p>
           <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
             <ul class="divide-y divide-gray-100">
               {pendingSubmissions.map((sub) => {
@@ -88,7 +108,7 @@ function parseFiles(filesJson: string | null): { name: string; key: string }[] {
                         {sub.website && (
                           <div class="text-sm text-gray-600"><a href={sub.website.startsWith('http') ? sub.website : `https://${sub.website}`} target="_blank" rel="noopener noreferrer" class="text-clr-green hover:underline">{sub.website}</a></div>
                         )}
-                        {sub.notes && <p class="text-sm text-gray-500 mt-1">{sub.notes}</p>}
+                        {sub.notes && <p class="text-base text-gray-500 mt-1">{sub.notes}</p>}
                         {sub.submitted_by && <p class="text-xs text-gray-400 mt-1">Submitted by {sub.submitted_by}</p>}
                         {subFiles.length > 0 && (
                           <div class="mt-2 text-sm text-clr-green">
@@ -99,14 +119,14 @@ function parseFiles(filesJson: string | null): { name: string; key: string }[] {
                         )}
                       </div>
                       <div class="flex flex-col sm:flex-row gap-2">
-                        <button type="button" class="approve-submission-btn px-3 py-1.5 bg-clr-green text-white rounded-lg text-sm font-medium hover:brightness-110" data-id={sub.id}>Approve</button>
-                        <button type="button" class="reject-submission-btn px-3 py-1.5 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300" data-id={sub.id}>Reject</button>
+                        <button type="button" class="approve-submission-btn px-5 py-2.5 bg-clr-green text-white rounded-lg text-base font-medium hover:brightness-110" data-id={sub.id}>Approve</button>
+                        <button type="button" class="reject-submission-btn px-5 py-2.5 bg-gray-200 text-gray-700 rounded-lg text-base font-medium hover:bg-gray-300" data-id={sub.id}>Reject</button>
                       </div>
                     </div>
                     <div class="reject-notes-wrap hidden mt-2" data-for={sub.id}>
                       <label class="block text-xs font-medium text-gray-500 mb-1">Rejection note (optional)</label>
                       <input type="text" class="reject-notes-input block w-full rounded border border-gray-200 px-2 py-1 text-sm" placeholder="e.g. Duplicate or not relevant" />
-                      <button type="button" class="confirm-reject-btn mt-2 px-3 py-1 bg-red-100 text-red-700 rounded text-sm" data-id={sub.id}>Confirm reject</button>
+                      <button type="button" class="confirm-reject-btn mt-2 px-3 py-1 bg-red-100 text-red-700 rounded text-base" data-id={sub.id}>Confirm reject</button>
                     </div>
                   </li>
                 );
@@ -119,8 +139,8 @@ function parseFiles(filesJson: string | null): { name: string; key: string }[] {
       {isBoardOrAdmin && (
         <>
       <section class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-8" aria-labelledby="upload-vendor-list-heading">
-        <h2 id="upload-vendor-list-heading" class="text-xl font-heading font-bold text-clr-green mb-3">Upload vendor list</h2>
-        <p class="text-sm text-gray-600 mb-4">Upload a CSV file to add many vendors at once. Columns: <strong>name</strong>, category, phone, email, website, notes. Optional: <strong>show_on_public</strong> (1 = public and portal, 0 = portal only). First row may be a header.</p>
+        <h2 id="upload-vendor-list-heading" class="text-3xl font-heading font-bold text-clr-green mb-3">Upload vendor list</h2>
+        <p class="text-base text-gray-600 mb-4">Upload a CSV file to add many vendors at once. Columns: <strong>name</strong>, category, phone, email, website, notes. Optional: <strong>show_on_public</strong> (1 = public and portal, 0 = portal only). First row may be a header.</p>
         <div id="vendor-upload-message" class="hidden mb-4 p-4 rounded-xl border" role="status" aria-live="polite"></div>
         <form id="vendor-upload-csv-form" class="flex flex-wrap items-end gap-4">
           <input type="hidden" name="csrf_token" value={escapeHtml(session.csrfToken ?? '')} />
@@ -128,9 +148,9 @@ function parseFiles(filesJson: string | null): { name: string; key: string }[] {
             <label for="vendor-csv-file" class="block text-sm font-medium text-gray-700 mb-1">CSV file</label>
             <input type="file" id="vendor-csv-file" name="file" accept=".csv,text/csv,text/plain" class="block w-full text-sm text-gray-500 file:mr-4 file:rounded file:border-0 file:bg-clr-green file:px-4 file:py-2 file:text-white file:font-medium hover:file:brightness-110" />
           </div>
-          <button type="submit" id="vendor-upload-csv-btn" class="px-4 py-2 bg-clr-green text-white rounded-lg font-medium hover:brightness-110">Upload CSV</button>
+          <button type="submit" id="vendor-upload-csv-btn" class="px-5 py-2.5 bg-clr-green text-white rounded-lg font-medium hover:brightness-110">Upload CSV</button>
         </form>
-        <p class="text-sm text-gray-500 mt-3">
+        <p class="text-base text-gray-500 mt-3">
           <a href="/sample-vendor-list.csv" download class="text-clr-green hover:underline">Download sample CSV</a>
         </p>
       </section>
@@ -199,15 +219,15 @@ function parseFiles(filesJson: string | null): { name: string; key: string }[] {
           <input type="file" id="vendor-files" name="file_0" multiple class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:rounded file:border-0 file:bg-clr-green file:px-4 file:py-2 file:text-white file:font-medium hover:file:brightness-110" />
         </div>
         <div class="flex gap-3">
-          <button type="submit" id="vendor-submit" class="px-4 py-2 bg-clr-green text-white rounded-lg font-medium hover:brightness-110">Create vendor</button>
-          <button type="button" id="vendor-cancel-edit" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 hidden">Cancel edit</button>
+          <button type="submit" id="vendor-submit" class="px-5 py-2.5 bg-clr-green text-white rounded-lg font-medium hover:brightness-110">Create vendor</button>
+          <button type="button" id="vendor-cancel-edit" class="px-5 py-2.5 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 hidden">Cancel edit</button>
         </div>
       </form>
         </>
       )}
 
       <h3 class="text-lg font-heading font-semibold text-clr-green mb-3">Current vendors — edit inline</h3>
-      <p class="text-sm text-gray-600 mb-4">Edit any cell and click <strong>Save</strong> on that row to update. Use the form above to add a new vendor.</p>
+      <p class="text-base text-gray-600 mb-4">Edit any cell and click <strong>Save</strong> on that row to update. Use the form above to add a new vendor.</p>
       {vendorsList.length === 0 && page === 1 ? (
         <p class="text-gray-500">No vendors yet. Add one above or upload a CSV.</p>
       ) : (
@@ -660,4 +680,5 @@ function parseFiles(filesJson: string | null): { name: string; key: string }[] {
       });
     })();
   </script>
-</BoardLayout>
+  </PortalPage>
+</PortalLayout>

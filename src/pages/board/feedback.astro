@@ -1,13 +1,15 @@
 ---
 export const prerender = false;
 
-import BoardLayout from '../../layouts/BoardLayout.astro';
 import { getBoardContext } from '../../lib/board-context';
+import { getPortalBadgeCounts } from '../../lib/portal-badge-counts';
 import { isBoardOnly } from '../../lib/auth';
 import { listAllFeedbackDocs, getFeedbackResponseCounts } from '../../lib/feedback-db';
 import { listOwners } from '../../lib/directory-db';
-import { listArbRequestsByHousehold } from '../../lib/arb-db';
+import PortalLayout from '../../layouts/PortalLayout.astro';
+import PortalPage from '../../components/PortalPage.astro';
 
+import BoardNav from '../../components/BoardNav.astro';
 const ctx = await getBoardContext(Astro);
 if ('redirect' in ctx) return Astro.redirect(ctx.redirect);
 const { env, session, effectiveRole } = ctx;
@@ -39,11 +41,12 @@ function feedbackPageUrl(value: number): string {
 }
 
 const db = env?.DB;
+const { email, role, name } = session;
+const badges = await getPortalBadgeCounts(db, email, role, name);
 const docs = db ? await listAllFeedbackDocs(db, pageSize, (page - 1) * pageSize) : [];
 const owners = db ? await listOwners(db) : [];
 const totalOwners = owners.length;
-const allRequests = db ? await listArbRequestsByHousehold(db, session.email) : [];
-const draftCount = allRequests.filter((r) => r.status === 'pending').length;
+
 const docsWithCounts = db
   ? await Promise.all(
       docs.map(async (d) => {
@@ -63,10 +66,27 @@ function formatDate(s: string | null): string {
 }
 ---
 
-<BoardLayout title="Feedback" subtitle="Manage document feedback requests" draftCount={draftCount} role={effectiveRole} session={session} elevatedUntil={session.elevated_until}>
-  <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
-        <h2 class="text-xl font-heading font-bold text-clr-green">Feedback documents</h2>
-        <button type="button" id="btn-new-feedback" class="inline-flex items-center gap-2 bg-clr-green hover:brightness-110 text-white px-4 py-2 rounded-xl font-semibold text-sm">
+<PortalLayout title="Feedback | Board | Member Portal | Crooked Lake Reserve HOA">
+  <PortalPage
+    currentPath="/board/feedback"
+    pageTitle="Feedback"
+    userName={badges.displayName ?? undefined}
+    userEmail={email}
+    effectiveRole={effectiveRole}
+    draftCount={badges.draftCount}
+    role={effectiveRole}
+    staffRole={role ?? ''}
+    arbInReviewCount={badges.arbInReviewCount}
+    vendorPendingCount={badges.vendorPendingCount}
+    maintenanceOpenCount={badges.maintenanceOpenCount}
+    meetingsRsvpCount={badges.meetingsRsvpCount}
+  >
+    <BoardNav currentPath="/board/feedback" />
+
+unt}
+<div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+        <h2 class="text-3xl font-heading font-bold text-clr-green">Feedback documents</h2>
+        <button type="button" id="btn-new-feedback" class="inline-flex items-center gap-2 bg-clr-green hover:brightness-110 text-white px-5 py-2.5 rounded-xl font-semibold text-base">
           New feedback request
         </button>
       </div>
@@ -92,8 +112,8 @@ function formatDate(s: string | null): string {
             <input type="file" id="form-pdf" name="file" accept=".pdf,application/pdf" class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-clr-green file:text-white" />
           </div>
           <div class="flex gap-2">
-            <button type="submit" class="bg-clr-green hover:brightness-110 text-white px-4 py-2 rounded-lg font-medium text-sm">Create</button>
-            <button type="button" id="btn-cancel-form" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg font-medium text-sm">Cancel</button>
+            <button type="submit" class="bg-clr-green hover:brightness-110 text-white px-5 py-2.5 rounded-lg font-medium text-base">Create</button>
+            <button type="button" id="btn-cancel-form" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-5 py-2.5 rounded-lg font-medium text-base">Cancel</button>
           </div>
         </form>
       </div>
@@ -130,8 +150,8 @@ function formatDate(s: string | null): string {
               <li class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h3 class="font-semibold text-clr-green">{d.title || 'Document'}</h3>
-                  <p class="text-sm text-gray-500">Due {formatDate(d.deadline)}</p>
-                  <p class="text-sm text-gray-600 mt-1">
+                  <p class="text-base text-gray-500">Due {formatDate(d.deadline)}</p>
+                  <p class="text-base text-gray-600 mt-1">
                     {responded}/{totalOwners} owners responded ({pct}%) - {d.counts.approved} approved, {d.counts.rejected} rejected
                   </p>
                 </div>
@@ -224,4 +244,5 @@ function formatDate(s: string | null): string {
     }
   });
 </script>
-</BoardLayout>
+  </PortalPage>
+</PortalLayout>

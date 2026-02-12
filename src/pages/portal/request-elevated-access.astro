@@ -2,11 +2,10 @@
 export const prerender = false;
 
 import PortalLayout from '../../layouts/PortalLayout.astro';
-import ProtectedPage from '../../components/ProtectedPage.astro';
-import PortalNav from '../../components/PortalNav.astro';
+import PortalPage from '../../components/PortalPage.astro';
 import { getPortalContext } from '../../lib/portal-context';
+import { getPortalBadgeCounts } from '../../lib/portal-badge-counts';
 import { isElevatedRole, getEffectiveRole } from '../../lib/auth';
-import { listArbRequestsByHousehold } from '../../lib/arb-db';
 
 const { env, session, effectiveRole } = await getPortalContext(Astro, { fingerprint: true });
 if (!session) return Astro.redirect('/portal/login');
@@ -30,42 +29,54 @@ if (isCurrentlyElevated) {
   return Astro.redirect(landing);
 }
 
+const { email, role, name } = session;
 const db = env?.DB;
-const allRequests = db ? await listArbRequestsByHousehold(db, session.email) : [];
-const draftCount = allRequests.filter((r) => r.status === 'pending').length;
+const badges = await getPortalBadgeCounts(db, email, role, name);
 
 const returnParam = Astro.url.searchParams.get('return');
 const returnLabel = returnParam && returnParam.startsWith('/board') ? 'Board' : returnParam && returnParam.startsWith('/admin') ? 'Admin' : returnParam && returnParam.includes('arb-dashboard') ? 'ARB Dashboard' : returnParam ? 'that page' : null;
 ---
 
 <PortalLayout title="Request elevated access | Member Portal | Crooked Lake Reserve HOA">
-  <ProtectedPage>
-  <div class="min-h-screen portal-theme-bg font-body">
-    <PortalNav currentPath="/portal/request-elevated-access" draftCount={draftCount} role={effectiveRole} staffRole={session.role ?? ''} />
-
-    <main class="max-w-2xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
-      <div class="bg-white rounded-2xl shadow-sm border border-gray-100 portal-theme-card p-6 sm:p-8">
-        <h1 class="text-2xl font-heading font-bold text-clr-green mb-2">Elevated access required</h1>
-        <p class="text-gray-600 portal-theme-text-muted mb-4">
+  <PortalPage
+    currentPath="/portal/request-elevated-access"
+    pageTitle="Elevated Access Required"
+    userName={badges.displayName ?? undefined}
+    userEmail={email}
+    effectiveRole={effectiveRole}
+    draftCount={badges.draftCount}
+    role={effectiveRole}
+    staffRole={role ?? ''}
+    arbInReviewCount={badges.arbInReviewCount}
+    vendorPendingCount={badges.vendorPendingCount}
+    maintenanceOpenCount={badges.maintenanceOpenCount}
+    meetingsRsvpCount={badges.meetingsRsvpCount}
+    feedbackDueCount={badges.feedbackDueCount}
+  >
+    <div class="max-w-2xl">
+      <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8">
+        <h1 class="text-3xl font-heading font-bold text-clr-green mb-3">Elevated access required</h1>
+        <p class="text-gray-700 text-base mb-4">
           You have a Board, ARB, or Admin role. To use Board tools (directory, dues, meetings, documents, audit logs) or the ARB dashboard, you need to request <strong>elevated access</strong> for a short time.
         </p>
-        <p class="text-sm text-gray-600 mb-6">
-          Elevated access lasts 2 hours. When you’re done, use <strong>Drop access</strong> in the banner to return to normal member view. All requests are logged for transparency.
+        <p class="text-base text-gray-600 mb-6">
+          Elevated access lasts 2 hours. When you're done, use <strong>Drop access</strong> in the banner to return to normal member view. All requests are logged for transparency.
         </p>
-        <div class="flex flex-wrap items-center gap-3">
-          <button type="button" id="pim-elevate-btn" class="bg-amber-600 hover:bg-amber-700 text-white px-5 py-2.5 rounded-lg font-semibold text-sm shadow-sm">
+        <div class="flex flex-wrap items-center gap-4">
+          <button type="button" id="pim-elevate-btn" class="bg-amber-600 hover:bg-amber-700 text-white px-6 py-3 rounded-lg font-semibold text-base shadow-sm">
             Request elevated access
           </button>
-          <a href="/portal/dashboard" class="text-sm text-gray-600 hover:text-clr-green underline">Back to dashboard</a>
+          <a href="/portal/dashboard" class="text-base text-gray-600 hover:text-clr-green underline">Back to dashboard</a>
         </div>
         {returnLabel && (
-          <p class="mt-4 text-sm text-gray-500 portal-theme-text-muted">
-            After you request access, you’ll be taken to {returnLabel}.
+          <p class="mt-4 text-base text-gray-500">
+            After you request access, you'll be taken to {returnLabel}.
           </p>
         )}
       </div>
-    </main>
-  </div>
+    </div>
+  </PortalPage>
+
   <script is:inline define:vars={{ returnParam, staffRole: whitelistRole, adminLanding: '/portal/admin', boardLanding: '/portal/board', arbLanding: '/portal/arb' }}>
     (function () {
       var btn = document.getElementById('pim-elevate-btn');
@@ -88,5 +99,4 @@ const returnLabel = returnParam && returnParam.startsWith('/board') ? 'Board' : 
       });
     })();
   </script>
-  </ProtectedPage>
 </PortalLayout>

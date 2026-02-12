@@ -2,13 +2,12 @@
 export const prerender = false;
 
 import PortalLayout from '../../layouts/PortalLayout.astro';
-import ProtectedPage from '../../components/ProtectedPage.astro';
-import PortalNav from '../../components/PortalNav.astro';
+import PortalPage from '../../components/PortalPage.astro';
 import FormField from '../../components/FormField.astro';
 import ESignatureCapture from '../../components/ESignatureCapture.astro';
 import { getPortalContext } from '../../lib/portal-context';
+import { getPortalBadgeCounts } from '../../lib/portal-badge-counts';
 import { SESSION_COOKIE_NAME } from '../../lib/auth';
-import { listArbRequestsByHousehold } from '../../lib/arb-db';
 import { getOwnerByEmail, getPhonesArray } from '../../lib/directory-db';
 import { getPreapprovalById } from '../../lib/preapproval-db';
 
@@ -68,10 +67,10 @@ if (!session.csrfToken) {
   return Astro.redirect('/portal/login');
 }
 
-// Get draft count for navigation badge
+// Get badge counts for navigation
 const db = env?.DB;
-const allRequests = db ? await listArbRequestsByHousehold(db, session.email) : [];
-const draftCount = allRequests.filter(r => r.status === 'pending').length;
+const { email, role, name } = session;
+const badges = await getPortalBadgeCounts(db, email, role, name);
 
 // Prefill from directory if user has an owner row (property address, name, phone)
 const ownerForPrefill = db ? await getOwnerByEmail(db, session.email) : null;
@@ -91,28 +90,40 @@ if (db && templateId) {
   }
 }
 
-const arbLabelClass = 'block text-sm font-semibold text-gray-700 mb-1';
-const arbInputClass = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-clr-green focus:ring-1 focus:ring-clr-green';
+const arbLabelClass = 'block text-base font-semibold text-gray-700 mb-2';
+const arbInputClass = 'w-full rounded-lg border border-gray-300 px-4 py-3 text-base text-gray-900 focus:border-clr-green focus:outline-none focus:ring-2 focus:ring-clr-green';
 ---
 
 <PortalLayout title="New ARB Request | Member Portal | Crooked Lake Reserve HOA">
-  <ProtectedPage>
-  <div class="min-h-screen portal-theme-bg font-body">
-    <PortalNav currentPath="/portal/arb-request" draftCount={draftCount} role={effectiveRole} staffRole={session?.role ?? ''} />
-
-    <main class="max-w-2xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
-      <h2 class="text-2xl font-heading font-bold text-clr-green mb-2">Architectural Review Application</h2>
-
-      <p class="text-gray-700 mb-4 text-sm sm:text-base">
-        Complete this form and submit it electronically. Your application will be sent to the Association's Architectural Review Board for review. <strong>Do not commence work until you receive approval</strong> from the ARB.
-      </p>
-      <p class="text-sm text-gray-500 mb-4">This is a digital submission. You will confirm your submission with an electronic signature below. If you have saved your contact and property address in <a href="/portal/profile" class="text-clr-green hover:underline">Profile</a>, those fields are prefilled below; you can change them as needed.</p>
-      <div class="flex flex-wrap items-center gap-4 mb-6">
-        <a href="/arb-request-how-to" class="text-clr-orange font-semibold hover:underline text-sm">How to submit an ARB request</a>
-        <span class="text-gray-400">|</span>
-        <a href="/portal/library" class="text-clr-green font-semibold hover:underline text-sm">Pre-approval library</a>
-        <span class="text-gray-400">|</span>
-        <a href="/contact" class="text-clr-green font-semibold hover:underline text-sm">ARB Guidelines & Requirements</a>
+  <PortalPage
+    currentPath="/portal/arb-request"
+    pageTitle="New ARB Request"
+    userName={badges.displayName ?? undefined}
+    userEmail={email}
+    effectiveRole={effectiveRole}
+    draftCount={badges.draftCount}
+    role={effectiveRole}
+    staffRole={role ?? ''}
+    arbInReviewCount={badges.arbInReviewCount}
+    vendorPendingCount={badges.vendorPendingCount}
+    maintenanceOpenCount={badges.maintenanceOpenCount}
+    meetingsRsvpCount={badges.meetingsRsvpCount}
+    feedbackDueCount={badges.feedbackDueCount}
+  >
+    <div class="max-w-4xl mx-auto">
+      <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8 mb-8">
+        <h1 class="text-3xl font-heading font-bold text-clr-green mb-3">Architectural Review Application</h1>
+        <p class="text-gray-700 text-lg mb-4 leading-relaxed">
+          Complete this form and submit it electronically. Your application will be sent to the Association's Architectural Review Board for review. <strong>Do not commence work until you receive approval</strong> from the ARB.
+        </p>
+        <p class="text-base text-gray-600 mb-5">This is a digital submission. You will confirm your submission with an electronic signature below. If you have saved your contact and property address in <a href="/portal/profile" class="text-clr-orange hover:underline font-semibold">Profile</a>, those fields are prefilled below; you can change them as needed.</p>
+        <div class="flex flex-wrap items-center gap-4">
+          <a href="/arb-request-how-to" class="text-clr-orange font-semibold hover:underline text-base">How to submit an ARB request</a>
+          <span class="text-gray-300">|</span>
+          <a href="/portal/library" class="text-clr-green font-semibold hover:underline text-base">Pre-approval library</a>
+          <span class="text-gray-300">|</span>
+          <a href="/contact" class="text-clr-green font-semibold hover:underline text-base">ARB Guidelines & Requirements</a>
+        </div>
       </div>
 
       <form
@@ -294,8 +305,7 @@ const arbInputClass = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-g
           </button>
         </div>
       </form>
-    </main>
-  </div>
+    </div>
 
   <script is:inline define:vars={{ maxFileBytes: 5 * 1024 * 1024, maxTotalBytes: 25 * 1024 * 1024, reviewMaxWidth: 2000, archiveMaxWidth: 1200 }}>
     (function () {
@@ -708,5 +718,6 @@ const arbInputClass = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-g
       setInterval(checkSessionTimeout, 60 * 1000);
     })();
   </script>
-  </ProtectedPage>
+    </div>
+  </PortalPage>
 </PortalLayout>

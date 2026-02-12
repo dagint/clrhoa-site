@@ -2,25 +2,23 @@
 export const prerender = false;
 
 import PortalLayout from '../../layouts/PortalLayout.astro';
-import ProtectedPage from '../../components/ProtectedPage.astro';
-import PortalNav from '../../components/PortalNav.astro';
+import PortalPage from '../../components/PortalPage.astro';
 import { getPortalContext } from '../../lib/portal-context';
+import { getPortalBadgeCounts } from '../../lib/portal-badge-counts';
 import { getOwnerByEmail, getPrimaryOwnerEmailForAddress } from '../../lib/directory-db';
-import { listArbRequestsByHousehold } from '../../lib/arb-db';
 import { getAssessmentByOwner, getPaymentHistory, listSpecialAssessmentsByOwner } from '../../lib/assessments-db';
 
 const { env, session, effectiveRole } = await getPortalContext(Astro, { fingerprint: true });
 if (!session) return Astro.redirect('/portal/login');
 
+const { email, role, name } = session;
 const db = env?.DB;
-const draftCount = db
-  ? (await listArbRequestsByHousehold(db, session.email)).filter((r) => r.status === 'pending').length
-  : 0;
+const badges = await getPortalBadgeCounts(db, email, role, name);
 // Assessments are per property (address). Use primary owner at this address so everyone at the same address sees the same dues.
-const owner = db ? await getOwnerByEmail(db, session.email) : null;
+const owner = db ? await getOwnerByEmail(db, email) : null;
 const assessmentEmail = db && owner?.address
-  ? (await getPrimaryOwnerEmailForAddress(db, owner.address)) ?? session.email
-  : session.email;
+  ? (await getPrimaryOwnerEmailForAddress(db, owner.address)) ?? email
+  : email;
 const assessment = db ? await getAssessmentByOwner(db, assessmentEmail) : null;
 const paymentHistory = db ? await getPaymentHistory(db, assessmentEmail) : [];
 const specialAssessments = db ? await listSpecialAssessmentsByOwner(db, assessmentEmail) : [];
@@ -137,211 +135,230 @@ function daysRemaining(nextDue: string | null): number | null {
 ---
 
 <PortalLayout title="Dues | Member Portal | Crooked Lake Reserve HOA">
-  <ProtectedPage>
-  <div class="min-h-screen portal-theme-bg font-body">
-    <PortalNav currentPath="/portal/assessments" draftCount={draftCount} role={effectiveRole} staffRole={session?.role ?? ''} />
-
-    <main class="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
-      <h2 class="text-2xl font-heading font-bold text-clr-green mb-2">Dues & balance</h2>
-      <p class="text-gray-600 mb-2">
+  <PortalPage
+    currentPath="/portal/assessments"
+    pageTitle="Dues & Balance"
+    userName={badges.displayName ?? undefined}
+    userEmail={email}
+    effectiveRole={effectiveRole}
+    draftCount={badges.draftCount}
+    role={effectiveRole}
+    staffRole={role ?? ''}
+    arbInReviewCount={badges.arbInReviewCount}
+    vendorPendingCount={badges.vendorPendingCount}
+    maintenanceOpenCount={badges.maintenanceOpenCount}
+    meetingsRsvpCount={badges.meetingsRsvpCount}
+    feedbackDueCount={badges.feedbackDueCount}
+  >
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8 mb-8">
+      <h1 class="text-3xl font-heading font-bold text-clr-green mb-3">Dues & Balance</h1>
+      <p class="text-gray-600 text-lg mb-3">
         View your balance, dues schedule, and payment history. No payment processing here; pay by the method specified by the board.
       </p>
-      <p class="text-sm text-gray-500 mb-6">
+      <p class="text-base text-gray-500">
         Your balance may include quarterly dues and any <strong>special assessments</strong> the board has added. The board can change the dues amount per quarter; check the schedule below or contact the board for the current amount.
       </p>
+    </div>
 
-      {!assessment ? (
-        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center mb-8">
-          <p class="text-gray-600 mb-2">No dues record found for your account.</p>
-          <p class="text-sm text-gray-500 mb-4">If you just joined, the board may need to add you to the roster. Otherwise, contact the board if you believe this is an error.</p>
-          <a href="/portal/faq" class="text-clr-green font-semibold hover:underline">See FAQ</a>
-        </div>
-      ) : (
-        <div class={`rounded-2xl shadow-sm border p-6 mb-8 ${isOverdue || totalDueFromSpecials > 0 ? 'bg-red-50 border-red-200' : 'bg-white border-gray-100'}`}>
-          <p class="text-sm text-gray-500 mb-1">Current balance</p>
-          <p class={`text-3xl font-heading font-bold ${isOverdue || totalDueFromSpecials > 0 ? 'text-red-700' : 'text-clr-green'}`}>
-            {formatCurrency(assessment.balance + totalDueFromSpecials)}
-            {totalDueFromSpecials > 0 && (
-              <span class="text-lg font-normal ml-2 text-gray-600">
-                (includes {formatCurrency(assessment.balance)} dues + {formatCurrency(totalDueFromSpecials)} special)
-              </span>
-            )}
-            {assessment.next_due && !isPaidThrough && (
-              <span class="text-lg font-normal ml-2">
-                Due {formatDate(assessment.next_due)}
-              </span>
-            )}
-            {isPaidThrough && assessment.paid_through && (
-              <span class="text-lg font-normal ml-2 text-clr-green">
-                Paid through {formatDate(assessment.paid_through)}
-              </span>
-            )}
-          </p>
+    {!assessment ? (
+      <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-12 text-center mb-8">
+        <svg class="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2zM10 8.5a.5.5 0 11-1 0 .5.5 0 011 0zm5 5a.5.5 0 11-1 0 .5.5 0 011 0z" />
+        </svg>
+        <p class="text-gray-600 text-lg mb-2">No dues record found for your account.</p>
+        <p class="text-base text-gray-500 mb-4">If you just joined, the board may need to add you to the roster. Otherwise, contact the board if you believe this is an error.</p>
+        <a href="/portal/faq" class="text-clr-green font-semibold hover:underline text-base">See FAQ</a>
+      </div>
+    ) : (
+      <div class={`rounded-2xl shadow-sm border p-6 sm:p-8 mb-8 ${isOverdue || totalDueFromSpecials > 0 ? 'bg-red-50 border-red-200' : 'bg-white border-gray-100'}`}>
+        <p class="text-base text-gray-600 mb-2">Current balance</p>
+        <p class={`text-4xl font-heading font-bold ${isOverdue || totalDueFromSpecials > 0 ? 'text-red-700' : 'text-clr-green'}`}>
+          {formatCurrency(assessment.balance + totalDueFromSpecials)}
+          {totalDueFromSpecials > 0 && (
+            <span class="block text-lg font-normal mt-2 text-gray-600">
+              (includes {formatCurrency(assessment.balance)} dues + {formatCurrency(totalDueFromSpecials)} special)
+            </span>
+          )}
+          {assessment.next_due && !isPaidThrough && (
+            <span class="block text-lg font-normal mt-2">
+              Due {formatDate(assessment.next_due)}
+            </span>
+          )}
           {isPaidThrough && assessment.paid_through && (
-            <p class="text-sm text-gray-600 mt-2">Current and future dues are paid. No action needed.</p>
+            <span class="block text-lg font-normal mt-2 text-clr-green">
+              Paid through {formatDate(assessment.paid_through)}
+            </span>
           )}
-          {!isPaidThrough && assessment.next_due && daysRemaining(assessment.next_due) !== null && !isOverdue && (
-            <p class="text-sm text-gray-600 mt-2">
-              {daysRemaining(assessment.next_due)! > 0
-                ? `${daysRemaining(assessment.next_due)} days remaining`
-                : 'Due today'}
-            </p>
-          )}
-          {isOverdue && lateFeeMessage && (
-            <p class="text-sm font-semibold text-red-700 mt-2">Late fee: {lateFeeMessage}</p>
-          )}
-        </div>
-      )}
-
-      <!-- How to pay: link to public dues page (same content), in a collapsible. -->
-      <section class="mb-8" aria-labelledby="how-to-pay-heading">
-        <details class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden group">
-          <summary id="how-to-pay-heading" class="flex items-center gap-2 cursor-pointer list-none py-4 px-5 font-heading font-semibold text-clr-green hover:bg-gray-50 transition-colors">
-            <span class="text-lg">How to pay</span>
-            <svg class="w-5 h-5 text-gray-400 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-            </svg>
-          </summary>
-          <div class="border-t border-gray-100 px-5 pb-5 pt-2">
-            <p class="text-gray-600 text-sm mb-4">
-              Payment methods, mailing address, drop-off options, and late fee information are on the same page we use for the public site.
-            </p>
-            <a
-              href="/dues"
-              class="inline-flex items-center gap-2 bg-clr-green hover:brightness-110 text-white px-5 py-2.5 rounded-xl font-semibold text-sm"
-            >
-              Dues &amp; Payment Information
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-              </svg>
-            </a>
-          </div>
-        </details>
-      </section>
-
-      <!-- Dues schedule: current quarter through end of next year (auto-filled). Paid/Due/Overdue/Upcoming. -->
-      <section class="mb-8" aria-labelledby="dues-schedule-heading">
-        <h3 id="dues-schedule-heading" class="text-lg font-heading font-semibold text-clr-green mb-3">Dues schedule</h3>
-        <p class="text-sm text-gray-600 mb-3">
-          Quarterly dues (due Jan 1, Apr 1, Jul 1, Oct 1). Shown from this quarter through next year. The board may add special assessments or change the amount per quarter; any special assessments appear in the balance above.
         </p>
-        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <table class="w-full text-sm">
-            <thead>
-              <tr class="border-b border-gray-200 bg-gray-50">
-                <th class="text-left py-3 px-4 font-semibold text-gray-700">Quarter</th>
-                <th class="text-left py-3 px-4 font-semibold text-gray-700">Due date</th>
-                <th class="text-right py-3 px-4 font-semibold text-gray-700">Amount</th>
-                <th class="text-left py-3 px-4 font-semibold text-gray-700">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {quarterSchedule.map((row) => (
-                <tr class="border-b border-gray-100 last:border-0">
-                  <td class="py-3 px-4 font-medium">{row.quarter} {row.year}</td>
-                  <td class="py-3 px-4">{formatDate(row.dueDate)}</td>
-                  <td class="py-3 px-4 text-right">{quarterlyAmountDisplay ?? '—'}</td>
-                  <td class="py-3 px-4">
-                    {row.status === 'Paid' && <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Paid</span>}
-                    {row.status === 'Upcoming' && <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">Upcoming</span>}
-                    {row.status === 'Due' && <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800">Due</span>}
-                    {row.status === 'Overdue' && <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">Overdue</span>}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        {isPaidThrough && assessment.paid_through && (
+          <p class="text-base text-gray-600 mt-3">Current and future dues are paid. No action needed.</p>
+        )}
+        {!isPaidThrough && assessment.next_due && daysRemaining(assessment.next_due) !== null && !isOverdue && (
+          <p class="text-base text-gray-600 mt-3">
+            {daysRemaining(assessment.next_due)! > 0
+              ? `${daysRemaining(assessment.next_due)} days remaining`
+              : 'Due today'}
+          </p>
+        )}
+        {isOverdue && lateFeeMessage && (
+          <p class="text-base font-semibold text-red-700 mt-3">Late fee: {lateFeeMessage}</p>
+        )}
+      </div>
+    )}
+
+    <!-- How to pay: link to public dues page (same content), in a collapsible. -->
+    <section class="mb-8" aria-labelledby="how-to-pay-heading">
+      <details class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden group">
+        <summary id="how-to-pay-heading" class="flex items-center gap-2 cursor-pointer list-none py-5 px-6 font-heading font-semibold text-clr-green hover:bg-gray-50 transition-colors">
+          <span class="text-xl">How to pay</span>
+          <svg class="w-6 h-6 text-gray-400 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          </svg>
+        </summary>
+        <div class="border-t border-gray-100 px-6 pb-6 pt-4">
+          <p class="text-gray-600 text-base mb-4 leading-relaxed">
+            Payment methods, mailing address, drop-off options, and late fee information are on the same page we use for the public site.
+          </p>
+          <a
+            href="/dues"
+            class="inline-flex items-center gap-2 bg-clr-green hover:brightness-110 text-white px-6 py-3 rounded-xl font-semibold text-base transition-all"
+          >
+            Dues &amp; Payment Information
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            </svg>
+          </a>
         </div>
-      </section>
+      </details>
+    </section>
 
-      {assessment && (
-        <>
-          {specialAssessments.length > 0 && (
-            <section class="mb-6" aria-labelledby="special-assessments-heading">
-              <h3 id="special-assessments-heading" class="text-lg font-heading font-semibold text-clr-green mb-3">Special assessments</h3>
-              <p class="text-sm text-gray-600 mb-3">One-off bills from the board (e.g. capital improvements). Pay by the method specified by the board.</p>
-              <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                <table class="w-full text-sm">
-                  <thead class="bg-gray-50 border-b border-gray-200">
-                    <tr>
-                      <th class="text-left py-2 px-4 font-medium text-gray-700">Description</th>
-                      <th class="text-right py-2 px-4 font-medium text-gray-700">Amount</th>
-                      <th class="text-left py-2 px-4 font-medium text-gray-700">Due</th>
-                      <th class="text-left py-2 px-4 font-medium text-gray-700">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {specialAssessments.map((s) => (
-                      <tr class="border-b border-gray-100 last:border-0">
-                        <td class="py-2 px-4">{s.description}</td>
-                        <td class="py-2 px-4 text-right">{formatCurrency(s.amount)}</td>
-                        <td class="py-2 px-4">{formatDate(s.due_date)}</td>
-                        <td class="py-2 px-4">
-                          {s.paid_at ? <span class="text-green-600">Paid {formatDate(s.paid_at)}</span> : <span class="text-amber-600 font-medium">Due</span>}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </section>
-          )}
+    <!-- Dues schedule: current quarter through end of next year (auto-filled). Paid/Due/Overdue/Upcoming. -->
+    <section class="mb-8" aria-labelledby="dues-schedule-heading">
+      <h3 id="dues-schedule-heading" class="text-xl font-heading font-semibold text-clr-green mb-3">Dues schedule</h3>
+      <p class="text-base text-gray-600 mb-4 leading-relaxed">
+        Quarterly dues (due Jan 1, Apr 1, Jul 1, Oct 1). Shown from this quarter through next year. The board may add special assessments or change the amount per quarter; any special assessments appear in the balance above.
+      </p>
+      <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <table class="w-full text-base">
+          <thead>
+            <tr class="border-b border-gray-200 bg-gray-50">
+              <th class="text-left py-4 px-6 font-semibold text-gray-700">Quarter</th>
+              <th class="text-left py-4 px-6 font-semibold text-gray-700">Due date</th>
+              <th class="text-right py-4 px-6 font-semibold text-gray-700">Amount</th>
+              <th class="text-left py-4 px-6 font-semibold text-gray-700">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {quarterSchedule.map((row) => (
+              <tr class="border-b border-gray-100 last:border-0">
+                <td class="py-4 px-6 font-medium">{row.quarter} {row.year}</td>
+                <td class="py-4 px-6">{formatDate(row.dueDate)}</td>
+                <td class="py-4 px-6 text-right">{quarterlyAmountDisplay ?? '—'}</td>
+                <td class="py-4 px-6">
+                  {row.status === 'Paid' && <span class="inline-flex items-center px-3 py-1 rounded-lg text-sm font-semibold bg-green-100 text-green-800">Paid</span>}
+                  {row.status === 'Upcoming' && <span class="inline-flex items-center px-3 py-1 rounded-lg text-sm font-semibold bg-gray-100 text-gray-700">Upcoming</span>}
+                  {row.status === 'Due' && <span class="inline-flex items-center px-3 py-1 rounded-lg text-sm font-semibold bg-amber-100 text-amber-800">Due</span>}
+                  {row.status === 'Overdue' && <span class="inline-flex items-center px-3 py-1 rounded-lg text-sm font-semibold bg-red-100 text-red-800">Overdue</span>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
 
-          {assessment.invoice_r2_key && (
-            <p class="mb-6">
-              <a
-                href={`/api/portal/file/${encodeURIComponent(assessment.invoice_r2_key)}`}
-                class="inline-flex items-center gap-2 bg-clr-green hover:brightness-110 text-white px-6 py-3 rounded-xl font-semibold text-sm"
-              >
-                Download latest invoice (PDF)
-              </a>
-            </p>
-          )}
-
-          <h3 class="text-lg font-heading font-semibold text-clr-green mb-3">Payment history (last 12 months)</h3>
-          <p class="text-sm text-gray-600 mb-3">Payments you’ve made; these match the &quot;Paid&quot; quarters in the schedule above.</p>
-          {paymentHistory.length === 0 ? (
-            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 text-center">
-              <p class="text-gray-600">No payments recorded in the last 12 months.</p>
-              <p class="text-sm text-gray-500 mt-1">Payments are added by the board when you pay. Contact the board if you’ve paid and don’t see it here.</p>
-            </div>
-          ) : (
+    {assessment && (
+      <>
+        {specialAssessments.length > 0 && (
+          <section class="mb-8" aria-labelledby="special-assessments-heading">
+            <h3 id="special-assessments-heading" class="text-xl font-heading font-semibold text-clr-green mb-3">Special assessments</h3>
+            <p class="text-base text-gray-600 mb-4 leading-relaxed">One-off bills from the board (e.g. capital improvements). Pay by the method specified by the board.</p>
             <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-              <table class="w-full text-sm">
-                <thead>
-                  <tr class="border-b border-gray-100 bg-gray-50">
-                    <th class="text-left py-3 px-4 font-semibold text-gray-700">Payment date</th>
-                    <th class="text-left py-3 px-4 font-semibold text-gray-700">Recorded</th>
-                    <th class="text-left py-3 px-4 font-semibold text-gray-700">Recorded by</th>
-                    <th class="text-left py-3 px-4 font-semibold text-gray-700">Method</th>
-                    <th class="text-left py-3 px-4 font-semibold text-gray-700">Check #</th>
-                    <th class="text-right py-3 px-4 font-semibold text-gray-700">Amount</th>
-                    <th class="text-right py-3 px-4 font-semibold text-gray-700">Balance after</th>
-                    <th class="text-left py-3 px-4 font-semibold text-gray-700">Receipt</th>
+              <table class="w-full text-base">
+                <thead class="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th class="text-left py-4 px-6 font-semibold text-gray-700">Description</th>
+                    <th class="text-right py-4 px-6 font-semibold text-gray-700">Amount</th>
+                    <th class="text-left py-4 px-6 font-semibold text-gray-700">Due</th>
+                    <th class="text-left py-4 px-6 font-semibold text-gray-700">Status</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {paymentHistory.map((p) => (
-                    <tr class="border-b border-gray-100">
-                      <td class="py-3 px-4">{formatDate(p.paid_at)}</td>
-                      <td class="py-3 px-4">{formatDate(p.created)}</td>
-                      <td class="py-3 px-4 text-gray-600">{p.recorded_by ?? '—'}</td>
-                      <td class="py-3 px-4">{p.payment_method === 'electronic_transfer' ? 'E-transfer' : p.payment_method === 'check' ? 'Check' : p.payment_method === 'cash' ? 'Cash' : p.payment_method ?? '—'}</td>
-                      <td class="py-3 px-4">{p.check_number ?? '—'}</td>
-                      <td class="py-3 px-4 text-right">{formatCurrency(p.amount)}</td>
-                      <td class="py-3 px-4 text-right">{formatCurrency(p.balance_after)}</td>
-                      <td class="py-3 px-4">
-                        <a href={`/portal/assessments/receipt/${p.id}`} target="_blank" rel="noopener noreferrer" class="text-clr-green hover:underline text-sm font-medium">Print receipt</a>
+                  {specialAssessments.map((s) => (
+                    <tr class="border-b border-gray-100 last:border-0">
+                      <td class="py-4 px-6">{s.description}</td>
+                      <td class="py-4 px-6 text-right">{formatCurrency(s.amount)}</td>
+                      <td class="py-4 px-6">{formatDate(s.due_date)}</td>
+                      <td class="py-4 px-6">
+                        {s.paid_at ? <span class="text-green-600 font-medium">Paid {formatDate(s.paid_at)}</span> : <span class="text-amber-600 font-semibold">Due</span>}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-          )}
-        </>
-      )}
-    </main>
-  </div>
-  </ProtectedPage>
+          </section>
+        )}
+
+        {assessment.invoice_r2_key && (
+          <p class="mb-8">
+            <a
+              href={`/api/portal/file/${encodeURIComponent(assessment.invoice_r2_key)}`}
+              class="inline-flex items-center gap-2 bg-clr-green hover:brightness-110 text-white px-6 py-3 rounded-xl font-semibold text-base transition-all"
+            >
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <span>Download latest invoice (PDF)</span>
+            </a>
+          </p>
+        )}
+
+        <h3 class="text-xl font-heading font-semibold text-clr-green mb-3">Payment history (last 12 months)</h3>
+        <p class="text-base text-gray-600 mb-4 leading-relaxed">Payments you've made; these match the &quot;Paid&quot; quarters in the schedule above.</p>
+        {paymentHistory.length === 0 ? (
+          <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-12 text-center">
+            <svg class="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            </svg>
+            <p class="text-gray-600 text-lg mb-2">No payments recorded in the last 12 months.</p>
+            <p class="text-base text-gray-500">Payments are added by the board when you pay. Contact the board if you've paid and don't see it here.</p>
+          </div>
+        ) : (
+          <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-x-auto">
+            <table class="w-full text-base">
+              <thead>
+                <tr class="border-b border-gray-100 bg-gray-50">
+                  <th class="text-left py-4 px-6 font-semibold text-gray-700">Payment date</th>
+                  <th class="text-left py-4 px-6 font-semibold text-gray-700">Recorded</th>
+                  <th class="text-left py-4 px-6 font-semibold text-gray-700">Recorded by</th>
+                  <th class="text-left py-4 px-6 font-semibold text-gray-700">Method</th>
+                  <th class="text-left py-4 px-6 font-semibold text-gray-700">Check #</th>
+                  <th class="text-right py-4 px-6 font-semibold text-gray-700">Amount</th>
+                  <th class="text-right py-4 px-6 font-semibold text-gray-700">Balance after</th>
+                  <th class="text-left py-4 px-6 font-semibold text-gray-700">Receipt</th>
+                </tr>
+              </thead>
+              <tbody>
+                {paymentHistory.map((p) => (
+                  <tr class="border-b border-gray-100">
+                    <td class="py-4 px-6">{formatDate(p.paid_at)}</td>
+                    <td class="py-4 px-6">{formatDate(p.created)}</td>
+                    <td class="py-4 px-6 text-gray-600">{p.recorded_by ?? '—'}</td>
+                    <td class="py-4 px-6">{p.payment_method === 'electronic_transfer' ? 'E-transfer' : p.payment_method === 'check' ? 'Check' : p.payment_method === 'cash' ? 'Cash' : p.payment_method ?? '—'}</td>
+                    <td class="py-4 px-6">{p.check_number ?? '—'}</td>
+                    <td class="py-4 px-6 text-right font-medium">{formatCurrency(p.amount)}</td>
+                    <td class="py-4 px-6 text-right font-medium">{formatCurrency(p.balance_after)}</td>
+                    <td class="py-4 px-6">
+                      <a href={`/portal/assessments/receipt/${p.id}`} target="_blank" rel="noopener noreferrer" class="text-clr-orange hover:underline font-semibold">Print receipt</a>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </>
+    )}
+  </PortalPage>
 </PortalLayout>

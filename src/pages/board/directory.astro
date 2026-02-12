@@ -1,12 +1,14 @@
 ---
 export const prerender = false;
 
-import BoardLayout from '../../layouts/BoardLayout.astro';
 import { getBoardContext } from '../../lib/board-context';
+import { getPortalBadgeCounts } from '../../lib/portal-badge-counts';
 import { getRolesForEmails, isBoardOrArbOnly } from '../../lib/auth';
 import { listOwners } from '../../lib/directory-db';
-import { listArbRequestsByHousehold } from '../../lib/arb-db';
+import PortalLayout from '../../layouts/PortalLayout.astro';
+import PortalPage from '../../components/PortalPage.astro';
 
+import BoardNav from '../../components/BoardNav.astro';
 const ctx = await getBoardContext(Astro);
 if ('redirect' in ctx) return Astro.redirect(ctx.redirect);
 const { env, session, effectiveRole } = ctx;
@@ -37,14 +39,15 @@ function directoryPageUrl(value: number): string {
 }
 
 const db = env?.DB;
+const { email, role, name } = session;
+const badges = await getPortalBadgeCounts(db, email, role, name);
 const owners = db ? await listOwners(db, pageSize, (page - 1) * pageSize) : [];
 const ownerRoles = await getRolesForEmails(env?.CLOURHOA_USERS, owners.map((o) => o.email));
-const allRequests = db ? await listArbRequestsByHousehold(db, session.email) : [];
-const draftCount = allRequests.filter((r) => r.status === 'pending').length;
+
 const csrfToken = session?.csrfToken ?? '';
 const csvFileInputClass = 'block w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border file:border-gray-300 file:bg-gray-50 file:text-gray-700 hover:file:bg-gray-100';
-const submitBtnClass = 'px-4 py-2 bg-clr-green text-white rounded-lg font-medium hover:brightness-110';
-const cancelEditBtnClass = 'px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 hidden';
+const submitBtnClass = 'px-5 py-2.5 bg-clr-green text-white rounded-lg font-medium hover:brightness-110';
+const cancelEditBtnClass = 'px-5 py-2.5 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 hidden';
 const checkboxClass = 'rounded border-gray-300 text-clr-green focus:ring-clr-green';
 
 function roleLabel(role: string): string {
@@ -52,11 +55,28 @@ function roleLabel(role: string): string {
 }
 ---
 
-<BoardLayout title="Directory" subtitle="Manage homeowner directory" draftCount={draftCount} role={effectiveRole} session={session} elevatedUntil={session.elevated_until}>
-  <div id="directory-message" class="hidden mb-4 p-4 rounded-xl border" role="status" aria-live="polite" aria-atomic="true"></div>
+<PortalLayout title="Directory | Board | Member Portal | Crooked Lake Reserve HOA">
+  <PortalPage
+    currentPath="/board/directory"
+    pageTitle="Directory"
+    userName={badges.displayName ?? undefined}
+    userEmail={email}
+    effectiveRole={effectiveRole}
+    draftCount={badges.draftCount}
+    role={effectiveRole}
+    staffRole={role ?? ''}
+    arbInReviewCount={badges.arbInReviewCount}
+    vendorPendingCount={badges.vendorPendingCount}
+    maintenanceOpenCount={badges.maintenanceOpenCount}
+    meetingsRsvpCount={badges.meetingsRsvpCount}
+  >
+    <BoardNav currentPath="/board/directory" />
+
+unt}
+<div id="directory-message" class="hidden mb-4 p-4 rounded-xl border" role="status" aria-live="polite" aria-atomic="true"></div>
   {canEditDirectory && (
   <>
-  <h2 class="text-xl font-heading font-bold text-clr-green mb-6">Add or edit owner</h2>
+  <h2 class="text-3xl font-heading font-bold text-clr-green mb-6">Add or edit owner</h2>
 
       <form id="owner-form" class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-8 space-y-4">
         <input type="hidden" name="id" id="form-owner-id" value="" />
@@ -91,7 +111,7 @@ function roleLabel(role: string): string {
             <option value="arb_board">ARB + Board</option>
             <option value="admin">Admin</option>
           </select>
-          <p id="elevated-role-warning" class="mt-2 text-sm text-amber-700 hidden" role="alert">
+          <p id="elevated-role-warning" class="mt-2 text-base text-amber-700 hidden" role="alert">
             This role has elevated access (ARB dashboard, Board tools, or full admin). Assign only to trusted people.
           </p>
         </div>
@@ -110,7 +130,7 @@ function roleLabel(role: string): string {
       </form>
 
       <h3 class="text-lg font-heading font-semibold text-clr-green mb-3 mt-8">Upload directory (CSV)</h3>
-      <p class="text-sm text-gray-600 mb-2">Upload a CSV with columns <strong>name</strong>, <strong>address</strong>, <strong>lot_number</strong> (optional, 1 to 25), <strong>phone</strong>, <strong>email</strong>. First row may be a header. Rows with an existing email are updated; others are added.</p>
+      <p class="text-base text-gray-600 mb-2">Upload a CSV with columns <strong>name</strong>, <strong>address</strong>, <strong>lot_number</strong> (optional, 1 to 25), <strong>phone</strong>, <strong>email</strong>. First row may be a header. Rows with an existing email are updated; others are added.</p>
       <form id="csv-upload-form" class="flex flex-wrap items-end gap-3 mb-8">
         <input type="hidden" name="csrf_token" id="csv-csrf" value={csrfToken} />
         <div>
@@ -119,7 +139,7 @@ function roleLabel(role: string): string {
         </div>
         <button type="submit" id="csv-upload-btn" class={submitBtnClass}>Upload CSV</button>
       </form>
-      <p id="csv-result" class="mb-6 text-sm hidden" role="status"></p>
+      <p id="csv-result" class="mb-6 text-base hidden" role="status"></p>
   </>
   )}
 
@@ -148,9 +168,9 @@ function roleLabel(role: string): string {
         </script>
         <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           {canEditDirectory && (
-          <div class="px-4 py-2 bg-gray-50 border-b border-gray-200 flex flex-wrap items-center gap-3">
-            <a href="/api/directory-export" class="px-3 py-1.5 text-sm bg-clr-green text-white rounded-lg font-medium hover:brightness-110" download>Export full directory (CSV)</a>
-            <button type="button" id="delete-selected-btn" class="px-3 py-1.5 text-sm bg-red-100 text-red-700 rounded-lg font-medium hover:bg-red-200 disabled:opacity-50 disabled:pointer-events-none" disabled>Delete selected</button>
+          <div class="px-5 py-2.5 bg-gray-50 border-b border-gray-200 flex flex-wrap items-center gap-3">
+            <a href="/api/directory-export" class="px-5 py-2.5 text-sm bg-clr-green text-white rounded-lg font-medium hover:brightness-110" download>Export full directory (CSV)</a>
+            <button type="button" id="delete-selected-btn" class="px-5 py-2.5 text-base bg-red-100 text-red-700 rounded-lg font-medium hover:bg-red-200 disabled:opacity-50 disabled:pointer-events-none" disabled>Delete selected</button>
           </div>
           )}
           <table class="min-w-full divide-y divide-gray-200">
@@ -203,8 +223,8 @@ function roleLabel(role: string): string {
                   </td>
                   {canEditDirectory && (
                   <td class="px-4 py-3">
-                    <button type="button" class="edit-owner-btn text-sm text-clr-green hover:underline mr-2" data-id={owner.id} data-name={owner.name ?? ''} data-address={owner.address ?? ''} data-lot-number={owner.lot_number ?? ''} data-phone={owner.phone ?? ''} data-email={owner.email ?? ''} data-role={role ?? 'member'} data-is-primary={(owner.is_primary ?? 1) === 1 ? '1' : '0'}>Edit</button>
-                    <button type="button" class="delete-owner-btn text-sm text-red-600 hover:underline" data-id={owner.id}>Delete</button>
+                    <button type="button" class="edit-owner-btn text-base text-clr-green hover:underline mr-2" data-id={owner.id} data-name={owner.name ?? ''} data-address={owner.address ?? ''} data-lot-number={owner.lot_number ?? ''} data-phone={owner.phone ?? ''} data-email={owner.email ?? ''} data-role={role ?? 'member'} data-is-primary={(owner.is_primary ?? 1) === 1 ? '1' : '0'}>Edit</button>
+                    <button type="button" class="delete-owner-btn text-base text-red-600 hover:underline" data-id={owner.id}>Delete</button>
                   </td>
                   )}
                 </tr>
@@ -245,7 +265,7 @@ function roleLabel(role: string): string {
         return (
         <section class="mt-10" aria-labelledby="lot-address-heading">
           <h3 id="lot-address-heading" class="text-lg font-heading font-semibold text-clr-green mb-3">Lot # → Address</h3>
-          <p class="text-sm text-gray-600 mb-3">One row per lot number and address. Multiple owners at the same address share one lot.</p>
+          <p class="text-base text-gray-600 mb-3">One row per lot number and address. Multiple owners at the same address share one lot.</p>
           <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
             <table class="min-w-full divide-y divide-gray-200">
               <thead class="bg-gray-50">
@@ -546,4 +566,5 @@ function roleLabel(role: string): string {
       }
     })();
   </script>
-</BoardLayout>
+  </PortalPage>
+</PortalLayout>
