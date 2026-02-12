@@ -1,0 +1,120 @@
+---
+/**
+ * POST /api/arb-check-deadlines — Trigger deadline check and auto-approval.
+ *
+ * This endpoint is called by:
+ * 1. Client-side polling (every 60 seconds) from ARB dashboard
+ * 2. Page loads of ARB dashboard
+ * 3. Manual trigger by admins
+ *
+ * It runs the lazy evaluation pattern to check for expired deadlines
+ * and auto-approve requests per FL Statute 720.3035 (30-day deadline).
+ *
+ * Returns: {
+ *   success: boolean,
+ *   checked_count: number,
+ *   auto_approved_ids: string[],
+ *   approaching_7_days: number,
+ *   approaching_3_days: number
+ * }
+ */
+export const prerender = false;
+
+import { getSessionFromCookie, getEffectiveRole } from '../../lib/auth';
+import { createLogger } from '../../lib/logging';
+import {
+  checkAndApplyDeadlines,
+  getRequestsNearingDeadline,
+} from '../../lib/arb-voting-db';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+
+// Auth check - only ARC, Board, or Admin can check deadlines
+const session = await getSessionFromCookie(
+  Astro.request.headers.get('cookie') ?? undefined,
+  env?.SESSION_SECRET
+);
+
+if (!session) {
+  return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+    status: 401,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const effectiveRole = getEffectiveRole(session);
+const isAuthorized =
+  effectiveRole === 'arb' ||
+  effectiveRole === 'board' ||
+  effectiveRole === 'arb_board' ||
+  effectiveRole === 'admin';
+
+if (!isAuthorized) {
+  return new Response(
+    JSON.stringify({
+      error: 'Forbidden. Only ARC, Board, or Admin can check deadlines.',
+    }),
+    { status: 403, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+
+// Only POST allowed
+if (Astro.request.method !== 'POST') {
+  return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+    status: 405,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+// Check D1 availability
+const db = env?.DB;
+if (!db) {
+  return new Response(JSON.stringify({ error: 'Server configuration error' }), {
+    status: 503,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const logger = createLogger({ endpoint: '/api/arb-check-deadlines' });
+
+try {
+  // Run deadline check and auto-approval
+  const autoApprovedIds = await checkAndApplyDeadlines(db);
+
+  // Get requests approaching deadline (for warning notifications)
+  const approaching7Days = await getRequestsNearingDeadline(db, 7);
+  const approaching3Days = await getRequestsNearingDeadline(db, 3);
+
+  logger.info('Deadline check completed', {
+    auto_approved_count: autoApprovedIds.length,
+    auto_approved_ids: autoApprovedIds,
+    approaching_7_days_count: approaching7Days.length,
+    approaching_3_days_count: approaching3Days.length,
+    checked_by: session.email,
+  });
+
+  return new Response(
+    JSON.stringify({
+      success: true,
+      checked_count: autoApprovedIds.length,
+      auto_approved_ids: autoApprovedIds,
+      approaching_7_days: approaching7Days.length,
+      approaching_3_days: approaching3Days.length,
+      message:
+        autoApprovedIds.length > 0
+          ? `${autoApprovedIds.length} request(s) auto-approved due to deadline expiration.`
+          : 'No requests exceeded deadline.',
+    }),
+    { status: 200, headers: { 'Content-Type': 'application/json' } }
+  );
+} catch (error) {
+  logger.error('Failed to check deadlines', { error, checked_by: session.email });
+  return new Response(
+    JSON.stringify({
+      error: 'Failed to check deadlines. Please try again.',
+    }),
+    { status: 500, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+---

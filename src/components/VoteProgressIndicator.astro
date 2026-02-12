@@ -1,0 +1,153 @@
+---
+/**
+ * VoteProgressIndicator.astro - Compact vote progress display
+ *
+ * Shows voting progress with color-coded bar and vote counts.
+ * Can be used in dashboard cards, summaries, or anywhere a compact
+ * vote status display is needed.
+ */
+import type { VoteResolutionResult } from '../lib/arb-voting-db';
+import { getProjectedOutcome } from '../lib/arb-voting-logic';
+
+interface Props {
+  resolution: VoteResolutionResult;
+  stage: 'ARC_REVIEW' | 'BOARD_REVIEW';
+  compact?: boolean; // If true, shows minimal info
+  showProjection?: boolean; // If true, shows projected outcome
+}
+
+const { resolution, stage, compact = false, showProjection = false } = Astro.props;
+
+const stageLabel = stage === 'ARC_REVIEW' ? 'ARC' : 'Board';
+const votesCast = resolution.approveCount + resolution.denyCount + resolution.returnCount + resolution.abstainCount;
+const percentComplete = Math.min(100, (votesCast / resolution.totalEligible) * 100);
+
+// Get projected outcome for display
+const projection = showProjection
+  ? getProjectedOutcome(
+      resolution.approveCount,
+      resolution.denyCount,
+      resolution.returnCount,
+      resolution.abstainCount,
+      resolution.totalEligible
+    )
+  : null;
+
+// Determine progress bar color based on outcome
+let progressColor = 'bg-blue-600';
+let outcomeLabel = 'Pending';
+
+if (resolution.outcome === 'APPROVED') {
+  progressColor = 'bg-green-600';
+  outcomeLabel = 'Approved';
+} else if (resolution.outcome === 'DENIED') {
+  progressColor = 'bg-red-600';
+  outcomeLabel = 'Denied';
+} else if (resolution.outcome === 'RETURNED') {
+  progressColor = 'bg-yellow-600';
+  outcomeLabel = 'Returned';
+} else if (resolution.outcome === 'DEADLOCKED') {
+  progressColor = 'bg-gray-600';
+  outcomeLabel = 'Deadlocked';
+}
+---
+
+<div class="vote-progress-indicator">
+  {!compact && (
+    <div class="flex justify-between items-center mb-2">
+      <span class="text-sm font-medium text-gray-700">{stageLabel} Vote</span>
+      <span class="text-xs text-gray-600">
+        {votesCast} / {resolution.totalEligible}
+        {resolution.outcome === 'PENDING' && ` (${resolution.majorityNeeded} needed)`}
+      </span>
+    </div>
+  )}
+
+  <!-- Progress Bar -->
+  <div class="w-full bg-gray-200 rounded-full h-2 mb-2">
+    <div
+      class={`${progressColor} h-2 rounded-full transition-all duration-500`}
+      style={`width: ${percentComplete}%`}
+      role="progressbar"
+      aria-valuenow={votesCast}
+      aria-valuemin="0"
+      aria-valuemax={resolution.totalEligible}
+      aria-label={`${votesCast} of ${resolution.totalEligible} votes cast`}
+    ></div>
+  </div>
+
+  {!compact && (
+    <div class="grid grid-cols-4 gap-2 text-center">
+      <!-- Approve Count -->
+      <div class="vote-count-badge">
+        <div class="text-lg font-bold text-green-700">{resolution.approveCount}</div>
+        <div class="text-xs text-gray-500">Approve</div>
+      </div>
+
+      <!-- Deny Count -->
+      <div class="vote-count-badge">
+        <div class="text-lg font-bold text-red-700">{resolution.denyCount}</div>
+        <div class="text-xs text-gray-500">Deny</div>
+      </div>
+
+      <!-- Return Count -->
+      <div class="vote-count-badge">
+        <div class="text-lg font-bold text-yellow-700">{resolution.returnCount}</div>
+        <div class="text-xs text-gray-500">Return</div>
+      </div>
+
+      <!-- Abstain Count -->
+      <div class="vote-count-badge">
+        <div class="text-lg font-bold text-gray-700">{resolution.abstainCount}</div>
+        <div class="text-xs text-gray-500">Abstain</div>
+      </div>
+    </div>
+  )}
+
+  {compact && (
+    <div class="flex items-center justify-between text-xs">
+      <span class={`font-semibold ${
+        resolution.outcome === 'APPROVED'
+          ? 'text-green-700'
+          : resolution.outcome === 'DENIED'
+            ? 'text-red-700'
+            : resolution.outcome === 'RETURNED'
+              ? 'text-yellow-700'
+              : 'text-gray-700'
+      }`}>
+        {outcomeLabel}
+      </span>
+      <span class="text-gray-500">
+        {resolution.approveCount}✓ {resolution.denyCount}✗ {resolution.returnCount}↩ {resolution.abstainCount}−
+      </span>
+    </div>
+  )}
+
+  {showProjection && projection && resolution.outcome === 'PENDING' && (
+    <div class="mt-2 text-xs text-gray-600 italic">
+      <strong>Projection:</strong> {projection}
+    </div>
+  )}
+
+  <!-- Outcome Banner (if resolved) -->
+  {resolution.outcome !== 'PENDING' && !compact && (
+    <div class={`mt-3 p-2 rounded text-center text-sm font-semibold ${
+      resolution.outcome === 'APPROVED'
+        ? 'bg-green-100 text-green-800'
+        : resolution.outcome === 'DENIED'
+          ? 'bg-red-100 text-red-800'
+          : resolution.outcome === 'RETURNED'
+            ? 'bg-yellow-100 text-yellow-800'
+            : 'bg-gray-100 text-gray-800'
+    }`}>
+      {outcomeLabel}
+      {resolution.outcome === 'DEADLOCKED' && ' - Manual Intervention Required'}
+    </div>
+  )}
+</div>
+
+<style>
+  .vote-count-badge {
+    @apply p-2 rounded;
+  }
+</style>

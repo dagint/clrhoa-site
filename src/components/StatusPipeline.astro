@@ -1,0 +1,206 @@
+---
+/**
+ * StatusPipeline.astro - Visual workflow stepper for ARB requests
+ *
+ * Displays the current stage in the multi-stage approval workflow with
+ * visual indicators for completed, current, and future stages.
+ *
+ * Workflow stages:
+ * DRAFT → SUBMITTED → ARC_REVIEW → ARC_APPROVED → BOARD_REVIEW → BOARD_APPROVED
+ *             │                         │                              │
+ *             └─→ RETURNED               └─→ DENIED                    └─→ DENIED/RETURNED
+ */
+import { getStatusLabel, getStatusColor } from '../lib/arb-status-machine';
+
+interface Props {
+  currentStage: string;
+  currentStatus: string;
+  compact?: boolean; // If true, shows simplified view
+}
+
+const { currentStage, currentStatus, compact = false } = Astro.props;
+
+// Define workflow stages
+const mainPath = [
+  { stage: 'DRAFT', label: 'Draft' },
+  { stage: 'SUBMITTED', label: 'Submitted' },
+  { stage: 'ARC_REVIEW', label: 'ARC Review' },
+  { stage: 'ARC_APPROVED', label: 'ARC Approved' },
+  { stage: 'BOARD_REVIEW', label: 'Board Review' },
+  { stage: 'BOARD_APPROVED', label: 'Approved' },
+];
+
+const returnedStatuses = ['ARC_RETURNED', 'BOARD_RETURNED'];
+const deniedStatuses = ['ARC_DENIED', 'BOARD_DENIED'];
+const terminalStatuses = [...deniedStatuses, 'BOARD_APPROVED', 'cancelled'];
+
+// Determine current step index
+const currentIndex = mainPath.findIndex((s) => s.stage === currentStage);
+
+// Check if in returned or denied state
+const isReturned = returnedStatuses.includes(currentStage);
+const isDenied = deniedStatuses.includes(currentStage);
+const isTerminal = terminalStatuses.includes(currentStage);
+---
+
+<div class="status-pipeline">
+  {!compact ? (
+    <!-- Full Stepper View -->
+    <div class="mb-6">
+      <h4 class="text-sm font-semibold text-gray-700 mb-3">Approval Workflow</h4>
+
+      <!-- Horizontal Stepper (Desktop) -->
+      <div class="hidden md:block">
+        <div class="flex items-center justify-between">
+          {mainPath.map((step, index) => {
+            const isPast = index < currentIndex;
+            const isCurrent = step.stage === currentStage;
+            const isFuture = index > currentIndex && !isCurrent;
+
+            return (
+              <div class="flex items-center flex-1" key={step.stage}>
+                <!-- Step Circle -->
+                <div class="flex flex-col items-center relative">
+                  <div
+                    class={`w-10 h-10 rounded-full flex items-center justify-center font-semibold text-sm border-2 transition-all ${
+                      isCurrent
+                        ? 'bg-blue-600 text-white border-blue-600 ring-4 ring-blue-100'
+                        : isPast
+                          ? 'bg-green-600 text-white border-green-600'
+                          : 'bg-white text-gray-400 border-gray-300'
+                    }`}
+                  >
+                    {isPast ? '✓' : index + 1}
+                  </div>
+                  <div
+                    class={`mt-2 text-xs font-medium text-center ${
+                      isCurrent ? 'text-blue-700' : isPast ? 'text-green-700' : 'text-gray-500'
+                    }`}
+                  >
+                    {step.label}
+                  </div>
+                </div>
+
+                <!-- Connector Line -->
+                {index < mainPath.length - 1 && (
+                  <div class="flex-1 h-0.5 mx-2 mt-[-30px]">
+                    <div
+                      class={`h-full transition-all ${
+                        isPast ? 'bg-green-600' : 'bg-gray-300'
+                      }`}
+                    ></div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <!-- Vertical Stepper (Mobile) -->
+      <div class="md:hidden space-y-4">
+        {mainPath.map((step, index) => {
+          const isPast = index < currentIndex;
+          const isCurrent = step.stage === currentStage;
+          const isFuture = index > currentIndex && !isCurrent;
+
+          return (
+            <div class="flex items-start" key={step.stage}>
+              <!-- Step Circle -->
+              <div class="flex flex-col items-center">
+                <div
+                  class={`w-8 h-8 rounded-full flex items-center justify-center font-semibold text-xs border-2 ${
+                    isCurrent
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : isPast
+                        ? 'bg-green-600 text-white border-green-600'
+                        : 'bg-white text-gray-400 border-gray-300'
+                  }`}
+                >
+                  {isPast ? '✓' : index + 1}
+                </div>
+                {index < mainPath.length - 1 && (
+                  <div class={`w-0.5 h-8 ${isPast ? 'bg-green-600' : 'bg-gray-300'}`}></div>
+                )}
+              </div>
+
+              <!-- Step Label -->
+              <div class="ml-4 flex-1">
+                <p
+                  class={`text-sm font-medium ${
+                    isCurrent ? 'text-blue-700' : isPast ? 'text-green-700' : 'text-gray-500'
+                  }`}
+                >
+                  {step.label}
+                </p>
+                {isCurrent && (
+                  <p class="text-xs text-gray-600 mt-1">Current stage</p>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <!-- Returned/Denied Banner -->
+      {(isReturned || isDenied) && (
+        <div
+          class={`mt-4 p-3 rounded-md border ${
+            isReturned
+              ? 'bg-yellow-50 border-yellow-200'
+              : 'bg-red-50 border-red-200'
+          }`}
+        >
+          <p
+            class={`text-sm font-semibold ${
+              isReturned ? 'text-yellow-800' : 'text-red-800'
+            }`}
+          >
+            {getStatusLabel(currentStage)}
+          </p>
+          {isReturned && (
+            <p class="text-xs text-yellow-700 mt-1">
+              Request returned for additional information. Owner can edit and resubmit.
+            </p>
+          )}
+          {isDenied && (
+            <p class="text-xs text-red-700 mt-1">
+              Request has been denied.
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  ) : (
+    <!-- Compact Badge View -->
+    <div class="inline-flex items-center">
+      <span
+        class={`px-3 py-1 rounded-full text-xs font-semibold ${
+          currentStage === 'DRAFT' || currentStage === 'SUBMITTED'
+            ? 'bg-gray-100 text-gray-700'
+            : currentStage === 'ARC_REVIEW'
+              ? 'bg-blue-100 text-blue-700'
+              : currentStage === 'ARC_APPROVED'
+                ? 'bg-green-100 text-green-700'
+                : currentStage === 'BOARD_REVIEW'
+                  ? 'bg-blue-100 text-blue-700'
+                  : currentStage === 'BOARD_APPROVED'
+                    ? 'bg-green-100 text-green-700'
+                    : isReturned
+                      ? 'bg-yellow-100 text-yellow-700'
+                      : isDenied
+                        ? 'bg-red-100 text-red-700'
+                        : 'bg-gray-100 text-gray-700'
+        }`}
+      >
+        {getStatusLabel(currentStage)}
+      </span>
+    </div>
+  )}
+</div>
+
+<style>
+  .status-pipeline {
+    @apply w-full;
+  }
+</style>

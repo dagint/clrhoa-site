@@ -43,11 +43,17 @@ const arbInReviewCount = dashboardData?.arbInReviewCount ?? 0;
 const vendorPendingCount = dashboardData?.vendorPendingCount ?? 0;
 const inReview = dashboardData?.inReview ?? [];
 const pending = dashboardData?.pending ?? [];
+const arcReview = dashboardData?.arcReview ?? [];
+const boardReview = dashboardData?.boardReview ?? [];
+const returned = dashboardData?.returned ?? [];
 const completedWithPeriod = dashboardData?.completedWithPeriod ?? [];
 const completedPage = dashboardData?.completedPage ?? 1;
 const completedPaginated = dashboardData?.completedPaginated ?? [];
 const totalCompletedPages = dashboardData?.totalCompletedPages ?? 0;
 const periodOptions = dashboardData?.periodOptions ?? [];
+
+// Count all items needing action
+const needsActionCount = inReview.length + pending.length + arcReview.length + boardReview.length + returned.length;
 ---
 
 <PortalLayout title="ARB Dashboard | Member Portal | Crooked Lake Reserve HOA">
@@ -184,7 +190,80 @@ const periodOptions = dashboardData?.periodOptions ?? [];
                 </ul>
               </>
             )}
-            {inReview.length === 0 && pending.length === 0 && (
+            {/* v2 Multi-stage voting workflow sections */}
+            {arcReview.length > 0 && (
+              <>
+                <div class="mt-8 pt-8 border-t border-gray-200">
+                  <h3 class="text-lg font-semibold text-gray-800 mb-3">
+                    ARC Review (Multi-Stage) (<span id="arc-review-count">{arcReview.length}</span>)
+                  </h3>
+                  <p class="text-sm text-gray-600 mb-4">
+                    New voting workflow: ARC members vote to approve, deny, or return for more information.
+                  </p>
+                </div>
+                <ul class="space-y-4 arb-request-list" id="arc-review-list">
+                  {arcReview.map((req) => {
+                    const files = filesByRequestId[req.id] ?? [];
+                    const approval = formatApproval(req.arb_esign ?? null, req.esign_timestamp ?? null);
+                    return (
+                      <li class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden searchable-card" data-search-text={`${req.id} ${req.owner_email} ${req.property_address ?? ''} ${req.applicant_name ?? ''} ${req.phone ?? ''}`.toLowerCase()}>
+                        <ArbDashboardCard request={req} files={files} approval={approval} canApproveArb={canApprove} />
+                      </li>
+                    );
+                  })}
+                </ul>
+              </>
+            )}
+
+            {boardReview.length > 0 && (
+              <>
+                <div class="mt-8 pt-8 border-t border-gray-200">
+                  <h3 class="text-lg font-semibold text-gray-800 mb-3">
+                    Board Review (Multi-Stage) (<span id="board-review-count">{boardReview.length}</span>)
+                  </h3>
+                  <p class="text-sm text-gray-600 mb-4">
+                    ARC has approved. Board members vote to give final approval, deny, or return.
+                  </p>
+                </div>
+                <ul class="space-y-4 arb-request-list" id="board-review-list">
+                  {boardReview.map((req) => {
+                    const files = filesByRequestId[req.id] ?? [];
+                    const approval = formatApproval(req.arb_esign ?? null, req.esign_timestamp ?? null);
+                    return (
+                      <li class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden searchable-card" data-search-text={`${req.id} ${req.owner_email} ${req.property_address ?? ''} ${req.applicant_name ?? ''} ${req.phone ?? ''}`.toLowerCase()}>
+                        <ArbDashboardCard request={req} files={files} approval={approval} canApproveArb={canApprove} />
+                      </li>
+                    );
+                  })}
+                </ul>
+              </>
+            )}
+
+            {returned.length > 0 && (
+              <>
+                <div class="mt-8 pt-8 border-t border-gray-200">
+                  <h3 class="text-lg font-semibold text-gray-800 mb-3">
+                    Awaiting Resubmission (<span id="returned-count">{returned.length}</span>)
+                  </h3>
+                  <p class="text-sm text-gray-600 mb-4">
+                    Returned for additional information. Owner can edit and resubmit.
+                  </p>
+                </div>
+                <ul class="space-y-4 arb-request-list" id="returned-list">
+                  {returned.map((req) => {
+                    const files = filesByRequestId[req.id] ?? [];
+                    const approval = formatApproval(req.arb_esign ?? null, req.esign_timestamp ?? null);
+                    return (
+                      <li class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden searchable-card" data-search-text={`${req.id} ${req.owner_email} ${req.property_address ?? ''} ${req.applicant_name ?? ''} ${req.phone ?? ''}`.toLowerCase()}>
+                        <ArbDashboardCard request={req} files={files} approval={approval} canApproveArb={canApprove} />
+                      </li>
+                    );
+                  })}
+                </ul>
+              </>
+            )}
+
+            {needsActionCount === 0 && (
               <p class="text-gray-500">No items need your action right now.</p>
             )}
           </section>
@@ -703,7 +782,7 @@ const periodOptions = dashboardData?.periodOptions ?? [];
             const isCompleted = card.classList.contains('completed-card');
             const isInReview = card.closest('#in-review-list');
             const isPending = card.closest('#pending-list');
-            
+
             if (card instanceof HTMLElement) {
               // Also check period filter for completed items
               if (isCompleted && periodSelect) {
@@ -916,7 +995,7 @@ const periodOptions = dashboardData?.periodOptions ?? [];
           }
 
           const rows = [['Request ID', 'Status', 'Owner Email', 'Applicant Name', 'Phone', 'Property Address', 'Application Type', 'Description', 'Submitted', 'Decision Date', 'Decision By']];
-          
+
           visibleCards.forEach(function (card) {
             const summaryBtn = card.querySelector('.arb-summary');
             if (!summaryBtn) return;
@@ -929,7 +1008,7 @@ const periodOptions = dashboardData?.periodOptions ?? [];
             const status = statusEl?.textContent?.trim() || '';
             const emailMatch = summaryBtn.textContent.match(/From:\s*([^\n]+)/);
             const email = emailMatch ? emailMatch[1].trim() : '';
-            
+
             // Get form fields from details
             const getFieldValue = function (labelText) {
               const label = Array.from(details.querySelectorAll('label')).find(l => l.textContent.includes(labelText));
@@ -944,7 +1023,7 @@ const periodOptions = dashboardData?.periodOptions ?? [];
             const applicationType = getFieldValue('Application for') || '';
             const description = getFieldValue('Description') || '';
             const submitted = getFieldValue('Submitted') || '';
-            
+
             // Get approval info
             const approvalEl = details.querySelector('[class*="border-green-200"], [class*="border-red-200"]');
             const decisionText = approvalEl?.textContent?.trim() || '';
@@ -991,27 +1070,27 @@ const periodOptions = dashboardData?.periodOptions ?? [];
         });
       }
     })();
-    
+
     // Session timeout: Auto-logout after 30 minutes of inactivity
     const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
     let lastActivity = Date.now();
     let timeoutWarningShown = false;
-    
+
     function resetActivity() {
       lastActivity = Date.now();
       timeoutWarningShown = false;
     }
-    
+
     function checkSessionTimeout() {
       const elapsed = Date.now() - lastActivity;
       const remaining = SESSION_TIMEOUT_MS - elapsed;
-      
+
       if (remaining <= 0) {
         alert('Your session has expired due to inactivity. You will be redirected to the login page.');
         window.location.href = '/portal/login';
         return;
       }
-      
+
       if (remaining <= 2 * 60 * 1000 && !timeoutWarningShown) {
         timeoutWarningShown = true;
         const confirmed = confirm('Your session will expire in 2 minutes due to inactivity. Click OK to stay logged in, or Cancel to log out now.');
@@ -1024,11 +1103,11 @@ const periodOptions = dashboardData?.periodOptions ?? [];
         }
       }
     }
-    
+
     ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'].forEach(function (event) {
       document.addEventListener(event, resetActivity, { passive: true });
     });
-    
+
     setInterval(checkSessionTimeout, 60 * 1000);
   </script>
   </ProtectedPage>

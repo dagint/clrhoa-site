@@ -1,0 +1,380 @@
+---
+/**
+ * POST /api/arb-vote — Cast or update a vote on an ARB request (multi-stage voting workflow v2).
+ *
+ * Body: {
+ *   requestId: string,
+ *   vote: 'APPROVE' | 'DENY' | 'RETURN' | 'ABSTAIN',
+ *   comment?: string (required for DENY and RETURN),
+ *   csrfToken: string
+ * }
+ *
+ * Returns: {
+ *   success: boolean,
+ *   vote: { vote, comment, voted_at },
+ *   resolution: VoteResolutionResult,
+ *   status_changed: boolean,
+ *   new_status?: string,
+ *   new_stage?: string
+ * }
+ */
+export const prerender = false;
+
+import {
+  getSessionFromCookie,
+  verifyCsrfToken,
+  verifyOrigin,
+  getEffectiveRole,
+} from '../../lib/auth';
+import { createLogger } from '../../lib/logging';
+import { getSecurityMonitor } from '../../lib/monitoring';
+import { getArbRequest } from '../../lib/arb-db';
+import {
+  castVote,
+  isEligibleToVote,
+  resolveVotes,
+  transitionStatus,
+  checkAndApplyDeadlines,
+} from '../../lib/arb-voting-db';
+import { canTransitionStatus } from '../../lib/arb-status-machine';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+
+// Auth check
+const session = await getSessionFromCookie(
+  Astro.request.headers.get('cookie') ?? undefined,
+  env?.SESSION_SECRET
+);
+
+if (!session) {
+  return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+    status: 401,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+// CSRF protection
+const origin = Astro.request.headers.get('origin');
+const referer = Astro.request.headers.get('referer');
+const expectedOrigin = Astro.url.origin;
+if (!verifyOrigin(origin, referer, expectedOrigin)) {
+  return new Response(
+    JSON.stringify({ error: 'Invalid origin. Request blocked for security.' }),
+    { status: 403, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+
+// Only POST allowed
+if (Astro.request.method !== 'POST') {
+  return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+    status: 405,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+// Check D1 and KV availability
+const db = env?.DB;
+const kv = env?.CLRHOA_USERS;
+if (!db || !kv) {
+  return new Response(JSON.stringify({ error: 'Server configuration error' }), {
+    status: 503,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const logger = createLogger({ endpoint: '/api/arb-vote' });
+const securityMonitor = getSecurityMonitor();
+const ipAddress =
+  Astro.request.headers.get('cf-connecting-ip') ??
+  Astro.request.headers.get('x-forwarded-for') ??
+  'unknown';
+
+// Parse request body
+let body: {
+  requestId?: string;
+  vote?: string;
+  comment?: string;
+  csrfToken?: string;
+};
+try {
+  body = await Astro.request.json();
+} catch {
+  return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
+    status: 400,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+// CSRF token verification
+if (!verifyCsrfToken(session, body.csrfToken)) {
+  return new Response(
+    JSON.stringify({
+      error: 'Invalid security token. Please refresh the page and try again.',
+    }),
+    { status: 403, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+
+// Validate inputs
+const requestId = (body.requestId ?? '').trim();
+const vote = (body.vote ?? '').toUpperCase() as
+  | 'APPROVE'
+  | 'DENY'
+  | 'RETURN'
+  | 'ABSTAIN';
+const comment = (body.comment ?? '').trim() || null;
+
+if (!requestId) {
+  return new Response(JSON.stringify({ error: 'Missing requestId.' }), {
+    status: 400,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const validVotes = ['APPROVE', 'DENY', 'RETURN', 'ABSTAIN'];
+if (!validVotes.includes(vote)) {
+  return new Response(
+    JSON.stringify({
+      error: `Invalid vote. Must be one of: ${validVotes.join(', ')}.`,
+    }),
+    { status: 400, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+
+// DENY and RETURN require comments
+if ((vote === 'DENY' || vote === 'RETURN') && !comment) {
+  return new Response(
+    JSON.stringify({
+      error: `Comment is required when voting to ${vote}.`,
+    }),
+    { status: 400, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+
+// First, check and apply any expired deadlines (lazy evaluation pattern)
+try {
+  await checkAndApplyDeadlines(db);
+} catch (e) {
+  logger.error('Failed to check deadlines', { error: e });
+  // Continue - don't fail the vote if deadline check fails
+}
+
+// Get the request
+const request = await getArbRequest(db, requestId);
+if (!request) {
+  return new Response(JSON.stringify({ error: 'Request not found.' }), {
+    status: 404,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+// Check workflow version
+if (request.workflow_version !== 2) {
+  return new Response(
+    JSON.stringify({
+      error:
+        'This request uses the legacy workflow. Please use /api/arb-approve instead.',
+    }),
+    { status: 400, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+
+// Determine current stage from request
+const currentStage = request.current_stage;
+if (!currentStage) {
+  return new Response(
+    JSON.stringify({
+      error: 'Request does not have a current stage set.',
+    }),
+    { status: 400, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+
+// Only allow voting in ARC_REVIEW or BOARD_REVIEW stages
+if (currentStage !== 'ARC_REVIEW' && currentStage !== 'BOARD_REVIEW') {
+  return new Response(
+    JSON.stringify({
+      error: `Voting is not allowed in stage "${currentStage}". Request must be in ARC_REVIEW or BOARD_REVIEW.`,
+    }),
+    { status: 400, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+
+const stage = currentStage as 'ARC_REVIEW' | 'BOARD_REVIEW';
+const cycle = request.current_cycle || 1;
+
+// Check if user is eligible to vote
+const eligibility = await isEligibleToVote(
+  db,
+  kv,
+  requestId,
+  session.email,
+  stage,
+  cycle
+);
+
+if (!eligibility.eligible) {
+  securityMonitor.trackUnauthorizedAccess(
+    '/api/arb-vote',
+    session.email,
+    ipAddress,
+    `Ineligible to vote: ${eligibility.reason}`
+  );
+  return new Response(
+    JSON.stringify({
+      error: `You are not eligible to vote on this request. ${eligibility.reason ?? ''}`,
+    }),
+    { status: 403, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+
+// Cast the vote
+try {
+  const voteRecord = await castVote(
+    db,
+    requestId,
+    session.email,
+    stage,
+    vote,
+    comment,
+    cycle
+  );
+
+  logger.info('Vote cast', {
+    requestId,
+    voter: session.email,
+    stage,
+    vote,
+    cycle,
+  });
+
+  // Resolve votes to check if majority reached
+  const resolution = await resolveVotes(db, kv, requestId, stage, cycle);
+
+  let statusChanged = false;
+  let newStatus: string | undefined;
+  let newStage: string | undefined;
+
+  // If outcome is resolved, transition status
+  if (resolution.outcome !== 'PENDING') {
+    const outcomeToStatus: Record<string, string> = {
+      APPROVED: stage === 'ARC_REVIEW' ? 'ARC_APPROVED' : 'BOARD_APPROVED',
+      DENIED: stage === 'ARC_REVIEW' ? 'ARC_DENIED' : 'BOARD_DENIED',
+      RETURNED: stage === 'ARC_REVIEW' ? 'ARC_RETURNED' : 'BOARD_RETURNED',
+      DEADLOCKED: 'DEADLOCKED', // Will need manual intervention
+    };
+
+    const targetStatus = outcomeToStatus[resolution.outcome];
+    const targetStage = targetStatus;
+
+    if (targetStatus && targetStatus !== 'DEADLOCKED') {
+      // Verify transition is allowed
+      const transitionCheck = canTransitionStatus(
+        request.status,
+        targetStatus,
+        2
+      );
+
+      if (transitionCheck.allowed) {
+        const reason = `Vote resolved: ${resolution.outcome} (${resolution.approveCount} approve, ${resolution.denyCount} deny, ${resolution.returnCount} return, ${resolution.abstainCount} abstain)`;
+
+        const updated = await transitionStatus(
+          db,
+          requestId,
+          targetStatus,
+          targetStage,
+          'system',
+          reason,
+          ipAddress,
+          {
+            vote_resolution: resolution,
+            final_vote: vote,
+            final_voter: session.email,
+          }
+        );
+
+        if (updated) {
+          statusChanged = true;
+          newStatus = targetStatus;
+          newStage = targetStage;
+
+          logger.info('Status transitioned via vote resolution', {
+            requestId,
+            from: request.status,
+            to: targetStatus,
+            outcome: resolution.outcome,
+          });
+
+          // If ARC_APPROVED, automatically advance to BOARD_REVIEW
+          if (targetStatus === 'ARC_APPROVED') {
+            const advanceUpdated = await transitionStatus(
+              db,
+              requestId,
+              'BOARD_REVIEW',
+              'BOARD_REVIEW',
+              'system',
+              'Automatically advanced to Board review after ARC approval',
+              ipAddress
+            );
+
+            if (advanceUpdated) {
+              newStatus = 'BOARD_REVIEW';
+              newStage = 'BOARD_REVIEW';
+              logger.info('Auto-advanced to BOARD_REVIEW', { requestId });
+            }
+          }
+        }
+      } else {
+        logger.warn('Vote resolved but transition not allowed', {
+          requestId,
+          targetStatus,
+          reason: transitionCheck.reason,
+        });
+      }
+    } else if (targetStatus === 'DEADLOCKED') {
+      logger.warn('Vote deadlocked - manual intervention required', {
+        requestId,
+        resolution,
+      });
+    }
+  }
+
+  return new Response(
+    JSON.stringify({
+      success: true,
+      vote: {
+        vote: voteRecord.vote,
+        comment: voteRecord.comment,
+        voted_at: voteRecord.voted_at,
+        updated_at: voteRecord.updated_at,
+      },
+      resolution: {
+        outcome: resolution.outcome,
+        approveCount: resolution.approveCount,
+        denyCount: resolution.denyCount,
+        returnCount: resolution.returnCount,
+        abstainCount: resolution.abstainCount,
+        totalEligible: resolution.totalEligible,
+        activeVoters: resolution.activeVoters,
+        majorityNeeded: resolution.majorityNeeded,
+        allVotesCast: resolution.allVotesCast,
+      },
+      status_changed: statusChanged,
+      new_status: newStatus,
+      new_stage: newStage,
+    }),
+    { status: 200, headers: { 'Content-Type': 'application/json' } }
+  );
+} catch (error) {
+  logger.error('Failed to cast vote', {
+    error,
+    requestId,
+    voter: session.email,
+  });
+  return new Response(
+    JSON.stringify({ error: 'Failed to cast vote. Please try again.' }),
+    { status: 500, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+---
