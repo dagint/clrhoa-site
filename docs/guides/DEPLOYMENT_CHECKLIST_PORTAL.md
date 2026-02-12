@@ -121,8 +121,8 @@ Set for **Production** so the built site has correct URLs and content. These are
 
 Rate limits are defined in code ([`src/lib/rate-limit.ts`](../src/lib/rate-limit.ts)) and use the **KV** binding. Once **KV** is bound to the RATE_LIMIT namespace (steps 2 and 4), the following are enforced automatically:
 
-- Login: 5 attempts per 15 minutes per IP  
-- ARB uploads, directory phone/email reveals, feedback, CSV upload, etc.: per-endpoint limits  
+- Login: 5 attempts per 15 minutes per IP
+- ARB uploads, directory phone/email reveals, feedback, CSV upload, etc.: per-endpoint limits
 
 No separate “rate limit config” env vars are required. Optional: review or tune values in `rate-limit.ts` before deploy.
 
@@ -192,12 +192,12 @@ Cron is set in `workers/backup/wrangler.toml` (e.g. daily 2:00 AM UTC). No DNS o
 
 ## Summary order
 
-1. Create D1, KV x3, R2 → update wrangler.toml with IDs.  
-2. Run `npm run db:remote:all`.  
-3. In Pages: bind DB, CLOURHOA_USERS, SESSION, KV, CLOURHOA_FILES.  
-4. In Pages: set SESSION_SECRET (required); NOTIFY_* and Resend (or MailChannels); backup vars if needed; PUBLIC_* and SITE.  
-5. Add first admin to CLOURHOA_USERS KV.  
-6. (Optional) Deploy backup Worker and set its secrets.  
+1. Create D1, KV x3, R2 → update wrangler.toml with IDs.
+2. Run `npm run db:remote:all`.
+3. In Pages: bind DB, CLOURHOA_USERS, SESSION, KV, CLOURHOA_FILES.
+4. In Pages: set SESSION_SECRET (required); NOTIFY_* and Resend (or MailChannels); backup vars if needed; PUBLIC_* and SITE.
+5. Add first admin to CLOURHOA_USERS KV.
+6. (Optional) Deploy backup Worker and set its secrets.
 7. Deploy Pages → test login, Board, and notifications.
 
 You’re ready for production once every item you need in sections 1–7 is checked and 10 is verified.

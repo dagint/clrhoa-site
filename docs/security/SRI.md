@@ -72,7 +72,7 @@ SRI hashes need to be updated when:
 1. **Generate new hash** using one of the methods above
 2. **Update the integrity attribute** in the file:
    ```astro
-   <script 
+   <script
      src="https://example.com/script.js"
      integrity="sha384-NEW_HASH_HERE"
      crossorigin="anonymous"
@@ -101,7 +101,7 @@ SRI hashes need to be updated when:
 Some scripts update frequently (e.g. reCAPTCHA), which can cause issues:
 
 - **Problem**: Hash changes when script updates
-- **Solution**: 
+- **Solution**:
   - Monitor for integrity failures
   - Update hash when needed
   - Consider using versioned script URLs if available
@@ -120,7 +120,7 @@ If SRI check fails:
 ### 1. Use SRI for All External Scripts
 
 ```html
-<script 
+<script
   src="https://example.com/script.js"
   integrity="sha384-..."
   crossorigin="anonymous"

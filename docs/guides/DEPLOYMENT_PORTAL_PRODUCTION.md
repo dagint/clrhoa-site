@@ -10,35 +10,35 @@ This guide helps you deploy the current site (including the member portal and DB
 
 ### Public pages: /news and /resources/vendors
 
-- **/news**  
-  - **Static:** Markdown articles from `src/content/news/` still render.  
-  - **From DB:** Board news items, meetings “on public news,” and vendor count come from D1.  
+- **/news**
+  - **Static:** Markdown articles from `src/content/news/` still render.
+  - **From DB:** Board news items, meetings “on public news,” and vendor count come from D1.
   - **If D1 is empty:** You still see markdown news. Board news and meetings sections are empty; vendor count is 0. **Nothing crashes.**
 
-- **/resources/vendors**  
-  - **Fully from DB:** `listPublicVendors(db)`.  
+- **/resources/vendors**
+  - **Fully from DB:** `listPublicVendors(db)`.
   - **If D1 is empty:** The page shows the empty state (e.g. “No vendors listed yet”). **Nothing crashes.**
 
 So deploying with an empty or new D1 does **not** break these pages; DB-backed sections are just empty until you add data.
 
 ### “Losing” existing content
 
-- **If production today has no D1 (fully static):**  
-  - There is no existing DB data to lose.  
-  - Static content (markdown news, etc.) stays in the repo and keeps working.  
-  - Any vendors that were hardcoded in the old site are **not** in D1. After deploy you can:  
-    - Re-add them via **Board → Vendors** after first login, or  
+- **If production today has no D1 (fully static):**
+  - There is no existing DB data to lose.
+  - Static content (markdown news, etc.) stays in the repo and keeps working.
+  - Any vendors that were hardcoded in the old site are **not** in D1. After deploy you can:
+    - Re-add them via **Board → Vendors** after first login, or
     - Run a one-time seed script that inserts into `vendors` and sets `show_on_public = 1` if you have a list.
 
-- **If production already has D1 and you’re just updating the app:**  
-  - Run any **new** migrations (see below).  
-  - Don’t drop or overwrite tables that hold existing data.  
+- **If production already has D1 and you’re just updating the app:**
+  - Run any **new** migrations (see below).
+  - Don’t drop or overwrite tables that hold existing data.
   - Then deploy. Existing DB data is preserved.
 
 ### Portal and login
 
-- **Login is allowed only for emails in the KV allow list** (`CLOURHOA_USERS`).  
-- If **no** keys are in that KV namespace, **no one** can log in.  
+- **Login is allowed only for emails in the KV allow list** (`CLOURHOA_USERS`).
+- If **no** keys are in that KV namespace, **no one** can log in.
 - So you must **add at least one email (e.g. admin) to KV** before or right after deploy so that person can log in and then add the directory and other users.
 
 ---
@@ -121,7 +121,7 @@ npx wrangler kv key put "your-admin@example.com" '{"role":"admin"}' --namespace-
 
 After deploy, that user can log in at **/portal/login** and then use **Board → Directory** to add owners and set roles. Adding an owner with a role (or “can log in”) updates the allow list (KV) so those users can log in too. So the **allow list** is maintained by:
 
-- **KV (CLOURHOA_USERS):** Who can log in at all.  
+- **KV (CLOURHOA_USERS):** Who can log in at all.
 - **Board → Directory:** Adding/editing owners and their roles updates KV. Removing someone from the directory removes them from KV **unless** their role is **admin** (admins stay in KV even if removed from the directory).
 
 ---
@@ -139,9 +139,9 @@ After deploy, that user can log in at **/portal/login** and then use **Board →
 ## 4. Keeping public pages from “going empty”
 
 - **Vendors:** All public vendors come from the `vendors` table with `show_on_public = 1`. Add them via **Board → Vendors** (or a one-time seed). Nothing is lost on deploy if you don’t delete or reset D1.
-- **News:**  
-  - Markdown news is in the repo; it doesn’t depend on D1.  
-  - Board news and meetings on **/news** come from D1; add them via Board after first login.  
+- **News:**
+  - Markdown news is in the repo; it doesn’t depend on D1.
+  - Board news and meetings on **/news** come from D1; add them via Board after first login.
 - **Meetings on /news:** Create meetings in **Board → Meetings** and check “Post to public news.”
 
 If you had a **static** vendor list on the old site (hardcoded HTML), that content is not in D1. Export or copy that list and re-add it via Board → Vendors (or a seed script) after first login so **/resources/vendors** is populated again.

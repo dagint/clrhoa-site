@@ -1,109 +1,115 @@
-# Documentation Index
+# CLRHOA Site Documentation
 
-Complete documentation for the Crooked Lake Reserve HOA website.
+Complete documentation for the Crooked Lake Reserve HOA portal and management system.
 
-## 🚀 Getting Started
+## 📚 Documentation Structure
 
-- **[Quick Start](QUICK_START.md)** - Get up and running in 5 minutes
-- **[Deployment Guide](DEPLOYMENT.md)** - Complete deployment instructions
-- **[Content Management](CONTENT.md)** - Adding and updating content
+### 🚀 Quick Start
+- [TODO.md](TODO.md) - Active TODO list and quick reference
 
-## 📚 Core Documentation
+---
 
-### Setup & Configuration
+## Core Documentation
 
-- **[Environment Variables](ENVIRONMENT_VARIABLES.md)** - Environment variable setup and reference
-- **[Contact Form Setup](CONTACT_FORM_SETUP.md)** - StaticForms and reCAPTCHA configuration
-- **[Analytics Setup](ANALYTICS_SETUP.md)** - Privacy-friendly analytics configuration
+### 📁 [guides/](guides/) - Setup & Deployment (15 docs)
+**Essential Guides:**
+- [QUICK_START.md](guides/QUICK_START.md) - Quick start guide
+- [LOCAL_ENV_SETUP.md](guides/LOCAL_ENV_SETUP.md) - Local development setup
+- [DEPLOYMENT.md](guides/DEPLOYMENT.md) - Deployment guide
+- [GITHUB_SECRETS_SETUP.md](guides/GITHUB_SECRETS_SETUP.md) - Secrets configuration
+- [TROUBLESHOOTING_VARS_AND_DEPLOY.md](guides/TROUBLESHOOTING_VARS_AND_DEPLOY.md) - Troubleshooting
 
-### Security
+**Feature Setup:**
+- [CONTACT_FORM_SETUP.md](guides/CONTACT_FORM_SETUP.md)
+- [PHASE35_NOTIFICATIONS_SETUP.md](guides/PHASE35_NOTIFICATIONS_SETUP.md)
+- [ANALYTICS_SETUP.md](guides/ANALYTICS_SETUP.md)
+- [ASSUME_ROLE_HOW_TO.md](guides/ASSUME_ROLE_HOW_TO.md)
 
-- **[Security Guide](SECURITY.md)** - Complete security documentation (start here)
-- **[Security Assessment](SECURITY_ASSESSMENT.md)** - Detailed security analysis and posture
-- **[Security Summary](SECURITY_SUMMARY.md)** - Executive summary and score breakdown
-- **[Security Checklist](SECURITY_CHECKLIST.md)** - Quick verification checklist
-- **[Data & Access Control](DATA_ACCESS_CONTROL.md)** - Who can access what; audit logging
-- **[Security Headers](SECURITY_HEADERS.md)** - HTTP security headers configuration
-- **[Rate Limiting](RATE_LIMITING.md)** - API and login rate limits
-- **[Dependency Security](DEPENDENCY_SECURITY.md)** - Managing dependencies and vulnerabilities
-- **[Security Monitoring](SECURITY_MONITORING.md)** - Monitoring and incident response
-- **[Subresource Integrity](SRI.md)** - SRI hash generation and updates
+### 🏗️ [architecture/](architecture/) - System Architecture (11 docs)
+**Core:**
+- [ARCHITECTURE.md](architecture/ARCHITECTURE.md) - System overview
+- [DATA_ACCESS_CONTROL.md](architecture/DATA_ACCESS_CONTROL.md) - Access control
+- [DATA_RETENTION.md](architecture/DATA_RETENTION.md) - Retention policies
 
-### Content & Management
+**Routing:**
+- [ROUTE_MAP.md](architecture/ROUTE_MAP.md) - Complete route map
+- [ROUTE_MAP_VISUAL.md](architecture/ROUTE_MAP_VISUAL.md) - Visual diagram
+- [ROUTE_GUARDS.md](architecture/ROUTE_GUARDS.md) - Route protection
 
-- **[Content Guide](CONTENT.md)** - Adding news articles and documents
-- **[Board Info Request](BOARD_INFO_REQUEST.md)** - Information needed from the board
-- **[PII Migration](PII_MIGRATION.md)** - PII migration summary
+### 🔐 [security/](security/) - Security (16 docs)
+**Primary:**
+- [SECURITY_MODEL.md](security/SECURITY_MODEL.md) - ⭐ Complete security model
+- [SECURITY_AUDIT_REPORT.md](security/SECURITY_AUDIT_REPORT.md) - Latest audit
+- [SECURITY_IMPLEMENTATION_SUMMARY.md](security/SECURITY_IMPLEMENTATION_SUMMARY.md)
 
-### Performance
+**Specific Topics:**
+- [SECURITY_HEADERS.md](security/SECURITY_HEADERS.md) - HTTP security headers
+- [CSRF_AUDIT.md](security/CSRF_AUDIT.md) - CSRF protection
+- [RATE_LIMITING.md](security/RATE_LIMITING.md) - Rate limiting
+- [SRI.md](security/SRI.md) - Subresource Integrity
 
-- **[Performance Optimizations](OPTIMIZATIONS.md)** - Build and runtime optimizations
+### 🔑 [auth-rbac/](auth-rbac/) - Auth & RBAC (6 docs)
+- [AUTH_IMPLEMENTATION.md](auth-rbac/AUTH_IMPLEMENTATION.md) - Auth system
+- [RBAC_IMPLEMENTATION.md](auth-rbac/RBAC_IMPLEMENTATION.md) - RBAC system
+- [PERMISSION_MANAGEMENT.md](auth-rbac/PERMISSION_MANAGEMENT.md)
+- [REVIEW_ASSUME_ROLE_AND_ACCESS.md](auth-rbac/REVIEW_ASSUME_ROLE_AND_ACCESS.md)
 
-### Architecture & code quality
+### 💾 [backup/](backup/) - Backup & Recovery (8 docs)
+**Main Guide:**
+- [R2_INCREMENTAL_BACKUP_GUIDE.md](backup/R2_INCREMENTAL_BACKUP_GUIDE.md) - ⭐ Complete backup guide
 
-- **[Architecture Overview](ARCHITECTURE.md)** - Public vs portal vs board; auth flow; key libs and data stores
-- **[Code Quality](CODE_QUALITY.md)** - Shared helpers, testing, type safety, and recommendations
-- **[Data & Access Control](DATA_ACCESS_CONTROL.md)** - Who can access what; audit logging
+**Other:**
+- [R2_BACKUP_STRATEGY.md](backup/R2_BACKUP_STRATEGY.md) - Strategy overview
+- [BACKUP_AND_RECOVERY.md](backup/BACKUP_AND_RECOVERY.md) - Recovery procedures
+- [RESTORATION_GUIDE.md](backup/RESTORATION_GUIDE.md) - Restoration guide
 
-## 📖 Documentation Structure
+### ⚖️ [compliance/](compliance/) - Florida HOA Compliance (6 docs)
+- [FLORIDA_COMPLIANCE_AUDIT_2026.md](compliance/FLORIDA_COMPLIANCE_AUDIT_2026.md)
+- [COMPLIANCE_QUICK_REFERENCE.md](compliance/COMPLIANCE_QUICK_REFERENCE.md)
+- [COMPLIANCE_ROLLOUT_PLAN.md](compliance/COMPLIANCE_ROLLOUT_PLAN.md)
 
-```
-docs/
-├── README.md                    # This file - documentation index
-├── QUICK_START.md              # Quick start guide
-├── DEPLOYMENT.md               # Deployment guide
-├── CONTENT.md                  # Content management
-├── ENVIRONMENT_VARIABLES.md    # Environment variables
-├── CONTACT_FORM_SETUP.md       # Contact form setup
-├── ANALYTICS_SETUP.md          # Analytics setup
-├── ARCHITECTURE.md             # Public vs portal vs board; auth; key libs
-├── CODE_QUALITY.md             # Shared helpers, testing, type safety
-├── DATA_ACCESS_CONTROL.md      # Who can access what; audit logging
-├── SECURITY.md                 # Security guide (index)
-├── SECURITY_ASSESSMENT.md      # Security analysis
-├── SECURITY_SUMMARY.md         # Security summary
-├── SECURITY_HEADERS.md         # Security headers
-├── DEPENDENCY_SECURITY.md      # Dependency security
-├── SECURITY_MONITORING.md      # Security monitoring
-├── SRI.md                      # Subresource Integrity
-├── BOARD_INFO_REQUEST.md       # Board information
-├── PII_MIGRATION.md            # PII migration
-└── OPTIMIZATIONS.md            # Performance optimizations
-```
+### 🔧 [implementation/](implementation/) - Implementation Summaries (4 docs)
+- [INCREMENTAL_BACKUP_IMPLEMENTATION.md](implementation/INCREMENTAL_BACKUP_IMPLEMENTATION.md)
+- [E2E_IMPLEMENTATION_SUMMARY.md](implementation/E2E_IMPLEMENTATION_SUMMARY.md)
+- [PORTAL_MIGRATION_GUIDE.md](implementation/PORTAL_MIGRATION_GUIDE.md)
 
-## 🎯 Common Tasks
+### 📦 [archived/](archived/) - Archived Docs (19 docs)
+Completed phases, old PRs, and resolved fixes.
 
-### For Board Members
+---
 
-1. **Adding News**: See [Content Guide](CONTENT.md#adding-news-articles)
-2. **Adding Documents**: See [Content Guide](CONTENT.md#adding-documents)
-3. **Updating Content**: See [Content Guide](CONTENT.md#editing-existing-content)
+## 🗂️ Quick Navigation
 
-### For Developers
+### "I want to..."
 
-1. **Initial Setup**: See [Quick Start](QUICK_START.md)
-2. **Deployment**: See [Deployment Guide](DEPLOYMENT.md)
-3. **Environment Variables**: See [Environment Variables](ENVIRONMENT_VARIABLES.md)
-4. **Security**: See [Security Guide](SECURITY.md)
+**...set up locally**
+→ [guides/LOCAL_ENV_SETUP.md](guides/LOCAL_ENV_SETUP.md)
 
-## 🔍 Finding Information
+**...deploy to production**
+→ [guides/DEPLOYMENT.md](guides/DEPLOYMENT.md)
 
-- **How do I...?** → Check [Quick Start](QUICK_START.md) or [Content Guide](CONTENT.md)
-- **Deploy the site?** → See [Deployment Guide](DEPLOYMENT.md)
-- **Configure forms?** → See [Contact Form Setup](CONTACT_FORM_SETUP.md)
-- **Security questions?** → See [Security Guide](SECURITY.md)
-- **Environment variables?** → See [Environment Variables](ENVIRONMENT_VARIABLES.md)
+**...understand security**
+→ [security/SECURITY_MODEL.md](security/SECURITY_MODEL.md)
 
-## 📝 Documentation Updates
+**...configure backups**
+→ [backup/R2_INCREMENTAL_BACKUP_GUIDE.md](backup/R2_INCREMENTAL_BACKUP_GUIDE.md)
 
-When updating documentation:
-- Keep it concise and actionable
-- Include examples where helpful
-- Link to related documentation
-- Update this index if adding new docs
+**...see all routes**
+→ [architecture/ROUTE_MAP.md](architecture/ROUTE_MAP.md)
 
-## 🆘 Need Help?
+**...ensure compliance**
+→ [compliance/FLORIDA_COMPLIANCE_AUDIT_2026.md](compliance/FLORIDA_COMPLIANCE_AUDIT_2026.md)
 
-- Check the relevant guide above
-- Review the main [README.md](../README.md)
-- Contact the website administrator
+---
+
+## 📊 Stats
+
+- **Total Documents:** 85 markdown files
+- **Categories:** 8 main categories
+- **Quick Start Guides:** 15
+- **Security Documents:** 16
+- **Archived:** 19
+
+---
+
+*Last updated: 2026-02-12 - Phase 2 Documentation Organization*

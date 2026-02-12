@@ -27,9 +27,9 @@ You do **not** create three separate forms or three API keys in StaticForms. You
 
 - Every submission is sent to the **same email** you set in the StaticForms dashboard (e.g. a general board or contact inbox).
 - Each submission includes a **recipient** field in the email body, for example:
-  - `recipient: board` → Board of Directors  
-  - `recipient: arb` → Architectural Review Board (ARB)  
-  - `recipient: vendor` → Vendor Information Request  
+  - `recipient: board` → Board of Directors
+  - `recipient: arb` → Architectural Review Board (ARB)
+  - `recipient: vendor` → Vendor Information Request
 
 So the three “choices” are already built into the form; StaticForms just delivers one stream of emails with that field in each one.
 
@@ -82,8 +82,8 @@ Restart the dev server (`npm run dev`) after changing env vars.
 
 1. **Workers & Pages** → your project → **Settings** → **Environment variables**.
 2. Add:
-   - `PUBLIC_STATICFORMS_API_KEY` = your StaticForms API key  
-   - `PUBLIC_RECAPTCHA_SITE_KEY` = (optional) your reCAPTCHA site key if using reCAPTCHA  
+   - `PUBLIC_STATICFORMS_API_KEY` = your StaticForms API key
+   - `PUBLIC_RECAPTCHA_SITE_KEY` = (optional) your reCAPTCHA site key if using reCAPTCHA
 3. Save and **redeploy**.
 
 ---
@@ -118,8 +118,8 @@ Restart the dev server (`npm run dev`) after changing env vars.
 
 ## 8. Summary
 
-1. Create a StaticForms account and get your **API key**.  
-2. Set **email** in StaticForms dashboard.  
-3. Choose spam protection: **honeypot-only**, **reCAPTCHA**, or **ALTCHA** (Pro); if reCAPTCHA, set secret in StaticForms and `PUBLIC_RECAPTCHA_SITE_KEY` on the site.  
-4. Set `PUBLIC_STATICFORMS_API_KEY` (and optionally `PUBLIC_RECAPTCHA_SITE_KEY`) in `.env.local` and Cloudflare Pages.  
+1. Create a StaticForms account and get your **API key**.
+2. Set **email** in StaticForms dashboard.
+3. Choose spam protection: **honeypot-only**, **reCAPTCHA**, or **ALTCHA** (Pro); if reCAPTCHA, set secret in StaticForms and `PUBLIC_RECAPTCHA_SITE_KEY` on the site.
+4. Set `PUBLIC_STATICFORMS_API_KEY` (and optionally `PUBLIC_RECAPTCHA_SITE_KEY`) in `.env.local` and Cloudflare Pages.
 5. Redeploy and test the contact flow.

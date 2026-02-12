@@ -55,14 +55,14 @@ Leave the rest in [vars] or override with secrets as needed.
 ## 3. MailChannels setup (DNS)
 
 1. **Sign up** at [mailchannels.com](https://www.mailchannels.com/) and create an API key (or use the domain authentication flow).
-2. **Domain authentication (required)**  
+2. **Domain authentication (required)**
    MailChannels requires a **Domain Lockdown** TXT record so only your Worker can send for your domain.
 
    Add a **TXT** record to your domain (e.g. `clrhoa.com`):
 
    - **Name/host:** `_mailchannels.clrhoa.com` (or `_mailchannels` for the root)
-   - **Value:**  
-     `v=mc1 cfid=YOUR_WORKER_SUBDOMAIN.workers.dev`  
+   - **Value:**
+     `v=mc1 cfid=YOUR_WORKER_SUBDOMAIN.workers.dev`
      Replace `YOUR_WORKER_SUBDOMAIN` with your Cloudflare Workers/Pages subdomain (e.g. `clrhoa-site.pages.dev` or your custom domain that serves the Worker).
 
    If you use a **custom domain** for the site (e.g. `clrhoa.com`), use that in `cfid=`:
@@ -71,10 +71,10 @@ Leave the rest in [vars] or override with secrets as needed.
 
    Without this record, sends will fail (often 500).
 
-3. **From address**  
+3. **From address**
    Set `NOTIFY_NOREPLY_EMAIL` to an address on a domain you control (e.g. `noreply@clrhoa.com`). Some providers require the domain to match the Domain Lockdown domain.
 
-4. **API key**  
+4. **API key**
    Create an API key in the MailChannels dashboard and set `MAILCHANNELS_API_KEY` in [vars] or as a secret. (Only used when `RESEND_API_KEY` is not set.)
 
 ---
@@ -84,7 +84,7 @@ Leave the rest in [vars] or override with secrets as needed.
 1. Sign up at [twilio.com](https://www.twilio.com/).
 2. Get **Account SID**, **Auth Token**, and a **Phone Number** from the console.
 3. Set in [vars]: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER` (e.g. `+15551234567`).
-4. For production, put `TWILIO_AUTH_TOKEN` in a secret:  
+4. For production, put `TWILIO_AUTH_TOKEN` in a secret:
    `wrangler secret put TWILIO_AUTH_TOKEN`
 
 SMS is used for:

@@ -87,7 +87,7 @@ npm run env:merge
 # Check .vars.local
 cat .vars.local
 
-# Check .secrets.local  
+# Check .secrets.local
 cat .secrets.local
 
 # Merge and see result
