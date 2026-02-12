@@ -17,48 +17,54 @@
 export const prerender = false;
 
 import PortalLayout from '../../layouts/PortalLayout.astro';
-import ProtectedPage from '../../components/ProtectedPage.astro';
-import PortalNav from '../../components/PortalNav.astro';
+import PortalPage from '../../components/PortalPage.astro';
 import ArbNav from '../../components/ArbNav.astro';
 import { getArbContext } from '../../lib/board-context';
-import { getArbRequestCountsByStatus, listArbRequestsByHousehold } from '../../lib/arb-db';
+import { getPortalBadgeCounts } from '../../lib/portal-badge-counts';
 
 // Route-level guard: enforce ARB-only access
 const ctx = await getArbContext(Astro);
 if ('redirect' in ctx) return Astro.redirect(ctx.redirect);
 const { env, session, effectiveRole } = ctx;
 
+const { email, role, name } = session;
 const db = env?.DB;
-const allRequests = db ? await listArbRequestsByHousehold(db, session.email) : [];
-const draftCount = allRequests.filter((r) => r.status === 'pending').length;
-const arbCounts = db ? await getArbRequestCountsByStatus(db) : { in_review: 0, pending: 0, approved: 0, rejected: 0, cancelled: 0 };
+const badges = await getPortalBadgeCounts(db, email, role, name);
 ---
 
 <PortalLayout title="ARB | Member Portal | Crooked Lake Reserve HOA">
-  <ProtectedPage>
-  <div class="min-h-screen portal-theme-bg font-body">
-    <PortalNav currentPath="/portal/arb" draftCount={draftCount} role={effectiveRole} staffRole={session.role ?? ''} arbInReviewCount={arbCounts.in_review} />
-
+  <PortalPage
+    currentPath="/portal/arb"
+    pageTitle="ARB"
+    userName={badges.displayName ?? undefined}
+    userEmail={email}
+    effectiveRole={effectiveRole}
+    draftCount={badges.draftCount}
+    role={effectiveRole}
+    staffRole={role ?? ''}
+    arbInReviewCount={badges.arbInReviewCount}
+    vendorPendingCount={badges.vendorPendingCount}
+    maintenanceOpenCount={badges.maintenanceOpenCount}
+    meetingsRsvpCount={badges.meetingsRsvpCount}
+    feedbackDueCount={badges.feedbackDueCount}
+  >
     <ArbNav currentPath="/portal/arb" />
 
-    <main class="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
-      <div class="mb-6">
-        <h2 class="text-2xl font-heading font-bold text-clr-green mb-1">ARB</h2>
-        <p class="text-gray-600 text-sm">Review ARB requests and manage the pre-approval library. Board tools (directory, dues, documents) require Board role or Act as Board.</p>
-      </div>
-      <div class="mb-6 flex flex-wrap gap-3">
-        <a href="/portal/arb-dashboard" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-clr-green hover:brightness-110 text-white font-semibold text-sm shadow-sm">
-          ARB Dashboard
-          {arbCounts.in_review > 0 && (
-            <span class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 rounded-full bg-amber-500 text-white text-xs font-bold">{arbCounts.in_review}</span>
-          )}
-        </a>
-        <a href="/board/library" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 border-gray-300 text-gray-700 hover:bg-gray-100 font-semibold text-sm">
-          Pre-approval library
-        </a>
-      </div>
-      <p class="text-sm text-gray-500">Use the banner to <strong>Act as Board</strong> when you need directory, dues, meetings, or other board-only tools (arb_board only).</p>
-    </main>
-  </div>
-  </ProtectedPage>
+    <div class="mb-8">
+      <h1 class="text-3xl font-heading font-bold text-clr-green mb-2">ARB</h1>
+      <p class="text-gray-600 text-lg">Review ARB requests and manage the pre-approval library. Board tools (directory, dues, documents) require Board role or Act as Board.</p>
+    </div>
+    <div class="mb-8 flex flex-wrap gap-4">
+      <a href="/portal/arb-dashboard" class="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-clr-green hover:brightness-110 text-white font-semibold text-base shadow-sm">
+        ARB Dashboard
+        {badges.arbInReviewCount > 0 && (
+          <span class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 rounded-full bg-amber-500 text-white text-xs font-bold">{badges.arbInReviewCount}</span>
+        )}
+      </a>
+      <a href="/board/library" class="inline-flex items-center gap-2 px-6 py-3 rounded-xl border-2 border-gray-300 text-gray-700 hover:bg-gray-100 font-semibold text-base">
+        Pre-approval library
+      </a>
+    </div>
+    <p class="text-base text-gray-500">Use the banner to <strong>Act as Board</strong> when you need directory, dues, meetings, or other board-only tools (arb_board only).</p>
+  </PortalPage>
 </PortalLayout>

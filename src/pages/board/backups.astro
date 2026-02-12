@@ -1,25 +1,45 @@
 ---
 export const prerender = false;
 
-import BoardLayout from '../../layouts/BoardLayout.astro';
 import { getBoardContext } from '../../lib/board-context';
-import { listArbRequestsByHousehold } from '../../lib/arb-db';
+import { getPortalBadgeCounts } from '../../lib/portal-badge-counts';
+import PortalLayout from '../../layouts/PortalLayout.astro';
+import PortalPage from '../../components/PortalPage.astro';
+import BoardNav from '../../components/BoardNav.astro';
 
 const ctx = await getBoardContext(Astro);
 if ('redirect' in ctx) return Astro.redirect(ctx.redirect);
 const { env, session, effectiveRole } = ctx;
 if (effectiveRole !== 'board' && effectiveRole !== 'admin') return Astro.redirect('/portal/dashboard');
 
-const allRequests = env?.DB ? await listArbRequestsByHousehold(env.DB, session.email) : [];
-const draftCount = allRequests.filter((r) => r.status === 'pending').length;
+const db = env?.DB;
+const { email, role, name } = session;
+const badges = await getPortalBadgeCounts(db, email, role, name);
 
 const url = Astro.url;
 const connected = url.searchParams.get('connected') === '1';
 const errorParam = url.searchParams.get('error') ?? '';
 ---
 
-<BoardLayout title="Backups" subtitle="Download full backup or configure automated backups to Google Drive" draftCount={draftCount} role={effectiveRole} session={session} elevatedUntil={session.elevated_until}>
-  <p class="text-gray-600 mb-6">
+<PortalLayout title="Backups | Board | Member Portal | Crooked Lake Reserve HOA">
+  <PortalPage
+    currentPath="/board/backups"
+    pageTitle="Backups"
+    userName={badges.displayName ?? undefined}
+    userEmail={email}
+    effectiveRole={effectiveRole}
+    draftCount={badges.draftCount}
+    role={effectiveRole}
+    staffRole={role ?? ''}
+    arbInReviewCount={badges.arbInReviewCount}
+    vendorPendingCount={badges.vendorPendingCount}
+    maintenanceOpenCount={badges.maintenanceOpenCount}
+    meetingsRsvpCount={badges.meetingsRsvpCount}
+  >
+    <BoardNav currentPath="/board/backups" />
+
+unt}
+<p class="text-gray-600 mb-6">
     Database (D1) and login whitelist (KV) backups. Automated backups run daily to Cloudflare R2; you can also send a copy to a Google Workspace Drive folder.
   </p>
 
@@ -40,8 +60,8 @@ const errorParam = url.searchParams.get('error') ?? '';
   )}
 
   <section class="mb-8" aria-labelledby="download-backup-heading">
-    <h2 id="download-backup-heading" class="text-lg font-heading font-semibold text-clr-green mb-3">Download full backup</h2>
-    <p class="text-sm text-gray-600 mb-3">
+    <h2 id="download-backup-heading" class="text-2xl font-heading font-semibold text-clr-green mb-3">Download full backup</h2>
+    <p class="text-base text-gray-600 mb-3">
       Get a ZIP with the current database (SQL) and whitelist (JSON) to save on your computer.
     </p>
     <a
@@ -54,8 +74,8 @@ const errorParam = url.searchParams.get('error') ?? '';
   </section>
 
   <section class="mb-8" aria-labelledby="automated-heading">
-    <h2 id="automated-heading" class="text-lg font-heading font-semibold text-clr-green mb-3">Automated backups (Cloudflare R2)</h2>
-    <p class="text-sm text-gray-600 mb-3">
+    <h2 id="automated-heading" class="text-2xl font-heading font-semibold text-clr-green mb-3">Automated backups (Cloudflare R2)</h2>
+    <p class="text-base text-gray-600 mb-3">
       The backup Worker runs daily at 2:00 AM UTC. It exports D1 and the whitelist and stores them in R2 under <code class="bg-gray-100 px-1 rounded">backups/d1/</code> and <code class="bg-gray-100 px-1 rounded">backups/kv/</code>. Retention is applied (default 30 days).
     </p>
     <div id="backup-status" class="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700 space-y-1.5" role="status" aria-live="polite">
@@ -70,8 +90,8 @@ const errorParam = url.searchParams.get('error') ?? '';
   </section>
 
   <section class="mb-8" aria-labelledby="google-drive-heading">
-    <h2 id="google-drive-heading" class="text-lg font-heading font-semibold text-clr-green mb-3">Google Drive backup</h2>
-    <p class="text-sm text-gray-600 mb-4">
+    <h2 id="google-drive-heading" class="text-2xl font-heading font-semibold text-clr-green mb-3">Google Drive backup</h2>
+    <p class="text-base text-gray-600 mb-4">
       Optionally upload the same backup set to a Google Workspace Drive folder. Connect your Google account, then set the folder ID (from the folder URL in Drive) and schedule.
     </p>
 
@@ -103,7 +123,7 @@ const errorParam = url.searchParams.get('error') ?? '';
       </div>
       <div class="flex items-center gap-4">
         <a href="/api/board/google-drive-auth" class="text-sm text-clr-orange hover:underline font-medium">Connect Google Drive</a>
-        <button type="submit" class="bg-clr-green hover:brightness-110 text-white px-5 py-2.5 rounded-xl font-semibold text-sm">
+        <button type="submit" class="bg-clr-green hover:brightness-110 text-white px-5 py-2.5 rounded-xl font-semibold text-base">
           Save settings
         </button>
       </div>
@@ -208,4 +228,5 @@ const errorParam = url.searchParams.get('error') ?? '';
       });
     })();
   </script>
-</BoardLayout>
+  </PortalPage>
+</PortalLayout>

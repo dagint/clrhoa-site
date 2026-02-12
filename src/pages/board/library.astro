@@ -1,11 +1,13 @@
 ---
 export const prerender = false;
 
-import BoardLayout from '../../layouts/BoardLayout.astro';
 import { getBoardContext } from '../../lib/board-context';
+import { getPortalBadgeCounts } from '../../lib/portal-badge-counts';
 import { listPreapprovalItems, listPreapprovalCategories, parsePhotos } from '../../lib/preapproval-db';
-import { listArbRequestsByHousehold } from '../../lib/arb-db';
+import PortalLayout from '../../layouts/PortalLayout.astro';
+import PortalPage from '../../components/PortalPage.astro';
 
+import BoardNav from '../../components/BoardNav.astro';
 const ctx = await getBoardContext(Astro);
 if ('redirect' in ctx) return Astro.redirect(ctx.redirect);
 const { env, session, effectiveRole } = ctx;
@@ -35,14 +37,32 @@ function libraryPageUrl(value: number): string {
 }
 
 const db = env?.DB;
+const { email, role, name } = session;
+const badges = await getPortalBadgeCounts(db, email, role, name);
 const items = db ? await listPreapprovalItems(db, { limit: pageSize, offset: (page - 1) * pageSize }) : [];
 const categories = db ? await listPreapprovalCategories(db) : [];
-const allRequests = db ? await listArbRequestsByHousehold(db, session.email) : [];
-const draftCount = allRequests.filter((r) => r.status === 'pending').length;
+
 ---
 
-<BoardLayout title="Pre-approval library" subtitle="ARB can add items; one Board member must approve before they appear in the member library" draftCount={draftCount} role={effectiveRole} session={session} elevatedUntil={session.elevated_until}>
-  <h2 class="text-xl font-heading font-bold text-clr-green mb-6">Add pre-approval item</h2>
+<PortalLayout title="Pre-approval library | Board | Member Portal | Crooked Lake Reserve HOA">
+  <PortalPage
+    currentPath="/board/library"
+    pageTitle="Pre-approval library"
+    userName={badges.displayName ?? undefined}
+    userEmail={email}
+    effectiveRole={effectiveRole}
+    draftCount={badges.draftCount}
+    role={effectiveRole}
+    staffRole={role ?? ''}
+    arbInReviewCount={badges.arbInReviewCount}
+    vendorPendingCount={badges.vendorPendingCount}
+    maintenanceOpenCount={badges.maintenanceOpenCount}
+    meetingsRsvpCount={badges.meetingsRsvpCount}
+  >
+    <BoardNav currentPath="/board/library" />
+
+unt}
+<h2 class="text-3xl font-heading font-bold text-clr-green mb-6">Add pre-approval item</h2>
       <form id="library-form" class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-8 space-y-4">
         <input type="hidden" name="id" id="form-id" value="" />
         <input type="hidden" name="csrf_token" id="form-csrf" value={session.csrfToken ?? ''} />
@@ -73,8 +93,8 @@ const draftCount = allRequests.filter((r) => r.status === 'pending').length;
           <p class="text-xs text-gray-500 mt-1">First image is used as the card thumbnail. Max 5 images. Photos are automatically resized and compressed for web to reduce size.</p>
         </div>
         <div class="flex gap-3">
-          <button type="submit" id="lib-submit" class="px-4 py-2 bg-clr-green text-white rounded-lg font-medium hover:brightness-110">Add item</button>
-          <button type="button" id="lib-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 hidden">Cancel edit</button>
+          <button type="submit" id="lib-submit" class="px-5 py-2.5 bg-clr-green text-white rounded-lg font-medium hover:brightness-110">Add item</button>
+          <button type="button" id="lib-cancel" class="px-5 py-2.5 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 hidden">Cancel edit</button>
         </div>
       </form>
 
@@ -118,17 +138,17 @@ const draftCount = allRequests.filter((r) => r.status === 'pending').length;
                   {isPending && (
                     <span class="ml-2 inline-block px-2 py-0.5 text-xs font-medium rounded bg-amber-100 text-amber-800">Pending board approval</span>
                   )}
-                  {item.rules && <p class="text-sm text-gray-600 mt-1 line-clamp-2">{item.rules}</p>}
+                  {item.rules && <p class="text-base text-gray-600 mt-1 line-clamp-2">{item.rules}</p>}
                   {photos.length > 0 && (
                     <p class="text-xs text-gray-500 mt-1">{photos.length} photo(s)</p>
                   )}
                 </div>
                 <div class="flex gap-2 shrink-0 flex-wrap">
                   {effectiveRole === 'board' && isPending && (
-                    <button type="button" class="lib-approve-btn px-3 py-1.5 text-sm bg-clr-green text-white rounded-lg hover:brightness-110" data-id={item.id}>Approve</button>
+                    <button type="button" class="lib-approve-btn px-5 py-2.5 text-base bg-clr-green text-white rounded-lg hover:brightness-110" data-id={item.id}>Approve</button>
                   )}
-                  <button type="button" class="lib-edit-btn px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200" data-id={item.id} data-category={item.category ?? ''} data-title={item.title ?? ''} data-description={item.description ?? ''} data-rules={item.rules ?? ''} data-photos={item.photos ?? '[]'}>Edit</button>
-                  <button type="button" class="lib-delete-btn px-3 py-1.5 text-sm bg-red-50 text-red-700 rounded-lg hover:bg-red-100" data-id={item.id}>Delete</button>
+                  <button type="button" class="lib-edit-btn px-5 py-2.5 text-base bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200" data-id={item.id} data-category={item.category ?? ''} data-title={item.title ?? ''} data-description={item.description ?? ''} data-rules={item.rules ?? ''} data-photos={item.photos ?? '[]'}>Edit</button>
+                  <button type="button" class="lib-delete-btn px-5 py-2.5 text-base bg-red-50 text-red-700 rounded-lg hover:bg-red-100" data-id={item.id}>Delete</button>
                 </div>
               </li>
             );
@@ -324,4 +344,5 @@ const draftCount = allRequests.filter((r) => r.status === 'pending').length;
       });
     })();
   </script>
-</BoardLayout>
+  </PortalPage>
+</PortalLayout>

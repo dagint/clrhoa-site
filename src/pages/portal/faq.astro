@@ -2,134 +2,139 @@
 export const prerender = false;
 
 import PortalLayout from '../../layouts/PortalLayout.astro';
-import ProtectedPage from '../../components/ProtectedPage.astro';
-import PortalNav from '../../components/PortalNav.astro';
-import GlobalSearch from '../../components/GlobalSearch.astro';
+import PortalPage from '../../components/PortalPage.astro';
 import { getPortalContext } from '../../lib/portal-context';
-import { listArbRequestsByHousehold } from '../../lib/arb-db';
+import { getPortalBadgeCounts } from '../../lib/portal-badge-counts';
 
 const { env, session, effectiveRole } = await getPortalContext(Astro);
 if (!session) return Astro.redirect('/portal/login');
 
+const { email, role, name } = session;
 const db = env?.DB;
-const allRequests = db ? await listArbRequestsByHousehold(db, session.email) : [];
-const draftCount = allRequests.filter((r) => r.status === 'pending').length;
+const badges = await getPortalBadgeCounts(db, email, role, name);
 ---
 
 <PortalLayout title="FAQ | Member Portal | Crooked Lake Reserve HOA">
-  <ProtectedPage>
-  <div class="min-h-screen bg-gray-50 portal-theme-bg font-body">
-    <GlobalSearch fixed={true} class="portal-theme-header" />
-    <div class="pt-14">
-      <PortalNav currentPath="/portal/faq" draftCount={draftCount} role={effectiveRole} staffRole={session?.role ?? ''} />
+  <PortalPage
+    currentPath="/portal/faq"
+    pageTitle="FAQ"
+    userName={badges.displayName ?? undefined}
+    userEmail={email}
+    effectiveRole={effectiveRole}
+    draftCount={badges.draftCount}
+    role={effectiveRole}
+    staffRole={role ?? ''}
+    arbInReviewCount={badges.arbInReviewCount}
+    vendorPendingCount={badges.vendorPendingCount}
+    maintenanceOpenCount={badges.maintenanceOpenCount}
+    meetingsRsvpCount={badges.meetingsRsvpCount}
+    feedbackDueCount={badges.feedbackDueCount}
+  >
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8 mb-8">
+      <h1 class="text-3xl font-heading font-bold text-clr-green mb-3">Portal FAQ</h1>
+      <p class="text-gray-600 text-lg">
+        Common questions about using the Member Portal.
+      </p>
+    </div>
 
-      <main class="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
-        <h1 class="text-2xl font-heading font-bold text-clr-green mb-2">Portal FAQ</h1>
-        <p class="text-gray-600 portal-theme-text-muted mb-8">
-          Common questions about using the Member Portal.
-        </p>
-
-        <div class="space-y-6">
-          <section class="bg-white rounded-2xl border border-gray-100 p-6 portal-theme-card">
-            <h2 class="text-lg font-heading font-bold text-clr-green mb-3">What is ARB?</h2>
-            <p class="text-gray-700 portal-theme-text">
+    <div class="space-y-6">
+      <section class="bg-white rounded-2xl border border-gray-200 p-6 sm:p-8 portal-theme-card">
+        <h2 class="text-2xl font-heading font-bold text-clr-green mb-3">What is ARB?</h2>
+        <p class="text-gray-700 text-base leading-relaxed">
               ARB stands for <strong>Architectural Review Board</strong>. It’s the committee that reviews exterior changes (paint, landscaping, fencing, pools, etc.) so the neighborhood stays consistent. When you submit an &quot;ARB request,&quot; they review it and approve or ask for changes. Status &quot;In review&quot; means the board is currently reviewing your request.
             </p>
           </section>
 
-          <section class="bg-white rounded-2xl border border-gray-100 p-6 portal-theme-card">
-            <h2 class="text-lg font-heading font-bold text-clr-green mb-3">When are dues due?</h2>
-            <p class="text-gray-700 portal-theme-text">
+          <section class="bg-white rounded-2xl border border-gray-200 p-6 sm:p-8 portal-theme-card">
+        <h2 class="text-2xl font-heading font-bold text-clr-green mb-3">When are dues due?</h2>
+            <p class="text-gray-700 text-base leading-relaxed">
               Dues are typically due quarterly (e.g. the first of Jan, Apr, Jul, Oct). Go to <strong>More</strong> then <strong>Dues</strong> to see your balance, next due date, and payment history. The board sets the exact schedule and can add special assessments or change the amount per quarter; contact them if you’re unsure.
             </p>
           </section>
 
-          <section class="bg-white rounded-2xl border border-gray-100 p-6 portal-theme-card">
-            <h2 class="text-lg font-heading font-bold text-clr-green mb-3">Why don’t I see Board or ARB links?</h2>
-            <p class="text-gray-700 portal-theme-text">
+          <section class="bg-white rounded-2xl border border-gray-200 p-6 sm:p-8 portal-theme-card">
+        <h2 class="text-2xl font-heading font-bold text-clr-green mb-3">Why don’t I see Board or ARB links?</h2>
+            <p class="text-gray-700 text-base leading-relaxed">
               Board and ARB tools are only visible when you have <strong>elevated access</strong>. If you’re a board or ARB member, you normally see the same portal as everyone else; when you need to use board tools (record payments, ARB dashboard, etc.), go to the <strong>Dashboard</strong> and click <strong>Request elevated access</strong>. You get a short window of access, then you’re back to the normal view. Use <strong>Drop access</strong> when you’re done.
             </p>
           </section>
 
-          <section class="bg-white rounded-2xl border border-gray-100 p-6 portal-theme-card">
-            <h2 class="text-lg font-heading font-bold text-clr-green mb-3">How do I print a payment receipt?</h2>
-            <p class="text-gray-700 portal-theme-text">
+          <section class="bg-white rounded-2xl border border-gray-200 p-6 sm:p-8 portal-theme-card">
+        <h2 class="text-2xl font-heading font-bold text-clr-green mb-3">How do I print a payment receipt?</h2>
+            <p class="text-gray-700 text-base leading-relaxed">
               Go to <strong>More</strong> then <strong>Dues</strong>. In <strong>Payment history</strong>, each payment has a <strong>Print receipt</strong> link. Click it to open a printable receipt showing the amount and the periods covered. Use your browser’s Print (or Save as PDF) to print or save it.
             </p>
           </section>
 
-          <section class="bg-white rounded-2xl border border-gray-100 p-6 portal-theme-card">
-            <h2 class="text-lg font-heading font-bold text-clr-green mb-3">How do I change my password?</h2>
-            <p class="text-gray-700 portal-theme-text">
+          <section class="bg-white rounded-2xl border border-gray-200 p-6 sm:p-8 portal-theme-card">
+        <h2 class="text-2xl font-heading font-bold text-clr-green mb-3">How do I change my password?</h2>
+            <p class="text-gray-700 text-base leading-relaxed">
               The portal uses your email to sign in; there is no separate password. Access is controlled by the board. If you need to sign in from a new device or have trouble logging in, contact the board.
             </p>
           </section>
 
-          <section class="bg-white rounded-2xl border border-gray-100 p-6 portal-theme-card">
-            <h2 class="text-lg font-heading font-bold text-clr-green mb-3">How do I update my contact information?</h2>
-            <p class="text-gray-700 portal-theme-text">
+          <section class="bg-white rounded-2xl border border-gray-200 p-6 sm:p-8 portal-theme-card">
+        <h2 class="text-2xl font-heading font-bold text-clr-green mb-3">How do I update my contact information?</h2>
+            <p class="text-gray-700 text-base leading-relaxed">
               Go to <strong>My account</strong> (in the main menu). Under &quot;Directory listing,&quot; click <strong>Edit directory info</strong>, update your name, address, or phone numbers, then click Save. Your listing is what other members see in the Directory.
             </p>
           </section>
 
-          <section class="bg-white rounded-2xl border border-gray-100 p-6 portal-theme-card">
-            <h2 class="text-lg font-heading font-bold text-clr-green mb-3">How do I submit an ARB request?</h2>
-            <p class="text-gray-700 portal-theme-text">
+          <section class="bg-white rounded-2xl border border-gray-200 p-6 sm:p-8 portal-theme-card">
+        <h2 class="text-2xl font-heading font-bold text-clr-green mb-3">How do I submit an ARB request?</h2>
+            <p class="text-gray-700 text-base leading-relaxed">
               Click <strong>More</strong> in the menu, then <strong>New ARB request</strong>. Fill in the form (your name, property address, type of work, and description) and attach photos or documents if needed. You can save a draft and finish later from <strong>My requests</strong>. When ready, submit for review. You can also use an item from the <strong>Pre-approval library</strong> as a template to pre-fill the description.
             </p>
           </section>
 
-          <section class="bg-white rounded-2xl border border-gray-100 p-6 portal-theme-card">
-            <h2 class="text-lg font-heading font-bold text-clr-green mb-3">Where do I see the status of my ARB request?</h2>
-            <p class="text-gray-700 portal-theme-text">
+          <section class="bg-white rounded-2xl border border-gray-200 p-6 sm:p-8 portal-theme-card">
+        <h2 class="text-2xl font-heading font-bold text-clr-green mb-3">Where do I see the status of my ARB request?</h2>
+            <p class="text-gray-700 text-base leading-relaxed">
               Go to <strong>More</strong> then <strong>My requests</strong>. Each request shows its status (e.g. pending, in review, approved, rejected). If the ARB asks for changes, you will see their notes and can edit and resubmit from the same page.
             </p>
           </section>
 
-          <section class="bg-white rounded-2xl border border-gray-100 p-6 portal-theme-card">
-            <h2 class="text-lg font-heading font-bold text-clr-green mb-3">How do I report a maintenance issue?</h2>
-            <p class="text-gray-700 portal-theme-text">
+          <section class="bg-white rounded-2xl border border-gray-200 p-6 sm:p-8 portal-theme-card">
+        <h2 class="text-2xl font-heading font-bold text-clr-green mb-3">How do I report a maintenance issue?</h2>
+            <p class="text-gray-700 text-base leading-relaxed">
               Click <strong>More</strong> then <strong>Maintenance</strong>. Describe the issue and add a photo if helpful. Submit the form. The board will see it and can assign a vendor and update the status; you can check back on the same page.
             </p>
           </section>
 
-          <section class="bg-white rounded-2xl border border-gray-100 p-6 portal-theme-card">
-            <h2 class="text-lg font-heading font-bold text-clr-green mb-3">How do I turn off or change email or SMS notifications?</h2>
-            <p class="text-gray-700 portal-theme-text">
+          <section class="bg-white rounded-2xl border border-gray-200 p-6 sm:p-8 portal-theme-card">
+        <h2 class="text-2xl font-heading font-bold text-clr-green mb-3">How do I turn off or change email or SMS notifications?</h2>
+            <p class="text-gray-700 text-base leading-relaxed">
               Go to <strong>My account</strong>. In the <strong>Notifications</strong> section you can uncheck specific email types you do not want, turn SMS alerts on or off, and add or change the phone number for SMS. You can also enable or disable browser push notifications there. Click <strong>Save notifications</strong> when done.
             </p>
           </section>
 
-          <section class="bg-white rounded-2xl border border-gray-100 p-6 portal-theme-card">
-            <h2 class="text-lg font-heading font-bold text-clr-green mb-3">Why can I not see other members&apos; phone numbers or emails in the Directory?</h2>
-            <p class="text-gray-700 portal-theme-text">
+          <section class="bg-white rounded-2xl border border-gray-200 p-6 sm:p-8 portal-theme-card">
+        <h2 class="text-2xl font-heading font-bold text-clr-green mb-3">Why can I not see other members&apos; phone numbers or emails in the Directory?</h2>
+            <p class="text-gray-700 text-base leading-relaxed">
               To protect privacy, contact details are hidden until you click <strong>Reveal phone</strong> or <strong>Reveal email</strong>. <strong>Each time you reveal a number or email, that action is logged</strong>; the board can see who revealed which contacts. This helps keep the directory useful while limiting misuse.
             </p>
           </section>
 
-          <section class="bg-white rounded-2xl border border-gray-100 p-6 portal-theme-card">
-            <h2 class="text-lg font-heading font-bold text-clr-green mb-3">Where do I pay my dues?</h2>
-            <p class="text-gray-700 portal-theme-text">
+          <section class="bg-white rounded-2xl border border-gray-200 p-6 sm:p-8 portal-theme-card">
+        <h2 class="text-2xl font-heading font-bold text-clr-green mb-3">Where do I pay my dues?</h2>
+            <p class="text-gray-700 text-base leading-relaxed">
               The portal does not process payments. Go to <strong>More</strong> then <strong>Dues</strong> to view your balance and payment history. Pay by the method the board specifies (e.g. check sent to the HOA address). Contact the board for current payment options.
             </p>
           </section>
 
-          <section class="bg-white rounded-2xl border border-gray-100 p-6 portal-theme-card">
-            <h2 class="text-lg font-heading font-bold text-clr-green mb-3">I cannot find what I need. What should I do?</h2>
-            <p class="text-gray-700 portal-theme-text">
+          <section class="bg-white rounded-2xl border border-gray-200 p-6 sm:p-8 portal-theme-card">
+        <h2 class="text-2xl font-heading font-bold text-clr-green mb-3">I cannot find what I need. What should I do?</h2>
+            <p class="text-gray-700 text-base leading-relaxed">
               Use the <strong>search bar</strong> at the top to search ARB requests, meetings, vendors, the directory, and the pre-approval library. Read the <strong>Documentation</strong> (under Help) for a guide to each section. If you still need help, contact the board.
             </p>
           </section>
 
-          <section class="bg-white rounded-2xl border border-gray-100 p-6 portal-theme-card">
-            <h2 class="text-lg font-heading font-bold text-clr-green mb-3">How do I report a problem or suggest a feature?</h2>
-            <p class="text-gray-700 portal-theme-text">
+          <section class="bg-white rounded-2xl border border-gray-200 p-6 sm:p-8 portal-theme-card">
+        <h2 class="text-2xl font-heading font-bold text-clr-green mb-3">How do I report a problem or suggest a feature?</h2>
+            <p class="text-gray-700 text-base leading-relaxed">
               Use the <strong>feedback button</strong> (thumbs up or down) in the bottom-right corner of any portal page. Click it, choose thumbs up or down, and add a short comment. The board uses this to <strong>fix issues</strong> (bugs, confusing wording, things that don’t work) and to <strong>consider new features</strong> when the portal doesn’t meet your needs. You can also leave positive feedback if something works well for you.
             </p>
-          </section>
-        </div>
-      </main>
+      </section>
     </div>
-  </div>
-  </ProtectedPage>
+  </PortalPage>
 </PortalLayout>

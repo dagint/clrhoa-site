@@ -1,0 +1,288 @@
+---
+/**
+ * Gmail-style sidebar navigation for portal.
+ * Large, clear menu items optimized for elderly users.
+ * Collapsible on mobile.
+ */
+import { getPortalElevatedLink } from '../config/navigation';
+
+interface Props {
+  currentPath: string;
+  draftCount?: number;
+  role?: string;
+  staffRole?: string;
+  arbInReviewCount?: number;
+  vendorPendingCount?: number;
+  maintenanceOpenCount?: number;
+  meetingsRsvpCount?: number;
+  feedbackDueCount?: number;
+}
+
+const {
+  currentPath,
+  draftCount = 0,
+  role = '',
+  staffRole = '',
+  arbInReviewCount = 0,
+  vendorPendingCount = 0,
+  maintenanceOpenCount = 0,
+  meetingsRsvpCount = 0,
+  feedbackDueCount = 0,
+} = Astro.props;
+
+const nonFinalCount = draftCount + arbInReviewCount;
+const elevatedLink = getPortalElevatedLink(staffRole);
+const isElevated = role === 'board' || role === 'admin' || role === 'arb' || role === 'arb_board';
+const isStaffFromWhitelist = !!elevatedLink;
+
+function isCurrent(href: string) {
+  if (href === '/portal/dashboard') return currentPath === '/portal/dashboard';
+  if (href === '/portal/board') return currentPath === '/portal/board' || currentPath.startsWith('/board/');
+  if (href === '/portal/admin') return currentPath === '/portal/admin' || currentPath.startsWith('/portal/admin/');
+  if (href === '/portal/arb') return currentPath === '/portal/arb' || currentPath.startsWith('/portal/arb');
+  if (href === '/portal/requests') return currentPath === '/portal/requests' || currentPath === '/portal/my-requests';
+  return currentPath.startsWith(href);
+}
+
+// Navigation items with icons
+const mainNavItems = [
+  { label: 'Dashboard', href: '/portal/dashboard', icon: 'home', badge: 0 },
+  { label: 'ARB Requests', href: '/portal/requests', icon: 'clipboard', badge: nonFinalCount },
+  { label: 'Maintenance', href: '/portal/maintenance', icon: 'wrench', badge: maintenanceOpenCount },
+  { label: 'Meetings', href: '/portal/meetings', icon: 'calendar', badge: meetingsRsvpCount },
+  { label: 'Directory', href: '/portal/directory', icon: 'users', badge: 0 },
+  { label: 'Vendors', href: '/portal/vendors', icon: 'briefcase', badge: 0 },
+  { label: 'Documents', href: '/portal/documents', icon: 'folder', badge: 0 },
+  { label: 'Dues', href: '/portal/assessments', icon: 'dollar', badge: 0 },
+  { label: 'Feedback', href: '/portal/feedback', icon: 'message', badge: feedbackDueCount },
+  { label: 'Library', href: '/portal/library', icon: 'book', badge: 0 },
+];
+
+const helpNavItems = [
+  { label: 'News', href: '/portal/news', icon: 'bell' },
+  { label: 'Documentation', href: '/portal/docs', icon: 'help' },
+  { label: 'FAQ', href: '/portal/faq', icon: 'question' },
+];
+
+// Icon SVG paths
+const icons: Record<string, string> = {
+  home: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6',
+  clipboard: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2',
+  wrench: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z',
+  calendar: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
+  users: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z',
+  briefcase: 'M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z',
+  folder: 'M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z',
+  dollar: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
+  message: 'M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z',
+  book: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253',
+  bell: 'M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9',
+  help: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
+  question: 'M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
+  shield: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z',
+};
+---
+
+<aside
+  id="portal-sidebar"
+  class="portal-sidebar fixed top-0 left-0 h-screen w-72 bg-white border-r border-gray-200 shadow-sm z-40 transition-transform duration-300 -translate-x-full lg:translate-x-0 overflow-y-auto"
+  aria-label="Main navigation"
+>
+  <!-- Sidebar Header -->
+  <div class="p-6 border-b border-gray-200">
+    <a href="/portal/dashboard" class="flex flex-col">
+      <span class="text-xl font-heading font-bold text-clr-green">Member Portal</span>
+      <span class="text-xs text-gray-500 mt-1">Crooked Lake Reserve HOA</span>
+    </a>
+  </div>
+
+  <!-- Main Navigation -->
+  <nav class="p-4" aria-label="Primary">
+    <ul class="space-y-1">
+      {mainNavItems.map((item) => (
+        <li>
+          <a
+            href={item.href}
+            class={`flex items-center gap-3 px-4 py-3 rounded-lg text-base font-medium transition-colors ${
+              isCurrent(item.href)
+                ? 'bg-clr-green/10 text-clr-green'
+                : 'text-gray-700 hover:bg-gray-100 hover:text-clr-green'
+            }`}
+          >
+            <svg
+              class="w-5 h-5 shrink-0"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={icons[item.icon]} />
+            </svg>
+            <span class="flex-1">{item.label}</span>
+            {item.badge > 0 && (
+              <span
+                class="inline-flex items-center justify-center min-w-[1.5rem] h-6 px-2 rounded-full bg-red-500 text-white text-xs font-bold"
+                aria-label={`${item.badge} notifications`}
+              >
+                {item.badge}
+              </span>
+            )}
+          </a>
+        </li>
+      ))}
+    </ul>
+  </nav>
+
+  <!-- Elevated Access Section -->
+  {isStaffFromWhitelist && elevatedLink && (
+    <div class="px-4 pb-4">
+      <div class="border-t border-gray-200 pt-4">
+        <p class="px-4 py-1 text-xs font-semibold text-amber-700 uppercase tracking-wide">
+          Elevated Access
+        </p>
+        <ul class="space-y-1 mt-2">
+          <li>
+            <a
+              href={
+                isElevated
+                  ? elevatedLink.href
+                  : `/portal/request-elevated-access?return=${encodeURIComponent(elevatedLink.href)}`
+              }
+              class={`flex items-center gap-3 px-4 py-3 rounded-lg text-base font-medium transition-colors ${
+                isCurrent(elevatedLink.href)
+                  ? 'bg-amber-50 text-amber-900'
+                  : 'text-amber-700 hover:bg-amber-50'
+              }`}
+            >
+              <svg
+                class="w-5 h-5 shrink-0"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={icons.shield} />
+              </svg>
+              <span class="flex-1">{elevatedLink.label}</span>
+              {!isElevated && (
+                <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+              )}
+              {isElevated && role === 'board' && vendorPendingCount > 0 && (
+                <span class="inline-flex items-center justify-center min-w-[1.5rem] h-6 px-2 rounded-full bg-amber-500 text-white text-xs font-bold">
+                  {vendorPendingCount}
+                </span>
+              )}
+            </a>
+          </li>
+        </ul>
+      </div>
+    </div>
+  )}
+
+  <!-- Help & Support Section (at bottom) -->
+  <div class="mt-auto px-4 pb-6">
+    <div class="border-t border-gray-200 pt-4">
+      <p class="px-4 py-1 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+        Help & Support
+      </p>
+      <ul class="space-y-1 mt-2">
+        {helpNavItems.map((item) => (
+          <li>
+            <a
+              href={item.href}
+              class={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+                isCurrent(item.href)
+                  ? 'bg-gray-100 text-clr-green'
+                  : 'text-gray-600 hover:bg-gray-50 hover:text-clr-green'
+              }`}
+            >
+              <svg
+                class="w-4 h-4 shrink-0"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={icons[item.icon]} />
+              </svg>
+              <span>{item.label}</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </div>
+  </div>
+</aside>
+
+<!-- Mobile sidebar overlay -->
+<div
+  id="sidebar-overlay"
+  class="fixed inset-0 bg-black/50 z-30 lg:hidden hidden"
+  aria-hidden="true"
+></div>
+
+<style>
+  .portal-sidebar {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(209 213 219) transparent;
+  }
+
+  .portal-sidebar::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .portal-sidebar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .portal-sidebar::-webkit-scrollbar-thumb {
+    background: rgb(209 213 219);
+    border-radius: 3px;
+  }
+
+  .portal-sidebar::-webkit-scrollbar-thumb:hover {
+    background: rgb(156 163 175);
+  }
+</style>
+
+<script is:inline>
+  (function () {
+    const sidebar = document.getElementById('portal-sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+
+    if (!sidebar || !overlay) return;
+
+    // Toggle sidebar on mobile
+    window.togglePortalSidebar = function () {
+      const isOpen = !sidebar.classList.contains('-translate-x-full');
+
+      if (isOpen) {
+        // Close
+        sidebar.classList.add('-translate-x-full');
+        overlay.classList.add('hidden');
+        document.body.style.overflow = '';
+      } else {
+        // Open
+        sidebar.classList.remove('-translate-x-full');
+        overlay.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+      }
+    };
+
+    // Close sidebar when clicking overlay
+    overlay.addEventListener('click', function () {
+      window.togglePortalSidebar();
+    });
+
+    // Close sidebar when clicking a link (mobile only)
+    if (window.innerWidth < 1024) {
+      sidebar.querySelectorAll('a').forEach(function (link) {
+        link.addEventListener('click', function () {
+          window.togglePortalSidebar();
+        });
+      });
+    }
+  })();
+</script>

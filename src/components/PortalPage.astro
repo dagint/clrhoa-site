@@ -1,0 +1,72 @@
+---
+/**
+ * Reusable portal page wrapper with sidebar + header.
+ * Reduces duplication across portal pages.
+ * Usage: <PortalPage currentPath="/portal/page" pageTitle="Page Title" ...props>
+ */
+import ProtectedPage from './ProtectedPage.astro';
+import PortalSidebar from './PortalSidebar.astro';
+import PortalHeader from './PortalHeader.astro';
+
+interface Props {
+  currentPath: string;
+  pageTitle: string;
+  userName?: string;
+  userEmail: string;
+  effectiveRole?: string;
+  draftCount?: number;
+  role?: string;
+  staffRole?: string;
+  arbInReviewCount?: number;
+  vendorPendingCount?: number;
+  maintenanceOpenCount?: number;
+  meetingsRsvpCount?: number;
+  feedbackDueCount?: number;
+}
+
+const {
+  currentPath,
+  pageTitle,
+  userName,
+  userEmail,
+  effectiveRole = 'member',
+  draftCount = 0,
+  role = '',
+  staffRole = '',
+  arbInReviewCount = 0,
+  vendorPendingCount = 0,
+  maintenanceOpenCount = 0,
+  meetingsRsvpCount = 0,
+  feedbackDueCount = 0,
+} = Astro.props;
+---
+
+<ProtectedPage>
+  <!-- Sidebar Navigation -->
+  <PortalSidebar
+    currentPath={currentPath}
+    draftCount={draftCount}
+    role={effectiveRole}
+    staffRole={staffRole}
+    arbInReviewCount={arbInReviewCount}
+    vendorPendingCount={vendorPendingCount}
+    maintenanceOpenCount={maintenanceOpenCount}
+    meetingsRsvpCount={meetingsRsvpCount}
+    feedbackDueCount={feedbackDueCount}
+  />
+
+  <!-- Main Content Area -->
+  <div class="flex-1 flex flex-col overflow-hidden">
+    <!-- Top Header -->
+    <PortalHeader userName={userName} userEmail={userEmail} effectiveRole={effectiveRole}>
+      <span slot="title">{pageTitle}</span>
+    </PortalHeader>
+
+    <!-- Scrollable Content -->
+    <main class="flex-1 overflow-y-auto pt-16 lg:pt-16">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <slot />
+      </div>
+    </main>
+  </div>
+</ProtectedPage>

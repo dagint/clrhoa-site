@@ -17,79 +17,86 @@
 export const prerender = false;
 
 import PortalLayout from '../../layouts/PortalLayout.astro';
-import ProtectedPage from '../../components/ProtectedPage.astro';
-import PortalNav from '../../components/PortalNav.astro';
+import PortalPage from '../../components/PortalPage.astro';
 import AdminNav from '../../components/AdminNav.astro';
 import { getAdminContext } from '../../lib/board-context';
-import { listArbRequestsByHousehold } from '../../lib/arb-db';
+import { getPortalBadgeCounts } from '../../lib/portal-badge-counts';
 
 // Route-level guard: enforce admin-only access
 const ctx = await getAdminContext(Astro);
 if ('redirect' in ctx) return Astro.redirect(ctx.redirect);
 const { env, session, effectiveRole } = ctx;
 
+const { email, role, name } = session;
 const db = env?.DB;
-const allRequests = db ? await listArbRequestsByHousehold(db, session.email) : [];
-const draftCount = allRequests.filter((r) => r.status === 'pending').length;
+const badges = await getPortalBadgeCounts(db, email, role, name);
 ---
 
 <PortalLayout title="Admin | Member Portal | Crooked Lake Reserve HOA">
-  <ProtectedPage>
-  <div class="min-h-screen portal-theme-bg font-body">
-    <PortalNav currentPath="/portal/admin" draftCount={draftCount} role={effectiveRole} staffRole={session.role ?? ''} />
-
+  <PortalPage
+    currentPath="/portal/admin"
+    pageTitle="Admin"
+    userName={badges.displayName ?? undefined}
+    userEmail={email}
+    effectiveRole={effectiveRole}
+    draftCount={badges.draftCount}
+    role={effectiveRole}
+    staffRole={role ?? ''}
+    arbInReviewCount={badges.arbInReviewCount}
+    vendorPendingCount={badges.vendorPendingCount}
+    maintenanceOpenCount={badges.maintenanceOpenCount}
+    meetingsRsvpCount={badges.meetingsRsvpCount}
+    feedbackDueCount={badges.feedbackDueCount}
+  >
     <AdminNav currentPath="/portal/admin" />
 
-    <main class="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
-      <div class="mb-6">
-        <h2 class="text-2xl font-heading font-bold text-clr-green mb-1">Admin</h2>
-        <p class="text-gray-600 text-sm">Site operations: feedback, SMS requests, test email, usage, and audit logs.</p>
-      </div>
+    <div class="mb-8">
+      <h1 class="text-3xl font-heading font-bold text-clr-green mb-2">Admin</h1>
+      <p class="text-gray-600 text-lg">Site operations: feedback, SMS requests, test email, usage, and audit logs.</p>
+    </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <section class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5" aria-labelledby="admin-feedback-heading">
-          <h3 id="admin-feedback-heading" class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Feedback &amp; requests</h3>
-          <ul class="space-y-2">
-            <li>
-              <a href="/portal/admin/feedback" class="flex items-center justify-between gap-3 p-3 rounded-xl border border-gray-100 hover:border-clr-green hover:bg-clr-green/5 transition-colors">
-                <span class="font-medium text-clr-green">Site feedback</span>
-                <span class="text-xs text-gray-400">Widget submissions</span>
-              </a>
-            </li>
-            <li>
-              <a href="/portal/admin/sms-requests" class="flex items-center justify-between gap-3 p-3 rounded-xl border border-gray-100 hover:border-clr-green hover:bg-clr-green/5 transition-colors">
-                <span class="font-medium text-clr-green">SMS requests</span>
-                <span class="text-xs text-gray-400">Members who want SMS</span>
-              </a>
-            </li>
-            <li>
-              <a href="/portal/admin/test-email" class="flex items-center justify-between gap-3 p-3 rounded-xl border border-gray-100 hover:border-clr-green hover:bg-clr-green/5 transition-colors">
-                <span class="font-medium text-clr-green">Test email</span>
-                <span class="text-xs text-gray-400">Send test message</span>
-              </a>
-            </li>
-          </ul>
-        </section>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <section class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6" aria-labelledby="admin-feedback-heading">
+        <h2 id="admin-feedback-heading" class="text-base font-semibold text-gray-500 uppercase tracking-wide mb-4">Feedback &amp; requests</h2>
+        <ul class="space-y-3">
+          <li>
+            <a href="/portal/admin/feedback" class="flex items-center justify-between gap-3 p-4 rounded-xl border border-gray-100 hover:border-clr-green hover:bg-clr-green/5 transition-colors">
+              <span class="font-semibold text-clr-green text-base">Site feedback</span>
+              <span class="text-sm text-gray-400">Widget submissions</span>
+            </a>
+          </li>
+          <li>
+            <a href="/portal/admin/sms-requests" class="flex items-center justify-between gap-3 p-4 rounded-xl border border-gray-100 hover:border-clr-green hover:bg-clr-green/5 transition-colors">
+              <span class="font-semibold text-clr-green text-base">SMS requests</span>
+              <span class="text-sm text-gray-400">Members who want SMS</span>
+            </a>
+          </li>
+          <li>
+            <a href="/portal/admin/test-email" class="flex items-center justify-between gap-3 p-4 rounded-xl border border-gray-100 hover:border-clr-green hover:bg-clr-green/5 transition-colors">
+              <span class="font-semibold text-clr-green text-base">Test email</span>
+              <span class="text-sm text-gray-400">Send test message</span>
+            </a>
+          </li>
+        </ul>
+      </section>
 
-        <section class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5" aria-labelledby="admin-usage-heading">
-          <h3 id="admin-usage-heading" class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Usage &amp; audit</h3>
-          <ul class="space-y-2">
-            <li>
-              <a href="/portal/usage" class="flex items-center justify-between gap-3 p-3 rounded-xl border border-gray-100 hover:border-clr-green hover:bg-clr-green/5 transition-colors">
-                <span class="font-medium text-clr-green">Site usage</span>
-                <span class="text-xs text-gray-400">Page views &amp; stats</span>
-              </a>
-            </li>
-            <li>
-              <a href="/board/audit-logs" class="flex items-center justify-between gap-3 p-3 rounded-xl border border-gray-100 hover:border-clr-green hover:bg-clr-green/5 transition-colors">
-                <span class="font-medium text-clr-green">Audit logs</span>
-                <span class="text-xs text-gray-400">PIM, directory, ARB</span>
-              </a>
-            </li>
-          </ul>
-        </section>
-      </div>
-    </main>
-  </div>
-  </ProtectedPage>
+      <section class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6" aria-labelledby="admin-usage-heading">
+        <h2 id="admin-usage-heading" class="text-base font-semibold text-gray-500 uppercase tracking-wide mb-4">Usage &amp; audit</h2>
+        <ul class="space-y-3">
+          <li>
+            <a href="/portal/usage" class="flex items-center justify-between gap-3 p-4 rounded-xl border border-gray-100 hover:border-clr-green hover:bg-clr-green/5 transition-colors">
+              <span class="font-semibold text-clr-green text-base">Site usage</span>
+              <span class="text-sm text-gray-400">Page views &amp; stats</span>
+            </a>
+          </li>
+          <li>
+            <a href="/board/audit-logs" class="flex items-center justify-between gap-3 p-4 rounded-xl border border-gray-100 hover:border-clr-green hover:bg-clr-green/5 transition-colors">
+              <span class="font-semibold text-clr-green text-base">Audit logs</span>
+              <span class="text-sm text-gray-400">PIM, directory, ARB</span>
+            </a>
+          </li>
+        </ul>
+      </section>
+    </div>
+  </PortalPage>
 </PortalLayout>

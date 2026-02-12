@@ -3,7 +3,8 @@ export const prerender = false;
 
 import PortalLayout from '../../layouts/PortalLayout.astro';
 import ProtectedPage from '../../components/ProtectedPage.astro';
-import PortalNav from '../../components/PortalNav.astro';
+import PortalSidebar from '../../components/PortalSidebar.astro';
+import PortalHeader from '../../components/PortalHeader.astro';
 import PWAInstallPrompt from '../../components/PWAInstallPrompt.astro';
 import PimElevationBanner from '../../components/PimElevationBanner.astro';
 import { getPortalContext } from '../../lib/portal-context';
@@ -21,19 +22,22 @@ if (!session) return Astro.redirect('/portal/login');
 
 const { email, role, name } = session;
 const db = env?.DB;
-// Use session name when set; otherwise fall back to directory (owner) name so "Welcome back, Michael" works
+
+// Use session name when set; otherwise fall back to directory (owner) name
 let displayName = name?.trim() || null;
 if (!displayName && db) {
   const owner = await getOwnerByEmail(db, email);
   displayName = owner?.name?.trim() || null;
 }
 const firstName = displayName ? displayName.split(/\s+/)[0] ?? null : null;
+
 let arbCounts: { pending: number; in_review: number } = { pending: 0, in_review: 0 };
 let pendingVendorCount = 0;
 const isStaffRole = effectiveRole === 'arb' || effectiveRole === 'board' || effectiveRole === 'admin' || effectiveRole === 'arb_board';
 const hasStaffWhitelistRole = role === 'arb' || role === 'board' || role === 'admin' || role === 'arb_board';
 const canRequestElevation = hasStaffWhitelistRole && !isStaffRole;
-// Load ARB and vendor counts for any staff (by whitelist) so we can show outstanding items even when not elevated
+
+// Load ARB and vendor counts for any staff
 if (db && hasStaffWhitelistRole) {
   const counts = await getArbRequestCountsByStatus(db);
   arbCounts = { pending: counts.pending, in_review: counts.in_review };
@@ -82,7 +86,7 @@ if (db) {
 }
 const hasNewNotices = recentVendorsCount > 0 || recentOwnersCount > 0;
 
-// ARB badge for dashboard tile: my pending drafts (or for staff, board pending count)
+// ARB badge for dashboard tile
 const arbBadgeCount = isStaffRole ? arbCounts.pending : draftCount;
 const showPimBanner = isStaffRole && typeof session.elevated_until === 'number' && session.elevated_until > Date.now();
 
@@ -97,252 +101,387 @@ const showActionNeededBanner = showActionFeedback || showActionMaintenance || sh
 
 <PortalLayout title="Dashboard | Member Portal | Crooked Lake Reserve HOA">
   <ProtectedPage>
-  <div class="min-h-screen bg-gray-50 portal-theme-bg font-body" id="portal-root">
-    {showPimBanner && <PimElevationBanner elevatedUntil={session.elevated_until!} role={effectiveRole} />}
-    <PortalNav currentPath="/portal/dashboard" draftCount={draftCount} role={effectiveRole} staffRole={session.role ?? ''} arbInReviewCount={arbCounts.in_review} vendorPendingCount={pendingVendorCount} />
+    <!-- Sidebar Navigation -->
+    <PortalSidebar
+      currentPath="/portal/dashboard"
+      draftCount={draftCount}
+      role={effectiveRole}
+      staffRole={role ?? ''}
+      arbInReviewCount={arbCounts.in_review}
+      vendorPendingCount={pendingVendorCount}
+      maintenanceOpenCount={maintenanceOpenCount}
+      meetingsRsvpCount={meetingsRsvpCount}
+      feedbackDueCount={feedbackDueCount}
+    />
 
-      <main class="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
-        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 portal-theme-card portal-card-accent p-6 sm:p-8">
-          <h2 class="text-2xl font-heading font-bold text-clr-green mb-6">
-            Welcome back{firstName ? `, ${firstName}` : ''} ({email})
-          </h2>
+    <!-- Main Content Area -->
+    <div class="flex-1 flex flex-col overflow-hidden">
+      <!-- Top Header -->
+      <PortalHeader userName={displayName ?? undefined} userEmail={email} effectiveRole={effectiveRole}>
+        <span slot="title">Dashboard</span>
+      </PortalHeader>
 
-          {hasStaffWhitelistRole && (
-            <div class="mb-6 p-4 rounded-xl bg-amber-50 border border-amber-200" role="region" aria-label="Elevated access">
-              <p class="text-sm font-semibold text-amber-900 mb-2">Board / ARB / Admin access</p>
-              {canRequestElevation ? (
-                <>
-                  <p class="text-sm text-amber-800 mb-2">By default you see the same portal as all members. When you need to use board or ARB tools (directory, dues, meetings, ARB dashboard), click <strong>Request elevated access</strong>. You get 2 hours of access, then you’re back to normal. When you’re done, you can click <strong>Drop access</strong> anytime.</p>
-                  <div class="flex flex-wrap items-center gap-3 mt-3">
-                    <button type="button" id="pim-elevate-btn" class="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg font-medium text-sm">Request elevated access</button>
-                    <a href="/portal/elevation-audit" class="text-sm text-amber-800 hover:text-amber-900 underline">View elevation audit (read-only)</a>
-                  </div>
-                </>
-              ) : (
-                <p class="text-sm text-amber-800 mb-2">You have elevated access. When you’re done, click <strong>Drop access</strong> in the banner above to return to normal member view. <a href="/portal/elevation-audit" class="text-amber-900 underline hover:no-underline">View elevation audit (read-only)</a> to see when others requested or dropped access.</p>
-              )}
+      <!-- Scrollable Content -->
+      <main class="flex-1 overflow-y-auto pt-16 lg:pt-16">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <!-- PIM Elevation Banner -->
+          {showPimBanner && (
+            <div class="mb-6">
+              <PimElevationBanner elevatedUntil={session.elevated_until!} role={effectiveRole} />
             </div>
           )}
 
-          {/* Outstanding items for Board/ARB — visible even when not elevated so they know what needs attention */}
-          {showStaffOutstanding && (
-            <div class="mb-6 p-4 rounded-xl bg-amber-50/80 border border-amber-200" role="region" aria-label="Outstanding Board and ARB items">
-              <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
-                <p class="text-sm font-semibold text-amber-900">Outstanding items requiring your action</p>
-                <button type="button" class="notification-dismiss text-xs text-amber-700 hover:text-amber-900 underline" data-key="staff_outstanding" aria-label="Mark as read">Mark as read</button>
+          <!-- Welcome Card -->
+          <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8 mb-8">
+            <h1 class="text-3xl font-heading font-bold text-clr-green mb-2">
+              Welcome back{firstName ? `, ${firstName}` : ''}!
+            </h1>
+            <p class="text-gray-600 text-lg">{email}</p>
+
+            {hasStaffWhitelistRole && (
+              <div class="mt-6 p-4 rounded-xl bg-amber-50 border border-amber-200">
+                <div class="flex items-start gap-3">
+                  <svg class="w-6 h-6 text-amber-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                  </svg>
+                  <div class="flex-1">
+                    <p class="font-semibold text-amber-900 mb-1">Board / ARB / Admin Access</p>
+                    {canRequestElevation ? (
+                      <>
+                        <p class="text-sm text-amber-800 mb-3">
+                          You're viewing the portal as a regular member. Click "Request elevated access" in the sidebar to use board or ARB tools for 2 hours.
+                        </p>
+                        <button type="button" id="pim-elevate-btn" class="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg font-medium text-sm transition-colors">
+                          Request elevated access
+                        </button>
+                      </>
+                    ) : (
+                      <p class="text-sm text-amber-800">
+                        You have elevated access. Click "Drop access" in the banner above to return to normal member view.
+                      </p>
+                    )}
+                  </div>
+                </div>
               </div>
-              {!isStaffRole && <p class="text-sm text-amber-800 mb-3">The following need attention. You must request elevated access to act on them.</p>}
-              <ul class="list-none space-y-1.5 mb-3">
+            )}
+          </div>
+
+          <!-- Outstanding Items for Board/ARB -->
+          {showStaffOutstanding && (
+            <div class="bg-amber-50 border border-amber-200 rounded-2xl p-6 mb-8">
+              <div class="flex items-start justify-between gap-4 mb-4">
+                <div class="flex items-start gap-3">
+                  <svg class="w-6 h-6 text-amber-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <div>
+                    <h2 class="text-lg font-heading font-semibold text-amber-900 mb-2">
+                      Outstanding Items Requiring Your Action
+                    </h2>
+                    {!isStaffRole && (
+                      <p class="text-sm text-amber-800 mb-3">You must request elevated access to act on these items.</p>
+                    )}
+                  </div>
+                </div>
+                <button type="button" class="notification-dismiss text-sm text-amber-700 hover:text-amber-900 underline shrink-0" data-key="staff_outstanding">
+                  Dismiss
+                </button>
+              </div>
+              <ul class="space-y-3">
                 {(arbCounts.in_review > 0 || arbCounts.pending > 0) && (
                   <li>
-                    <a href={isStaffRole ? '/portal/arb-dashboard' : '/portal/request-elevated-access?return=' + encodeURIComponent('/portal/arb-dashboard')} class="text-sm font-medium text-amber-900 hover:text-amber-700 underline">
-                      ARB: {arbCounts.in_review} in review, {arbCounts.pending} pending
+                    <a
+                      href={isStaffRole ? '/portal/arb-dashboard' : '/portal/request-elevated-access?return=' + encodeURIComponent('/portal/arb-dashboard')}
+                      class="flex items-center justify-between p-4 bg-white rounded-lg hover:shadow-md transition-shadow"
+                    >
+                      <div>
+                        <p class="font-medium text-amber-900">ARB Requests</p>
+                        <p class="text-sm text-amber-700">{arbCounts.in_review} in review, {arbCounts.pending} pending</p>
+                      </div>
+                      <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                      </svg>
                     </a>
                   </li>
                 )}
                 {pendingVendorCount > 0 && (
                   <li>
-                    <a href={isStaffRole ? '/board/vendors' : '/portal/request-elevated-access?return=' + encodeURIComponent('/board/vendors')} class="text-sm font-medium text-amber-900 hover:text-amber-700 underline">
-                      Vendor submissions: {pendingVendorCount} pending
+                    <a
+                      href={isStaffRole ? '/board/vendors' : '/portal/request-elevated-access?return=' + encodeURIComponent('/board/vendors')}
+                      class="flex items-center justify-between p-4 bg-white rounded-lg hover:shadow-md transition-shadow"
+                    >
+                      <div>
+                        <p class="font-medium text-amber-900">Vendor Submissions</p>
+                        <p class="text-sm text-amber-700">{pendingVendorCount} pending approval</p>
+                      </div>
+                      <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                      </svg>
                     </a>
                   </li>
                 )}
               </ul>
-              {!isStaffRole && (
-                <a href="/portal/request-elevated-access" class="inline-block bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg font-medium text-sm">Request elevated access to complete these</a>
-              )}
             </div>
           )}
 
-          {/* Action needed: for all members when they have feedback due, open maintenance, or meetings to RSVP */}
+          <!-- Action Needed Banner -->
           {showActionNeededBanner && (
-            <div class="mb-6 p-4 rounded-xl bg-clr-green/10 border border-clr-green/30" role="region" aria-label="Action needed">
-              <p class="text-sm font-semibold text-clr-green mb-2">Action needed</p>
-              <p class="text-sm text-gray-700 mb-3">You have outstanding items that need your attention. Use <strong>Mark as read</strong> to hide an item for 7 days.</p>
-              <ul class="list-none space-y-2 mb-0">
+            <div class="bg-clr-green/10 border border-clr-green/30 rounded-2xl p-6 mb-8">
+              <div class="flex items-start gap-3 mb-4">
+                <svg class="w-6 h-6 text-clr-green shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                </svg>
+                <div>
+                  <h2 class="text-lg font-heading font-semibold text-clr-green mb-2">Action Needed</h2>
+                  <p class="text-sm text-gray-700 mb-3">You have outstanding items that need your attention. Use "Dismiss" to hide an item for 7 days.</p>
+                </div>
+              </div>
+              <ul class="space-y-3">
                 {showActionFeedback && (
-                  <li class="flex flex-wrap items-center gap-2">
-                    <a href="/portal/feedback" class="inline-flex items-center gap-2 text-sm font-medium text-clr-green hover:underline">
+                  <li class="flex items-center justify-between p-4 bg-white rounded-lg">
+                    <a href="/portal/feedback" class="flex-1 font-medium text-clr-green hover:underline">
                       Document feedback: {feedbackDueCount} due for your review
                     </a>
-                    <button type="button" class="notification-dismiss text-xs text-gray-600 hover:text-clr-green underline" data-key="action_feedback" aria-label="Mark as read">Mark as read</button>
+                    <button type="button" class="notification-dismiss text-sm text-gray-600 hover:text-clr-green underline ml-4" data-key="action_feedback">
+                      Dismiss
+                    </button>
                   </li>
                 )}
                 {showActionMaintenance && (
-                  <li class="flex flex-wrap items-center gap-2">
-                    <a href="/portal/maintenance" class="inline-flex items-center gap-2 text-sm font-medium text-clr-green hover:underline">
+                  <li class="flex items-center justify-between p-4 bg-white rounded-lg">
+                    <a href="/portal/maintenance" class="flex-1 font-medium text-clr-green hover:underline">
                       Maintenance: {maintenanceOpenCount} open request{maintenanceOpenCount === 1 ? '' : 's'}
                     </a>
-                    <button type="button" class="notification-dismiss text-xs text-gray-600 hover:text-clr-green underline" data-key="action_maintenance" aria-label="Mark as read">Mark as read</button>
+                    <button type="button" class="notification-dismiss text-sm text-gray-600 hover:text-clr-green underline ml-4" data-key="action_maintenance">
+                      Dismiss
+                    </button>
                   </li>
                 )}
                 {showActionMeetings && (
-                  <li class="flex flex-wrap items-center gap-2">
-                    <a href="/portal/meetings" class="inline-flex items-center gap-2 text-sm font-medium text-clr-green hover:underline">
+                  <li class="flex items-center justify-between p-4 bg-white rounded-lg">
+                    <a href="/portal/meetings" class="flex-1 font-medium text-clr-green hover:underline">
                       Meetings: RSVP for {meetingsRsvpCount} upcoming meeting{meetingsRsvpCount === 1 ? '' : 's'}
                     </a>
-                    <button type="button" class="notification-dismiss text-xs text-gray-600 hover:text-clr-green underline" data-key="action_meetings" aria-label="Mark as read">Mark as read</button>
+                    <button type="button" class="notification-dismiss text-sm text-gray-600 hover:text-clr-green underline ml-4" data-key="action_meetings">
+                      Dismiss
+                    </button>
                   </li>
                 )}
               </ul>
             </div>
           )}
 
-          <p class="text-sm text-gray-600 mb-4">Choose an action below to get started.</p>
-
+          <!-- Recent Updates -->
           {hasNewNotices && (
-            <div class="mb-6 p-4 rounded-xl bg-clr-green/10 border border-clr-green/20" role="region" aria-label="Recent updates">
-              <p class="text-sm font-semibold text-clr-green mb-2">Recent updates</p>
-              <ul class="text-sm text-gray-700 portal-theme-text space-y-1">
-                {recentVendorsCount > 0 && (
-                  <li>
-                    <a href="/portal/vendors" class="text-clr-green hover:underline font-medium">
-                      {recentVendorsCount} new vendor{recentVendorsCount === 1 ? '' : 's'} added
-                    </a>
-                    <span class="text-gray-500 portal-theme-text-muted"> in the last {RECENT_DAYS} days</span>
-                  </li>
-                )}
-                {recentOwnersCount > 0 && (
-                  <li>
-                    <a href="/portal/directory" class="text-clr-green hover:underline font-medium">
-                      {recentOwnersCount} new member{recentOwnersCount === 1 ? '' : 's'} in the directory
-                    </a>
-                    <span class="text-gray-500 portal-theme-text-muted"> in the last {RECENT_DAYS} days</span>
-                  </li>
-                )}
-              </ul>
+            <div class="bg-blue-50 border border-blue-200 rounded-2xl p-6 mb-8">
+              <div class="flex items-start gap-3 mb-4">
+                <svg class="w-6 h-6 text-blue-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div>
+                  <h2 class="text-lg font-heading font-semibold text-blue-900 mb-2">Recent Updates</h2>
+                  <ul class="space-y-2 text-sm">
+                    {recentVendorsCount > 0 && (
+                      <li>
+                        <a href="/portal/vendors" class="text-blue-700 hover:underline font-medium">
+                          {recentVendorsCount} new vendor{recentVendorsCount === 1 ? '' : 's'} added
+                        </a>
+                        <span class="text-gray-600"> in the last {RECENT_DAYS} days</span>
+                      </li>
+                    )}
+                    {recentOwnersCount > 0 && (
+                      <li>
+                        <a href="/portal/directory" class="text-blue-700 hover:underline font-medium">
+                          {recentOwnersCount} new member{recentOwnersCount === 1 ? '' : 's'} in the directory
+                        </a>
+                        <span class="text-gray-600"> in the last {RECENT_DAYS} days</span>
+                      </li>
+                    )}
+                  </ul>
+                </div>
+              </div>
             </div>
           )}
 
-          <!-- Quick actions: clear next steps for all members -->
-          <h3 class="text-base font-heading font-semibold text-gray-800 mb-3">Quick actions</h3>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8" role="navigation" aria-label="Quick actions">
-            <a href="/portal/arb-request" class="flex flex-col items-center justify-center p-6 rounded-2xl bg-clr-green hover:brightness-110 text-white shadow-md transition-all min-h-[140px]">
-              <span class="mb-2 w-10 h-10 flex items-center justify-center" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg></span>
-              <span class="font-heading font-semibold text-center">New ARB request</span>
+          <!-- Quick Actions -->
+          <h2 class="text-2xl font-heading font-bold text-gray-800 mb-6">Quick Actions</h2>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <!-- New ARB Request -->
+            <a
+              href="/portal/arb-request"
+              class="group bg-clr-green hover:brightness-110 text-white rounded-2xl p-8 shadow-sm hover:shadow-md transition-all"
+            >
+              <div class="flex items-center gap-4 mb-3">
+                <div class="w-14 h-14 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
+                  <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                  </svg>
+                </div>
+                <div class="flex-1">
+                  <h3 class="text-xl font-heading font-semibold mb-1">New ARB Request</h3>
+                  <p class="text-white/90 text-sm">Submit a new architectural request</p>
+                </div>
+              </div>
               {arbBadgeCount > 0 && (
-                <span class="mt-2 text-sm font-medium opacity-90">{arbBadgeCount} pending</span>
+                <div class="mt-4 pt-4 border-t border-white/20">
+                  <p class="text-white/90 text-sm">You have {arbBadgeCount} pending request{arbBadgeCount === 1 ? '' : 's'}</p>
+                </div>
               )}
             </a>
-            <a href="/portal/maintenance" class="flex flex-col items-center justify-center p-6 rounded-2xl bg-clr-beige hover:brightness-95 text-clr-green shadow-md transition-all min-h-[140px]">
-              <span class="mb-2 w-10 h-10 flex items-center justify-center" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></span>
-              <span class="font-heading font-semibold text-center">Maintenance</span>
+
+            <!-- Maintenance -->
+            <a
+              href="/portal/maintenance"
+              class="group bg-clr-beige hover:brightness-95 text-clr-green rounded-2xl p-8 shadow-sm hover:shadow-md transition-all"
+            >
+              <div class="flex items-center gap-4 mb-3">
+                <div class="w-14 h-14 rounded-xl bg-clr-green/10 flex items-center justify-center shrink-0">
+                  <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                </div>
+                <div class="flex-1">
+                  <h3 class="text-xl font-heading font-semibold mb-1">Maintenance</h3>
+                  <p class="text-clr-green/80 text-sm">Report or track issues</p>
+                </div>
+              </div>
               {maintenanceOpenCount > 0 && (
-                <span class="mt-2 text-sm font-medium">{maintenanceOpenCount} open</span>
+                <div class="mt-4 pt-4 border-t border-clr-green/20">
+                  <p class="text-clr-green/80 text-sm">{maintenanceOpenCount} open request{maintenanceOpenCount === 1 ? '' : 's'}</p>
+                </div>
               )}
             </a>
-            <a href="/portal/meetings" class="flex flex-col items-center justify-center p-6 rounded-2xl bg-gray-100 hover:bg-gray-200 text-gray-800 portal-theme-card transition-all min-h-[140px]">
-              <span class="mb-2 w-10 h-10 flex items-center justify-center" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
-              <span class="font-heading font-semibold text-center">Upcoming meetings</span>
+
+            <!-- Meetings -->
+            <a
+              href="/portal/meetings"
+              class="group bg-white hover:bg-gray-50 text-gray-800 border border-gray-200 rounded-2xl p-8 shadow-sm hover:shadow-md transition-all"
+            >
+              <div class="flex items-center gap-4 mb-3">
+                <div class="w-14 h-14 rounded-xl bg-gray-100 flex items-center justify-center shrink-0">
+                  <svg class="w-8 h-8 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <div class="flex-1">
+                  <h3 class="text-xl font-heading font-semibold mb-1">Meetings</h3>
+                  <p class="text-gray-600 text-sm">View upcoming meetings</p>
+                </div>
+              </div>
               {meetingsRsvpCount > 0 && (
-                <span class="mt-2 text-sm font-medium text-gray-600 portal-theme-text-muted">RSVP for {meetingsRsvpCount}</span>
+                <div class="mt-4 pt-4 border-t border-gray-200">
+                  <p class="text-gray-600 text-sm">RSVP for {meetingsRsvpCount} meeting{meetingsRsvpCount === 1 ? '' : 's'}</p>
+                </div>
               )}
             </a>
-            <a href="/portal/directory" class="flex flex-col items-center justify-center p-6 rounded-2xl bg-gray-100 hover:bg-gray-200 text-gray-800 portal-theme-card transition-all min-h-[140px]">
-              <span class="mb-2 w-10 h-10 flex items-center justify-center" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
-              <span class="font-heading font-semibold text-center">Owner directory</span>
+
+            <!-- Directory -->
+            <a
+              href="/portal/directory"
+              class="group bg-white hover:bg-gray-50 text-gray-800 border border-gray-200 rounded-2xl p-8 shadow-sm hover:shadow-md transition-all"
+            >
+              <div class="flex items-center gap-4 mb-3">
+                <div class="w-14 h-14 rounded-xl bg-gray-100 flex items-center justify-center shrink-0">
+                  <svg class="w-8 h-8 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                  </svg>
+                </div>
+                <div class="flex-1">
+                  <h3 class="text-xl font-heading font-semibold mb-1">Owner Directory</h3>
+                  <p class="text-gray-600 text-sm">Browse community members</p>
+                </div>
+              </div>
               {directoryCount > 0 && (
-                <span class="mt-2 text-sm font-medium text-gray-600 portal-theme-text-muted">{directoryCount} members</span>
+                <div class="mt-4 pt-4 border-t border-gray-200">
+                  <p class="text-gray-600 text-sm">{directoryCount} members</p>
+                </div>
               )}
             </a>
           </div>
 
-          <!-- Notification badges summary -->
-          <div class="flex flex-wrap gap-3 mb-6" role="status" aria-label="Notification summary">
-            {arbBadgeCount > 0 && (
-              <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-100 text-amber-800 text-sm">
-                <span aria-hidden="true">ARB:</span> {arbBadgeCount} pending
-              </span>
-            )}
-            {maintenanceOpenCount > 0 && (
-              <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-100 text-blue-800 text-sm">
-                Maintenance: {maintenanceOpenCount} open
-              </span>
-            )}
-            {meetingsRsvpCount > 0 && (
-              <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-100 text-gray-800 portal-theme-card text-sm">
-                Meetings: RSVP for {meetingsRsvpCount}
-              </span>
-            )}
-            {feedbackDueCount > 0 && (
-              <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-clr-green/15 text-clr-green text-sm">
-                Feedback: {feedbackDueCount} due
-              </span>
-            )}
-          </div>
-
-          <p class="text-sm text-gray-500 portal-theme-text-muted">
-            Your role: <strong class="text-clr-green">{effectiveRole}</strong>
-          </p>
-          <p class="text-sm text-gray-600 mt-4">
-            <a href="/arb-request-how-to" class="text-clr-orange hover:underline">How to submit an ARB request</a>
-          </p>
+          <!-- Staff Quick Actions -->
           {isStaffRole && (
-            <section class="mt-6 p-4 rounded-xl bg-gray-50 border border-gray-200" aria-labelledby="quick-actions-heading">
-              <h3 id="quick-actions-heading" class="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-3">Quick actions</h3>
+            <div class="bg-gray-50 border border-gray-200 rounded-2xl p-6">
+              <h3 class="text-lg font-heading font-semibold text-gray-800 mb-4">Staff Tools</h3>
               <div class="flex flex-wrap gap-3">
                 {(effectiveRole === 'board' || effectiveRole === 'admin' || effectiveRole === 'arb_board') && (
-                  <a href="/board/assessments" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-clr-green hover:brightness-110 text-white font-semibold text-sm shadow-sm">
-                    Record payment
+                  <a
+                    href="/board/assessments"
+                    class="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-clr-green hover:brightness-110 text-white font-semibold shadow-sm transition-all"
+                  >
+                    Record Payment
                   </a>
                 )}
                 {(effectiveRole === 'arb' || effectiveRole === 'admin' || effectiveRole === 'arb_board') && (
-                  <a href="/portal/arb-dashboard" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 border-clr-green text-clr-green hover:bg-clr-green/10 font-semibold text-sm">
+                  <a
+                    href="/portal/arb-dashboard"
+                    class="inline-flex items-center gap-2 px-5 py-3 rounded-xl border-2 border-clr-green text-clr-green hover:bg-clr-green/10 font-semibold transition-all"
+                  >
                     ARB Dashboard
                     {(arbCounts.pending > 0 || arbCounts.in_review > 0) && (
-                      <span class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 rounded-full bg-amber-500 text-white text-xs font-bold" aria-label={`${arbCounts.in_review} in review, ${arbCounts.pending} pending`}>{arbCounts.in_review + arbCounts.pending}</span>
+                      <span class="inline-flex items-center justify-center min-w-[1.5rem] h-6 px-2 rounded-full bg-amber-500 text-white text-xs font-bold">
+                        {arbCounts.in_review + arbCounts.pending}
+                      </span>
                     )}
                   </a>
                 )}
-                {(effectiveRole === 'board' || effectiveRole === 'admin' || effectiveRole === 'arb_board') && (
-                  <a href="/board/vendors" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 border-gray-300 text-gray-700 hover:bg-gray-100 font-semibold text-sm">
-                    Vendor submissions
-                    {pendingVendorCount > 0 && (
-                      <span class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 rounded-full bg-amber-500 text-white text-xs font-bold" aria-label={`${pendingVendorCount} pending`}>{pendingVendorCount}</span>
-                    )}
-                  </a>
-                )}
-                <a href="/portal/board" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-gray-300 text-gray-600 hover:bg-gray-100 font-medium text-sm">
-                  Board home
+                <a
+                  href="/portal/board"
+                  class="inline-flex items-center gap-2 px-5 py-3 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-100 font-medium transition-all"
+                >
+                  Board Home
                 </a>
               </div>
-            </section>
+            </div>
           )}
+
+          <!-- Help Link -->
+          <div class="mt-8 text-center">
+            <a href="/arb-request-how-to" class="text-clr-orange hover:underline text-lg font-medium">
+              How to submit an ARB request →
+            </a>
+          </div>
         </div>
       </main>
-  </div>
-  <PWAInstallPrompt />
-  <script is:inline>
-    document.getElementById('pim-elevate-btn')?.addEventListener('click', function () {
-      const btn = this;
-      btn.disabled = true;
-      fetch('/api/pim/elevate', { method: 'POST', credentials: 'same-origin' })
-        .then(function (r) {
-          if (r.ok) window.location.reload();
-          else btn.disabled = false;
-        })
-        .catch(function () { btn.disabled = false; });
-    });
+    </div>
 
-    document.querySelectorAll('.notification-dismiss').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        const key = this.getAttribute('data-key');
-        if (!key) return;
-        const el = this;
-        el.disabled = true;
-        fetch('/api/notifications/dismiss', {
-          method: 'POST',
-          credentials: 'same-origin',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ key }),
-        })
+    <PWAInstallPrompt />
+
+    <script is:inline>
+      document.getElementById('pim-elevate-btn')?.addEventListener('click', function () {
+        const btn = this;
+        btn.disabled = true;
+        fetch('/api/pim/elevate', { method: 'POST', credentials: 'same-origin' })
           .then(function (r) {
             if (r.ok) window.location.reload();
-            else el.disabled = false;
+            else btn.disabled = false;
           })
-          .catch(function () { el.disabled = false; });
+          .catch(function () {
+            btn.disabled = false;
+          });
       });
-    });
-  </script>
+
+      document.querySelectorAll('.notification-dismiss').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          const key = this.getAttribute('data-key');
+          if (!key) return;
+          const el = this;
+          el.disabled = true;
+          fetch('/api/notifications/dismiss', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ key }),
+          })
+            .then(function (r) {
+              if (r.ok) window.location.reload();
+              else el.disabled = false;
+            })
+            .catch(function () {
+              el.disabled = false;
+            });
+        });
+      });
+    </script>
   </ProtectedPage>
 </PortalLayout>

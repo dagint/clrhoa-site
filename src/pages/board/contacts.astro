@@ -1,9 +1,11 @@
 ---
 export const prerender = false;
 
-import BoardLayout from '../../layouts/BoardLayout.astro';
+import PortalLayout from '../../layouts/PortalLayout.astro';
+import PortalPage from '../../components/PortalPage.astro';
+import BoardNav from '../../components/BoardNav.astro';
 import { getBoardContext } from '../../lib/board-context';
-import { listArbRequestsByHousehold } from '../../lib/arb-db';
+import { getPortalBadgeCounts } from '../../lib/portal-badge-counts';
 import { CONTACT_SUBMISSIONS_EXPIRY_WHERE } from '../../lib/contact-submissions';
 
 const ctx = await getBoardContext(Astro);
@@ -13,6 +15,9 @@ const isBoard = effectiveRole === 'board' || effectiveRole === 'admin' || effect
 if (!isBoard) return Astro.redirect('/portal/dashboard');
 
 const db = env?.DB;
+const { email, role, name } = session;
+const badges = await getPortalBadgeCounts(db, email, role, name);
+
 const pageSize = 20;
 const page = Math.max(1, parseInt(Astro.url.searchParams.get('page') ?? '1', 10) || 1);
 const offset = (page - 1) * pageSize;
@@ -35,9 +40,6 @@ const totalPages = Math.max(1, Math.ceil(total / pageSize));
 const start = total === 0 ? 0 : (page - 1) * pageSize + 1;
 const end = Math.min(page * pageSize, total);
 
-const allRequests = db ? await listArbRequestsByHousehold(db, session.email) : [];
-const draftCount = allRequests.filter((r) => r.status === 'pending').length;
-
 function formatDate(s: string | null): string {
   if (!s) return '—';
   try {
@@ -57,118 +59,136 @@ function safeMailto(email: string): string {
 }
 ---
 
-<BoardLayout title="Contact submissions" subtitle="Public contact form log (backup if email failed)" draftCount={draftCount} role={effectiveRole} session={session} elevatedUntil={session.elevated_until} showRoleBanner={false}>
-  <p class="text-sm text-gray-600 mb-4">
-    Every public contact form submission is logged here. If the email to the board failed, you can follow up from this list. Submissions older than 1 year are not shown (optional cleanup: <code class="bg-gray-100 px-1 rounded">npm run db:contact-submissions-delete-expired</code>). Run <code class="bg-gray-100 px-1 rounded">npm run db:contact-submissions:local</code> (or <code class="bg-gray-100 px-1 rounded">db:contact-submissions</code> for remote) if the table does not exist yet.
-  </p>
+<PortalLayout title="Contact submissions | Board | Member Portal | Crooked Lake Reserve HOA">
+  <PortalPage
+    currentPath="/board/contacts"
+    pageTitle="Contact submissions"
+    userName={badges.displayName ?? undefined}
+    userEmail={email}
+    effectiveRole={effectiveRole}
+    draftCount={badges.draftCount}
+    role={effectiveRole}
+    staffRole={role ?? ''}
+    arbInReviewCount={badges.arbInReviewCount}
+    vendorPendingCount={badges.vendorPendingCount}
+    maintenanceOpenCount={badges.maintenanceOpenCount}
+    meetingsRsvpCount={badges.meetingsRsvpCount}
+    <BoardNav currentPath="/board/contacts" />
 
-  {submissions.length === 0 && total === 0 ? (
-    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center text-gray-500">
-      No contact submissions yet, or the <code>contact_submissions</code> table has not been created.
+    <div class="mb-6">
+      <p class="text-base text-gray-600">
+        Every public contact form submission is logged here. If the email to the board failed, you can follow up from this list. Submissions older than 1 year are not shown (optional cleanup: <code class="bg-gray-100 px-1 rounded">npm run db:contact-submissions-delete-expired</code>). Run <code class="bg-gray-100 px-1 rounded">npm run db:contact-submissions:local</code> (or <code class="bg-gray-100 px-1 rounded">db:contact-submissions</code> for remote) if the table does not exist yet.
+      </p>
     </div>
-  ) : (
-    <>
-      <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
-        <p class="text-sm text-gray-600">
-          Showing {start}–{end} of {total}
-        </p>
-        <nav class="flex items-center gap-2" aria-label="Pagination">
-          <a
-            href={page > 1 ? `?page=${page - 1}` : undefined}
-            class:list={['px-3 py-1.5 rounded border text-sm font-medium', page > 1 ? 'border-gray-300 text-gray-700 hover:bg-gray-50' : 'border-gray-200 text-gray-400 cursor-not-allowed pointer-events-none']}
-            aria-disabled={page <= 1}
-          >
-            Previous
-          </a>
-          <span class="text-sm text-gray-600">
-            Page {page} of {totalPages}
-          </span>
-          <a
-            href={page < totalPages ? `?page=${page + 1}` : undefined}
-            class:list={['px-3 py-1.5 rounded border text-sm font-medium', page < totalPages ? 'border-gray-300 text-gray-700 hover:bg-gray-50' : 'border-gray-200 text-gray-400 cursor-not-allowed pointer-events-none']}
-            aria-disabled={page >= totalPages}
-          >
-            Next
-          </a>
-        </nav>
-      </div>
-      <div class="overflow-x-auto rounded-xl border border-gray-200 bg-white">
-        <table class="w-full text-sm" aria-label="Contact form submissions">
-          <thead>
-            <tr class="border-b border-gray-200 bg-gray-50 text-left">
-              <th class="px-4 py-3 font-semibold text-gray-700">Date</th>
-              <th class="px-4 py-3 font-semibold text-gray-700">Name</th>
-              <th class="px-4 py-3 font-semibold text-gray-700">Email</th>
-              <th class="px-4 py-3 font-semibold text-gray-700">Recipient</th>
-              <th class="px-4 py-3 font-semibold text-gray-700">Message</th>
-              <th class="px-4 py-3 font-semibold text-gray-700">Email sent</th>
-              <th class="px-4 py-3 font-semibold text-gray-700 w-20">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {submissions.map((row) => (
-              <tr class="border-b border-gray-100 hover:bg-gray-50/50" data-submission-id={row.id}>
-                <td class="px-4 py-3 text-gray-600 whitespace-nowrap">{formatDate(row.created_at)}</td>
-                <td class="px-4 py-3 font-medium text-gray-800">{row.name}</td>
-                <td class="px-4 py-3">
-                  <a href={`mailto:${safeMailto(row.email)}`} class="text-clr-green hover:underline">{row.email}</a>
-                </td>
-                <td class="px-4 py-3 text-gray-700">{recipientLabel(row.recipient)}</td>
-                <td class="px-4 py-3 text-gray-700 max-w-xs truncate" title={row.message}>{row.message.length > 80 ? row.message.slice(0, 80) + '…' : row.message}</td>
-                <td class="px-4 py-3">
-                  {row.email_sent ? (
-                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Sent</span>
-                  ) : (
-                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800" title={row.email_error ?? 'Email failed'}>
-                      Failed
-                    </span>
-                  )}
-                </td>
-                <td class="px-4 py-3">
-                  <button
-                    type="button"
-                    class="text-red-600 hover:text-red-800 text-xs font-medium"
-                    data-delete-id={row.id}
-                    aria-label={`Delete submission from ${row.name}`}
-                  >
-                    Delete
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </>
-  )}
 
-  <script is:inline define:vars={{ currentPage: page }}>
-    document.querySelectorAll('[data-delete-id]').forEach((btn) => {
-      btn.addEventListener('click', async () => {
-        const id = btn.getAttribute('data-delete-id');
-        if (!id || !confirm('Remove this contact submission? This cannot be undone.')) return;
-        const row = btn.closest('tr');
-        btn.setAttribute('disabled', '');
-        try {
-          const res = await fetch(`/api/board/contact-submissions?id=${encodeURIComponent(id)}`, { method: 'DELETE', credentials: 'same-origin' });
-          const data = await res.json().catch(() => ({}));
-          if (!res.ok) {
-            alert(data.error || 'Delete failed');
+    {submissions.length === 0 && total === 0 ? (
+      <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center text-gray-500 text-base">
+        No contact submissions yet, or the <code>contact_submissions</code> table has not been created.
+      </div>
+    ) : (
+      <>
+        <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
+          <p class="text-base text-gray-600">
+            Showing {start}–{end} of {total}
+          </p>
+          <nav class="flex items-center gap-2" aria-label="Pagination">
+            <a
+              href={page > 1 ? `?page=${page - 1}` : undefined}
+              class:list={['px-5 py-2.5 rounded border text-base font-medium', page > 1 ? 'border-gray-300 text-gray-700 hover:bg-gray-50' : 'border-gray-200 text-gray-400 cursor-not-allowed pointer-events-none']}
+              aria-disabled={page <= 1}
+            >
+              Previous
+            </a>
+            <span class="text-base text-gray-600">
+              Page {page} of {totalPages}
+            </span>
+            <a
+              href={page < totalPages ? `?page=${page + 1}` : undefined}
+              class:list={['px-5 py-2.5 rounded border text-base font-medium', page < totalPages ? 'border-gray-300 text-gray-700 hover:bg-gray-50' : 'border-gray-200 text-gray-400 cursor-not-allowed pointer-events-none']}
+              aria-disabled={page >= totalPages}
+            >
+              Next
+            </a>
+          </nav>
+        </div>
+        <div class="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+          <table class="w-full text-base" aria-label="Contact form submissions">
+            <thead>
+              <tr class="border-b border-gray-200 bg-gray-50 text-left">
+                <th class="px-4 py-3 font-semibold text-gray-700">Date</th>
+                <th class="px-4 py-3 font-semibold text-gray-700">Name</th>
+                <th class="px-4 py-3 font-semibold text-gray-700">Email</th>
+                <th class="px-4 py-3 font-semibold text-gray-700">Recipient</th>
+                <th class="px-4 py-3 font-semibold text-gray-700">Message</th>
+                <th class="px-4 py-3 font-semibold text-gray-700">Email sent</th>
+                <th class="px-4 py-3 font-semibold text-gray-700 w-20">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {submissions.map((row) => (
+                <tr class="border-b border-gray-100 hover:bg-gray-50/50" data-submission-id={row.id}>
+                  <td class="px-4 py-3 text-gray-600 whitespace-nowrap">{formatDate(row.created_at)}</td>
+                  <td class="px-4 py-3 font-medium text-gray-800">{row.name}</td>
+                  <td class="px-4 py-3">
+                    <a href={`mailto:${safeMailto(row.email)}`} class="text-clr-green hover:underline">{row.email}</a>
+                  </td>
+                  <td class="px-4 py-3 text-gray-700">{recipientLabel(row.recipient)}</td>
+                  <td class="px-4 py-3 text-gray-700 max-w-xs truncate" title={row.message}>{row.message.length > 80 ? row.message.slice(0, 80) + '…' : row.message}</td>
+                  <td class="px-4 py-3">
+                    {row.email_sent ? (
+                      <span class="inline-flex items-center px-2 py-0.5 rounded text-sm font-medium bg-green-100 text-green-800">Sent</span>
+                    ) : (
+                      <span class="inline-flex items-center px-2 py-0.5 rounded text-sm font-medium bg-amber-100 text-amber-800" title={row.email_error ?? 'Email failed'}>
+                        Failed
+                      </span>
+                    )}
+                  </td>
+                  <td class="px-4 py-3">
+                    <button
+                      type="button"
+                      class="text-red-600 hover:text-red-800 text-base font-medium"
+                      data-delete-id={row.id}
+                      aria-label={`Delete submission from ${row.name}`}
+                    >
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </>
+    )}
+
+    <script is:inline define:vars={{ currentPage: page }}>
+      document.querySelectorAll('[data-delete-id]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const id = btn.getAttribute('data-delete-id');
+          if (!id || !confirm('Remove this contact submission? This cannot be undone.')) return;
+          const row = btn.closest('tr');
+          btn.setAttribute('disabled', '');
+          try {
+            const res = await fetch(`/api/board/contact-submissions?id=${encodeURIComponent(id)}`, { method: 'DELETE', credentials: 'same-origin' });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+              alert(data.error || 'Delete failed');
+              btn.removeAttribute('disabled');
+              return;
+            }
+            row?.remove();
+            const remaining = document.querySelectorAll('tbody tr[data-submission-id]').length;
+            if (remaining === 0 && currentPage > 1) {
+              window.location.href = `?page=${currentPage - 1}`;
+            } else {
+              window.location.reload();
+            }
+          } catch (e) {
+            alert('Request failed');
             btn.removeAttribute('disabled');
-            return;
           }
-          row?.remove();
-          const remaining = document.querySelectorAll('tbody tr[data-submission-id]').length;
-          if (remaining === 0 && currentPage > 1) {
-            window.location.href = `?page=${currentPage - 1}`;
-          } else {
-            window.location.reload();
-          }
-        } catch (e) {
-          alert('Request failed');
-          btn.removeAttribute('disabled');
-        }
+        });
       });
-    });
-  </script>
-</BoardLayout>
+    </script>
+  </PortalPage>
+</PortalLayout>

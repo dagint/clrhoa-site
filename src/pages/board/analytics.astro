@@ -2,11 +2,10 @@
 export const prerender = false;
 
 import PortalLayout from '../../layouts/PortalLayout.astro';
-import ProtectedPage from '../../components/ProtectedPage.astro';
-import PortalNav from '../../components/PortalNav.astro';
+import PortalPage from '../../components/PortalPage.astro';
 import BoardNav from '../../components/BoardNav.astro';
-import PortalElevatedRoleBanner from '../../components/PortalElevatedRoleBanner.astro';
 import { getPortalContext } from '../../lib/portal-context';
+import { getPortalBadgeCounts } from '../../lib/portal-badge-counts';
 import { getDashboardMetrics } from '../../lib/analytics';
 
 const { env, session, effectiveRole } = await getPortalContext(Astro);
@@ -18,6 +17,9 @@ if (!allowedRoles.includes(effectiveRole)) {
 }
 
 const db = env?.DB;
+const { email, role, name } = session;
+const badges = await getPortalBadgeCounts(db, email, role, name);
+
 const period = (Astro.url.searchParams.get('period') as 'today' | 'week' | 'month' | 'year') || 'month';
 const metrics = db ? await getDashboardMetrics(db, period) : null;
 
@@ -35,260 +37,265 @@ const formatPercent = (numerator: number, denominator: number) => {
 ---
 
 <PortalLayout title="Analytics Dashboard | Board Portal | Crooked Lake Reserve HOA">
-  <ProtectedPage>
-  <div class="min-h-screen portal-theme-bg font-body">
-    <PortalNav currentPath="/board/analytics" role={effectiveRole} staffRole={session.role ?? ''} />
-    <PortalElevatedRoleBanner role={effectiveRole} session={session} />
+  <PortalPage
+    currentPath="/board/analytics"
+    pageTitle="Analytics Dashboard"
+    userName={badges.displayName ?? undefined}
+    userEmail={email}
+    effectiveRole={effectiveRole}
+    draftCount={badges.draftCount}
+    role={effectiveRole}
+    staffRole={role ?? ''}
+    arbInReviewCount={badges.arbInReviewCount}
+    vendorPendingCount={badges.vendorPendingCount}
+    maintenanceOpenCount={badges.maintenanceOpenCount}
+    meetingsRsvpCount={badges.meetingsRsvpCount}
     <BoardNav currentPath="/board/analytics" />
 
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
-      <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
-        <div>
-          <h2 class="text-2xl font-heading font-bold text-clr-green">Analytics Dashboard</h2>
-          <p class="text-gray-600 mt-1">E-Signature & ARB Request Statistics</p>
-        </div>
-
-        <!-- Period Selector -->
-        <div class="flex gap-2">
-          {['today', 'week', 'month', 'year'].map((p) => (
-            <a
-              href={`?period=${p}`}
-              class={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                period === p
-                  ? 'bg-clr-green text-white'
-                  : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
-              }`}
-            >
-              {p === 'today' ? 'Today' : p === 'week' ? 'Week' : p === 'month' ? 'Month' : 'Year'}
-            </a>
-          ))}
-        </div>
+    <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+      <div>
+        <p class="text-base text-gray-600 mt-1">E-Signature & ARB Request Statistics</p>
       </div>
 
-      {metrics ? (
-        <>
-          <!-- Period Label -->
-          <div class="mb-6 text-sm text-gray-600">
-            Showing data for: <strong>{metrics.period.label}</strong>
-            ({metrics.period.startDate} to {metrics.period.endDate})
-          </div>
+      <!-- Period Selector -->
+      <div class="flex gap-2">
+        {['today', 'week', 'month', 'year'].map((p) => (
+          <a
+            href={`?period=${p}`}
+            class={`px-5 py-2.5 rounded-lg text-base font-semibold transition-colors ${
+              period === p
+                ? 'bg-clr-green text-white'
+                : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+            }`}
+          >
+            {p === 'today' ? 'Today' : p === 'week' ? 'Week' : p === 'month' ? 'Month' : 'Year'}
+          </a>
+        ))}
+      </div>
+    </div>
 
-          <!-- E-Signature Stats -->
-          <div class="mb-8">
-            <h3 class="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <svg class="w-6 h-6 text-clr-green" fill="currentColor" viewBox="0 0 20 20">
-                <path fill-rule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
-              </svg>
-              Electronic Signatures
-            </h3>
+    {metrics ? (
+      <>
+        <!-- Period Label -->
+        <div class="mb-6 text-base text-gray-600">
+          Showing data for: <strong>{metrics.period.label}</strong>
+          ({metrics.period.startDate} to {metrics.period.endDate})
+        </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-              <!-- Signature Cards -->
-              <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-                <p class="text-sm text-gray-600 mb-1">Signatures Created</p>
-                <p class="text-3xl font-bold text-clr-green">{metrics.signatures.totalCreated}</p>
-              </div>
+        <!-- E-Signature Stats -->
+        <div class="mb-8">
+          <h3 class="text-2xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <svg class="w-6 h-6 text-clr-green" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+            </svg>
+            Electronic Signatures
+          </h3>
 
-              <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-                <p class="text-sm text-gray-600 mb-1">Verified</p>
-                <p class="text-3xl font-bold text-blue-600">{metrics.signatures.totalVerified}</p>
-                <p class="text-xs text-gray-500 mt-1">
-                  {formatPercent(metrics.signatures.totalVerified, metrics.signatures.totalCreated)} verification rate
-                </p>
-              </div>
-
-              <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-                <p class="text-sm text-gray-600 mb-1">Viewed</p>
-                <p class="text-3xl font-bold text-purple-600">{metrics.signatures.totalViewed}</p>
-              </div>
-
-              <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-                <p class="text-sm text-gray-600 mb-1">Revoked</p>
-                <p class="text-3xl font-bold text-red-600">{metrics.signatures.totalRevoked}</p>
-              </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <!-- Signature Cards -->
+            <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+              <p class="text-base text-gray-600 mb-1">Signatures Created</p>
+              <p class="text-3xl font-bold text-clr-green">{metrics.signatures.totalCreated}</p>
             </div>
 
-            <!-- Signatures by Document Type -->
-            {Object.keys(metrics.signatures.byDocumentType).length > 0 && (
-              <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm mb-4">
-                <h4 class="font-semibold text-gray-900 mb-4">Signatures by Document Type</h4>
-                <div class="space-y-2">
-                  {Object.entries(metrics.signatures.byDocumentType).map(([type, count]) => (
-                    <div class="flex items-center justify-between">
-                      <span class="text-sm text-gray-700 font-medium capitalize">{type.replace('_', ' ')}</span>
-                      <span class="text-sm font-bold text-clr-green">{count}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          <!-- ARB Request Stats -->
-          <div class="mb-8">
-            <h3 class="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <svg class="w-6 h-6 text-clr-green" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
-                <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd" />
-              </svg>
-              ARB Requests
-            </h3>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-              <!-- ARB Cards -->
-              <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-                <p class="text-sm text-gray-600 mb-1">Submitted</p>
-                <p class="text-3xl font-bold text-clr-green">{metrics.arb.totalSubmitted}</p>
-              </div>
-
-              <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-                <p class="text-sm text-gray-600 mb-1">Approved</p>
-                <p class="text-3xl font-bold text-green-600">{metrics.arb.totalApproved}</p>
-                <p class="text-xs text-gray-500 mt-1">
-                  {formatPercent(metrics.arb.totalApproved, metrics.arb.totalSubmitted)} approval rate
-                </p>
-              </div>
-
-              <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-                <p class="text-sm text-gray-600 mb-1">Denied</p>
-                <p class="text-3xl font-bold text-red-600">{metrics.arb.totalDenied}</p>
-              </div>
-
-              <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-                <p class="text-sm text-gray-600 mb-1">Returned</p>
-                <p class="text-3xl font-bold text-amber-600">{metrics.arb.totalReturned}</p>
-              </div>
-
-              <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-                <p class="text-sm text-gray-600 mb-1">Cancelled</p>
-                <p class="text-3xl font-bold text-gray-600">{metrics.arb.totalCancelled}</p>
-              </div>
-            </div>
-
-            <!-- E-Signature Adoption -->
-            <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm mb-4">
-              <h4 class="font-semibold text-gray-900 mb-4">E-Signature Adoption</h4>
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <p class="text-sm text-gray-600 mb-1">With E-Signature</p>
-                  <p class="text-2xl font-bold text-clr-green">{metrics.arb.withSignature}</p>
-                  <div class="mt-2 h-2 bg-gray-200 rounded-full overflow-hidden">
-                    <div
-                      class="h-full bg-clr-green"
-                      style={`width: ${formatPercent(metrics.arb.withSignature, metrics.arb.totalSubmitted)}`}
-                    ></div>
-                  </div>
-                </div>
-                <div>
-                  <p class="text-sm text-gray-600 mb-1">Without E-Signature</p>
-                  <p class="text-2xl font-bold text-gray-600">{metrics.arb.withoutSignature}</p>
-                  <div class="mt-2 h-2 bg-gray-200 rounded-full overflow-hidden">
-                    <div
-                      class="h-full bg-gray-400"
-                      style={`width: ${formatPercent(metrics.arb.withoutSignature, metrics.arb.totalSubmitted)}`}
-                    ></div>
-                  </div>
-                </div>
-              </div>
-              <p class="text-xs text-gray-500 mt-4">
-                <strong>{formatPercent(metrics.arb.withSignature, metrics.arb.totalSubmitted)}</strong> of requests use electronic signatures
+            <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+              <p class="text-base text-gray-600 mb-1">Verified</p>
+              <p class="text-3xl font-bold text-blue-600">{metrics.signatures.totalVerified}</p>
+              <p class="text-sm text-gray-500 mt-1">
+                {formatPercent(metrics.signatures.totalVerified, metrics.signatures.totalCreated)} verification rate
               </p>
             </div>
 
-            <!-- Processing Time -->
-            {metrics.arb.avgProcessingTimeHours > 0 && (
-              <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm mb-4">
-                <h4 class="font-semibold text-gray-900 mb-2">Average Processing Time</h4>
-                <p class="text-3xl font-bold text-clr-green">{formatHours(metrics.arb.avgProcessingTimeHours)}</p>
-                <p class="text-sm text-gray-600 mt-1">From submission to decision</p>
+            <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+              <p class="text-base text-gray-600 mb-1">Viewed</p>
+              <p class="text-3xl font-bold text-purple-600">{metrics.signatures.totalViewed}</p>
+            </div>
+
+            <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+              <p class="text-base text-gray-600 mb-1">Revoked</p>
+              <p class="text-3xl font-bold text-red-600">{metrics.signatures.totalRevoked}</p>
+            </div>
+          </div>
+
+          <!-- Signatures by Document Type -->
+          {Object.keys(metrics.signatures.byDocumentType).length > 0 && (
+            <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm mb-4">
+              <h4 class="text-lg font-semibold text-gray-900 mb-4">Signatures by Document Type</h4>
+              <div class="space-y-2">
+                {Object.entries(metrics.signatures.byDocumentType).map(([type, count]) => (
+                  <div class="flex items-center justify-between">
+                    <span class="text-base text-gray-700 font-medium capitalize">{type.replace('_', ' ')}</span>
+                    <span class="text-base font-bold text-clr-green">{count}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <!-- ARB Request Stats -->
+        <div class="mb-8">
+          <h3 class="text-2xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <svg class="w-6 h-6 text-clr-green" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
+              <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd" />
+            </svg>
+            ARB Requests
+          </h3>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+            <!-- ARB Cards -->
+            <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+              <p class="text-base text-gray-600 mb-1">Submitted</p>
+              <p class="text-3xl font-bold text-clr-green">{metrics.arb.totalSubmitted}</p>
+            </div>
+
+            <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+              <p class="text-base text-gray-600 mb-1">Approved</p>
+              <p class="text-3xl font-bold text-green-600">{metrics.arb.totalApproved}</p>
+              <p class="text-sm text-gray-500 mt-1">
+                {formatPercent(metrics.arb.totalApproved, metrics.arb.totalSubmitted)} approval rate
+              </p>
+            </div>
+
+            <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+              <p class="text-base text-gray-600 mb-1">Denied</p>
+              <p class="text-3xl font-bold text-red-600">{metrics.arb.totalDenied}</p>
+            </div>
+
+            <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+              <p class="text-base text-gray-600 mb-1">Returned</p>
+              <p class="text-3xl font-bold text-amber-600">{metrics.arb.totalReturned}</p>
+            </div>
+
+            <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+              <p class="text-base text-gray-600 mb-1">Cancelled</p>
+              <p class="text-3xl font-bold text-gray-600">{metrics.arb.totalCancelled}</p>
+            </div>
+          </div>
+
+          <!-- E-Signature Adoption -->
+          <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm mb-4">
+            <h4 class="text-lg font-semibold text-gray-900 mb-4">E-Signature Adoption</h4>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <p class="text-base text-gray-600 mb-1">With E-Signature</p>
+                <p class="text-2xl font-bold text-clr-green">{metrics.arb.withSignature}</p>
+                <div class="mt-2 h-2 bg-gray-200 rounded-full overflow-hidden">
+                  <div
+                    class="h-full bg-clr-green"
+                    style={`width: ${formatPercent(metrics.arb.withSignature, metrics.arb.totalSubmitted)}`}
+                  ></div>
+                </div>
+              </div>
+              <div>
+                <p class="text-base text-gray-600 mb-1">Without E-Signature</p>
+                <p class="text-2xl font-bold text-gray-600">{metrics.arb.withoutSignature}</p>
+                <div class="mt-2 h-2 bg-gray-200 rounded-full overflow-hidden">
+                  <div
+                    class="h-full bg-gray-400"
+                    style={`width: ${formatPercent(metrics.arb.withoutSignature, metrics.arb.totalSubmitted)}`}
+                  ></div>
+                </div>
+              </div>
+            </div>
+            <p class="text-sm text-gray-500 mt-4">
+              <strong>{formatPercent(metrics.arb.withSignature, metrics.arb.totalSubmitted)}</strong> of requests use electronic signatures
+            </p>
+          </div>
+
+          <!-- Processing Time -->
+          {metrics.arb.avgProcessingTimeHours > 0 && (
+            <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm mb-4">
+              <h4 class="text-lg font-semibold text-gray-900 mb-2">Average Processing Time</h4>
+              <p class="text-3xl font-bold text-clr-green">{formatHours(metrics.arb.avgProcessingTimeHours)}</p>
+              <p class="text-base text-gray-600 mt-1">From submission to decision</p>
+            </div>
+          )}
+
+          <!-- Top Reviewers -->
+          {metrics.arb.topReviewers.length > 0 && (
+            <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+              <h4 class="text-lg font-semibold text-gray-900 mb-4">Top Reviewers</h4>
+              <div class="space-y-2">
+                {metrics.arb.topReviewers.slice(0, 5).map((reviewer, idx) => (
+                  <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                      <span class="text-base font-bold text-gray-400">#{idx + 1}</span>
+                      <span class="text-base text-gray-700">{reviewer.email}</span>
+                    </div>
+                    <span class="text-base font-bold text-clr-green">{reviewer.count} reviews</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <!-- Daily Trends Charts -->
+        {(metrics.signatures.byDay.length > 0 || metrics.arb.byDay.length > 0) && (
+          <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+            <h4 class="text-lg font-semibold text-gray-900 mb-4">Daily Trends</h4>
+            <p class="text-base text-gray-600 mb-6">Activity over time (simple data tables - charts can be added later)</p>
+
+            {metrics.signatures.byDay.length > 0 && (
+              <div class="mb-6">
+                <h5 class="text-base font-semibold text-gray-700 mb-2">Signatures Created</h5>
+                <div class="overflow-x-auto">
+                  <table class="min-w-full text-base">
+                    <thead class="bg-gray-50">
+                      <tr>
+                        <th class="px-4 py-3 text-left font-medium text-gray-700">Date</th>
+                        <th class="px-4 py-3 text-right font-medium text-gray-700">Count</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200">
+                      {metrics.signatures.byDay.map((day) => (
+                        <tr>
+                          <td class="px-4 py-3 text-gray-700">{day.date}</td>
+                          <td class="px-4 py-3 text-right font-semibold text-clr-green">{day.count}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
 
-            <!-- Top Reviewers -->
-            {metrics.arb.topReviewers.length > 0 && (
-              <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-                <h4 class="font-semibold text-gray-900 mb-4">Top Reviewers</h4>
-                <div class="space-y-2">
-                  {metrics.arb.topReviewers.slice(0, 5).map((reviewer, idx) => (
-                    <div class="flex items-center justify-between">
-                      <div class="flex items-center gap-2">
-                        <span class="text-sm font-bold text-gray-400">#{idx + 1}</span>
-                        <span class="text-sm text-gray-700">{reviewer.email}</span>
-                      </div>
-                      <span class="text-sm font-bold text-clr-green">{reviewer.count} reviews</span>
-                    </div>
-                  ))}
+            {metrics.arb.byDay.length > 0 && (
+              <div>
+                <h5 class="text-base font-semibold text-gray-700 mb-2">ARB Requests</h5>
+                <div class="overflow-x-auto">
+                  <table class="min-w-full text-base">
+                    <thead class="bg-gray-50">
+                      <tr>
+                        <th class="px-4 py-3 text-left font-medium text-gray-700">Date</th>
+                        <th class="px-4 py-3 text-right font-medium text-gray-700">Submitted</th>
+                        <th class="px-4 py-3 text-right font-medium text-gray-700">Approved</th>
+                        <th class="px-4 py-3 text-right font-medium text-gray-700">Denied</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200">
+                      {metrics.arb.byDay.map((day) => (
+                        <tr>
+                          <td class="px-4 py-3 text-gray-700">{day.date}</td>
+                          <td class="px-4 py-3 text-right font-semibold text-blue-600">{day.submitted}</td>
+                          <td class="px-4 py-3 text-right font-semibold text-green-600">{day.approved}</td>
+                          <td class="px-4 py-3 text-right font-semibold text-red-600">{day.denied}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             )}
           </div>
-
-          <!-- Daily Trends Charts -->
-          {(metrics.signatures.byDay.length > 0 || metrics.arb.byDay.length > 0) && (
-            <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-              <h4 class="font-semibold text-gray-900 mb-4">Daily Trends</h4>
-              <p class="text-sm text-gray-600 mb-6">Activity over time (simple data tables - charts can be added later)</p>
-
-              {metrics.signatures.byDay.length > 0 && (
-                <div class="mb-6">
-                  <h5 class="text-sm font-semibold text-gray-700 mb-2">Signatures Created</h5>
-                  <div class="overflow-x-auto">
-                    <table class="min-w-full text-sm">
-                      <thead class="bg-gray-50">
-                        <tr>
-                          <th class="px-3 py-2 text-left font-medium text-gray-700">Date</th>
-                          <th class="px-3 py-2 text-right font-medium text-gray-700">Count</th>
-                        </tr>
-                      </thead>
-                      <tbody class="divide-y divide-gray-200">
-                        {metrics.signatures.byDay.map((day) => (
-                          <tr>
-                            <td class="px-3 py-2 text-gray-700">{day.date}</td>
-                            <td class="px-3 py-2 text-right font-semibold text-clr-green">{day.count}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
-              {metrics.arb.byDay.length > 0 && (
-                <div>
-                  <h5 class="text-sm font-semibold text-gray-700 mb-2">ARB Requests</h5>
-                  <div class="overflow-x-auto">
-                    <table class="min-w-full text-sm">
-                      <thead class="bg-gray-50">
-                        <tr>
-                          <th class="px-3 py-2 text-left font-medium text-gray-700">Date</th>
-                          <th class="px-3 py-2 text-right font-medium text-gray-700">Submitted</th>
-                          <th class="px-3 py-2 text-right font-medium text-gray-700">Approved</th>
-                          <th class="px-3 py-2 text-right font-medium text-gray-700">Denied</th>
-                        </tr>
-                      </thead>
-                      <tbody class="divide-y divide-gray-200">
-                        {metrics.arb.byDay.map((day) => (
-                          <tr>
-                            <td class="px-3 py-2 text-gray-700">{day.date}</td>
-                            <td class="px-3 py-2 text-right font-semibold text-blue-600">{day.submitted}</td>
-                            <td class="px-3 py-2 text-right font-semibold text-green-600">{day.approved}</td>
-                            <td class="px-3 py-2 text-right font-semibold text-red-600">{day.denied}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </>
-      ) : (
-        <div class="bg-white rounded-xl border border-gray-200 p-8 text-center">
-          <p class="text-gray-600">No analytics data available.</p>
-        </div>
-      )}
-    </main>
-  </div>
-  </ProtectedPage>
+        )}
+      </>
+    ) : (
+      <div class="bg-white rounded-xl border border-gray-200 p-8 text-center">
+        <p class="text-base text-gray-600">No analytics data available.</p>
+      </div>
+    )}
+  </PortalPage>
 </PortalLayout>

@@ -1,11 +1,10 @@
 ---
 /**
- * Layout for portal (member) pages. Ensures UTF-8 charset and consistent document structure
- * so special characters (e.g. ellipsis …) and formatting render correctly.
- * Includes global search bar and top spacing so all portal pages share the same chrome.
+ * Layout for portal (member) pages with Gmail-style sidebar navigation.
+ * Ensures UTF-8 charset and consistent document structure.
+ * Includes sidebar, top header with profile dropdown, and main content area.
  */
 import '../styles/tailwind.css';
-import GlobalSearch from '../components/GlobalSearch.astro';
 import FeedbackWidget from '../components/FeedbackWidget.astro';
 import UsageBeacon from '../components/UsageBeacon.astro';
 import ServiceWorkerRegistration from '../components/ServiceWorkerRegistration.astro';
@@ -29,8 +28,10 @@ const { title = 'Member Portal | Crooked Lake Reserve HOA' } = Astro.props;
     <meta name="robots" content="noindex, nofollow" />
   </head>
   <body class="min-h-screen bg-gray-50 text-gray-900 font-body">
-    <GlobalSearch fixed={true} class="portal-theme-header" />
-    <div class="pt-14">
+    <!-- Main layout: sidebar + content area -->
+    <div class="flex h-screen overflow-hidden">
+      <!-- Sidebar and Header are injected by page components (via slots) -->
+      <!-- This allows pages to pass dynamic data to navigation components -->
       <slot />
     </div>
     <FeedbackWidget />

@@ -2,15 +2,17 @@
 export const prerender = false;
 
 import PortalLayout from '../../layouts/PortalLayout.astro';
-import ProtectedPage from '../../components/ProtectedPage.astro';
-import PortalNav from '../../components/PortalNav.astro';
-import GlobalSearch from '../../components/GlobalSearch.astro';
+import PortalPage from '../../components/PortalPage.astro';
 import { getPortalContext } from '../../lib/portal-context';
+import { getPortalBadgeCounts } from '../../lib/portal-badge-counts';
 import { listPreapprovalItems, listPreapprovalCategories, parsePhotos } from '../../lib/preapproval-db';
-import { listArbRequestsByHousehold } from '../../lib/arb-db';
 
 const { env, session, effectiveRole } = await getPortalContext(Astro);
 if (!session) return Astro.redirect('/portal/login');
+
+const { email, role, name } = session;
+const db = env?.DB;
+const badges = await getPortalBadgeCounts(db, email, role, name);
 
 const PORTAL_LIBRARY_PAGE_SIZES = [10, 25, 50, 100] as const;
 const DEFAULT_PORTAL_LIBRARY_PAGE_SIZE = 25;
@@ -38,124 +40,128 @@ function portalLibraryPageUrl(value: number): string {
   return u.pathname + u.search;
 }
 
-const db = env?.DB;
 const categories = db ? await listPreapprovalCategories(db) : [];
 const items = db
   ? await listPreapprovalItems(db, categoryFilter ? { category: categoryFilter, approvedOnly: true, limit: pageSize, offset: (page - 1) * pageSize } : { approvedOnly: true, limit: pageSize, offset: (page - 1) * pageSize })
   : [];
-const allRequests = db ? await listArbRequestsByHousehold(db, session.email) : [];
-const draftCount = allRequests.filter((r) => r.status === 'pending').length;
 ---
 
 <PortalLayout title="Pre-approval Library | Member Portal | Crooked Lake Reserve HOA">
-  <ProtectedPage>
-  <div class="min-h-screen bg-gray-50 portal-theme-bg font-body">
-    <GlobalSearch fixed={true} class="portal-theme-header" />
-    <div class="pt-14">
-      <PortalNav currentPath="/portal/library" draftCount={draftCount} role={effectiveRole} staffRole={session?.role ?? ''} />
+  <PortalPage
+    currentPath="/portal/library"
+    pageTitle="Pre-approval Library"
+    userName={badges.displayName ?? undefined}
+    userEmail={email}
+    effectiveRole={effectiveRole}
+    draftCount={badges.draftCount}
+    role={effectiveRole}
+    staffRole={role ?? ''}
+    arbInReviewCount={badges.arbInReviewCount}
+    vendorPendingCount={badges.vendorPendingCount}
+    maintenanceOpenCount={badges.maintenanceOpenCount}
+    meetingsRsvpCount={badges.meetingsRsvpCount}
+    feedbackDueCount={badges.feedbackDueCount}
+  >
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8 mb-8">
+      <h1 class="text-3xl font-heading font-bold text-clr-green mb-2">Architectural Pre-Approval Library</h1>
+      <p class="text-base text-gray-600 portal-theme-text-muted mb-6">
+        Browse pre-approved designs and use one as a template when submitting an ARB request.
+      </p>
 
-      <main class="max-w-4xl mx-auto px-4 sm:px-6 py-8">
-        <h2 class="text-2xl font-heading font-bold text-clr-green mb-2">Architectural Pre-Approval Library</h2>
-        <p class="text-gray-600 portal-theme-text-muted mb-6">
-          Browse pre-approved designs and use one as a template when submitting an ARB request.
-        </p>
-
-        {categories.length > 0 && (
-          <div class="flex flex-wrap gap-2 mb-6" role="tablist" aria-label="Filter by category">
+      {categories.length > 0 && (
+        <div class="flex flex-wrap gap-2 mb-6" role="tablist" aria-label="Filter by category">
+          <a
+            href="/portal/library"
+            class:list={['px-4 py-2 rounded-lg text-base font-medium transition-colors', !categoryFilter ? 'bg-clr-green text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300 portal-theme-card']}
+          >
+            All
+          </a>
+          {categories.map((cat) => (
             <a
-              href="/portal/library"
-              class:list={['px-4 py-2 rounded-lg text-sm font-medium transition-colors', !categoryFilter ? 'bg-clr-green text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300 portal-theme-card']}
+              href={`/portal/library?category=${encodeURIComponent(cat)}`}
+              class:list={['px-4 py-2 rounded-lg text-base font-medium transition-colors', categoryFilter === cat ? 'bg-clr-green text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300 portal-theme-card']}
             >
-              All
+              {cat}
             </a>
-            {categories.map((cat) => (
-              <a
-                href={`/portal/library?category=${encodeURIComponent(cat)}`}
-                class:list={['px-4 py-2 rounded-lg text-sm font-medium transition-colors', categoryFilter === cat ? 'bg-clr-green text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300 portal-theme-card']}
-              >
-                {cat}
-              </a>
-            ))}
-          </div>
-        )}
+          ))}
+        </div>
+      )}
 
-        {items.length === 0 && page === 1 ? (
-          <div class="bg-white rounded-2xl border border-gray-100 p-8 text-center text-gray-500 portal-theme-text-muted">
-            No pre-approved items yet. The board may add designs to this library over time.
-          </div>
-        ) : (
-          <>
-          <div class="flex flex-wrap items-center gap-2 mb-4">
-            <label for="portal-library-per-page" class="text-sm text-gray-600">Per page:</label>
-            <select id="portal-library-per-page" name="limit" class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-700 focus:border-clr-green focus:outline-none focus:ring-1 focus:ring-clr-green" aria-label="Entries per page">
-              {PORTAL_LIBRARY_PAGE_SIZES.map((size) => (
-                <option value={size} selected={pageSize === size}>{size}</option>
-              ))}
-            </select>
-          </div>
-          <script is:inline>
-            document.getElementById('portal-library-per-page')?.addEventListener('change', function () {
-              const limit = this.value;
-              const u = new URL(window.location.href);
-              u.searchParams.set('limit', limit);
-              u.searchParams.delete('page');
-              if (limit === '25') u.searchParams.delete('limit');
-              window.location.href = u.pathname + u.search;
-            });
-          </script>
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" id="library-grid">
-            {items.map((item) => {
-              const photos = parsePhotos(item.photos);
-              const firstPhoto = photos[0];
-              return (
-                <article
-                  class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden portal-theme-card flex flex-col"
-                  id={item.id}
-                >
-                  <div class="aspect-video bg-gray-100 relative">
-                    {firstPhoto ? (
-                      <img
-                        src={`/api/portal/file/${encodeURIComponent(firstPhoto.key)}`}
-                        alt=""
-                        class="w-full h-full object-cover"
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div class="w-full h-full flex items-center justify-center text-gray-400 text-4xl">-</div>
-                    )}
-                  </div>
-                  <div class="p-4 flex flex-col flex-1">
-                    <h3 class="font-heading font-semibold text-clr-green text-lg">{item.title ?? 'Untitled'}</h3>
-                    {item.category && (
-                      <p class="text-sm text-gray-500 mt-0.5">{item.category}</p>
-                    )}
-                    {item.rules && (
-                      <p class="text-sm text-gray-600 mt-2 line-clamp-3 portal-theme-text">{item.rules}</p>
-                    )}
-                    <a
-                      href={`/portal/arb-request?template=${encodeURIComponent(item.id)}`}
-                      class="mt-4 inline-flex items-center justify-center px-4 py-2 bg-clr-green text-white text-sm font-medium rounded-lg hover:brightness-110 transition-colors"
-                    >
-                      Use as template
-                    </a>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-          {items.length > 0 && (
-            <nav class="flex items-center justify-between gap-2 py-2 px-3 mt-4 border-t border-gray-200 bg-gray-50 text-sm" aria-label="Library pagination">
-              <span class="text-gray-600">Page {page}</span>
-              <div class="flex gap-2">
-                {page > 1 && <a href={portalLibraryPageUrl(page - 1)} class="text-clr-green hover:underline font-medium">Previous</a>}
-                {items.length === pageSize && <a href={portalLibraryPageUrl(page + 1)} class="text-clr-green hover:underline font-medium">Next</a>}
-              </div>
-            </nav>
-          )}
-          </>
+      {items.length === 0 && page === 1 ? (
+        <div class="bg-white rounded-2xl border border-gray-100 p-8 text-center text-base text-gray-500 portal-theme-text-muted">
+          No pre-approved items yet. The board may add designs to this library over time.
+        </div>
+      ) : (
+        <>
+        <div class="flex flex-wrap items-center gap-2 mb-4">
+          <label for="portal-library-per-page" class="text-base text-gray-600">Per page:</label>
+          <select id="portal-library-per-page" name="limit" class="rounded border border-gray-300 bg-white px-2 py-1.5 text-base text-gray-700 focus:border-clr-green focus:outline-none focus:ring-1 focus:ring-clr-green" aria-label="Entries per page">
+            {PORTAL_LIBRARY_PAGE_SIZES.map((size) => (
+              <option value={size} selected={pageSize === size}>{size}</option>
+            ))}
+          </select>
+        </div>
+        <script is:inline>
+          document.getElementById('portal-library-per-page')?.addEventListener('change', function () {
+            const limit = this.value;
+            const u = new URL(window.location.href);
+            u.searchParams.set('limit', limit);
+            u.searchParams.delete('page');
+            if (limit === '25') u.searchParams.delete('limit');
+            window.location.href = u.pathname + u.search;
+          });
+        </script>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" id="library-grid">
+          {items.map((item) => {
+            const photos = parsePhotos(item.photos);
+            const firstPhoto = photos[0];
+            return (
+              <article
+                class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden portal-theme-card flex flex-col"
+                id={item.id}
+              >
+                <div class="aspect-video bg-gray-100 relative">
+                  {firstPhoto ? (
+                    <img
+                      src={`/api/portal/file/${encodeURIComponent(firstPhoto.key)}`}
+                      alt=""
+                      class="w-full h-full object-cover"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div class="w-full h-full flex items-center justify-center text-gray-400 text-4xl">-</div>
+                  )}
+                </div>
+                <div class="p-4 flex flex-col flex-1">
+                  <h3 class="font-heading font-semibold text-clr-green text-2xl">{item.title ?? 'Untitled'}</h3>
+                  {item.category && (
+                    <p class="text-base text-gray-500 mt-0.5">{item.category}</p>
+                  )}
+                  {item.rules && (
+                    <p class="text-base text-gray-600 mt-2 line-clamp-3 portal-theme-text">{item.rules}</p>
+                  )}
+                  <a
+                    href={`/portal/arb-request?template=${encodeURIComponent(item.id)}`}
+                    class="mt-4 inline-flex items-center justify-center px-4 py-2 bg-clr-green text-white text-base font-medium rounded-lg hover:brightness-110 transition-colors"
+                  >
+                    Use as template
+                  </a>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+        {items.length > 0 && (
+          <nav class="flex items-center justify-between gap-2 py-2 px-3 mt-4 border-t border-gray-200 bg-gray-50 text-base" aria-label="Library pagination">
+            <span class="text-base text-gray-600">Page {page}</span>
+            <div class="flex gap-2">
+              {page > 1 && <a href={portalLibraryPageUrl(page - 1)} class="text-base text-clr-green hover:underline font-medium">Previous</a>}
+              {items.length === pageSize && <a href={portalLibraryPageUrl(page + 1)} class="text-base text-clr-green hover:underline font-medium">Next</a>}
+            </div>
+          </nav>
         )}
-      </main>
+        </>
+      )}
     </div>
-  </div>
-  </ProtectedPage>
+  </PortalPage>
 </PortalLayout>

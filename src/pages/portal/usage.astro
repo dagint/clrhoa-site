@@ -16,10 +16,9 @@
 export const prerender = false;
 
 import PortalLayout from '../../layouts/PortalLayout.astro';
-import ProtectedPage from '../../components/ProtectedPage.astro';
-import PortalNav from '../../components/PortalNav.astro';
+import PortalPage from '../../components/PortalPage.astro';
 import { getAdminContext } from '../../lib/board-context';
-import { listArbRequestsByHousehold } from '../../lib/arb-db';
+import { getPortalBadgeCounts } from '../../lib/portal-badge-counts';
 import { getDailyStats, getWeeklyStats, getAdminPageViews, getAdminPageViewsCount, getTopPagesByViews } from '../../lib/usage-db';
 
 // Route-level guard: enforce admin-only access
@@ -27,7 +26,10 @@ const ctx = await getAdminContext(Astro);
 if ('redirect' in ctx) return Astro.redirect(ctx.redirect);
 const { env, session, effectiveRole } = ctx;
 
+const { email, role, name } = session;
 const db = env?.DB;
+const badges = await getPortalBadgeCounts(db, email, role, name);
+
 const url = Astro.url;
 
 const VIEWS_PAGE_SIZES = [10, 25, 50, 100] as const;
@@ -67,9 +69,6 @@ const topPages = db ? await getTopPagesByViews(db, 10) : [];
 const adminEvents = db ? await getAdminPageViews(db, viewsLimit, (viewsPage - 1) * viewsLimit, filters) : [];
 const adminViewsTotal = db ? await getAdminPageViewsCount(db, filters) : 0;
 
-const allRequests = db ? await listArbRequestsByHousehold(db, session.email) : [];
-const draftCount = allRequests.filter((r) => r.status === 'pending').length;
-
 function viewsPageUrl(key: string, value: number): string {
   const u = new URL(url);
   if (value <= 1) u.searchParams.delete(key);
@@ -95,32 +94,43 @@ const chartDataJson = JSON.stringify(chartData).replace(/<\/script/gi, '<\\/scri
 ---
 
 <PortalLayout title="Site usage | Member Portal | Crooked Lake Reserve HOA">
-  <ProtectedPage>
-  <div class="min-h-screen bg-gray-50 portal-theme-bg font-body" id="portal-root">
-    <PortalNav currentPath="/portal/usage" draftCount={draftCount} role={effectiveRole} staffRole={session.role ?? ''} arbInReviewCount={0} vendorPendingCount={0} />
-
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
+  <PortalPage
+    currentPath="/portal/usage"
+    pageTitle="Site Usage"
+    userName={badges.displayName ?? undefined}
+    userEmail={email}
+    effectiveRole={effectiveRole}
+    draftCount={badges.draftCount}
+    role={effectiveRole}
+    staffRole={role ?? ''}
+    arbInReviewCount={badges.arbInReviewCount}
+    vendorPendingCount={badges.vendorPendingCount}
+    maintenanceOpenCount={badges.maintenanceOpenCount}
+    meetingsRsvpCount={badges.meetingsRsvpCount}
+    feedbackDueCount={badges.feedbackDueCount}
+  >
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8 mb-8">
       <h1 class="text-3xl font-heading font-bold text-clr-green mb-2">Site usage</h1>
-      <p class="text-gray-600 portal-theme-text-muted mb-8">Anonymous totals: page views and unique visitors. Admin-only.</p>
+      <p class="text-base text-gray-600 portal-theme-text-muted mb-8">Anonymous totals: page views and unique visitors. Admin-only.</p>
 
       <section class="mb-12">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div class="bg-white rounded-2xl shadow-sm border border-gray-100 portal-theme-card p-6">
-            <h2 class="text-lg font-heading font-semibold text-clr-green mb-4">Daily (last 30 days)</h2>
+            <h2 class="text-2xl font-heading font-semibold text-clr-green mb-4">Daily (last 30 days)</h2>
             <div class="relative h-64 md:h-72">
               <canvas id="chart-daily" aria-label="Daily page views and unique visitors"></canvas>
             </div>
           </div>
           <div class="bg-white rounded-2xl shadow-sm border border-gray-100 portal-theme-card p-6">
-            <h2 class="text-lg font-heading font-semibold text-clr-green mb-4">Weekly (last 12 weeks)</h2>
+            <h2 class="text-2xl font-heading font-semibold text-clr-green mb-4">Weekly (last 12 weeks)</h2>
             <div class="relative h-64 md:h-72">
               <canvas id="chart-weekly" aria-label="Weekly page views and unique visitors"></canvas>
             </div>
           </div>
         </div>
         <div class="mt-6 bg-white rounded-2xl shadow-sm border border-gray-100 portal-theme-card p-6">
-          <h2 class="text-lg font-heading font-semibold text-clr-green mb-4">Active users & page views (last 30 days)</h2>
-          <p class="text-sm text-gray-600 portal-theme-text-muted mb-4">Line chart: page views, unique visitors (sessions), and active users (logged-in members) per day.</p>
+          <h2 class="text-2xl font-heading font-semibold text-clr-green mb-4">Active users & page views (last 30 days)</h2>
+          <p class="text-base text-gray-600 portal-theme-text-muted mb-4">Line chart: page views, unique visitors (sessions), and active users (logged-in members) per day.</p>
           <div class="relative h-72 md:h-80">
             <canvas id="chart-active-users" aria-label="Active users and page views over time"></canvas>
           </div>
@@ -129,8 +139,8 @@ const chartDataJson = JSON.stringify(chartData).replace(/<\/script/gi, '<\\/scri
 
       <section class="mb-12">
         <div class="bg-white rounded-2xl shadow-sm border border-gray-100 portal-theme-card p-6">
-          <h2 class="text-lg font-heading font-semibold text-clr-green mb-4">Top 10 pages (last 90 days)</h2>
-          <p class="text-sm text-gray-600 portal-theme-text-muted mb-4">Page views vs unique visitors by path.</p>
+          <h2 class="text-2xl font-heading font-semibold text-clr-green mb-4">Top 10 pages (last 90 days)</h2>
+          <p class="text-base text-gray-600 portal-theme-text-muted mb-4">Page views vs unique visitors by path.</p>
           <div class="relative h-64 md:h-80">
             <canvas id="chart-top-pages" aria-label="Top pages by views and unique visitors"></canvas>
           </div>
@@ -138,31 +148,31 @@ const chartDataJson = JSON.stringify(chartData).replace(/<\/script/gi, '<\\/scri
       </section>
 
       <section class="mb-12" aria-labelledby="admin-usage-heading">
-        <h2 id="admin-usage-heading" class="text-lg font-heading font-semibold text-clr-green mb-3">Page views: user → path → time</h2>
-        <p class="text-sm text-gray-600 portal-theme-text-muted mb-4">Recent page views by user or anonymous session. Filter by user (email) or time period, then paged.</p>
+        <h2 id="admin-usage-heading" class="text-2xl font-heading font-semibold text-clr-green mb-3">Page views: user → path → time</h2>
+        <p class="text-base text-gray-600 portal-theme-text-muted mb-4">Recent page views by user or anonymous session. Filter by user (email) or time period, then paged.</p>
         <form method="get" action={url.pathname} class="flex flex-wrap items-end gap-3 mb-4">
           <input type="hidden" name="views_limit" value={viewsLimit} />
           <div>
-            <label for="views-user" class="block text-sm text-gray-600 mb-0.5">User (email)</label>
-            <input type="text" id="views-user" name="views_user" value={viewsUser} placeholder="Filter by user email…" class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-700 w-48 max-w-full focus:border-clr-green focus:outline-none focus:ring-1 focus:ring-clr-green" />
+            <label for="views-user" class="block text-base text-gray-600 mb-0.5">User (email)</label>
+            <input type="text" id="views-user" name="views_user" value={viewsUser} placeholder="Filter by user email…" class="rounded border border-gray-300 bg-white px-2 py-1.5 text-base text-gray-700 w-48 max-w-full focus:border-clr-green focus:outline-none focus:ring-1 focus:ring-clr-green" />
           </div>
           <div>
-            <label for="views-period" class="block text-sm text-gray-600 mb-0.5">Time period</label>
-            <select id="views-period" name="views_period" class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-700 focus:border-clr-green focus:outline-none focus:ring-1 focus:ring-clr-green" aria-label="Filter by time period">
+            <label for="views-period" class="block text-base text-gray-600 mb-0.5">Time period</label>
+            <select id="views-period" name="views_period" class="rounded border border-gray-300 bg-white px-2 py-1.5 text-base text-gray-700 focus:border-clr-green focus:outline-none focus:ring-1 focus:ring-clr-green" aria-label="Filter by time period">
               <option value="all" selected={viewsPeriod === null}>All time</option>
               {VIEWS_PERIOD_OPTIONS.map((d) => (
                 <option value={d} selected={viewsPeriod === d}>Last {d} days</option>
               ))}
             </select>
           </div>
-          <button type="submit" class="rounded bg-clr-green text-white px-3 py-1.5 text-sm font-medium hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-clr-green focus:ring-offset-1">Apply</button>
+          <button type="submit" class="rounded bg-clr-green text-white px-3 py-1.5 text-base font-medium hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-clr-green focus:ring-offset-1">Apply</button>
           {(viewsUser || viewsPeriod !== null) && (
-            <a href={url.pathname + (viewsLimit !== DEFAULT_VIEWS_PAGE_SIZE ? '?views_limit=' + viewsLimit : '')} class="text-sm text-gray-600 hover:underline">Clear filters</a>
+            <a href={url.pathname + (viewsLimit !== DEFAULT_VIEWS_PAGE_SIZE ? '?views_limit=' + viewsLimit : '')} class="text-base text-gray-600 hover:underline">Clear filters</a>
           )}
         </form>
         <div class="flex flex-wrap items-center gap-2 mb-4">
-          <label for="views-per-page" class="text-sm text-gray-600">Per page:</label>
-          <select id="views-per-page" class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-700 focus:border-clr-green focus:outline-none focus:ring-1 focus:ring-clr-green" aria-label="Page views per page">
+          <label for="views-per-page" class="text-base text-gray-600">Per page:</label>
+          <select id="views-per-page" class="rounded border border-gray-300 bg-white px-2 py-1.5 text-base text-gray-700 focus:border-clr-green focus:outline-none focus:ring-1 focus:ring-clr-green" aria-label="Page views per page">
             {VIEWS_PAGE_SIZES.map((size) => (
               <option value={size} selected={viewsLimit === size}>{size}</option>
             ))}
@@ -170,11 +180,11 @@ const chartDataJson = JSON.stringify(chartData).replace(/<\/script/gi, '<\\/scri
         </div>
         <div class="bg-white rounded-2xl shadow-sm border border-gray-100 portal-theme-card overflow-hidden">
           {adminEvents.length === 0 ? (
-            <p class="p-6 text-gray-500">No page view records yet.</p>
+            <p class="p-6 text-base text-gray-500">No page view records yet.</p>
           ) : (
             <>
               <div class="overflow-x-auto">
-                <table class="w-full text-sm">
+                <table class="w-full text-base">
                   <thead class="bg-gray-50 border-b border-gray-200 portal-theme-header">
                     <tr>
                       <th class="text-left py-2 px-3 font-medium text-gray-700">User / session</th>
@@ -185,19 +195,19 @@ const chartDataJson = JSON.stringify(chartData).replace(/<\/script/gi, '<\\/scri
                   <tbody>
                     {adminEvents.map((row) => (
                       <tr class="border-b border-gray-100 hover:bg-gray-50/50 portal-theme-text">
-                        <td class="py-2 px-3 text-gray-700">{row.user_id ?? '(anonymous)'}</td>
-                        <td class="py-2 px-3 font-mono text-gray-600 max-w-xs truncate" title={row.path}>{row.path}</td>
-                        <td class="py-2 px-3 text-gray-600 whitespace-nowrap">{formatDate(row.created_at)}</td>
+                        <td class="py-2 px-3 text-base text-gray-700">{row.user_id ?? '(anonymous)'}</td>
+                        <td class="py-2 px-3 font-mono text-base text-gray-600 max-w-xs truncate" title={row.path}>{row.path}</td>
+                        <td class="py-2 px-3 text-base text-gray-600 whitespace-nowrap">{formatDate(row.created_at)}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-              <nav class="flex items-center justify-between gap-2 py-2 px-3 border-t border-gray-200 bg-gray-50 text-sm" aria-label="Page views pagination">
-                <span class="text-gray-600">Page {viewsPage} of {Math.max(1, Math.ceil(adminViewsTotal / viewsLimit))}{adminViewsTotal > 0 ? ` (${adminViewsTotal} total)` : ''}</span>
+              <nav class="flex items-center justify-between gap-2 py-2 px-3 border-t border-gray-200 bg-gray-50 text-base" aria-label="Page views pagination">
+                <span class="text-base text-gray-600">Page {viewsPage} of {Math.max(1, Math.ceil(adminViewsTotal / viewsLimit))}{adminViewsTotal > 0 ? ` (${adminViewsTotal} total)` : ''}</span>
                 <div class="flex gap-2">
-                  {viewsPage > 1 && <a href={viewsPageUrl('views_page', viewsPage - 1)} class="text-clr-green hover:underline font-medium">Previous</a>}
-                  {(viewsPage * viewsLimit) < adminViewsTotal && <a href={viewsPageUrl('views_page', viewsPage + 1)} class="text-clr-green hover:underline font-medium">Next</a>}
+                  {viewsPage > 1 && <a href={viewsPageUrl('views_page', viewsPage - 1)} class="text-base text-clr-green hover:underline font-medium">Previous</a>}
+                  {(viewsPage * viewsLimit) < adminViewsTotal && <a href={viewsPageUrl('views_page', viewsPage + 1)} class="text-base text-clr-green hover:underline font-medium">Next</a>}
                 </div>
               </nav>
             </>
@@ -207,7 +217,7 @@ const chartDataJson = JSON.stringify(chartData).replace(/<\/script/gi, '<\\/scri
           <strong>Data retention:</strong> Page view rows are stored indefinitely. For privacy and storage, consider keeping only recent granular data (e.g. 90 days) and deleting or aggregating older rows via a scheduled job.
         </p>
       </section>
-    </main>
+    </div>
 
     <script is:inline type="application/json" id="usage-chart-data" set:html={chartDataJson} />
     <script>
@@ -224,6 +234,5 @@ const chartDataJson = JSON.stringify(chartData).replace(/<\/script/gi, '<\\/scri
         window.location.href = u.pathname + u.search;
       });
     </script>
-  </div>
-  </ProtectedPage>
+  </PortalPage>
 </PortalLayout>
