@@ -1,0 +1,234 @@
+---
+/**
+ * POST /api/arb-begin-review — Begin ARC review (SUBMITTED → ARC_REVIEW).
+ *
+ * Only ARC members can begin review. This starts the voting process.
+ *
+ * Body: {
+ *   requestId: string,
+ *   csrfToken: string
+ * }
+ *
+ * Returns: {
+ *   success: boolean,
+ *   requestId: string,
+ *   status: string,
+ *   stage: string
+ * }
+ */
+export const prerender = false;
+
+import {
+  getSessionFromCookie,
+  verifyCsrfToken,
+  verifyOrigin,
+  getEffectiveRole,
+} from '../../lib/auth';
+import { createLogger } from '../../lib/logging';
+import { getSecurityMonitor } from '../../lib/monitoring';
+import { getArbRequest } from '../../lib/arb-db';
+import { transitionStatus, setDeadline } from '../../lib/arb-voting-db';
+import { canTransitionStatus } from '../../lib/arb-status-machine';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+
+// Auth check
+const session = await getSessionFromCookie(
+  Astro.request.headers.get('cookie') ?? undefined,
+  env?.SESSION_SECRET
+);
+
+if (!session) {
+  return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+    status: 401,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+// Check if user has ARC role
+const effectiveRole = getEffectiveRole(session);
+const hasArcRole = effectiveRole === 'arb' || effectiveRole === 'arb_board';
+
+if (!hasArcRole) {
+  return new Response(
+    JSON.stringify({
+      error: 'Forbidden. Only ARC members can begin review.',
+    }),
+    { status: 403, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+
+// CSRF protection
+const origin = Astro.request.headers.get('origin');
+const referer = Astro.request.headers.get('referer');
+const expectedOrigin = Astro.url.origin;
+if (!verifyOrigin(origin, referer, expectedOrigin)) {
+  return new Response(
+    JSON.stringify({ error: 'Invalid origin. Request blocked for security.' }),
+    { status: 403, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+
+// Only POST allowed
+if (Astro.request.method !== 'POST') {
+  return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+    status: 405,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+// Check D1 availability
+const db = env?.DB;
+if (!db) {
+  return new Response(JSON.stringify({ error: 'Server configuration error' }), {
+    status: 503,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const logger = createLogger({ endpoint: '/api/arb-begin-review' });
+const securityMonitor = getSecurityMonitor();
+const ipAddress =
+  Astro.request.headers.get('cf-connecting-ip') ??
+  Astro.request.headers.get('x-forwarded-for') ??
+  'unknown';
+
+// Parse request body
+let body: {
+  requestId?: string;
+  csrfToken?: string;
+};
+try {
+  body = await Astro.request.json();
+} catch {
+  return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
+    status: 400,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+// CSRF token verification
+if (!verifyCsrfToken(session, body.csrfToken)) {
+  return new Response(
+    JSON.stringify({
+      error: 'Invalid security token. Please refresh the page and try again.',
+    }),
+    { status: 403, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+
+// Validate inputs
+const requestId = (body.requestId ?? '').trim();
+
+if (!requestId) {
+  return new Response(JSON.stringify({ error: 'Missing requestId.' }), {
+    status: 400,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+// Get the request
+const request = await getArbRequest(db, requestId);
+if (!request) {
+  return new Response(JSON.stringify({ error: 'Request not found.' }), {
+    status: 404,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+// Check workflow version
+if (request.workflow_version !== 2) {
+  return new Response(
+    JSON.stringify({
+      error:
+        'This request uses the legacy workflow. Please use /api/arb-resubmit instead.',
+    }),
+    { status: 400, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+
+// Check current status
+const currentStatus = request.current_stage || request.status;
+if (currentStatus !== 'SUBMITTED') {
+  return new Response(
+    JSON.stringify({
+      error: `Cannot begin review from status "${currentStatus}". Request must be in SUBMITTED status.`,
+    }),
+    { status: 400, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+
+// Verify transition is allowed
+const transitionCheck = canTransitionStatus('SUBMITTED', 'ARC_REVIEW', 2);
+if (!transitionCheck.allowed) {
+  return new Response(
+    JSON.stringify({
+      error: `Transition not allowed: ${transitionCheck.reason}`,
+    }),
+    { status: 400, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+
+// Transition to ARC_REVIEW
+try {
+  const updated = await transitionStatus(
+    db,
+    requestId,
+    'ARC_REVIEW',
+    'ARC_REVIEW',
+    session.email,
+    `ARC review started by ${session.email}`,
+    ipAddress
+  );
+
+  if (!updated) {
+    return new Response(
+      JSON.stringify({ error: 'Failed to update request status.' }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+
+  // Set submitted_at timestamp if not already set (starts the 30-day deadline clock)
+  const now = new Date().toISOString();
+  if (!request.submitted_at) {
+    await db
+      .prepare(
+        `UPDATE arb_requests
+         SET submitted_at = ?
+         WHERE id = ?`
+      )
+      .bind(now, requestId)
+      .run();
+
+    // Set deadline (submitted_at + 30 days)
+    await setDeadline(db, requestId, now);
+  }
+
+  logger.info('ARC review started', {
+    requestId,
+    startedBy: session.email,
+  });
+
+  return new Response(
+    JSON.stringify({
+      success: true,
+      requestId,
+      status: 'ARC_REVIEW',
+      stage: 'ARC_REVIEW',
+      message: 'ARC review started. ARC members can now vote.',
+    }),
+    { status: 200, headers: { 'Content-Type': 'application/json' } }
+  );
+} catch (error) {
+  logger.error('Failed to begin ARC review', {
+    error,
+    requestId,
+    startedBy: session.email,
+  });
+  return new Response(
+    JSON.stringify({ error: 'Failed to begin review. Please try again.' }),
+    { status: 500, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+---

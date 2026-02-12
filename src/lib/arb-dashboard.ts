@@ -87,8 +87,11 @@ export interface ArbDashboardData {
   draftCount: number;
   arbInReviewCount: number;
   vendorPendingCount: number;
-  inReview: ArbRequest[];
-  pending: ArbRequest[];
+  inReview: ArbRequest[]; // v1: in_review
+  pending: ArbRequest[]; // v1: pending
+  arcReview: ArbRequest[]; // v2: ARC_REVIEW
+  boardReview: ArbRequest[]; // v2: BOARD_REVIEW
+  returned: ArbRequest[]; // v2: ARC_RETURNED or BOARD_RETURNED
   completedWithPeriod: ArbRequestWithPeriod[];
   completedPage: number;
   completedPaginated: ArbRequestWithPeriod[];
@@ -109,15 +112,42 @@ export async function getArbDashboardData(
 
   const ownerRequests = await listArbRequestsByHousehold(db, sessionEmail);
   const draftCount = ownerRequests.filter((r) => r.status === 'pending').length;
-  const arbInReviewCount = allRequests.filter((r) => r.status === 'in_review').length;
+
+  // Count both v1 (in_review) and v2 (ARC_REVIEW + BOARD_REVIEW) requests for badge
+  const v1InReview = allRequests.filter((r) => r.status === 'in_review' && r.workflow_version !== 2);
+  const v2InReview = allRequests.filter((r) =>
+    r.workflow_version === 2 &&
+    (r.current_stage === 'ARC_REVIEW' || r.current_stage === 'BOARD_REVIEW')
+  );
+  const arbInReviewCount = v1InReview.length + v2InReview.length;
+
   const vendorPendingCount = (await listPendingSubmissions(db)).length;
 
-  const inReview = allRequests.filter((r) => r.status === 'in_review');
-  const pending = allRequests.filter((r) => r.status === 'pending');
-  const completed = allRequests.filter((r) => r.status === 'approved' || r.status === 'rejected');
+  // v1 legacy workflow
+  const inReview = allRequests.filter((r) => r.status === 'in_review' && r.workflow_version !== 2);
+  const pending = allRequests.filter((r) => r.status === 'pending' && r.workflow_version !== 2);
+
+  // v2 multi-stage voting workflow
+  const arcReview = allRequests.filter((r) => r.workflow_version === 2 && r.current_stage === 'ARC_REVIEW');
+  const boardReview = allRequests.filter((r) => r.workflow_version === 2 && r.current_stage === 'BOARD_REVIEW');
+  const returned = allRequests.filter((r) =>
+    r.workflow_version === 2 &&
+    (r.current_stage === 'ARC_RETURNED' || r.current_stage === 'BOARD_RETURNED')
+  );
+
+  // Completed: v1 (approved/rejected) + v2 (terminal statuses)
+  const completed = allRequests.filter((r) => {
+    if (r.workflow_version === 2) {
+      return r.current_stage === 'BOARD_APPROVED' ||
+             r.current_stage === 'BOARD_DENIED' ||
+             r.current_stage === 'ARC_DENIED';
+    }
+    return r.status === 'approved' || r.status === 'rejected';
+  });
+
   const completedWithPeriod = completed.map((r) => ({
     ...r,
-    yearQuarter: getYearQuarter(r.esign_timestamp ?? r.created),
+    yearQuarter: getYearQuarter(r.esign_timestamp ?? r.resolved_at ?? r.created),
   }));
 
   const completedPage = Math.max(1, parseInt(pageParam, 10) || 1);
@@ -144,6 +174,9 @@ export async function getArbDashboardData(
     vendorPendingCount,
     inReview,
     pending,
+    arcReview,
+    boardReview,
+    returned,
     completedWithPeriod,
     completedPage,
     completedPaginated,
