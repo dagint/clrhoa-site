@@ -1,10 +1,9 @@
 ---
 export const prerender = false;
 
-import BoardLayout from '../../layouts/BoardLayout.astro';
 import { getBoardContext } from '../../lib/board-context';
+import { getPortalBadgeCounts } from '../../lib/portal-badge-counts';
 import { listOwners, listDirectoryLogs } from '../../lib/directory-db';
-import { listArbAuditLog, listArbRequestsByHousehold } from '../../lib/arb-db';
 import { listAssessmentPaymentsForAudit } from '../../lib/assessments-db';
 import { listSubmissions } from '../../lib/vendor-submissions-db';
 import { listMemberDocuments } from '../../lib/member-documents-db';
@@ -15,7 +14,11 @@ import { listAllMeetings } from '../../lib/meetings-db';
 import { listVendorAuditLog } from '../../lib/vendors-db';
 import { listPimElevationLog } from '../../lib/pim-db';
 import { listAdminAssumedRoleAudit } from '../../lib/admin-assumed-role-db';
+import { listArbAuditLog } from '../../lib/arb-db';
+import PortalLayout from '../../layouts/PortalLayout.astro';
+import PortalPage from '../../components/PortalPage.astro';
 
+import BoardNav from '../../components/BoardNav.astro';
 const ctx = await getBoardContext(Astro);
 if ('redirect' in ctx) return Astro.redirect(ctx.redirect);
 const { env, session, effectiveRole } = ctx;
@@ -50,13 +53,14 @@ function auditPageUrl(key: string, value: number): string {
 }
 
 const db = env?.DB;
+const { email, role, name } = session;
+const badges = await getPortalBadgeCounts(db, email, role, name);
 const directoryLogs = db ? await listDirectoryLogs(db, pageSize, (directoryPage - 1) * pageSize) : [];
 const arbLogs = db ? await listArbAuditLog(db, pageSize, (arbPage - 1) * pageSize) : [];
 const owners = db ? await listOwners(db) : [];
 const ownersWithCreator = owners.filter((o) => o.created_by_email?.trim());
 const ownersWithUpdater = owners.filter((o) => o.updated_by?.trim()).sort((a, b) => (b.updated_at ?? '').localeCompare(a.updated_at ?? ''));
-const allRequests = db ? await listArbRequestsByHousehold(db, session.email) : [];
-const draftCount = allRequests.filter((r) => r.status === 'pending').length;
+
 
 const paymentAudit = db ? await listAssessmentPaymentsForAudit(db, pageSize, (paymentsPage - 1) * pageSize) : [];
 const vendorApproved = db ? await listSubmissions(db, { status: 'approved' }) : [];
@@ -98,8 +102,25 @@ function formatDate(s: string | null): string {
 }
 ---
 
-<BoardLayout title="Audit logs" subtitle="Transparency for elevated access (Board, ARB, Admin)" draftCount={draftCount} role={effectiveRole} session={session} elevatedUntil={session.elevated_until} mainWide showRoleBanner={false}>
-  <p class="text-gray-600 mb-4">
+<PortalLayout title="Audit logs | Board | Member Portal | Crooked Lake Reserve HOA">
+  <PortalPage
+    currentPath="/board/audit-logs"
+    pageTitle="Audit logs"
+    userName={badges.displayName ?? undefined}
+    userEmail={email}
+    effectiveRole={effectiveRole}
+    draftCount={badges.draftCount}
+    role={effectiveRole}
+    staffRole={role ?? ''}
+    arbInReviewCount={badges.arbInReviewCount}
+    vendorPendingCount={badges.vendorPendingCount}
+    maintenanceOpenCount={badges.maintenanceOpenCount}
+    meetingsRsvpCount={badges.meetingsRsvpCount}
+  >
+    <BoardNav currentPath="/board/audit-logs" />
+
+unt}
+<p class="text-gray-600 mb-4">
         Full audit logs for transparency: PIM elevated access requests, directory (contact reveals, who added/updated owners), assessment payments recorded, vendor list changes and vendor submission approvals/rejections, member document uploads, special assessments, preapproval library, feedback docs, meetings, and ARB status changes. <strong>Revealed contact information (phone numbers and emails that were viewed) is redacted for privacy, but the identity of who performed each action is shown for accountability.</strong>
   </p>
   <div class="flex flex-wrap items-center gap-2 mb-8">
@@ -130,8 +151,8 @@ function formatDate(s: string | null): string {
   <!-- Admin assume role: when admins assumed Board/ARB or cleared (Board and Admin only) -->
   {showAdminAssumeRoleAudit && adminAssumedRoleLog.length > 0 && (
   <section aria-labelledby="admin-assume-heading">
-    <h2 id="admin-assume-heading" class="text-lg font-heading font-semibold text-clr-green mb-3">Admin assume role (technical assistance)</h2>
-    <p class="text-sm text-gray-600 mb-3">When an administrator assumed Board or ARB role to provide technical assistance, and actions they performed while assumed. One role at a time; all actions are logged.</p>
+    <h2 id="admin-assume-heading" class="text-2xl font-heading font-semibold text-clr-green mb-3">Admin assume role (technical assistance)</h2>
+    <p class="text-base text-gray-600 mb-3">When an administrator assumed Board or ARB role to provide technical assistance, and actions they performed while assumed. One role at a time; all actions are logged.</p>
     <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
       <div class="overflow-x-auto">
         <table class="w-full text-sm">
@@ -174,8 +195,8 @@ function formatDate(s: string | null): string {
 
   <!-- PIM: elevated access requests (who elevated when, who dropped) -->
   <section aria-labelledby="pim-elevation-heading">
-    <h2 id="pim-elevation-heading" class="text-lg font-heading font-semibold text-clr-green mb-3">PIM: elevated access requests</h2>
-    <p class="text-sm text-gray-600 mb-3">When someone with an elevated role (Board, ARB, Admin) requested temporary elevated access or dropped it. All CRUD operations while elevated are covered by the other audit sections below.</p>
+    <h2 id="pim-elevation-heading" class="text-2xl font-heading font-semibold text-clr-green mb-3">PIM: elevated access requests</h2>
+    <p class="text-base text-gray-600 mb-3">When someone with an elevated role (Board, ARB, Admin) requested temporary elevated access or dropped it. All CRUD operations while elevated are covered by the other audit sections below.</p>
     <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
       {pimElevationLog.length === 0 ? (
         <p class="p-4 text-gray-500">No PIM elevation entries yet.</p>
@@ -219,8 +240,8 @@ function formatDate(s: string | null): string {
 
   <!-- Directory: contact reveal log -->
       <section aria-labelledby="dir-reveal-heading">
-        <h2 id="dir-reveal-heading" class="text-lg font-heading font-semibold text-clr-green mb-3">Contact reveal log (directory)</h2>
-        <p class="text-sm text-gray-600 mb-3">Who viewed whose phone or email. Board, ARB, and Admin access is recorded here even when the member has opted out of sharing with other members. Target &quot;(full directory export)&quot; means the viewer downloaded the full member list (names, emails, phones) as CSV; one log entry per export.</p>
+        <h2 id="dir-reveal-heading" class="text-2xl font-heading font-semibold text-clr-green mb-3">Contact reveal log (directory)</h2>
+        <p class="text-base text-gray-600 mb-3">Who viewed whose phone or email. Board, ARB, and Admin access is recorded here even when the member has opted out of sharing with other members. Target &quot;(full directory export)&quot; means the viewer downloaded the full member list (names, emails, phones) as CSV; one log entry per export.</p>
         <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
           {directoryLogs.length === 0 ? (
             <p class="p-4 text-gray-500">No directory reveal entries yet.</p>
@@ -268,8 +289,8 @@ function formatDate(s: string | null): string {
 
       <!-- Who added which owner -->
       <section aria-labelledby="dir-added-heading">
-        <h2 id="dir-added-heading" class="text-lg font-heading font-semibold text-clr-green mb-3">Directory: who added which owner</h2>
-        <p class="text-sm text-gray-600 mb-3">Owners added via the board directory (with recorded creator).</p>
+        <h2 id="dir-added-heading" class="text-2xl font-heading font-semibold text-clr-green mb-3">Directory: who added which owner</h2>
+        <p class="text-base text-gray-600 mb-3">Owners added via the board directory (with recorded creator).</p>
         <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
           {ownersWithCreator.length === 0 ? (
             <p class="p-4 text-gray-500">No directory add records (created_by_email) yet.</p>
@@ -298,8 +319,8 @@ function formatDate(s: string | null): string {
 
       <!-- Who updated which owner -->
       <section aria-labelledby="dir-updated-heading">
-        <h2 id="dir-updated-heading" class="text-lg font-heading font-semibold text-clr-green mb-3">Directory: who updated which owner</h2>
-        <p class="text-sm text-gray-600 mb-3">Last update by board (edit or CSV upload). Run the owners-updated-by migration to populate.</p>
+        <h2 id="dir-updated-heading" class="text-2xl font-heading font-semibold text-clr-green mb-3">Directory: who updated which owner</h2>
+        <p class="text-base text-gray-600 mb-3">Last update by board (edit or CSV upload). Run the owners-updated-by migration to populate.</p>
         <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
           {ownersWithUpdater.length === 0 ? (
             <p class="p-4 text-gray-500">No directory update records (updated_by) yet.</p>
@@ -330,8 +351,8 @@ function formatDate(s: string | null): string {
 
       <!-- Assessment payments recorded -->
       <section aria-labelledby="payments-audit-heading">
-        <h2 id="payments-audit-heading" class="text-lg font-heading font-semibold text-clr-green mb-3">Assessment payments recorded</h2>
-        <p class="text-sm text-gray-600 mb-3">Who recorded which payment (dues and special assessments). Only payments with a recorded-by value appear.</p>
+        <h2 id="payments-audit-heading" class="text-2xl font-heading font-semibold text-clr-green mb-3">Assessment payments recorded</h2>
+        <p class="text-base text-gray-600 mb-3">Who recorded which payment (dues and special assessments). Only payments with a recorded-by value appear.</p>
         <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
           {paymentAudit.length === 0 ? (
             <p class="p-4 text-gray-500">No payment records with recorded-by yet.</p>
@@ -379,8 +400,8 @@ function formatDate(s: string | null): string {
 
       <!-- Vendor list: changes (create, update, delete) -->
       <section aria-labelledby="vendor-changes-heading">
-        <h2 id="vendor-changes-heading" class="text-lg font-heading font-semibold text-clr-green mb-3">Vendor list: changes</h2>
-        <p class="text-sm text-gray-600 mb-3">Who created, updated, or deleted vendors (including vendors approved from member suggestions). Run the vendor-audit migration to enable.</p>
+        <h2 id="vendor-changes-heading" class="text-2xl font-heading font-semibold text-clr-green mb-3">Vendor list: changes</h2>
+        <p class="text-base text-gray-600 mb-3">Who created, updated, or deleted vendors (including vendors approved from member suggestions). Run the vendor-audit migration to enable.</p>
         <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
           {vendorAuditLog.length === 0 ? (
             <p class="p-4 text-gray-500">No vendor change log yet.</p>
@@ -426,8 +447,8 @@ function formatDate(s: string | null): string {
 
       <!-- Vendor submissions: approved/rejected -->
       <section aria-labelledby="vendor-audit-heading">
-        <h2 id="vendor-audit-heading" class="text-lg font-heading font-semibold text-clr-green mb-3">Vendor submissions: approved or rejected</h2>
-        <p class="text-sm text-gray-600 mb-3">Who reviewed member-suggested vendors (approved or rejected) and when.</p>
+        <h2 id="vendor-audit-heading" class="text-2xl font-heading font-semibold text-clr-green mb-3">Vendor submissions: approved or rejected</h2>
+        <p class="text-base text-gray-600 mb-3">Who reviewed member-suggested vendors (approved or rejected) and when.</p>
         <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
           {vendorSubmissionsAudit.length === 0 ? (
             <p class="p-4 text-gray-500">No vendor approvals or rejections yet.</p>
@@ -462,8 +483,8 @@ function formatDate(s: string | null): string {
 
       <!-- Member documents: uploads -->
       <section aria-labelledby="member-docs-audit-heading">
-        <h2 id="member-docs-audit-heading" class="text-lg font-heading font-semibold text-clr-green mb-3">Member documents: uploads</h2>
-        <p class="text-sm text-gray-600 mb-3">Who uploaded which member-only document (minutes, budgets, other).</p>
+        <h2 id="member-docs-audit-heading" class="text-2xl font-heading font-semibold text-clr-green mb-3">Member documents: uploads</h2>
+        <p class="text-base text-gray-600 mb-3">Who uploaded which member-only document (minutes, budgets, other).</p>
         <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
           {memberDocsAudit.length === 0 ? (
             <p class="p-4 text-gray-500">No member document uploads yet.</p>
@@ -496,8 +517,8 @@ function formatDate(s: string | null): string {
 
       <!-- Special assessments: who created -->
       <section aria-labelledby="special-assessments-audit-heading">
-        <h2 id="special-assessments-audit-heading" class="text-lg font-heading font-semibold text-clr-green mb-3">Special assessments: who created</h2>
-        <p class="text-sm text-gray-600 mb-3">Who created which special assessment (owner, amount, due date).</p>
+        <h2 id="special-assessments-audit-heading" class="text-2xl font-heading font-semibold text-clr-green mb-3">Special assessments: who created</h2>
+        <p class="text-base text-gray-600 mb-3">Who created which special assessment (owner, amount, due date).</p>
         <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
           {specialAssessmentsAudit.length === 0 ? (
             <p class="p-4 text-gray-500">No special assessments yet.</p>
@@ -532,8 +553,8 @@ function formatDate(s: string | null): string {
 
       <!-- Preapproval library: who created -->
       <section aria-labelledby="preapproval-audit-heading">
-        <h2 id="preapproval-audit-heading" class="text-lg font-heading font-semibold text-clr-green mb-3">Preapproval library: who created</h2>
-        <p class="text-sm text-gray-600 mb-3">Who added which preapproval item (category, title).</p>
+        <h2 id="preapproval-audit-heading" class="text-2xl font-heading font-semibold text-clr-green mb-3">Preapproval library: who created</h2>
+        <p class="text-base text-gray-600 mb-3">Who added which preapproval item (category, title).</p>
         <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
           {preapprovalAudit.length === 0 ? (
             <p class="p-4 text-gray-500">No preapproval items yet.</p>
@@ -566,8 +587,8 @@ function formatDate(s: string | null): string {
 
       <!-- Feedback docs: who created -->
       <section aria-labelledby="feedback-docs-audit-heading">
-        <h2 id="feedback-docs-audit-heading" class="text-lg font-heading font-semibold text-clr-green mb-3">Feedback docs: who created</h2>
-        <p class="text-sm text-gray-600 mb-3">Who created which feedback/ballot document (title, deadline).</p>
+        <h2 id="feedback-docs-audit-heading" class="text-2xl font-heading font-semibold text-clr-green mb-3">Feedback docs: who created</h2>
+        <p class="text-base text-gray-600 mb-3">Who created which feedback/ballot document (title, deadline).</p>
         <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
           {feedbackDocsAudit.length === 0 ? (
             <p class="p-4 text-gray-500">No feedback docs yet.</p>
@@ -600,8 +621,8 @@ function formatDate(s: string | null): string {
 
       <!-- Meetings: who created -->
       <section aria-labelledby="meetings-audit-heading">
-        <h2 id="meetings-audit-heading" class="text-lg font-heading font-semibold text-clr-green mb-3">Meetings: who created</h2>
-        <p class="text-sm text-gray-600 mb-3">Who created which meeting (title, date).</p>
+        <h2 id="meetings-audit-heading" class="text-2xl font-heading font-semibold text-clr-green mb-3">Meetings: who created</h2>
+        <p class="text-base text-gray-600 mb-3">Who created which meeting (title, date).</p>
         <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
           {meetingsAudit.length === 0 ? (
             <p class="p-4 text-gray-500">No meetings yet.</p>
@@ -634,8 +655,8 @@ function formatDate(s: string | null): string {
 
       <!-- ARB audit log -->
       <section aria-labelledby="arb-audit-heading">
-        <h2 id="arb-audit-heading" class="text-lg font-heading font-semibold text-clr-green mb-3">ARB audit log</h2>
-        <p class="text-sm text-gray-600 mb-3">Status changes: who approved, sent back for requestor updates, etc.</p>
+        <h2 id="arb-audit-heading" class="text-2xl font-heading font-semibold text-clr-green mb-3">ARB audit log</h2>
+        <p class="text-base text-gray-600 mb-3">Status changes: who approved, sent back for requestor updates, etc.</p>
         <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
           {arbLogs.length === 0 ? (
             <p class="p-4 text-gray-500">No ARB audit entries yet.</p>
@@ -680,4 +701,5 @@ function formatDate(s: string | null): string {
           )}
         </div>
       </section>
-</BoardLayout>
+  </PortalPage>
+</PortalLayout>

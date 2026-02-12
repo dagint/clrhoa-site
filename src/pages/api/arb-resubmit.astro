@@ -8,7 +8,9 @@ export const prerender = false;
 import { getSessionFromCookie, verifyCsrfToken, verifyOrigin } from '../../lib/auth';
 import { checkRateLimit, getRateLimitConfig } from '../../lib/rate-limit';
 import { getSecurityMonitor } from '../../lib/monitoring';
-import { setArbRequestInReview } from '../../lib/arb-db';
+import { getArbRequest, setArbRequestInReview } from '../../lib/arb-db';
+import { incrementCycle, transitionStatus, setDeadline } from '../../lib/arb-voting-db';
+import { canTransitionStatus } from '../../lib/arb-status-machine';
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
@@ -84,22 +86,114 @@ if (!requestId) {
 }
 
 const clientIp = Astro.clientAddress || Astro.request.headers.get('cf-connecting-ip') || null;
-const updated = await setArbRequestInReview(db, requestId, session.email, clientIp);
 
-if (!updated) {
+// Get request to check workflow version
+const request = await getArbRequest(db, requestId);
+if (!request) {
   return new Response(
-    JSON.stringify({
-      error: 'Request not found, not yours, or not in a state that can be submitted for review (must be pending).',
-    }),
+    JSON.stringify({ error: 'Request not found.' }),
     { status: 404, headers: { 'Content-Type': 'application/json' } }
   );
 }
+
+// Check ownership
+if (request.owner_email.toLowerCase() !== session.email.toLowerCase()) {
+  return new Response(
+    JSON.stringify({ error: 'You do not own this request.' }),
+    { status: 403, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+
+// Handle v1 (legacy) workflow
+if (request.workflow_version !== 2) {
+  const updated = await setArbRequestInReview(db, requestId, session.email, clientIp);
+  if (!updated) {
+    return new Response(
+      JSON.stringify({
+        error: 'Request not in a state that can be submitted for review (must be pending).',
+      }),
+      { status: 400, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+  return new Response(
+    JSON.stringify({
+      success: true,
+      requestId,
+      message: 'Request submitted for ARB review. You can no longer edit it until the ARB returns it for revision.',
+    }),
+    { status: 200, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+
+// Handle v2 (multi-stage voting) workflow
+const currentStage = request.current_stage || '';
+
+// Check if request can be resubmitted (must be in ARC_RETURNED or BOARD_RETURNED)
+const canResubmit = currentStage === 'ARC_RETURNED' || currentStage === 'BOARD_RETURNED' || currentStage === 'DRAFT';
+if (!canResubmit) {
+  return new Response(
+    JSON.stringify({
+      error: `Cannot resubmit from status "${currentStage}". Request must be in DRAFT, ARC_RETURNED, or BOARD_RETURNED status.`,
+    }),
+    { status: 400, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+
+// Verify transition is allowed
+const transitionCheck = canTransitionStatus(currentStage, 'SUBMITTED', 2);
+if (!transitionCheck.allowed) {
+  return new Response(
+    JSON.stringify({
+      error: `Transition not allowed: ${transitionCheck.reason}`,
+    }),
+    { status: 400, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+
+// If resubmitting after BOARD_RETURNED, increment cycle (new round of voting)
+if (currentStage === 'BOARD_RETURNED' || currentStage === 'ARC_RETURNED') {
+  await incrementCycle(db, requestId);
+}
+
+// Transition to SUBMITTED
+const updated = await transitionStatus(
+  db,
+  requestId,
+  'SUBMITTED',
+  'SUBMITTED',
+  session.email,
+  `Request resubmitted by owner after ${currentStage}`,
+  clientIp
+);
+
+if (!updated) {
+  return new Response(
+    JSON.stringify({ error: 'Failed to resubmit request.' }),
+    { status: 500, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+
+// Set submitted_at timestamp (starts/restarts the 30-day deadline clock)
+const now = new Date().toISOString();
+await db
+  .prepare(
+    `UPDATE arb_requests
+     SET submitted_at = ?
+     WHERE id = ?`
+  )
+  .bind(now, requestId)
+  .run();
+
+// Set deadline (submitted_at + 30 days)
+await setDeadline(db, requestId, now);
 
 return new Response(
   JSON.stringify({
     success: true,
     requestId,
-    message: 'Request submitted for ARB review. You can no longer edit it until the ARB returns it for revision.',
+    status: 'SUBMITTED',
+    stage: 'SUBMITTED',
+    message: 'Request submitted for ARC review. You can no longer edit it until it is returned for revision.',
   }),
   { status: 200, headers: { 'Content-Type': 'application/json' } }
 );

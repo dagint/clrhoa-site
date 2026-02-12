@@ -1,0 +1,242 @@
+---
+/**
+ * GET /api/arb-get-votes — Get vote status for a request with privacy rules.
+ *
+ * Privacy rules:
+ * - While voting is in progress: Only show vote counts, not individual votes
+ * - After stage resolved: Show all votes with voter names
+ * - Request owners: Never see individual votes, only aggregate outcomes
+ *
+ * Query params:
+ *   ?requestId=ARB-2026-0001
+ *
+ * Returns: {
+ *   success: boolean,
+ *   requestId: string,
+ *   stage: string,
+ *   cycle: number,
+ *   resolution: VoteResolutionResult,
+ *   my_vote?: { vote, comment, voted_at },
+ *   votes?: Array<{ voter_email, vote, comment, voted_at }> (only if resolved or you're a reviewer),
+ *   eligible_voters: number,
+ *   is_owner: boolean
+ * }
+ */
+export const prerender = false;
+
+import { getSessionFromCookie, getEffectiveRole } from '../../lib/auth';
+import { createLogger } from '../../lib/logging';
+import { getArbRequest } from '../../lib/arb-db';
+import {
+  getVotesForRequest,
+  getVoteByVoter,
+  resolveVotes,
+  getEligibleVoterCount,
+  checkAndApplyDeadlines,
+} from '../../lib/arb-voting-db';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+
+// Auth check
+const session = await getSessionFromCookie(
+  Astro.request.headers.get('cookie') ?? undefined,
+  env?.SESSION_SECRET
+);
+
+if (!session) {
+  return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+    status: 401,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+// Only GET allowed
+if (Astro.request.method !== 'GET') {
+  return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+    status: 405,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+// Check D1 and KV availability
+const db = env?.DB;
+const kvNamespace = env?.CLRHOA_USERS;
+if (!db || !kvNamespace) {
+  return new Response(JSON.stringify({ error: 'Server configuration error' }), {
+    status: 503,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+const kv = kvNamespace as KVNamespace;
+
+const logger = createLogger({ endpoint: '/api/arb-get-votes' });
+
+// Get request ID from query params
+const url = new URL(Astro.request.url);
+const requestId = url.searchParams.get('requestId')?.trim();
+
+if (!requestId) {
+  return new Response(JSON.stringify({ error: 'Missing requestId parameter.' }), {
+    status: 400,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+// First, check and apply any expired deadlines (lazy evaluation pattern)
+try {
+  await checkAndApplyDeadlines(db);
+} catch (e) {
+  logger.error('Failed to check deadlines', { error: e });
+  // Continue - don't fail the request if deadline check fails
+}
+
+// Get the request
+const request = await getArbRequest(db, requestId);
+if (!request) {
+  return new Response(JSON.stringify({ error: 'Request not found.' }), {
+    status: 404,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+// Check workflow version
+if (request.workflow_version !== 2) {
+  return new Response(
+    JSON.stringify({
+      error:
+        'This request uses the legacy workflow. Vote information not available.',
+    }),
+    { status: 400, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+
+// Determine current stage
+const currentStage = request.current_stage;
+if (!currentStage) {
+  return new Response(
+    JSON.stringify({
+      error: 'Request does not have a current stage set.',
+    }),
+    { status: 400, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+
+// Only return vote data for review stages
+if (currentStage !== 'ARC_REVIEW' && currentStage !== 'BOARD_REVIEW') {
+  return new Response(
+    JSON.stringify({
+      success: true,
+      requestId,
+      stage: currentStage,
+      message: 'Vote information not available for this stage.',
+    }),
+    { status: 200, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+
+const stage = currentStage as 'ARC_REVIEW' | 'BOARD_REVIEW';
+const cycle = request.current_cycle || 1;
+
+// Determine if user is the request owner
+const isOwner = request.owner_email.toLowerCase() === session.email.toLowerCase();
+
+// Determine if user is a reviewer (ARC or Board)
+const effectiveRole = getEffectiveRole(session);
+const isReviewer =
+  effectiveRole === 'arb' ||
+  effectiveRole === 'board' ||
+  effectiveRole === 'arb_board' ||
+  effectiveRole === 'admin';
+
+// Get all votes
+const votes = await getVotesForRequest(db, requestId, stage, cycle);
+
+// Get resolution
+const resolution = await resolveVotes(db, kv, requestId, stage, cycle);
+
+// Get user's own vote (if any)
+const myVote = await getVoteByVoter(db, requestId, session.email, stage, cycle);
+
+// Get eligible voter count
+const eligibleVoterCount = await getEligibleVoterCount(db, kv, requestId, stage, cycle);
+
+// Determine if individual votes should be shown
+// Show individual votes if:
+// 1. Stage is resolved (outcome is not PENDING), OR
+// 2. User is a reviewer (not owner) and they can see other votes during active voting
+const stageResolved = resolution.outcome !== 'PENDING';
+const showIndividualVotes = stageResolved || (isReviewer && !isOwner);
+
+// Build response
+const response: {
+  success: boolean;
+  requestId: string;
+  stage: string;
+  cycle: number;
+  resolution: {
+    outcome: string;
+    approveCount: number;
+    denyCount: number;
+    returnCount: number;
+    abstainCount: number;
+    totalEligible: number;
+    activeVoters: number;
+    majorityNeeded: number;
+    allVotesCast: boolean;
+  };
+  my_vote?: { vote: string; comment: string | null; voted_at: string };
+  votes?: Array<{
+    voter_email: string;
+    vote: string;
+    comment: string | null;
+    voted_at: string;
+  }>;
+  eligible_voters: number;
+  is_owner: boolean;
+  show_individual_votes: boolean;
+} = {
+  success: true,
+  requestId,
+  stage,
+  cycle,
+  resolution: {
+    outcome: resolution.outcome,
+    approveCount: resolution.approveCount,
+    denyCount: resolution.denyCount,
+    returnCount: resolution.returnCount,
+    abstainCount: resolution.abstainCount,
+    totalEligible: resolution.totalEligible,
+    activeVoters: resolution.activeVoters,
+    majorityNeeded: resolution.majorityNeeded,
+    allVotesCast: resolution.allVotesCast,
+  },
+  eligible_voters: eligibleVoterCount,
+  is_owner: isOwner,
+  show_individual_votes: showIndividualVotes,
+};
+
+// Include user's own vote if they voted
+if (myVote) {
+  response.my_vote = {
+    vote: myVote.vote,
+    comment: myVote.comment,
+    voted_at: myVote.voted_at,
+  };
+}
+
+// Include individual votes if allowed
+if (showIndividualVotes) {
+  response.votes = votes.map((v) => ({
+    voter_email: v.voter_email,
+    vote: v.vote,
+    comment: v.comment,
+    voted_at: v.voted_at,
+  }));
+}
+
+return new Response(JSON.stringify(response), {
+  status: 200,
+  headers: { 'Content-Type': 'application/json' },
+});
+---

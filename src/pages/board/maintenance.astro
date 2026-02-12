@@ -1,17 +1,24 @@
 ---
 export const prerender = false;
 
-import BoardLayout from '../../layouts/BoardLayout.astro';
 import { getBoardContext } from '../../lib/board-context';
+import { getPortalBadgeCounts } from '../../lib/portal-badge-counts';
 import { isBoardOnly } from '../../lib/auth';
 import { listAllMaintenance, parsePhotosJson } from '../../lib/maintenance-db';
-import { listArbRequestsByHousehold } from '../../lib/arb-db';
+import PortalLayout from '../../layouts/PortalLayout.astro';
+import PortalPage from '../../components/PortalPage.astro';
 
+import BoardNav from '../../components/BoardNav.astro';
 const ctx = await getBoardContext(Astro);
 if ('redirect' in ctx) return Astro.redirect(ctx.redirect);
 const { env, session, effectiveRole } = ctx;
 const isBoard = isBoardOnly(effectiveRole) || effectiveRole === 'admin';
+
 if (!isBoard) return Astro.redirect('/portal/dashboard');
+
+const db = env?.DB;
+const { email, role, name } = session;
+const badges = await getPortalBadgeCounts(db, email, role, name);
 
 const MAINTENANCE_PAGE_SIZES = [10, 25, 50, 100] as const;
 const DEFAULT_MAINTENANCE_PAGE_SIZE = 25;
@@ -39,10 +46,7 @@ function maintenancePageUrl(value: number): string {
   return u.pathname + u.search;
 }
 
-const db = env?.DB;
 const allRequests = db ? await listAllMaintenance(db, statusFilter, pageSize, (page - 1) * pageSize) : [];
-const allArbRequests = db ? await listArbRequestsByHousehold(db, session.email) : [];
-const draftCount = allArbRequests.filter((r) => r.status === 'pending').length;
 
 function formatDate(s: string): string {
   try {
@@ -57,30 +61,47 @@ function categoryLabel(cat: string): string {
 }
 ---
 
-<BoardLayout title="Maintenance" subtitle="Manage maintenance requests" draftCount={draftCount} role={effectiveRole} session={session} elevatedUntil={session.elevated_until}>
-  <h2 class="text-xl font-heading font-bold text-clr-green mb-4">Maintenance requests</h2>
+<PortalLayout title="Maintenance | Board | Member Portal | Crooked Lake Reserve HOA">
+  <PortalPage
+    currentPath="/board/maintenance"
+    pageTitle="Maintenance"
+    userName={badges.displayName ?? undefined}
+    userEmail={email}
+    effectiveRole={effectiveRole}
+    draftCount={badges.draftCount}
+    role={effectiveRole}
+    staffRole={role ?? ''}
+    arbInReviewCount={badges.arbInReviewCount}
+    vendorPendingCount={badges.vendorPendingCount}
+    maintenanceOpenCount={badges.maintenanceOpenCount}
+    meetingsRsvpCount={badges.meetingsRsvpCount}
+  >
+    <BoardNav currentPath="/board/maintenance" />
+
+unt}
+<h2 class="text-3xl font-heading font-bold text-clr-green mb-4">Maintenance requests</h2>
       <div class="flex flex-wrap gap-2 mb-6">
         <a
           href="/board/maintenance"
-          class={`px-3 py-1.5 rounded-lg text-sm font-medium ${!statusFilter ? 'bg-clr-green text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+          class={`px-5 py-2.5 rounded-lg text-sm font-medium ${!statusFilter ? 'bg-clr-green text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
         >
           All
         </a>
         <a
           href="/board/maintenance?status=reported"
-          class={`px-3 py-1.5 rounded-lg text-sm font-medium ${statusFilter === 'reported' ? 'bg-clr-green text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+          class={`px-5 py-2.5 rounded-lg text-sm font-medium ${statusFilter === 'reported' ? 'bg-clr-green text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
         >
           Reported
         </a>
         <a
           href="/board/maintenance?status=in_progress"
-          class={`px-3 py-1.5 rounded-lg text-sm font-medium ${statusFilter === 'in_progress' ? 'bg-clr-green text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+          class={`px-5 py-2.5 rounded-lg text-sm font-medium ${statusFilter === 'in_progress' ? 'bg-clr-green text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
         >
           In progress
         </a>
         <a
           href="/board/maintenance?status=completed"
-          class={`px-3 py-1.5 rounded-lg text-sm font-medium ${statusFilter === 'completed' ? 'bg-clr-green text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+          class={`px-5 py-2.5 rounded-lg text-sm font-medium ${statusFilter === 'completed' ? 'bg-clr-green text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
         >
           Completed
         </a>
@@ -141,14 +162,14 @@ function categoryLabel(cat: string): string {
                     />
                     <button
                       type="button"
-                      class="save-maint text-sm text-clr-green hover:underline"
+                      class="save-maint text-base text-clr-green hover:underline"
                       data-id={r.id}
                     >
                       Save
                     </button>
                   </div>
                 </div>
-                <p class="text-gray-600 text-sm mt-2">{r.description}</p>
+                <p class="text-gray-600 text-base mt-2">{r.description}</p>
                 {photos.length > 0 && (
                   <div class="flex flex-wrap gap-2 mt-2">
                     {photos.slice(0, 5).map((key) => (
@@ -206,4 +227,5 @@ function categoryLabel(cat: string): string {
     });
   });
 </script>
-</BoardLayout>
+  </PortalPage>
+</PortalLayout>

@@ -2,25 +2,42 @@
 export const prerender = false;
 
 import PortalLayout from '../../layouts/PortalLayout.astro';
-import ProtectedPage from '../../components/ProtectedPage.astro';
-import PortalNav from '../../components/PortalNav.astro';
+import PortalPage from '../../components/PortalPage.astro';
+import ESignatureDisplay from '../../components/ESignatureDisplay.astro';
 import { getPortalContext } from '../../lib/portal-context';
+import { getPortalBadgeCounts } from '../../lib/portal-badge-counts';
 import { listArbRequestsByHousehold, batchLoadArbFilesByRequests } from '../../lib/arb-db';
 import type { ArbFile } from '../../lib/arb-db';
+import { batchLoadElectronicSignatures } from '../../lib/esignature-db';
+import type { ElectronicSignature } from '../../lib/esignature-db';
 import { sanitizeForDisplay } from '../../lib/sanitize';
 
 const { env, session, effectiveRole } = await getPortalContext(Astro, { fingerprint: true });
 if (!session) return Astro.redirect('/portal/login');
 
+const { email, role, name } = session;
 const db = env?.DB;
-const requests = db ? await listArbRequestsByHousehold(db, session.email) : [];
-const draftCount = requests.filter(r => r.status === 'pending').length;
-const arbInReviewCount = requests.filter(r => r.status === 'in_review').length;
+const badges = await getPortalBadgeCounts(db, email, role, name);
+const requests = db ? await listArbRequestsByHousehold(db, email) : [];
 
 // Batch load all files for all requests in a single query (avoids N+1 problem)
 const filesByRequestId: Record<string, ArbFile[]> = db
   ? await batchLoadArbFilesByRequests(db, requests.map(r => r.id))
   : {};
+
+// Batch load electronic signatures (avoids N+1 problem)
+const signatureIds = requests.map(r => r.signature_id).filter(Boolean) as string[];
+const signaturesById = db && signatureIds.length > 0
+  ? await batchLoadElectronicSignatures(db, signatureIds)
+  : {};
+
+// Map signatures to request IDs
+const signaturesByRequestId: Record<string, ElectronicSignature | null> = {};
+for (const req of requests) {
+  if (req.signature_id && signaturesById[req.signature_id]) {
+    signaturesByRequestId[req.id] = signaturesById[req.signature_id];
+  }
+}
 
 function getFileViewUrl(r2KeysJson: string): string | null {
   try {
@@ -66,23 +83,34 @@ function formatApproval(arbEsign: string | null, esignTimestamp: string | null):
 ---
 
 <PortalLayout title="My ARB Requests | Member Portal | Crooked Lake Reserve HOA">
-  <ProtectedPage>
-  <div class="min-h-screen portal-theme-bg font-body">
-    <PortalNav currentPath="/portal/my-requests" draftCount={draftCount} arbInReviewCount={arbInReviewCount} role={effectiveRole} staffRole={session?.role ?? ''} />
-
-    <main class="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+  <PortalPage
+    currentPath="/portal/my-requests"
+    pageTitle="My ARB Requests"
+    userName={badges.displayName ?? undefined}
+    userEmail={email}
+    effectiveRole={effectiveRole}
+    draftCount={badges.draftCount}
+    role={effectiveRole}
+    staffRole={role ?? ''}
+    arbInReviewCount={badges.arbInReviewCount}
+    vendorPendingCount={badges.vendorPendingCount}
+    maintenanceOpenCount={badges.maintenanceOpenCount}
+    meetingsRsvpCount={badges.meetingsRsvpCount}
+    feedbackDueCount={badges.feedbackDueCount}
+  >
+    <div class="max-w-5xl mx-auto">
       <div class="flex flex-wrap items-center justify-between gap-4 mb-6 no-print">
-        <h2 class="text-2xl font-heading font-bold text-clr-green">My ARB requests</h2>
+        <h1 class="text-3xl font-heading font-bold text-clr-green">My ARB Requests</h1>
         {requests.filter(r => r.status === 'pending').length > 0 && (
-          <div class="flex flex-wrap items-center gap-2">
-            <label class="inline-flex items-center gap-2 text-sm">
-              <input type="checkbox" id="select-all-pending" class="rounded border-gray-300 text-clr-green focus:ring-clr-green" />
+          <div class="flex flex-wrap items-center gap-3">
+            <label class="inline-flex items-center gap-2 text-base">
+              <input type="checkbox" id="select-all-pending" class="w-5 h-5 rounded border-gray-300 text-clr-green focus:ring-clr-green" />
               <span>Select all pending</span>
             </label>
             <button
               type="button"
               id="bulk-cancel-btn"
-              class="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+              class="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-base font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               disabled
             >
               Cancel selected
@@ -91,17 +119,20 @@ function formatApproval(arbEsign: string | null, esignTimestamp: string | null):
         )}
       </div>
 
-      <p class="text-gray-600 mb-6 no-print">
-        <a href="/portal/arb-request" class="text-clr-green font-semibold hover:underline">Submit a new ARB request</a>
-        <span class="text-gray-500"> | </span>
-        <a href="/arb-request-how-to" class="text-clr-orange hover:underline">How to submit (guide)</a>
+      <p class="text-gray-600 text-lg mb-8 no-print">
+        <a href="/portal/arb-request" class="text-clr-orange font-semibold hover:underline">Submit a new ARB request</a>
+        <span class="text-gray-400"> | </span>
+        <a href="/arb-request-how-to" class="text-clr-green hover:underline">How to submit (guide)</a>
       </p>
 
       {requests.length === 0 ? (
-        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center">
-          <p class="text-gray-600 mb-4">You haven’t submitted any ARB requests yet.</p>
-          <p class="text-sm text-gray-500 mb-4">When you’re planning exterior changes (paint, landscaping, fencing, etc.), submit a request so the board can review it.</p>
-          <a href="/portal/arb-request" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-clr-green hover:brightness-110 text-white font-semibold text-sm">Submit your first ARB request</a>
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-12 text-center">
+          <svg class="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          <p class="text-gray-600 text-lg mb-3">You haven't submitted any ARB requests yet.</p>
+          <p class="text-base text-gray-500 mb-6">When you're planning exterior changes (paint, landscaping, fencing, etc.), submit a request so the board can review it.</p>
+          <a href="/portal/arb-request" class="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-clr-green hover:brightness-110 text-white font-semibold text-base transition-all">Submit your first ARB request</a>
         </div>
       ) : (
         <ul class="space-y-4" id="request-list">
@@ -110,22 +141,22 @@ function formatApproval(arbEsign: string | null, esignTimestamp: string | null):
             const approval = formatApproval(req.arb_esign ?? null, req.esign_timestamp ?? null);
             const isPending = req.status === 'pending';
             return (
-              <li class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+              <li class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
                 {isPending ? (
-                  <div class="flex items-start gap-2 p-2 no-print border-b border-gray-100">
-                    <input type="checkbox" class="request-checkbox mt-2 rounded border-gray-300 text-clr-green focus:ring-clr-green" value={req.id} data-status="pending" />
+                  <div class="flex items-start gap-3 p-3 no-print border-b border-gray-100">
+                    <input type="checkbox" class="request-checkbox mt-2 w-5 h-5 rounded border-gray-300 text-clr-green focus:ring-clr-green" value={req.id} data-status="pending" />
                     <div class="flex-1">
                       <button
                         type="button"
-                        class="request-summary w-full text-left p-4 sm:p-6 flex flex-wrap justify-between gap-2 items-start hover:bg-gray-50 transition-colors"
+                        class="request-summary w-full text-left p-5 sm:p-7 flex flex-wrap justify-between gap-3 items-start hover:bg-gray-50 transition-colors"
                         data-request-id={req.id}
                         aria-expanded="false"
                       >
                         <div class="flex-1 min-w-0">
                           <div class="flex flex-wrap justify-between gap-2 mb-2">
-                            <span class="font-mono text-sm text-gray-500">#{req.id}</span>
+                            <span class="font-mono text-base text-gray-500">#{req.id}</span>
                             <span
-                              class={`inline-flex px-2 py-1 rounded text-xs font-semibold shrink-0 ${
+                              class={`inline-flex px-3 py-1 rounded-lg text-sm font-semibold shrink-0 ${
                                 req.status === 'pending'
                                   ? 'bg-amber-100 text-amber-800'
                                   : req.status === 'in_review'
@@ -140,25 +171,25 @@ function formatApproval(arbEsign: string | null, esignTimestamp: string | null):
                               {req.status === 'in_review' ? 'In review' : req.status === 'cancelled' ? 'Cancelled' : req.status}
                             </span>
                           </div>
-                          <p class="text-gray-700 line-clamp-2" set:html={sanitizeForDisplay(req.description)}></p>
-                          <p class="text-xs text-gray-400 mt-2">Submitted: {new Date(req.created).toLocaleString()}</p>
+                          <p class="text-gray-700 text-base line-clamp-2 leading-relaxed" set:html={sanitizeForDisplay(req.description)}></p>
+                          <p class="text-sm text-gray-500 mt-2">Submitted: {new Date(req.created).toLocaleString()}</p>
                         </div>
-                        <span class="request-chevron text-gray-400 shrink-0 ml-2" aria-hidden="true">&#9660;</span>
+                        <span class="request-chevron text-gray-400 shrink-0 ml-2 text-xl" aria-hidden="true">&#9660;</span>
                       </button>
                     </div>
                   </div>
                 ) : (
                   <button
                     type="button"
-                    class="request-summary w-full text-left p-4 sm:p-6 flex flex-wrap justify-between gap-2 items-start hover:bg-gray-50 transition-colors"
+                    class="request-summary w-full text-left p-5 sm:p-7 flex flex-wrap justify-between gap-3 items-start hover:bg-gray-50 transition-colors"
                     data-request-id={req.id}
                     aria-expanded="false"
                   >
                     <div class="flex-1 min-w-0">
                       <div class="flex flex-wrap justify-between gap-2 mb-2">
-                        <span class="font-mono text-sm text-gray-500">#{req.id}</span>
+                        <span class="font-mono text-base text-gray-500">#{req.id}</span>
                         <span
-                          class={`inline-flex px-2 py-1 rounded text-xs font-semibold shrink-0 ${
+                          class={`inline-flex px-3 py-1 rounded-lg text-sm font-semibold shrink-0 ${
                             req.status === 'pending'
                               ? 'bg-amber-100 text-amber-800'
                               : req.status === 'in_review'
@@ -173,20 +204,20 @@ function formatApproval(arbEsign: string | null, esignTimestamp: string | null):
                           {req.status === 'in_review' ? 'In review' : req.status === 'cancelled' ? 'Cancelled' : req.status}
                         </span>
                       </div>
-                      <p class="text-gray-700 line-clamp-2" set:html={sanitizeForDisplay(req.description)}></p>
-                      <p class="text-xs text-gray-400 mt-2">Submitted: {new Date(req.created).toLocaleString()}</p>
+                      <p class="text-gray-700 text-base line-clamp-2 leading-relaxed" set:html={sanitizeForDisplay(req.description)}></p>
+                      <p class="text-sm text-gray-500 mt-2">Submitted: {new Date(req.created).toLocaleString()}</p>
                     </div>
-                    <span class="request-chevron text-gray-400 shrink-0 ml-2" aria-hidden="true">&#9660;</span>
+                    <span class="request-chevron text-gray-400 shrink-0 ml-2 text-xl" aria-hidden="true">&#9660;</span>
                   </button>
                 )}
-                <div class="request-details hidden border-t border-gray-100 bg-gray-50/50" data-request-id={req.id}>
-                  <div class="p-4 sm:p-6 request-details-screen">
-                    <p class="text-xs text-gray-500 mb-3 italic no-print">Read-only view. To change details or attachments, click &quot;Edit this request&quot; below.</p>
+                <div class="request-details hidden border-t border-gray-200 bg-gray-50/50" data-request-id={req.id}>
+                  <div class="p-5 sm:p-8 request-details-screen">
+                    <p class="text-sm text-gray-500 mb-4 italic no-print">Read-only view. To change details or attachments, click &quot;Edit this request&quot; below.</p>
                     {req.status === 'pending' && req.revision_notes && (
-                      <div class="mb-4 rounded-xl border-2 border-amber-200 bg-amber-50 p-4">
-                        <p class="text-sm font-semibold text-amber-900 mb-1">ARB requested revisions</p>
-                        <p class="text-sm text-amber-900 whitespace-pre-wrap">{req.revision_notes}</p>
-                        <p class="text-xs text-amber-700 mt-2 no-print">Please update your request as requested above, then submit for review again.</p>
+                      <div class="mb-6 rounded-xl border-2 border-amber-200 bg-amber-50 p-5">
+                        <p class="text-base font-semibold text-amber-900 mb-2">ARB requested revisions</p>
+                        <p class="text-base text-amber-900 whitespace-pre-wrap leading-relaxed">{req.revision_notes}</p>
+                        <p class="text-sm text-amber-700 mt-3 no-print">Please update your request as requested above, then submit for review again.</p>
                       </div>
                     )}
                     <div class="rounded-xl border border-gray-200 bg-white p-4 sm:p-6 space-y-4 text-sm read-only-form">
@@ -250,6 +281,11 @@ function formatApproval(arbEsign: string | null, esignTimestamp: string | null):
                           </p>
                         </div>
                       )}
+                      {signaturesByRequestId[req.id] && (
+                        <div class="mt-4">
+                          <ESignatureDisplay signature={signaturesByRequestId[req.id]} showDetails={true} />
+                        </div>
+                      )}
                       {files.length > 0 && (
                         <div class="print-attachments-section pt-2 border-t border-gray-200">
                           <p class="font-semibold text-gray-700 mb-2 text-sm">Attachments ({files.length})</p>
@@ -281,39 +317,39 @@ function formatApproval(arbEsign: string | null, esignTimestamp: string | null):
                       )}
                     </div>
                     {req.status === 'pending' && (
-                      <div class="no-print pt-4 space-y-3">
+                      <div class="no-print pt-6 space-y-4">
                         {req.updated_at && req.updated_at !== req.created && (
-                          <p class="text-xs text-gray-500">
+                          <p class="text-sm text-gray-500">
                             Last saved: {new Date(req.updated_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
                           </p>
                         )}
-                        <div class="flex flex-wrap gap-3 items-center">
-                          <button type="button" class="submit-for-review px-4 py-2 rounded-lg bg-clr-green hover:brightness-110 text-white text-sm font-semibold" data-request-id={req.id}>Submit for review</button>
-                          <a href={`/portal/arb-request/edit/${req.id}`} class="inline-flex items-center gap-1 text-clr-green font-semibold hover:underline">Edit this request &rarr;</a>
+                        <div class="flex flex-wrap gap-4 items-center">
+                          <button type="button" class="submit-for-review px-6 py-3 rounded-lg bg-clr-green hover:brightness-110 text-white text-base font-semibold transition-all" data-request-id={req.id}>Submit for review</button>
+                          <a href={`/portal/arb-request/edit/${req.id}`} class="inline-flex items-center gap-2 text-clr-orange font-semibold hover:underline text-base">Edit this request &rarr;</a>
                         </div>
-                        <p class="text-sm text-gray-500">
-                          <button type="button" class="cancel-request text-gray-500 hover:text-red-600 hover:underline font-medium" data-request-id={req.id}>Cancel this request</button>
+                        <p class="text-base">
+                          <button type="button" class="cancel-request text-gray-600 hover:text-red-600 hover:underline font-semibold" data-request-id={req.id}>Cancel this request</button>
                         </p>
                       </div>
                     )}
                     {req.status === 'in_review' && (
-                      <p class="no-print pt-4 text-sm text-blue-700">In review by the ARB. Edits are locked until the ARB returns it for revision.</p>
+                      <p class="no-print pt-6 text-base text-blue-700 font-medium">In review by the ARB. Edits are locked until the ARB returns it for revision.</p>
                     )}
                     {req.status === 'cancelled' && (
-                      <p class="no-print pt-4 text-sm text-gray-600">This request was cancelled. Attachments were removed; form details are kept for your reference.</p>
+                      <p class="no-print pt-6 text-base text-gray-600">This request was cancelled. Attachments were removed; form details are kept for your reference.</p>
                     )}
                     {(req.status === 'approved' || req.status === 'rejected') && (
-                      <div class="no-print pt-4 border-t border-gray-200">
-                        <p class="text-sm text-gray-600 mb-2">Copy this request to start a new one with the same form details and attachments. Approval/rejection and any revision notes are not copied; the new request will be pending with only the application content and attachments. You can remove or add attachments before submitting.</p>
-                        <button type="button" class="copy-request px-4 py-2 rounded-lg border border-clr-green bg-white hover:bg-clr-green/5 text-clr-green text-sm font-semibold" data-request-id={req.id}>Copy request (includes attachments)</button>
+                      <div class="no-print pt-6 border-t border-gray-200">
+                        <p class="text-base text-gray-600 mb-4 leading-relaxed">Copy this request to start a new one with the same form details and attachments. Approval/rejection and any revision notes are not copied; the new request will be pending with only the application content and attachments. You can remove or add attachments before submitting.</p>
+                        <button type="button" class="copy-request px-6 py-3 rounded-lg border-2 border-clr-green bg-white hover:bg-clr-green/10 text-clr-green text-base font-semibold transition-colors" data-request-id={req.id}>Copy request (includes attachments)</button>
                       </div>
                     )}
-                    <div class="no-print pt-4 border-t border-gray-200 flex flex-wrap items-center gap-3">
-                      <label class="inline-flex items-center gap-2 text-sm">
-                        <input type="checkbox" class="print-include-attachments rounded border-gray-300 text-clr-green focus:ring-clr-green" checked />
+                    <div class="no-print pt-6 border-t border-gray-200 flex flex-wrap items-center gap-4">
+                      <label class="inline-flex items-center gap-2 text-base">
+                        <input type="checkbox" class="print-include-attachments w-5 h-5 rounded border-gray-300 text-clr-green focus:ring-clr-green" checked />
                         Include attachments in PDF
                       </label>
-                      <button type="button" class="print-to-pdf px-4 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-sm font-semibold text-gray-700">Print / Save as PDF</button>
+                      <button type="button" class="print-to-pdf px-5 py-3 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-base font-semibold text-gray-700 transition-colors">Print / Save as PDF</button>
                     </div>
                   </div>
                   <div class="print-form-view hidden p-6" aria-hidden="true">
@@ -351,8 +387,7 @@ function formatApproval(arbEsign: string | null, esignTimestamp: string | null):
           })}
         </ul>
       )}
-    </main>
-  </div>
+    </div>
 
   <style>
     @media print {
@@ -718,5 +753,5 @@ function formatApproval(arbEsign: string | null, esignTimestamp: string | null):
       setInterval(checkSessionTimeout, 60 * 1000);
     })();
   </script>
-  </ProtectedPage>
+  </PortalPage>
 </PortalLayout>

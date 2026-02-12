@@ -2,21 +2,72 @@
 export const prerender = false;
 
 import PortalLayout from '../../layouts/PortalLayout.astro';
-import ProtectedPage from '../../components/ProtectedPage.astro';
-import PortalNav from '../../components/PortalNav.astro';
+import PortalPage from '../../components/PortalPage.astro';
 import { getPortalContext } from '../../lib/portal-context';
 import { listPortalVendors } from '../../lib/vendors-db';
-import { listArbRequestsByHousehold } from '../../lib/arb-db';
-import { listVendorSubmissionsByHousehold } from '../../lib/vendor-submissions-db';
+import { getArbRequestCountsByStatus, listArbRequestsByHousehold } from '../../lib/arb-db';
+import { listPendingSubmissions, listVendorSubmissionsByHousehold } from '../../lib/vendor-submissions-db';
+import { getOwnerByEmail } from '../../lib/directory-db';
+import { listMaintenanceByHousehold } from '../../lib/maintenance-db';
+import { listUpcomingWithCountsAndUser, householdHasRsvpd } from '../../lib/meetings-db';
+import { listActiveFeedbackDocs, getFeedbackResponse, householdHasResponded } from '../../lib/feedback-db';
 
 const { env, session, effectiveRole } = await getPortalContext(Astro, { fingerprint: true });
 if (!session) return Astro.redirect('/portal/login');
 
+const { email, role, name } = session;
 const db = env?.DB;
-const vendorsList = db ? await listPortalVendors(db) : [];
-const allRequests = db ? await listArbRequestsByHousehold(db, session.email) : [];
+
+// User display name
+let displayName = name?.trim() || null;
+if (!displayName && db) {
+  const owner = await getOwnerByEmail(db, email);
+  displayName = owner?.name?.trim() || null;
+}
+
+// Badge counts for sidebar
+let arbCounts: { pending: number; in_review: number } = { pending: 0, in_review: 0 };
+let pendingVendorCount = 0;
+const hasStaffWhitelistRole = role === 'arb' || role === 'board' || role === 'admin' || role === 'arb_board';
+
+if (db && hasStaffWhitelistRole) {
+  const counts = await getArbRequestCountsByStatus(db);
+  arbCounts = { pending: counts.pending, in_review: counts.in_review };
+  const pendingSubmissions = await listPendingSubmissions(db);
+  pendingVendorCount = pendingSubmissions.length;
+}
+
+const allRequests = db ? await listArbRequestsByHousehold(db, email) : [];
 const draftCount = allRequests.filter((r) => r.status === 'pending').length;
-const householdSubmissions = db ? await listVendorSubmissionsByHousehold(db, session.email) : [];
+
+let maintenanceOpenCount = 0;
+let meetingsRsvpCount = 0;
+let feedbackDueCount = 0;
+if (db) {
+  const maintenanceList = await listMaintenanceByHousehold(db, email);
+  maintenanceOpenCount = maintenanceList.filter((m) => m.status !== 'completed').length;
+  const upcomingMeetings = await listUpcomingWithCountsAndUser(db, email);
+  meetingsRsvpCount = 0;
+  for (const m of upcomingMeetings) {
+    if (m.user_response != null) continue;
+    if (await householdHasRsvpd(db, m.id, email)) continue;
+    meetingsRsvpCount += 1;
+  }
+  const activeFeedback = await listActiveFeedbackDocs(db);
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowStr = tomorrow.toISOString().slice(0, 10);
+  for (const doc of activeFeedback) {
+    const resp = await getFeedbackResponse(db, doc.id, email);
+    if (resp) continue;
+    if (await householdHasResponded(db, doc.id, email)) continue;
+    if (doc.deadline == null || doc.deadline <= tomorrowStr) feedbackDueCount += 1;
+  }
+}
+
+// Vendors data
+const vendorsList = db ? await listPortalVendors(db) : [];
+const householdSubmissions = db ? await listVendorSubmissionsByHousehold(db, email) : [];
 
 // Group by category
 const byCategory: Record<string, typeof vendorsList> = {};
@@ -41,268 +92,345 @@ function parseFiles(filesJson: string | null): { name: string; key: string }[] {
 ---
 
 <PortalLayout title="Vendors | Member Portal | Crooked Lake Reserve HOA">
-  <ProtectedPage>
-  <div class="min-h-screen portal-theme-bg font-body">
-    <PortalNav currentPath="/portal/vendors" draftCount={draftCount} role={effectiveRole} staffRole={session?.role ?? ''} />
-
-    <main class="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
-      {submitted && (
-        <div class="mb-6 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-green-800 text-sm" role="status">
-          Your suggestion has been submitted. A board or committee member will review it before it appears on the vendor list.
+  <PortalPage
+    currentPath="/portal/vendors"
+    pageTitle="Recommended Vendors"
+    userName={displayName ?? undefined}
+    userEmail={email}
+    effectiveRole={effectiveRole}
+    draftCount={draftCount}
+    role={effectiveRole}
+    staffRole={role ?? ''}
+    arbInReviewCount={arbCounts.in_review}
+    vendorPendingCount={pendingVendorCount}
+    maintenanceOpenCount={maintenanceOpenCount}
+    meetingsRsvpCount={meetingsRsvpCount}
+    feedbackDueCount={feedbackDueCount}
+  >
+    {submitted && (
+      <div class="mb-6 rounded-xl border border-green-200 bg-green-50 p-4" role="status">
+        <div class="flex items-start gap-3">
+          <svg class="w-5 h-5 text-green-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <p class="text-sm text-green-800 font-medium">
+            Your suggestion has been submitted! A board member will review it before it appears on the vendor list.
+          </p>
         </div>
-      )}
-      <h2 class="text-2xl font-heading font-bold text-clr-green mb-2">Recommended Vendors</h2>
-      <p class="text-gray-600 mb-6">
-        Board-recommended service providers. Contact info and optional documents are listed below.
-        You can suggest a vendor for the list; board or committee members will review before it is published.
+      </div>
+    )}
+
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8 mb-8">
+      <h1 class="text-3xl font-heading font-bold text-clr-green mb-3">Recommended Vendors</h1>
+      <p class="text-gray-600 text-lg">
+        Board-recommended service providers for common needs. Contact info and documents are listed below.
       </p>
+    </div>
 
-      <details class="mb-8 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <summary class="px-4 py-3 cursor-pointer font-medium text-clr-green hover:bg-gray-50">
-          Suggest a vendor
-        </summary>
-        <div class="px-4 pb-4 pt-2 border-t border-gray-100">
-          <form id="suggest-vendor-form" method="post" action="/api/vendor-submissions" enctype="multipart/form-data" class="space-y-3 max-w-xl">
-            <input type="hidden" name="csrf_token" id="suggest-csrf" value={session.csrfToken ?? ''} />
-            <div>
-              <label for="suggest-name" class="block text-sm font-medium text-gray-700">Vendor name *</label>
-              <input type="text" id="suggest-name" name="name" required class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2" />
-            </div>
-            <div>
-              <label for="suggest-category-select" class="block text-sm font-medium text-gray-700">Category</label>
-              <p class="text-xs text-gray-500 mt-0.5 mb-1">Choose an existing category or add a new one to avoid duplicates.</p>
-              <select id="suggest-category-select" class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2 bg-white" aria-label="Choose existing category or add new">
-                <option value="">— Choose a category —</option>
+    <!-- Suggest Vendor Section -->
+    <details class="mb-8 bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+      <summary class="px-6 py-4 cursor-pointer font-semibold text-clr-green hover:bg-gray-50 flex items-center justify-between text-lg">
+        <span>Suggest a vendor</span>
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+        </svg>
+      </summary>
+      <div class="px-6 pb-6 pt-4 border-t border-gray-100 bg-gray-50">
+        <form id="suggest-vendor-form" method="post" action="/api/vendor-submissions" enctype="multipart/form-data" class="space-y-4 max-w-2xl">
+          <input type="hidden" name="csrf_token" id="suggest-csrf" value={session.csrfToken ?? ''} />
+
+          <div>
+            <label for="suggest-name" class="block text-base font-medium text-gray-700 mb-2">Vendor name *</label>
+            <input type="text" id="suggest-name" name="name" required class="block w-full rounded-lg border border-gray-300 px-4 py-3 text-base focus:ring-2 focus:ring-clr-green focus:border-clr-green" />
+          </div>
+
+          <div>
+            <label for="suggest-category-select" class="block text-base font-medium text-gray-700 mb-2">Category</label>
+            <p class="text-sm text-gray-500 mb-2">Choose an existing category or add a new one.</p>
+            <select id="suggest-category-select" class="block w-full rounded-lg border border-gray-300 px-4 py-3 text-base bg-white focus:ring-2 focus:ring-clr-green">
+              <option value="">— Choose a category —</option>
+              {categories.map((cat) => (
+                <option value={cat}>{cat}</option>
+              ))}
+              <option value="__new__">— Add new category —</option>
+            </select>
+            <div id="suggest-category-new-wrap" class="mt-3 hidden">
+              <label for="suggest-category-new" class="block text-sm font-medium text-gray-600 mb-2">New category name</label>
+              <input type="text" id="suggest-category-new" list="category-datalist" placeholder="e.g. Landscaping, Plumbing" class="block w-full rounded-lg border border-gray-300 px-4 py-3 text-base" />
+              <datalist id="category-datalist">
                 {categories.map((cat) => (
-                  <option value={cat}>{cat}</option>
+                  <option value={cat} />
                 ))}
-                <option value="__new__">— Add new category —</option>
-              </select>
-              <div id="suggest-category-new-wrap" class="mt-2 hidden">
-                <label for="suggest-category-new" class="block text-xs font-medium text-gray-600 mb-0.5">New category name</label>
-                <input type="text" id="suggest-category-new" list="category-datalist" placeholder="e.g. Landscaping, Plumbing" class="block w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" aria-label="Type a new category (suggestions will appear as you type)" />
-                <datalist id="category-datalist">
-                  {categories.map((cat) => (
-                    <option value={cat} />
-                  ))}
-                </datalist>
-              </div>
-              <input type="hidden" name="category" id="suggest-category-value" value="" />
+              </datalist>
             </div>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label for="suggest-phone" class="block text-sm font-medium text-gray-700">Phone</label>
-                <input type="text" id="suggest-phone" name="phone" class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2" />
-              </div>
-              <div>
-                <label for="suggest-email" class="block text-sm font-medium text-gray-700">Email</label>
-                <input type="email" id="suggest-email" name="email" class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2" />
-              </div>
-            </div>
-            <div>
-              <label for="suggest-website" class="block text-sm font-medium text-gray-700">Website (optional)</label>
-              <input type="url" id="suggest-website" name="website" placeholder="https://example.com" class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2" />
-            </div>
-            <div>
-              <label for="suggest-notes" class="block text-sm font-medium text-gray-700">Notes (optional)</label>
-              <textarea id="suggest-notes" name="notes" rows={2} class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2"></textarea>
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700">Attachments (optional)</label>
-              <input type="file" id="suggest-files" name="file_0" multiple class="mt-1 block w-full text-sm text-gray-500 file:mr-2 file:rounded file:border-0 file:bg-clr-green file:px-3 file:py-1.5 file:text-white file:text-sm" />
-            </div>
-            <div class="flex items-center gap-3">
-              <button type="submit" id="suggest-submit" class="px-4 py-2 bg-clr-green text-white rounded-lg font-medium hover:brightness-110 text-sm">Submit suggestion</button>
-              <span id="suggest-message" class="text-sm text-gray-500"></span>
-            </div>
-          </form>
-        </div>
-      </details>
+            <input type="hidden" name="category" id="suggest-category-value" value="" />
+          </div>
 
-      {householdSubmissions.length > 0 && (
-        <section class="mb-10" aria-labelledby="household-recommendations-heading">
-          <h3 id="household-recommendations-heading" class="text-lg font-heading font-semibold text-clr-green mb-3">Household recommendations</h3>
-          <p class="text-sm text-gray-600 mb-4">Vendor suggestions from anyone at your address. All household members can see and submit recommendations.</p>
-          <ul class="space-y-3">
-            {householdSubmissions.map((sub) => {
-              const statusLabel = sub.status === 'pending' ? 'Pending review' : sub.status === 'approved' ? 'Approved' : 'Not approved';
-              const statusClass = sub.status === 'pending' ? 'bg-amber-100 text-amber-800' : sub.status === 'approved' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-700';
-              return (
-                <li class="bg-white rounded-xl border border-gray-100 p-4 shadow-sm flex flex-wrap items-start justify-between gap-2">
-                  <div>
-                    <span class="font-medium text-gray-900">{sub.name ?? 'Unnamed'}</span>
-                    {sub.category && <span class="ml-2 text-sm text-gray-500">({sub.category})</span>}
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label for="suggest-phone" class="block text-base font-medium text-gray-700 mb-2">Phone</label>
+              <input type="text" id="suggest-phone" name="phone" class="block w-full rounded-lg border border-gray-300 px-4 py-3 text-base focus:ring-2 focus:ring-clr-green" />
+            </div>
+            <div>
+              <label for="suggest-email" class="block text-base font-medium text-gray-700 mb-2">Email</label>
+              <input type="email" id="suggest-email" name="email" class="block w-full rounded-lg border border-gray-300 px-4 py-3 text-base focus:ring-2 focus:ring-clr-green" />
+            </div>
+          </div>
+
+          <div>
+            <label for="suggest-website" class="block text-base font-medium text-gray-700 mb-2">Website (optional)</label>
+            <input type="url" id="suggest-website" name="website" placeholder="https://example.com" class="block w-full rounded-lg border border-gray-300 px-4 py-3 text-base focus:ring-2 focus:ring-clr-green" />
+          </div>
+
+          <div>
+            <label for="suggest-notes" class="block text-base font-medium text-gray-700 mb-2">Notes (optional)</label>
+            <textarea id="suggest-notes" name="notes" rows={3} class="block w-full rounded-lg border border-gray-300 px-4 py-3 text-base focus:ring-2 focus:ring-clr-green"></textarea>
+          </div>
+
+          <div>
+            <label class="block text-base font-medium text-gray-700 mb-2">Attachments (optional)</label>
+            <input type="file" id="suggest-files" name="file_0" multiple class="block w-full text-base text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-clr-green file:px-4 file:py-2 file:text-white file:font-medium file:cursor-pointer hover:file:brightness-110" />
+          </div>
+
+          <div class="flex items-center gap-4">
+            <button type="submit" id="suggest-submit" class="px-6 py-3 bg-clr-green text-white rounded-lg font-semibold text-base hover:brightness-110 transition-all shadow-sm">
+              Submit Suggestion
+            </button>
+            <span id="suggest-message" class="text-base"></span>
+          </div>
+        </form>
+      </div>
+    </details>
+
+    <!-- Household Submissions -->
+    {householdSubmissions.length > 0 && (
+      <section class="mb-8">
+        <h2 class="text-2xl font-heading font-bold text-gray-800 mb-4 flex items-center gap-2">
+          <span class="w-1 h-6 bg-clr-orange rounded-full"></span>
+          Your Household's Suggestions
+        </h2>
+        <p class="text-gray-600 mb-4">Vendor suggestions from anyone at your address.</p>
+        <div class="space-y-3">
+          {householdSubmissions.map((sub) => {
+            const statusLabel = sub.status === 'pending' ? 'Pending review' : sub.status === 'approved' ? 'Approved' : 'Not approved';
+            const statusClass = sub.status === 'pending' ? 'bg-amber-100 text-amber-800' : sub.status === 'approved' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-700';
+            return (
+              <div class="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                  <div class="flex-1">
+                    <p class="font-semibold text-gray-900 text-lg">{sub.name ?? 'Unnamed'}</p>
+                    {sub.category && <p class="text-base text-gray-500 mt-1">{sub.category}</p>}
                     {sub.submitted_by && (
-                      <p class="text-xs text-gray-500 mt-1">Submitted by {sub.submitted_by}</p>
+                      <p class="text-sm text-gray-500 mt-2">Submitted by {sub.submitted_by}</p>
                     )}
                     {sub.submitted_at && (
-                      <p class="text-xs text-gray-400">
+                      <p class="text-sm text-gray-400">
                         {new Date(sub.submitted_at).toLocaleDateString(undefined, { dateStyle: 'medium' })}
                       </p>
                     )}
                   </div>
-                  <span class={`text-xs font-medium px-2 py-1 rounded ${statusClass}`}>{statusLabel}</span>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      )}
-
-      {vendorsList.length === 0 ? (
-        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center text-gray-500">
-          No vendors listed yet. The board can add recommendations from Board: Vendors.
+                  <span class={`text-sm font-semibold px-3 py-1.5 rounded-lg ${statusClass}`}>{statusLabel}</span>
+                </div>
+              </div>
+            );
+          })}
         </div>
-      ) : (
-        <div class="space-y-8">
-          {categories.map((cat) => (
-            <section>
-              <h3 class="text-lg font-heading font-semibold text-clr-green mb-3 capitalize">{cat}</h3>
-              <div class="space-y-4">
-                {byCategory[cat].map((v) => {
-                  const files = parseFiles(v.files);
-                  return (
-                    <div class="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
-                      <div class="font-medium text-gray-900">{v.name ?? '-'}</div>
-                      <div class="mt-2 text-sm text-gray-600 space-y-1">
-                        {v.phone && <div>Phone: {v.phone}</div>}
-                        {v.email && <div>Email: <a href={`mailto:${v.email}`} class="text-clr-green hover:underline">{v.email}</a></div>}
-                        {v.website && (
-                          <div>Website: <a href={v.website.startsWith('http') ? v.website : `https://${v.website}`} target="_blank" rel="noopener noreferrer" class="text-clr-green hover:underline">{v.website}</a></div>
-                        )}
+      </section>
+    )}
+
+    <!-- Vendor List -->
+    {vendorsList.length === 0 ? (
+      <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-12 text-center">
+        <svg class="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+        </svg>
+        <p class="text-gray-500 text-lg mb-2">No vendors listed yet</p>
+        <p class="text-gray-400">The board can add recommendations from Board: Vendors</p>
+      </div>
+    ) : (
+      <div class="space-y-10">
+        {categories.map((cat) => (
+          <section>
+            <h2 class="text-2xl font-heading font-bold text-gray-800 mb-5 flex items-center gap-2 capitalize">
+              <span class="w-1 h-6 bg-clr-green rounded-full"></span>
+              {cat}
+            </h2>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {byCategory[cat].map((v) => {
+                const files = parseFiles(v.files);
+                return (
+                  <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm hover:shadow-md transition-shadow">
+                    <div class="flex items-start gap-3 mb-4">
+                      <div class="w-12 h-12 rounded-lg bg-clr-green/10 flex items-center justify-center shrink-0">
+                        <svg class="w-6 h-6 text-clr-green" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                        </svg>
                       </div>
-                      {v.notes && (
-                        <p class="mt-2 text-sm text-gray-500">{v.notes}</p>
+                      <div class="flex-1">
+                        <h3 class="font-semibold text-gray-900 text-lg">{v.name ?? '-'}</h3>
+                      </div>
+                    </div>
+                    <div class="space-y-2 text-base">
+                      {v.phone && (
+                        <div class="flex items-center gap-2">
+                          <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                          </svg>
+                          <span class="text-gray-700 font-medium">{v.phone}</span>
+                        </div>
                       )}
-                      {files.length > 0 && (
-                        <div class="mt-3 flex flex-wrap gap-2">
-                          {files.map((f) => (
-                            <a
-                              href={`/api/portal/file/${encodeURIComponent(f.key)}`}
-                              class="text-sm text-clr-green hover:underline"
-                            >
-                              {f.name}
-                            </a>
-                          ))}
+                      {v.email && (
+                        <div class="flex items-center gap-2">
+                          <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                          </svg>
+                          <a href={`mailto:${v.email}`} class="text-clr-green hover:underline font-medium">{v.email}</a>
+                        </div>
+                      )}
+                      {v.website && (
+                        <div class="flex items-center gap-2">
+                          <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                          </svg>
+                          <a href={v.website.startsWith('http') ? v.website : `https://${v.website}`} target="_blank" rel="noopener noreferrer" class="text-clr-green hover:underline font-medium">
+                            Visit Website
+                          </a>
                         </div>
                       )}
                     </div>
-                  );
-                })}
-              </div>
-            </section>
-          ))}
-        </div>
-      )}
-    </main>
-  </div>
+                    {v.notes && (
+                      <p class="mt-4 text-base text-gray-600 p-3 bg-gray-50 rounded-lg">{v.notes}</p>
+                    )}
+                    {files.length > 0 && (
+                      <div class="mt-4 flex flex-wrap gap-2">
+                        {files.map((f) => (
+                          <a
+                            href={`/api/portal/file/${encodeURIComponent(f.key)}`}
+                            class="inline-flex items-center gap-2 px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors"
+                          >
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            {f.name}
+                          </a>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        ))}
+      </div>
+    )}
 
-  <script is:inline>
-    (function () {
-      var form = document.getElementById('suggest-vendor-form');
-      var submitBtn = document.getElementById('suggest-submit');
-      var messageEl = document.getElementById('suggest-message');
-      var csrfInput = document.getElementById('suggest-csrf');
-      var fileInput = document.getElementById('suggest-files');
-      var categorySelect = document.getElementById('suggest-category-select');
-      var categoryNewWrap = document.getElementById('suggest-category-new-wrap');
-      var categoryNewInput = document.getElementById('suggest-category-new');
-      var categoryValue = document.getElementById('suggest-category-value');
-      if (!form) return;
+    <script is:inline>
+      (function () {
+        var form = document.getElementById('suggest-vendor-form');
+        var submitBtn = document.getElementById('suggest-submit');
+        var messageEl = document.getElementById('suggest-message');
+        var csrfInput = document.getElementById('suggest-csrf');
+        var fileInput = document.getElementById('suggest-files');
+        var categorySelect = document.getElementById('suggest-category-select');
+        var categoryNewWrap = document.getElementById('suggest-category-new-wrap');
+        var categoryNewInput = document.getElementById('suggest-category-new');
+        var categoryValue = document.getElementById('suggest-category-value');
+        if (!form) return;
 
-      function syncCategoryValue() {
-        if (!categoryValue) return;
-        if (categorySelect && categorySelect.value === '__new__') {
-          categoryValue.value = (categoryNewInput && categoryNewInput.value) ? categoryNewInput.value.trim() : '';
-        } else if (categorySelect) {
-          categoryValue.value = categorySelect.value || '';
-        }
-      }
-
-      if (categorySelect) {
-        categorySelect.addEventListener('change', function () {
-          if (this.value === '__new__') {
-            if (categoryNewWrap) categoryNewWrap.classList.remove('hidden');
-            if (categoryNewInput) { categoryNewInput.value = ''; categoryNewInput.focus(); }
-            categoryValue.value = '';
-          } else {
-            if (categoryNewWrap) categoryNewWrap.classList.add('hidden');
-            if (categoryNewInput) categoryNewInput.value = '';
-            categoryValue.value = this.value || '';
-          }
-        });
-      }
-      if (categoryNewInput) {
-        categoryNewInput.addEventListener('input', syncCategoryValue);
-        categoryNewInput.addEventListener('change', syncCategoryValue);
-      }
-
-      form.addEventListener('submit', function (e) {
-        e.preventDefault();
-        syncCategoryValue();
-        if (categorySelect && categorySelect.value === '__new__' && categoryNewInput) {
-          categoryValue.value = categoryNewInput.value.trim();
-        }
-        if (!messageEl) return;
-        messageEl.textContent = '';
-        var token = (csrfInput && csrfInput.value) || '';
-        var formData = new FormData(form);
-        formData.set('csrf_token', token);
-        if (fileInput && fileInput.files && fileInput.files.length) {
-          for (var i = 0; i < fileInput.files.length; i++) {
-            formData.set('file_' + i, fileInput.files[i]);
+        function syncCategoryValue() {
+          if (!categoryValue) return;
+          if (categorySelect && categorySelect.value === '__new__') {
+            categoryValue.value = (categoryNewInput && categoryNewInput.value) ? categoryNewInput.value.trim() : '';
+          } else if (categorySelect) {
+            categoryValue.value = categorySelect.value || '';
           }
         }
-        submitBtn.disabled = true;
-        fetch('/api/vendor-submissions', {
-          method: 'POST',
-          body: formData,
-          headers: { Accept: 'application/json' }
-        })
-          .then(function (res) {
-            if (res.redirected && res.url && res.url.indexOf('submitted=1') !== -1) {
-              return { redirected: true };
-            }
-            return res.json().then(function (data) { return { res: res, data: data }; });
-          })
-          .then(function (out) {
-            if (out.redirected) {
-              var target = '/portal/vendors?submitted=1';
-              if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-                if (window.location.protocol === 'https:') {
-                  target = 'http://' + window.location.host + target;
-                }
-              }
-              window.location.href = target;
-              return;
-            }
-            var res = out.res, data = out.data;
-            if (res && res.ok && data && data.success) {
-              messageEl.textContent = data.message || 'Submitted. A reviewer will approve it before it appears on the list.';
-              messageEl.className = 'text-sm text-clr-green';
-              form.reset();
-              if (fileInput) fileInput.value = '';
-              if (categoryValue) categoryValue.value = '';
-              if (categorySelect) categorySelect.value = '';
+
+        if (categorySelect) {
+          categorySelect.addEventListener('change', function () {
+            if (this.value === '__new__') {
+              if (categoryNewWrap) categoryNewWrap.classList.remove('hidden');
+              if (categoryNewInput) { categoryNewInput.value = ''; categoryNewInput.focus(); }
+              categoryValue.value = '';
+            } else {
               if (categoryNewWrap) categoryNewWrap.classList.add('hidden');
               if (categoryNewInput) categoryNewInput.value = '';
-              var target = '/portal/vendors?submitted=1';
-              if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-                if (window.location.protocol === 'https:') target = 'http://' + window.location.host + target;
-              }
-              setTimeout(function () { window.location.href = target; }, 800);
-            } else {
-              messageEl.textContent = (data && data.error) || 'Submission failed.';
-              messageEl.className = 'text-sm text-red-600';
+              categoryValue.value = this.value || '';
             }
+          });
+        }
+        if (categoryNewInput) {
+          categoryNewInput.addEventListener('input', syncCategoryValue);
+          categoryNewInput.addEventListener('change', syncCategoryValue);
+        }
+
+        form.addEventListener('submit', function (e) {
+          e.preventDefault();
+          syncCategoryValue();
+          if (categorySelect && categorySelect.value === '__new__' && categoryNewInput) {
+            categoryValue.value = categoryNewInput.value.trim();
+          }
+          if (!messageEl) return;
+          messageEl.textContent = '';
+          var token = (csrfInput && csrfInput.value) || '';
+          var formData = new FormData(form);
+          formData.set('csrf_token', token);
+          if (fileInput && fileInput.files && fileInput.files.length) {
+            for (var i = 0; i < fileInput.files.length; i++) {
+              formData.set('file_' + i, fileInput.files[i]);
+            }
+          }
+          submitBtn.disabled = true;
+          fetch('/api/vendor-submissions', {
+            method: 'POST',
+            body: formData,
+            headers: { Accept: 'application/json' }
           })
-          .catch(function () {
-            messageEl.textContent = 'Network error. Try again.';
-            messageEl.className = 'text-sm text-red-600';
-          })
-          .then(function () { submitBtn.disabled = false; });
-      });
-    })();
-  </script>
-  </ProtectedPage>
+            .then(function (res) {
+              if (res.redirected && res.url && res.url.indexOf('submitted=1') !== -1) {
+                return { redirected: true };
+              }
+              return res.json().then(function (data) { return { res: res, data: data }; });
+            })
+            .then(function (out) {
+              if (out.redirected) {
+                var target = '/portal/vendors?submitted=1';
+                if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                  if (window.location.protocol === 'https:') {
+                    target = 'http://' + window.location.host + target;
+                  }
+                }
+                window.location.href = target;
+                return;
+              }
+              var res = out.res, data = out.data;
+              if (res && res.ok && data && data.success) {
+                messageEl.textContent = data.message || 'Submitted!';
+                messageEl.className = 'text-base text-clr-green font-medium';
+                form.reset();
+                if (fileInput) fileInput.value = '';
+                if (categoryValue) categoryValue.value = '';
+                if (categorySelect) categorySelect.value = '';
+                if (categoryNewWrap) categoryNewWrap.classList.add('hidden');
+                if (categoryNewInput) categoryNewInput.value = '';
+                var target = '/portal/vendors?submitted=1';
+                if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                  if (window.location.protocol === 'https:') target = 'http://' + window.location.host + target;
+                }
+                setTimeout(function () { window.location.href = target; }, 800);
+              } else {
+                messageEl.textContent = (data && data.error) || 'Submission failed.';
+                messageEl.className = 'text-base text-red-600 font-medium';
+              }
+            })
+            .catch(function () {
+              messageEl.textContent = 'Network error. Try again.';
+              messageEl.className = 'text-base text-red-600 font-medium';
+            })
+            .then(function () { submitBtn.disabled = false; });
+        });
+      })();
+    </script>
+  </PortalPage>
 </PortalLayout>

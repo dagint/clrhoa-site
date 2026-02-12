@@ -1,11 +1,10 @@
 ---
 export const prerender = false;
 
-import BoardLayout from '../../layouts/BoardLayout.astro';
 import { getBoardContext } from '../../lib/board-context';
+import { getPortalBadgeCounts } from '../../lib/portal-badge-counts';
 import { canRecordPayments, isBoardOnly } from '../../lib/auth';
 import { listPrimaryOwnersByAddress } from '../../lib/directory-db';
-import { listArbRequestsByHousehold } from '../../lib/arb-db';
 import {
   getAssessmentByOwner,
   listAllAssessments,
@@ -14,7 +13,10 @@ import {
   isMissingForQuarter,
 } from '../../lib/assessments-db';
 import { escapeHtml } from '../../lib/sanitize';
+import PortalLayout from '../../layouts/PortalLayout.astro';
+import PortalPage from '../../components/PortalPage.astro';
 
+import BoardNav from '../../components/BoardNav.astro';
 const ctx = await getBoardContext(Astro);
 if ('redirect' in ctx) return Astro.redirect(ctx.redirect);
 const { env, session, effectiveRole } = ctx;
@@ -23,9 +25,10 @@ if (!isBoard) return Astro.redirect('/portal/dashboard');
 const canRecord = canRecordPayments(effectiveRole);
 
 const db = env?.DB;
+const { email, role, name } = session;
+const badges = await getPortalBadgeCounts(db, email, role, name);
 const owners = db ? await listPrimaryOwnersByAddress(db) : [];
-const allRequests = db ? await listArbRequestsByHousehold(db, session.email) : [];
-const draftCount = allRequests.filter((r) => r.status === 'pending').length;
+
 
 const allAssessments = db ? await listAllAssessments(db) : [];
 const allSpecials = db ? await listAllSpecialAssessments(db) : [];
@@ -71,8 +74,25 @@ function formatCurrency(n: number): string {
 }
 ---
 
-<BoardLayout title="Dues" subtitle="Record payments, add special assessments, set quarterly amounts" draftCount={draftCount} role={effectiveRole} session={session} elevatedUntil={session.elevated_until}>
-  <div id="csrf-holder" class="hidden" data-csrf={escapeHtml(session.csrfToken ?? '')} aria-hidden="true"></div>
+<PortalLayout title="Dues | Board | Member Portal | Crooked Lake Reserve HOA">
+  <PortalPage
+    currentPath="/board/assessments"
+    pageTitle="Dues"
+    userName={badges.displayName ?? undefined}
+    userEmail={email}
+    effectiveRole={effectiveRole}
+    draftCount={badges.draftCount}
+    role={effectiveRole}
+    staffRole={role ?? ''}
+    arbInReviewCount={badges.arbInReviewCount}
+    vendorPendingCount={badges.vendorPendingCount}
+    maintenanceOpenCount={badges.maintenanceOpenCount}
+    meetingsRsvpCount={badges.meetingsRsvpCount}
+  >
+    <BoardNav currentPath="/board/assessments" />
+
+unt}
+<div id="csrf-holder" class="hidden" data-csrf={escapeHtml(session.csrfToken ?? '')} aria-hidden="true"></div>
   <div id="assessments-message" class="hidden mb-4 p-4 rounded-xl border" role="status" aria-live="polite" aria-atomic="true"></div>
 
   {!canRecord && (effectiveRole === 'arb_board' || effectiveRole === 'admin') && (
@@ -80,7 +100,7 @@ function formatCurrency(n: number): string {
       <strong>View only.</strong> To record payments or add special assessments, use <strong>Act as Board</strong> in the yellow banner at the top of the page.
     </div>
   )}
-  <p class="text-sm text-gray-600 mb-4">One row per <strong>property (address)</strong>. Multiple people may be at one address; the primary contact is used for dues. Quarterly dues are due on the 1st of each quarter month (Jan 1, Apr 1, Jul 1, Oct 1). Record payments below; use &quot;Add special assessment&quot; for one-off charges. The quarterly dues amount can be changed by the board (e.g. in settings or when needed).</p>
+  <p class="text-base text-gray-600 mb-4">One row per <strong>property (address)</strong>. Multiple people may be at one address; the primary contact is used for dues. Quarterly dues are due on the 1st of each quarter month (Jan 1, Apr 1, Jul 1, Oct 1). Record payments below; use &quot;Add special assessment&quot; for one-off charges. The quarterly dues amount can be changed by the board (e.g. in settings or when needed).</p>
 
   <div class="flex flex-wrap items-center gap-4 mb-4">
     <span class="text-sm font-medium text-gray-700">Show:</span>
@@ -173,8 +193,8 @@ function formatCurrency(n: number): string {
   <section class="mt-10">
     {canRecord && (
     <>
-    <h2 class="text-lg font-heading font-semibold text-clr-green mb-3">Add special assessment</h2>
-    <p class="text-sm text-gray-600 mb-3">One-off bill for a single owner. They will see it on Portal → Dues until paid.</p>
+    <h2 class="text-2xl font-heading font-semibold text-clr-green mb-3">Add special assessment</h2>
+    <p class="text-base text-gray-600 mb-3">One-off bill for a single owner. They will see it on Portal → Dues until paid.</p>
     <form id="add-special-form" class="flex flex-wrap items-end gap-3 mb-6">
       <input type="hidden" name="csrf_token" id="add-special-csrf" value={session.csrfToken ?? ''} />
       <div>
@@ -198,7 +218,7 @@ function formatCurrency(n: number): string {
         <label for="special-due" class="block text-xs font-medium text-gray-600 mb-0.5">Due date</label>
         <input type="date" id="special-due" name="due_date" class="rounded border border-gray-200 px-3 py-2 w-36" />
       </div>
-      <button type="submit" id="add-special-btn" class="px-4 py-2 bg-clr-green text-white rounded-lg font-medium hover:brightness-110" aria-busy="false">Add</button>
+      <button type="submit" id="add-special-btn" class="px-5 py-2.5 bg-clr-green text-white rounded-lg font-medium hover:brightness-110" aria-busy="false">Add</button>
     </form>
     </>
     )}
@@ -237,7 +257,8 @@ function formatCurrency(n: number): string {
       </div>
     )}
   </section>
-</BoardLayout>
+  </PortalPage>
+</PortalLayout>
 
 <script is:inline define:vars={{ today: today, currentYear: currentYear, csrfToken: session?.csrfToken ?? '', missingCount: missingThisQuarter.length, totalCount: sortedOwners.length }}>
   (function () {

@@ -2,17 +2,19 @@
 export const prerender = false;
 
 import PortalLayout from '../../layouts/PortalLayout.astro';
-import ProtectedPage from '../../components/ProtectedPage.astro';
-import PortalNav from '../../components/PortalNav.astro';
+import PortalPage from '../../components/PortalPage.astro';
 import PortalElevatedRoleBanner from '../../components/PortalElevatedRoleBanner.astro';
 import BoardNav from '../../components/BoardNav.astro';
 import ArbNav from '../../components/ArbNav.astro';
 import ArbDashboardCard from '../../components/ArbDashboardCard.astro';
 import ArbDashboardExportSection from '../../components/ArbDashboardExportSection.astro';
 import { getPortalContext } from '../../lib/portal-context';
+import { getPortalBadgeCounts } from '../../lib/portal-badge-counts';
 import { canApproveArb } from '../../lib/auth';
 import { getArbDashboardData, formatApproval } from '../../lib/arb-dashboard';
 import { sanitizeForScriptInjection } from '../../lib/sanitize';
+import { batchLoadElectronicSignatures } from '../../lib/esignature-db';
+import type { ElectronicSignature } from '../../lib/esignature-db';
 
 const { env, session, effectiveRole } = await getPortalContext(Astro);
 if (!session) return Astro.redirect('/portal/login');
@@ -31,43 +33,73 @@ const suggestedArbEsign = sanitizeForScriptInjection(
     : (session.name?.trim() || session.email)
 );
 
+const { email, role, name } = session;
 const db = env?.DB;
+const badges = await getPortalBadgeCounts(db, email, role, name);
 const dashboardData = db
   ? await getArbDashboardData(db, session.email, Astro.url.searchParams.get('page') ?? '1')
   : null;
 
 const allRequests = dashboardData?.allRequests ?? [];
 const filesByRequestId = dashboardData?.filesByRequestId ?? {};
-const draftCount = dashboardData?.draftCount ?? 0;
-const arbInReviewCount = dashboardData?.arbInReviewCount ?? 0;
-const vendorPendingCount = dashboardData?.vendorPendingCount ?? 0;
 const inReview = dashboardData?.inReview ?? [];
 const pending = dashboardData?.pending ?? [];
+const arcReview = dashboardData?.arcReview ?? [];
+const boardReview = dashboardData?.boardReview ?? [];
+const returned = dashboardData?.returned ?? [];
 const completedWithPeriod = dashboardData?.completedWithPeriod ?? [];
 const completedPage = dashboardData?.completedPage ?? 1;
 const completedPaginated = dashboardData?.completedPaginated ?? [];
 const totalCompletedPages = dashboardData?.totalCompletedPages ?? 0;
 const periodOptions = dashboardData?.periodOptions ?? [];
+
+// Batch load electronic signatures (avoids N+1 problem)
+const signatureIds = allRequests.map(r => r.signature_id).filter(Boolean) as string[];
+const signaturesById = db && signatureIds.length > 0
+  ? await batchLoadElectronicSignatures(db, signatureIds)
+  : {};
+
+// Map signatures to request IDs
+const signaturesByRequestId: Record<string, ElectronicSignature | null> = {};
+for (const req of allRequests) {
+  if (req.signature_id && signaturesById[req.signature_id]) {
+    signaturesByRequestId[req.id] = signaturesById[req.signature_id];
+  }
+}
+
+// Count all items needing action
+const needsActionCount = inReview.length + pending.length + arcReview.length + boardReview.length + returned.length;
 ---
 
 <PortalLayout title="ARB Dashboard | Member Portal | Crooked Lake Reserve HOA">
-  <ProtectedPage>
-  <div class="min-h-screen portal-theme-bg font-body">
-    <PortalNav currentPath="/portal/arb-dashboard" draftCount={draftCount} role={effectiveRole} staffRole={session.role ?? ''} arbInReviewCount={arbInReviewCount} vendorPendingCount={vendorPendingCount} />
-
+  <PortalPage
+    currentPath="/portal/arb-dashboard"
+    pageTitle="ARB Dashboard"
+    userName={badges.displayName ?? undefined}
+    userEmail={email}
+    effectiveRole={effectiveRole}
+    draftCount={badges.draftCount}
+    role={effectiveRole}
+    staffRole={role ?? ''}
+    arbInReviewCount={badges.arbInReviewCount}
+    vendorPendingCount={badges.vendorPendingCount}
+    maintenanceOpenCount={badges.maintenanceOpenCount}
+    meetingsRsvpCount={badges.meetingsRsvpCount}
+    feedbackDueCount={badges.feedbackDueCount}
+  >
     <PortalElevatedRoleBanner role={effectiveRole} session={session} />
 
     {effectiveRole === 'arb' ? <ArbNav currentPath="/portal/arb-dashboard" /> : <BoardNav currentPath="/portal/arb-dashboard" />}
 
-    <main class="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+    <div class="arb-dashboard-content">
       {(effectiveRole === 'arb' || effectiveRole === 'arb_board') && (
-        <div class="mb-8 p-4 rounded-xl bg-clr-green/10 border border-clr-green/30">
-          <p class="text-sm text-gray-700 mb-2">
+        <div class="mb-8 p-5 rounded-xl bg-clr-green/10 border border-clr-green/30">
+          <p class="text-base text-gray-700 mb-3">
             <strong>Update the ARB request form</strong> (PDF/Word) that members use to submit requests. Changes appear on the public Documents page.
           </p>
           <a
             href="/board/public-documents"
-            class="inline-flex items-center gap-2 px-4 py-2 bg-clr-green text-white rounded-lg font-medium text-sm hover:brightness-110"
+            class="inline-flex items-center gap-2 px-5 py-2.5 bg-clr-green text-white rounded-lg font-semibold text-base hover:brightness-110"
           >
             Update ARB request form
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
@@ -76,12 +108,12 @@ const periodOptions = dashboardData?.periodOptions ?? [];
       )}
 
       {!canApprove && (effectiveRole === 'arb_board' || effectiveRole === 'admin') && (
-        <div class="mb-6 p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-sm" role="status">
+        <div class="mb-6 p-5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-base" role="status">
           <strong>View only.</strong> To approve or reject requests, set deadlines, or add ARB notes, use <strong>Act as ARB</strong> in the yellow banner at the top of the page.
         </div>
       )}
       {!canApprove && effectiveRole === 'board' && (
-        <div class="mb-6 p-4 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 text-sm" role="status">
+        <div class="mb-6 p-5 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 text-base" role="status">
           <strong>View only.</strong> Board members can view ARB requests here. Only ARB members can approve, reject, set deadlines, or add ARB notes.
         </div>
       )}
@@ -90,16 +122,16 @@ const periodOptions = dashboardData?.periodOptions ?? [];
 
       {allRequests.length === 0 ? (
         <>
-          <h2 class="text-2xl font-heading font-bold text-clr-green mb-6">ARB dashboard</h2>
-          <p class="text-gray-500">No requests yet.</p>
+          <h2 class="text-3xl font-heading font-bold text-clr-green mb-6">ARB dashboard</h2>
+          <p class="text-gray-500 text-base">No requests yet.</p>
         </>
       ) : (
         <>
           <section class="mb-10" aria-label="Needs your action">
             <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
               <div>
-                <h2 class="text-2xl font-heading font-bold text-clr-green mb-2">Needs your action</h2>
-                <p class="text-sm text-gray-600">
+                <h2 class="text-3xl font-heading font-bold text-clr-green mb-3">Needs your action</h2>
+                <p class="text-base text-gray-600">
                   <strong>In review</strong> = ready for you to approve, reject, or return for revision. <strong>Pending</strong> = awaiting owner to submit.
                 </p>
               </div>
@@ -109,32 +141,32 @@ const periodOptions = dashboardData?.periodOptions ?? [];
                   type="text"
                   id="search-input"
                   placeholder="Search by ID, email, or address..."
-                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-clr-green focus:ring-1 focus:ring-clr-green"
+                  class="w-full rounded-lg border border-gray-300 px-4 py-3 text-base focus:border-clr-green focus:ring-2 focus:ring-clr-green"
                 />
               </div>
             </div>
             {inReview.length > 0 && (
               <>
-                <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+                <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
                   <div>
-                    <h3 class="text-lg font-semibold text-gray-800">In review (<span id="in-review-count">{inReview.length}</span>)</h3>
+                    <h3 class="text-xl font-semibold text-gray-800">In review (<span id="in-review-count">{inReview.length}</span>)</h3>
                     {inReview.some((r: { review_deadline?: string | null }) => {
                       const deadline = r.review_deadline ? new Date(r.review_deadline) : null;
                       return deadline && deadline < new Date();
                     }) && (
-                      <p class="text-sm text-red-600 font-semibold mt-1">Warning: Some requests are past their review deadline</p>
+                      <p class="text-base text-red-600 font-semibold mt-2">Warning: Some requests are past their review deadline</p>
                     )}
                   </div>
                   {canApprove && (
-                  <div class="flex flex-wrap items-center gap-2 no-print">
-                    <label class="inline-flex items-center gap-2 text-sm">
+                  <div class="flex flex-wrap items-center gap-3 no-print">
+                    <label class="inline-flex items-center gap-2 text-base">
                       <input type="checkbox" id="select-all-in-review" class="rounded border-gray-300 text-clr-green focus:ring-clr-green" />
                       <span>Select all</span>
                     </label>
                     <button
                       type="button"
                       id="bulk-approve-btn"
-                      class="px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-700 text-white text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                      class="px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
                       disabled
                     >
                       Approve selected
@@ -142,7 +174,7 @@ const periodOptions = dashboardData?.periodOptions ?? [];
                     <button
                       type="button"
                       id="bulk-reject-btn"
-                      class="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                      class="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
                       disabled
                     >
                       Reject selected
@@ -159,7 +191,7 @@ const periodOptions = dashboardData?.periodOptions ?? [];
                         <div class="flex items-start gap-2 p-2 no-print">
                           {canApprove && <input type="checkbox" class="request-checkbox mt-2 rounded border-gray-300 text-clr-green focus:ring-clr-green" value={req.id} data-status="in_review" />}
                           <div class="flex-1">
-                            <ArbDashboardCard request={req} files={files} approval={approval} canApproveArb={canApprove} />
+                            <ArbDashboardCard request={req} files={files} approval={approval} signature={signaturesByRequestId[req.id] ?? null} canApproveArb={canApprove} />
                           </div>
                         </div>
                       </li>
@@ -170,33 +202,106 @@ const periodOptions = dashboardData?.periodOptions ?? [];
             )}
             {pending.length > 0 && (
               <>
-                <h3 class="text-lg font-semibold text-gray-800 mb-3">Pending (<span id="pending-count">{pending.length}</span>)</h3>
+                <h3 class="text-xl font-semibold text-gray-800 mb-4">Pending (<span id="pending-count">{pending.length}</span>)</h3>
                 <ul class="space-y-4 arb-request-list" id="pending-list">
                   {pending.map((req) => {
                     const files = filesByRequestId[req.id] ?? [];
                     const approval = formatApproval(req.arb_esign ?? null, req.esign_timestamp ?? null);
                     return (
                       <li class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden searchable-card" data-search-text={`${req.id} ${req.owner_email} ${req.property_address ?? ''} ${req.applicant_name ?? ''} ${req.phone ?? ''}`.toLowerCase()}>
-                        <ArbDashboardCard request={req} files={files} approval={approval} canApproveArb={canApprove} />
+                        <ArbDashboardCard request={req} files={files} approval={approval} signature={signaturesByRequestId[req.id] ?? null} canApproveArb={canApprove} />
                       </li>
                     );
                   })}
                 </ul>
               </>
             )}
-            {inReview.length === 0 && pending.length === 0 && (
-              <p class="text-gray-500">No items need your action right now.</p>
+            {/* v2 Multi-stage voting workflow sections */}
+            {arcReview.length > 0 && (
+              <>
+                <div class="mt-8 pt-8 border-t border-gray-200">
+                  <h3 class="text-xl font-semibold text-gray-800 mb-4">
+                    ARC Review (Multi-Stage) (<span id="arc-review-count">{arcReview.length}</span>)
+                  </h3>
+                  <p class="text-base text-gray-600 mb-4">
+                    New voting workflow: ARC members vote to approve, deny, or return for more information.
+                  </p>
+                </div>
+                <ul class="space-y-4 arb-request-list" id="arc-review-list">
+                  {arcReview.map((req) => {
+                    const files = filesByRequestId[req.id] ?? [];
+                    const approval = formatApproval(req.arb_esign ?? null, req.esign_timestamp ?? null);
+                    return (
+                      <li class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden searchable-card" data-search-text={`${req.id} ${req.owner_email} ${req.property_address ?? ''} ${req.applicant_name ?? ''} ${req.phone ?? ''}`.toLowerCase()}>
+                        <ArbDashboardCard request={req} files={files} approval={approval} signature={signaturesByRequestId[req.id] ?? null} canApproveArb={canApprove} />
+                      </li>
+                    );
+                  })}
+                </ul>
+              </>
+            )}
+
+            {boardReview.length > 0 && (
+              <>
+                <div class="mt-8 pt-8 border-t border-gray-200">
+                  <h3 class="text-xl font-semibold text-gray-800 mb-4">
+                    Board Review (Multi-Stage) (<span id="board-review-count">{boardReview.length}</span>)
+                  </h3>
+                  <p class="text-base text-gray-600 mb-4">
+                    ARC has approved. Board members vote to give final approval, deny, or return.
+                  </p>
+                </div>
+                <ul class="space-y-4 arb-request-list" id="board-review-list">
+                  {boardReview.map((req) => {
+                    const files = filesByRequestId[req.id] ?? [];
+                    const approval = formatApproval(req.arb_esign ?? null, req.esign_timestamp ?? null);
+                    return (
+                      <li class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden searchable-card" data-search-text={`${req.id} ${req.owner_email} ${req.property_address ?? ''} ${req.applicant_name ?? ''} ${req.phone ?? ''}`.toLowerCase()}>
+                        <ArbDashboardCard request={req} files={files} approval={approval} signature={signaturesByRequestId[req.id] ?? null} canApproveArb={canApprove} />
+                      </li>
+                    );
+                  })}
+                </ul>
+              </>
+            )}
+
+            {returned.length > 0 && (
+              <>
+                <div class="mt-8 pt-8 border-t border-gray-200">
+                  <h3 class="text-xl font-semibold text-gray-800 mb-4">
+                    Awaiting Resubmission (<span id="returned-count">{returned.length}</span>)
+                  </h3>
+                  <p class="text-base text-gray-600 mb-4">
+                    Returned for additional information. Owner can edit and resubmit.
+                  </p>
+                </div>
+                <ul class="space-y-4 arb-request-list" id="returned-list">
+                  {returned.map((req) => {
+                    const files = filesByRequestId[req.id] ?? [];
+                    const approval = formatApproval(req.arb_esign ?? null, req.esign_timestamp ?? null);
+                    return (
+                      <li class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden searchable-card" data-search-text={`${req.id} ${req.owner_email} ${req.property_address ?? ''} ${req.applicant_name ?? ''} ${req.phone ?? ''}`.toLowerCase()}>
+                        <ArbDashboardCard request={req} files={files} approval={approval} signature={signaturesByRequestId[req.id] ?? null} canApproveArb={canApprove} />
+                      </li>
+                    );
+                  })}
+                </ul>
+              </>
+            )}
+
+            {needsActionCount === 0 && (
+              <p class="text-gray-500 text-base">No items need your action right now.</p>
             )}
           </section>
 
           <section class="border-t border-gray-200 pt-10" aria-label="Completed (approved/denied)">
-            <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
-              <h2 class="text-2xl font-heading font-bold text-clr-green">Completed (approved/denied)</h2>
+            <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+              <h2 class="text-3xl font-heading font-bold text-clr-green">Completed (approved/denied)</h2>
               {completedWithPeriod.length > 0 && (
                 <button
                   type="button"
                   id="export-csv-btn"
-                  class="no-print px-4 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-sm font-semibold text-gray-700"
+                  class="no-print px-5 py-2.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-base font-semibold text-gray-700"
                 >
                   Export CSV
                 </button>
@@ -204,17 +309,17 @@ const periodOptions = dashboardData?.periodOptions ?? [];
             </div>
             {completedWithPeriod.length > 0 ? (
               <>
-                <div class="flex flex-wrap items-center justify-between gap-4 mb-4 no-print">
-                  <div class="flex flex-wrap items-center gap-2">
-                    <label for="completed-period" class="text-sm font-medium text-gray-700">Show:</label>
-                    <select id="completed-period" class="rounded-lg border border-gray-300 px-3 py-2 text-sm bg-white" aria-label="Filter by period">
+                <div class="flex flex-wrap items-center justify-between gap-4 mb-6 no-print">
+                  <div class="flex flex-wrap items-center gap-3">
+                    <label for="completed-period" class="text-base font-medium text-gray-700">Show:</label>
+                    <select id="completed-period" class="rounded-lg border border-gray-300 px-4 py-2 text-base bg-white" aria-label="Filter by period">
                       {periodOptions.map((opt) => (
                         <option value={opt.value}>{opt.label}</option>
                       ))}
                     </select>
                   </div>
                   {totalCompletedPages > 1 && (
-                    <div class="flex items-center gap-2 text-sm text-gray-600">
+                    <div class="flex items-center gap-3 text-base text-gray-600">
                       <span>Page {completedPage} of {totalCompletedPages}</span>
                       {completedPage > 1 && (
                         <a href={`?page=${completedPage - 1}`} class="px-2 py-1 rounded border border-gray-300 hover:bg-gray-50">Previous</a>
@@ -231,122 +336,123 @@ const periodOptions = dashboardData?.periodOptions ?? [];
                     const approval = formatApproval(req.arb_esign ?? null, req.esign_timestamp ?? null);
                     return (
                       <li class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden completed-card searchable-card" data-year-quarter={req.yearQuarter} data-search-text={`${req.id} ${req.owner_email} ${req.property_address ?? ''} ${req.applicant_name ?? ''} ${req.phone ?? ''}`.toLowerCase()}>
-                        <ArbDashboardCard request={req} files={files} approval={approval} canApproveArb={canApprove} />
+                        <ArbDashboardCard request={req} files={files} approval={approval} signature={signaturesByRequestId[req.id] ?? null} canApproveArb={canApprove} />
                       </li>
                     );
                   })}
                 </ul>
                 {totalCompletedPages > 1 && (
-                  <div class="flex justify-center items-center gap-2 mt-6 no-print">
+                  <div class="flex justify-center items-center gap-3 mt-6 no-print">
                     {completedPage > 1 && (
-                      <a href={`?page=${completedPage - 1}`} class="px-4 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-sm font-semibold text-gray-700">← Previous</a>
+                      <a href={`?page=${completedPage - 1}`} class="px-5 py-2.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-base font-semibold text-gray-700">← Previous</a>
                     )}
-                    <span class="text-sm text-gray-600">Page {completedPage} of {totalCompletedPages}</span>
+                    <span class="text-base text-gray-600 font-medium">Page {completedPage} of {totalCompletedPages}</span>
                     {completedPage < totalCompletedPages && (
-                      <a href={`?page=${completedPage + 1}`} class="px-4 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-sm font-semibold text-gray-700">Next →</a>
+                      <a href={`?page=${completedPage + 1}`} class="px-5 py-2.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-base font-semibold text-gray-700">Next →</a>
                     )}
                   </div>
                 )}
               </>
             ) : (
-              <p class="text-gray-500">No completed requests yet.</p>
+              <p class="text-gray-500 text-base">No completed requests yet.</p>
             )}
           </section>
         </>
       )}
-    </main>
+    </div>
 
-    <!-- Modal: Set review deadline -->
-    <div id="deadline-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" aria-modal="true" aria-labelledby="deadline-modal-title">
-      <div class="bg-white rounded-xl shadow-xl max-w-lg w-full p-6">
-        <h3 id="deadline-modal-title" class="text-lg font-heading font-bold text-clr-green mb-2">Set Review Deadline</h3>
-        <p class="text-sm text-gray-600 mb-3">Set a deadline for reviewing this request. You'll be alerted if the deadline passes.</p>
+  </PortalPage>
+
+  <!-- Modal: Set review deadline -->
+  <div id="deadline-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" aria-modal="true" aria-labelledby="deadline-modal-title">
+    <div class="bg-white rounded-xl shadow-xl max-w-lg w-full p-6">
+      <h3 id="deadline-modal-title" class="text-xl font-heading font-bold text-clr-green mb-3">Set Review Deadline</h3>
+      <p class="text-base text-gray-600 mb-4">Set a deadline for reviewing this request. You'll be alerted if the deadline passes.</p>
         <form id="deadline-form" class="space-y-4">
-          <label for="deadline-input" class="block text-sm font-semibold text-gray-700">Deadline date</label>
+          <label for="deadline-input" class="block text-base font-semibold text-gray-700">Deadline date</label>
           <input
             type="date"
             id="deadline-input"
             name="deadline"
-            class="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-clr-green focus:ring-1 focus:ring-clr-green"
+            class="w-full rounded-lg border border-gray-300 px-4 py-3 text-gray-900 text-base focus:border-clr-green focus:ring-2 focus:ring-clr-green"
             min={new Date().toISOString().split('T')[0]}
           />
           <div class="flex flex-wrap gap-3 justify-end">
-            <button type="button" id="deadline-modal-cancel" class="px-4 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 text-sm font-semibold">Cancel</button>
-            <button type="button" id="deadline-clear-btn" class="px-4 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 text-sm font-semibold">Clear deadline</button>
-            <button type="submit" id="deadline-modal-submit" class="px-4 py-2 rounded-lg bg-clr-green hover:brightness-110 text-white text-sm font-semibold">Set deadline</button>
+            <button type="button" id="deadline-modal-cancel" class="px-5 py-2.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 text-base font-semibold">Cancel</button>
+            <button type="button" id="deadline-clear-btn" class="px-5 py-2.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 text-base font-semibold">Clear deadline</button>
+            <button type="submit" id="deadline-modal-submit" class="px-5 py-2.5 rounded-lg bg-clr-green hover:brightness-110 text-white text-base font-semibold">Set deadline</button>
           </div>
         </form>
       </div>
     </div>
 
-    <!-- Modal: ARB internal notes -->
-    <div id="arb-notes-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" aria-modal="true" aria-labelledby="notes-modal-title">
-      <div class="bg-white rounded-xl shadow-xl max-w-lg w-full p-6">
-        <h3 id="notes-modal-title" class="text-lg font-heading font-bold text-clr-green mb-2">ARB Internal Notes</h3>
-        <p class="text-sm text-gray-600 mb-3">Add private notes for ARB members only. These notes are not visible to the request owner.</p>
+  <!-- Modal: ARB internal notes -->
+  <div id="arb-notes-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" aria-modal="true" aria-labelledby="notes-modal-title">
+    <div class="bg-white rounded-xl shadow-xl max-w-lg w-full p-6">
+      <h3 id="notes-modal-title" class="text-xl font-heading font-bold text-clr-green mb-3">ARB Internal Notes</h3>
+      <p class="text-base text-gray-600 mb-4">Add private notes for ARB members only. These notes are not visible to the request owner.</p>
         <form id="arb-notes-form" class="space-y-4">
-          <label for="arb-notes-input" class="block text-sm font-semibold text-gray-700">Notes</label>
+          <label for="arb-notes-input" class="block text-base font-semibold text-gray-700">Notes</label>
           <textarea
             id="arb-notes-input"
             name="arbNotes"
             rows="6"
-            class="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-clr-green focus:ring-1 focus:ring-clr-green"
+            class="w-full rounded-lg border border-gray-300 px-4 py-3 text-gray-900 text-base focus:border-clr-green focus:ring-2 focus:ring-clr-green"
             placeholder="e.g. Discussed at meeting, needs clarification on materials, etc."
           ></textarea>
           <div class="flex flex-wrap gap-3 justify-end">
-            <button type="button" id="notes-modal-cancel" class="px-4 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 text-sm font-semibold">Cancel</button>
-            <button type="submit" id="notes-modal-submit" class="px-4 py-2 rounded-lg bg-clr-green hover:brightness-110 text-white text-sm font-semibold">Save notes</button>
+            <button type="button" id="notes-modal-cancel" class="px-5 py-2.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 text-base font-semibold">Cancel</button>
+            <button type="submit" id="notes-modal-submit" class="px-5 py-2.5 rounded-lg bg-clr-green hover:brightness-110 text-white text-base font-semibold">Save notes</button>
           </div>
         </form>
       </div>
     </div>
 
-    <!-- Modal: revision reason (required when ARB clicks "Request revision") -->
-    <div id="revision-reason-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" aria-modal="true" aria-labelledby="revision-modal-title">
-      <div class="bg-white rounded-xl shadow-xl max-w-lg w-full p-6">
-        <h3 id="revision-modal-title" class="text-lg font-heading font-bold text-clr-green mb-2">Return request for revision</h3>
-        <p class="text-sm text-gray-600 mb-3">Provide context for the requestor (required). They will see this when editing their request. Examples: &quot;Please add site survey&quot;, &quot;Item missing - paint color samples needed&quot;, &quot;Requested by requestor to update plans&quot;.</p>
+  <!-- Modal: revision reason (required when ARB clicks "Request revision") -->
+  <div id="revision-reason-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" aria-modal="true" aria-labelledby="revision-modal-title">
+    <div class="bg-white rounded-xl shadow-xl max-w-lg w-full p-6">
+      <h3 id="revision-modal-title" class="text-xl font-heading font-bold text-clr-green mb-3">Return request for revision</h3>
+      <p class="text-base text-gray-600 mb-4">Provide context for the requestor (required). They will see this when editing their request. Examples: &quot;Please add site survey&quot;, &quot;Item missing - paint color samples needed&quot;, &quot;Requested by requestor to update plans&quot;.</p>
         <form id="revision-reason-form" class="space-y-4">
-          <label for="revision-notes-input" class="block text-sm font-semibold text-gray-700">Revision notes</label>
+          <label for="revision-notes-input" class="block text-base font-semibold text-gray-700">Revision notes</label>
           <textarea
             id="revision-notes-input"
             name="revisionNotes"
             required
             rows="4"
-            class="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-clr-green focus:ring-1 focus:ring-clr-green"
+            class="w-full rounded-lg border border-gray-300 px-4 py-3 text-gray-900 text-base focus:border-clr-green focus:ring-2 focus:ring-clr-green"
             placeholder="e.g. Please add a site survey. Paint color samples are missing."
           ></textarea>
           <div class="flex flex-wrap gap-3 justify-end">
-            <button type="button" id="revision-modal-cancel" class="px-4 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 text-sm font-semibold">Cancel</button>
-            <button type="submit" id="revision-modal-submit" class="px-4 py-2 rounded-lg border border-amber-600 text-amber-700 bg-amber-50 hover:bg-amber-100 text-sm font-semibold">Return for revision</button>
+            <button type="button" id="revision-modal-cancel" class="px-5 py-2.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 text-base font-semibold">Cancel</button>
+            <button type="submit" id="revision-modal-submit" class="px-5 py-2.5 rounded-lg border border-amber-600 text-amber-700 bg-amber-50 hover:bg-amber-100 text-base font-semibold">Return for revision</button>
           </div>
         </form>
       </div>
     </div>
 
-    <!-- Modal: e-signature for approve/reject (pre-filled from logged-in user; editable) -->
-    <div id="arb-esign-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" aria-modal="true" aria-labelledby="arb-esign-modal-title">
-      <div class="bg-white rounded-xl shadow-xl max-w-lg w-full p-6">
-        <h3 id="arb-esign-modal-title" class="text-lg font-heading font-bold text-clr-green mb-2">E-signature for this action</h3>
-        <p class="text-sm text-gray-600 mb-3">Your name and title will be recorded on the request. You can edit the text below to add or clarify your name.</p>
+  <!-- Modal: e-signature for approve/reject (pre-filled from logged-in user; editable) -->
+  <div id="arb-esign-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" aria-modal="true" aria-labelledby="arb-esign-modal-title">
+    <div class="bg-white rounded-xl shadow-xl max-w-lg w-full p-6">
+      <h3 id="arb-esign-modal-title" class="text-xl font-heading font-bold text-clr-green mb-3">E-signature for this action</h3>
+      <p class="text-base text-gray-600 mb-4">Your name and title will be recorded on the request. You can edit the text below to add or clarify your name.</p>
         <form id="arb-esign-form" class="space-y-4">
-          <label for="arb-esign-input" class="block text-sm font-semibold text-gray-700">Name / title (e.g. Jane Doe, ARB Member)</label>
+          <label for="arb-esign-input" class="block text-base font-semibold text-gray-700">Name / title (e.g. Jane Doe, ARB Member)</label>
           <input
             type="text"
             id="arb-esign-input"
             name="arbEsign"
             required
-            class="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-clr-green focus:ring-1 focus:ring-clr-green"
+            class="w-full rounded-lg border border-gray-300 px-4 py-3 text-gray-900 text-base focus:border-clr-green focus:ring-2 focus:ring-clr-green"
             placeholder="e.g. Jane Doe, ARB Member"
           />
           <div class="flex flex-wrap gap-3 justify-end">
-            <button type="button" id="arb-esign-cancel" class="px-4 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 text-sm font-semibold">Cancel</button>
-            <button type="submit" id="arb-esign-submit" class="px-4 py-2 rounded-lg bg-clr-green hover:brightness-110 text-white text-sm font-semibold">Confirm</button>
+            <button type="button" id="arb-esign-cancel" class="px-5 py-2.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 text-base font-semibold">Cancel</button>
+            <button type="submit" id="arb-esign-submit" class="px-5 py-2.5 rounded-lg bg-clr-green hover:brightness-110 text-white text-base font-semibold">Confirm</button>
           </div>
         </form>
       </div>
     </div>
-  </div>
 
   <style>
     @media print {
@@ -703,7 +809,7 @@ const periodOptions = dashboardData?.periodOptions ?? [];
             const isCompleted = card.classList.contains('completed-card');
             const isInReview = card.closest('#in-review-list');
             const isPending = card.closest('#pending-list');
-            
+
             if (card instanceof HTMLElement) {
               // Also check period filter for completed items
               if (isCompleted && periodSelect) {
@@ -916,7 +1022,7 @@ const periodOptions = dashboardData?.periodOptions ?? [];
           }
 
           const rows = [['Request ID', 'Status', 'Owner Email', 'Applicant Name', 'Phone', 'Property Address', 'Application Type', 'Description', 'Submitted', 'Decision Date', 'Decision By']];
-          
+
           visibleCards.forEach(function (card) {
             const summaryBtn = card.querySelector('.arb-summary');
             if (!summaryBtn) return;
@@ -929,7 +1035,7 @@ const periodOptions = dashboardData?.periodOptions ?? [];
             const status = statusEl?.textContent?.trim() || '';
             const emailMatch = summaryBtn.textContent.match(/From:\s*([^\n]+)/);
             const email = emailMatch ? emailMatch[1].trim() : '';
-            
+
             // Get form fields from details
             const getFieldValue = function (labelText) {
               const label = Array.from(details.querySelectorAll('label')).find(l => l.textContent.includes(labelText));
@@ -944,7 +1050,7 @@ const periodOptions = dashboardData?.periodOptions ?? [];
             const applicationType = getFieldValue('Application for') || '';
             const description = getFieldValue('Description') || '';
             const submitted = getFieldValue('Submitted') || '';
-            
+
             // Get approval info
             const approvalEl = details.querySelector('[class*="border-green-200"], [class*="border-red-200"]');
             const decisionText = approvalEl?.textContent?.trim() || '';
@@ -991,27 +1097,27 @@ const periodOptions = dashboardData?.periodOptions ?? [];
         });
       }
     })();
-    
+
     // Session timeout: Auto-logout after 30 minutes of inactivity
     const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
     let lastActivity = Date.now();
     let timeoutWarningShown = false;
-    
+
     function resetActivity() {
       lastActivity = Date.now();
       timeoutWarningShown = false;
     }
-    
+
     function checkSessionTimeout() {
       const elapsed = Date.now() - lastActivity;
       const remaining = SESSION_TIMEOUT_MS - elapsed;
-      
+
       if (remaining <= 0) {
         alert('Your session has expired due to inactivity. You will be redirected to the login page.');
         window.location.href = '/portal/login';
         return;
       }
-      
+
       if (remaining <= 2 * 60 * 1000 && !timeoutWarningShown) {
         timeoutWarningShown = true;
         const confirmed = confirm('Your session will expire in 2 minutes due to inactivity. Click OK to stay logged in, or Cancel to log out now.');
@@ -1024,12 +1130,11 @@ const periodOptions = dashboardData?.periodOptions ?? [];
         }
       }
     }
-    
+
     ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'].forEach(function (event) {
       document.addEventListener(event, resetActivity, { passive: true });
     });
-    
+
     setInterval(checkSessionTimeout, 60 * 1000);
   </script>
-  </ProtectedPage>
 </PortalLayout>

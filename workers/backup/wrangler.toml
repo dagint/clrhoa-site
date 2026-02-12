@@ -28,7 +28,7 @@ bucket_name = "clrhoa-files"
 [vars]
 # Cloudflare account ID — must match your account. Set in this file (same value as CLOUDFLARE_ACCOUNT_ID in GitHub Secrets).
 # If you use CI/CD, ensure this value is your real account ID (e.g. edd8cf1c48ad414729e72fb0bf468543).
-CLOUDFLARE_ACCOUNT_ID = "REPLACE_WITH_ACCOUNT_ID"
+CLOUDFLARE_ACCOUNT_ID = "edd8cf1c48ad414729e72fb0bf468543"
 # D1 database UUID (same as main app wrangler.toml)
 D1_DATABASE_ID = "a214f9da-3577-4ee7-bc50-bc9b9754a79c"
 # Retention: keep daily backups this many days

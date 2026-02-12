@@ -2,11 +2,11 @@
 export const prerender = false;
 
 import PortalLayout from '../../layouts/PortalLayout.astro';
-import ProtectedPage from '../../components/ProtectedPage.astro';
-import PortalNav from '../../components/PortalNav.astro';
+import PortalPage from '../../components/PortalPage.astro';
 import { getPortalContext } from '../../lib/portal-context';
+import { getPortalBadgeCounts } from '../../lib/portal-badge-counts';
 import { listDirectoryLogsByViewer } from '../../lib/directory-db';
-import { listArbAuditLogForOwner, listArbRequestsByHousehold } from '../../lib/arb-db';
+import { listArbAuditLogForOwner } from '../../lib/arb-db';
 
 const { env, session, effectiveRole } = await getPortalContext(Astro);
 if (!session) return Astro.redirect('/portal/login');
@@ -36,11 +36,11 @@ function activityPageUrl(key: string, value: number): string {
   return u.pathname + u.search;
 }
 
+const { email, role, name } = session;
 const db = env?.DB;
-const dirLogs = db ? await listDirectoryLogsByViewer(db, session.email, pageSize, (dirPage - 1) * pageSize) : [];
-const arbLogs = db ? await listArbAuditLogForOwner(db, session.email, pageSize, (arbPage - 1) * pageSize) : [];
-const allRequests = db ? await listArbRequestsByHousehold(db, session.email) : [];
-const draftCount = allRequests.filter((r) => r.status === 'pending').length;
+const badges = await getPortalBadgeCounts(db, email, role, name);
+const dirLogs = db ? await listDirectoryLogsByViewer(db, email, pageSize, (dirPage - 1) * pageSize) : [];
+const arbLogs = db ? await listArbAuditLogForOwner(db, email, pageSize, (arbPage - 1) * pageSize) : [];
 
 const BLANK = '—';
 
@@ -64,18 +64,31 @@ function revealType(row: { target_name: string | null; target_phone: string | nu
 ---
 
 <PortalLayout title="My activity | Member Portal | Crooked Lake Reserve HOA">
-  <ProtectedPage>
-  <div class="min-h-screen portal-theme-bg font-body">
-    <PortalNav currentPath="/portal/my-activity" draftCount={draftCount} role={effectiveRole} staffRole={session?.role ?? ''} />
-
-    <main class="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
-      <h1 class="text-2xl font-heading font-bold text-clr-green mb-2">My activity</h1>
-      <p class="text-gray-600 mb-4">
+  <PortalPage
+    currentPath="/portal/my-activity"
+    pageTitle="My Activity"
+    userName={badges.displayName ?? undefined}
+    userEmail={email}
+    effectiveRole={effectiveRole}
+    draftCount={badges.draftCount}
+    role={effectiveRole}
+    staffRole={role ?? ''}
+    arbInReviewCount={badges.arbInReviewCount}
+    vendorPendingCount={badges.vendorPendingCount}
+    maintenanceOpenCount={badges.maintenanceOpenCount}
+    meetingsRsvpCount={badges.meetingsRsvpCount}
+    feedbackDueCount={badges.feedbackDueCount}
+  >
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8 mb-8">
+      <h1 class="text-3xl font-heading font-bold text-clr-green mb-3">My Activity</h1>
+      <p class="text-gray-600 text-lg leading-relaxed">
         A log of your own actions on the portal: when you revealed directory contact info and when your ARB requests were updated. Only you can see this page; the board has a separate full audit log for transparency.
       </p>
-      <div class="flex flex-wrap items-center gap-2 mb-8">
-        <label for="activity-per-page" class="text-sm text-gray-600">Per page:</label>
-        <select id="activity-per-page" name="limit" class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-700 focus:border-clr-green focus:outline-none focus:ring-1 focus:ring-clr-green" aria-label="Entries per page">
+    </div>
+
+    <div class="flex flex-wrap items-center gap-3 mb-8">
+      <label for="activity-per-page" class="text-base font-medium text-gray-700">Per page:</label>
+      <select id="activity-per-page" name="limit" class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-base text-gray-700 focus:border-clr-green focus:outline-none focus:ring-2 focus:ring-clr-green" aria-label="Entries per page">
           {ACTIVITY_PAGE_SIZES.map((size) => (
             <option value={size} selected={pageSize === size}>{size}</option>
           ))}
@@ -95,7 +108,7 @@ function revealType(row: { target_name: string | null; target_phone: string | nu
       </script>
 
       <section class="mb-10" aria-labelledby="dir-activity-heading">
-        <h2 id="dir-activity-heading" class="text-lg font-heading font-semibold text-clr-green mb-3">Directory: contact I revealed</h2>
+        <h2 id="dir-activity-heading" class="text-2xl font-heading font-semibold text-clr-green mb-4">Directory: contact I revealed</h2>
         <p class="text-sm text-gray-600 mb-3">When you clicked &quot;Reveal phone&quot; or &quot;Reveal email&quot; in the directory, when you updated your directory info (profile), or when you exported the full directory (board only).</p>
         {dirLogs.length === 0 ? (
           <p class="p-4 bg-gray-50 rounded-xl text-gray-500 text-sm">No directory actions yet.</p>
@@ -133,7 +146,7 @@ function revealType(row: { target_name: string | null; target_phone: string | nu
       </section>
 
       <section aria-labelledby="arb-activity-heading">
-        <h2 id="arb-activity-heading" class="text-lg font-heading font-semibold text-clr-green mb-3">ARB: activity on my requests</h2>
+        <h2 id="arb-activity-heading" class="text-2xl font-heading font-semibold text-clr-green mb-4">ARB: activity on my requests</h2>
         <p class="text-sm text-gray-600 mb-3">Status changes on your ARB requests (submitted, sent back for revisions, approved, rejected, or cancelled by you).</p>
         {arbLogs.length === 0 ? (
           <p class="p-4 bg-gray-50 rounded-xl text-gray-500 text-sm">No ARB activity yet.</p>
@@ -175,9 +188,7 @@ function revealType(row: { target_name: string | null; target_phone: string | nu
               </div>
             </nav>
           </div>
-        )}
-      </section>
-    </main>
-  </div>
-  </ProtectedPage>
+      )}
+    </section>
+  </PortalPage>
 </PortalLayout>

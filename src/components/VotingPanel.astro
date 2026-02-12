@@ -1,0 +1,387 @@
+---
+/**
+ * VotingPanel.astro - Multi-stage voting interface for ARB requests
+ *
+ * Displays vote buttons (APPROVE, DENY, RETURN, ABSTAIN) with comment textarea.
+ * Shows vote counts and current user's vote status.
+ * Handles recusal banners and vote submission.
+ */
+import type { VoteResolutionResult, ArcRequestVote } from '../lib/arb-voting-db';
+
+interface Props {
+  requestId: string;
+  stage: 'ARC_REVIEW' | 'BOARD_REVIEW';
+  cycle: number;
+  resolution: VoteResolutionResult;
+  myVote?: { vote: string; comment: string | null; voted_at: string };
+  isRecused: boolean;
+  recusalReason?: string;
+  isOwner: boolean;
+  csrfToken: string;
+}
+
+const {
+  requestId,
+  stage,
+  cycle,
+  resolution,
+  myVote,
+  isRecused,
+  recusalReason,
+  isOwner,
+  csrfToken,
+} = Astro.props;
+
+const stageLabel = stage === 'ARC_REVIEW' ? 'ARC' : 'Board';
+
+// Determine if voting is still open
+const votingOpen = resolution.outcome === 'PENDING' && !isRecused && !isOwner;
+
+// Vote button states
+const currentVote = myVote?.vote;
+---
+
+<div class="voting-panel bg-white border-2 border-gray-200 rounded-lg p-6 mb-6">
+  <!-- Header -->
+  <div class="mb-4">
+    <h3 class="text-lg font-semibold text-gray-900">{stageLabel} Voting</h3>
+    <p class="text-sm text-gray-600 mt-1">
+      {votingOpen
+        ? `Cast your vote for this request (${resolution.approveCount + resolution.denyCount + resolution.returnCount + resolution.abstainCount} of ${resolution.totalEligible} votes cast)`
+        : resolution.outcome !== 'PENDING'
+          ? `Voting complete: ${resolution.outcome}`
+          : 'Voting in progress'}
+    </p>
+  </div>
+
+  <!-- Recusal Banner -->
+  {isRecused && (
+    <div class="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-md">
+      <div class="flex items-start">
+        <svg class="h-5 w-5 text-yellow-400 mt-0.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+          <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+        </svg>
+        <div class="ml-3">
+          <h4 class="text-sm font-semibold text-yellow-800">You are recused from voting</h4>
+          <p class="text-sm text-yellow-700 mt-1">{recusalReason || 'You cannot vote on this request.'}</p>
+        </div>
+      </div>
+    </div>
+  )}
+
+  <!-- Owner Banner -->
+  {isOwner && (
+    <div class="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-md">
+      <div class="flex items-start">
+        <svg class="h-5 w-5 text-blue-400 mt-0.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+          <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+        </svg>
+        <div class="ml-3">
+          <p class="text-sm text-blue-800">This is your request. You cannot vote on it, but you can see the voting progress.</p>
+        </div>
+      </div>
+    </div>
+  )}
+
+  <!-- Vote Progress -->
+  <div class="mb-6">
+    <div class="flex justify-between items-center mb-2">
+      <span class="text-sm font-medium text-gray-700">Vote Progress</span>
+      <span class="text-sm text-gray-600">
+        {resolution.approveCount + resolution.denyCount + resolution.returnCount + resolution.abstainCount} / {resolution.totalEligible}
+        ({resolution.majorityNeeded} needed for majority)
+      </span>
+    </div>
+    <div class="w-full bg-gray-200 rounded-full h-2.5">
+      <div
+        class={`h-2.5 rounded-full transition-all ${
+          resolution.outcome === 'APPROVED'
+            ? 'bg-green-600'
+            : resolution.outcome === 'DENIED'
+              ? 'bg-red-600'
+              : resolution.outcome === 'RETURNED'
+                ? 'bg-yellow-600'
+                : 'bg-blue-600'
+        }`}
+        style={`width: ${Math.min(100, ((resolution.approveCount + resolution.denyCount + resolution.returnCount + resolution.abstainCount) / resolution.totalEligible) * 100)}%`}
+      ></div>
+    </div>
+  </div>
+
+  <!-- Vote Counts -->
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+    <div class="p-3 bg-green-50 border border-green-200 rounded-md text-center">
+      <div class="text-2xl font-bold text-green-700">{resolution.approveCount}</div>
+      <div class="text-xs text-green-600 mt-1">Approve</div>
+    </div>
+    <div class="p-3 bg-red-50 border border-red-200 rounded-md text-center">
+      <div class="text-2xl font-bold text-red-700">{resolution.denyCount}</div>
+      <div class="text-xs text-red-600 mt-1">Deny</div>
+    </div>
+    <div class="p-3 bg-yellow-50 border border-yellow-200 rounded-md text-center">
+      <div class="text-2xl font-bold text-yellow-700">{resolution.returnCount}</div>
+      <div class="text-xs text-yellow-600 mt-1">Return</div>
+    </div>
+    <div class="p-3 bg-gray-50 border border-gray-200 rounded-md text-center">
+      <div class="text-2xl font-bold text-gray-700">{resolution.abstainCount}</div>
+      <div class="text-xs text-gray-600 mt-1">Abstain</div>
+    </div>
+  </div>
+
+  <!-- Current Vote Display -->
+  {myVote && (
+    <div class="mb-6 p-4 bg-gray-50 border border-gray-200 rounded-md">
+      <div class="flex items-start justify-between">
+        <div>
+          <p class="text-sm font-semibold text-gray-900">Your Current Vote: <span class={`${
+            myVote.vote === 'APPROVE'
+              ? 'text-green-700'
+              : myVote.vote === 'DENY'
+                ? 'text-red-700'
+                : myVote.vote === 'RETURN'
+                  ? 'text-yellow-700'
+                  : 'text-gray-700'
+          }`}>{myVote.vote}</span></p>
+          {myVote.comment && (
+            <p class="text-sm text-gray-600 mt-2"><strong>Comment:</strong> {myVote.comment}</p>
+          )}
+          <p class="text-xs text-gray-400 mt-1">Voted on {new Date(myVote.voted_at).toLocaleString()}</p>
+        </div>
+        {votingOpen && (
+          <span class="text-xs text-blue-600">You can change your vote below</span>
+        )}
+      </div>
+    </div>
+  )}
+
+  <!-- Voting Buttons -->
+  {votingOpen && (
+    <form id={`vote-form-${requestId}`} class="vote-form" data-request-id={requestId} data-stage={stage} data-cycle={cycle}>
+      <input type="hidden" name="csrfToken" value={csrfToken} />
+
+      <!-- Vote Buttons -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+        <button
+          type="button"
+          class={`vote-button px-4 py-3 rounded-md font-semibold text-sm transition-all border-2 ${
+            currentVote === 'APPROVE'
+              ? 'bg-green-600 text-white border-green-600'
+              : 'bg-white text-green-700 border-green-300 hover:bg-green-50'
+          }`}
+          data-vote="APPROVE"
+        >
+          ✓ Approve
+        </button>
+        <button
+          type="button"
+          class={`vote-button px-4 py-3 rounded-md font-semibold text-sm transition-all border-2 ${
+            currentVote === 'DENY'
+              ? 'bg-red-600 text-white border-red-600'
+              : 'bg-white text-red-700 border-red-300 hover:bg-red-50'
+          }`}
+          data-vote="DENY"
+        >
+          ✗ Deny
+        </button>
+        <button
+          type="button"
+          class={`vote-button px-4 py-3 rounded-md font-semibold text-sm transition-all border-2 ${
+            currentVote === 'RETURN'
+              ? 'bg-yellow-600 text-white border-yellow-600'
+              : 'bg-white text-yellow-700 border-yellow-300 hover:bg-yellow-50'
+          }`}
+          data-vote="RETURN"
+        >
+          ↩ Return
+        </button>
+        <button
+          type="button"
+          class={`vote-button px-4 py-3 rounded-md font-semibold text-sm transition-all border-2 ${
+            currentVote === 'ABSTAIN'
+              ? 'bg-gray-600 text-white border-gray-600'
+              : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+          }`}
+          data-vote="ABSTAIN"
+        >
+          − Abstain
+        </button>
+      </div>
+
+      <!-- Comment Textarea -->
+      <div class="mb-4">
+        <label for={`vote-comment-${requestId}`} class="block text-sm font-medium text-gray-700 mb-2">
+          Comment <span class="text-red-600" id={`comment-required-${requestId}`} style="display: none;">*</span>
+          <span class="text-xs text-gray-500 font-normal">(Required for DENY and RETURN)</span>
+        </label>
+        <textarea
+          id={`vote-comment-${requestId}`}
+          name="comment"
+          rows="4"
+          class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-clr-green focus:border-transparent"
+          placeholder="Explain your vote (required for DENY/RETURN)"
+        >{myVote?.comment || ''}</textarea>
+      </div>
+
+      <!-- Submit Button -->
+      <div class="flex items-center justify-between">
+        <div id={`vote-message-${requestId}`} class="text-sm"></div>
+        <button
+          type="submit"
+          class="px-6 py-2 bg-clr-green text-white rounded-md font-semibold hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-clr-green focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          id={`vote-submit-${requestId}`}
+        >
+          Submit Vote
+        </button>
+      </div>
+    </form>
+  )}
+
+  <!-- Resolved Banner -->
+  {resolution.outcome !== 'PENDING' && (
+    <div class={`p-4 rounded-md ${
+      resolution.outcome === 'APPROVED'
+        ? 'bg-green-50 border border-green-200'
+        : resolution.outcome === 'DENIED'
+          ? 'bg-red-50 border border-red-200'
+          : resolution.outcome === 'RETURNED'
+            ? 'bg-yellow-50 border border-yellow-200'
+            : 'bg-gray-50 border border-gray-200'
+    }`}>
+      <p class={`text-sm font-semibold ${
+        resolution.outcome === 'APPROVED'
+          ? 'text-green-800'
+          : resolution.outcome === 'DENIED'
+            ? 'text-red-800'
+            : resolution.outcome === 'RETURNED'
+              ? 'text-yellow-800'
+              : 'text-gray-800'
+      }`}>
+        Voting Complete: {resolution.outcome}
+      </p>
+      <p class="text-xs text-gray-600 mt-1">
+        Final tally: {resolution.approveCount} approve, {resolution.denyCount} deny, {resolution.returnCount} return, {resolution.abstainCount} abstain
+        (majority needed: {resolution.majorityNeeded})
+      </p>
+    </div>
+  )}
+</div>
+
+<script>
+  // Client-side vote submission handling
+  document.addEventListener('DOMContentLoaded', () => {
+    const forms = document.querySelectorAll('.vote-form');
+
+    forms.forEach((form) => {
+      const requestId = form.getAttribute('data-request-id');
+      if (!requestId) return;
+
+      const voteButtons = form.querySelectorAll('.vote-button');
+      const commentTextarea = form.querySelector('textarea[name="comment"]') as HTMLTextAreaElement;
+      const submitButton = form.querySelector('button[type="submit"]') as HTMLButtonElement;
+      const messageDiv = document.getElementById(`vote-message-${requestId}`);
+      const commentRequired = document.getElementById(`comment-required-${requestId}`);
+
+      let selectedVote: string | null = null;
+
+      // Handle vote button clicks
+      voteButtons.forEach((button) => {
+        button.addEventListener('click', () => {
+          selectedVote = button.getAttribute('data-vote');
+
+          // Update button styles
+          voteButtons.forEach((btn) => btn.classList.remove('bg-green-600', 'bg-red-600', 'bg-yellow-600', 'bg-gray-600', 'text-white'));
+          voteButtons.forEach((btn) => btn.classList.add('bg-white', 'border-2'));
+
+          if (selectedVote === 'APPROVE') {
+            button.classList.add('bg-green-600', 'text-white', 'border-green-600');
+            button.classList.remove('bg-white', 'text-green-700');
+          } else if (selectedVote === 'DENY') {
+            button.classList.add('bg-red-600', 'text-white', 'border-red-600');
+            button.classList.remove('bg-white', 'text-red-700');
+          } else if (selectedVote === 'RETURN') {
+            button.classList.add('bg-yellow-600', 'text-white', 'border-yellow-600');
+            button.classList.remove('bg-white', 'text-yellow-700');
+          } else if (selectedVote === 'ABSTAIN') {
+            button.classList.add('bg-gray-600', 'text-white', 'border-gray-600');
+            button.classList.remove('bg-white', 'text-gray-700');
+          }
+
+          // Show/hide comment required indicator
+          if (selectedVote === 'DENY' || selectedVote === 'RETURN') {
+            commentRequired?.style.setProperty('display', 'inline');
+          } else {
+            commentRequired?.style.setProperty('display', 'none');
+          }
+        });
+      });
+
+      // Handle form submission
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        if (!selectedVote) {
+          if (messageDiv) {
+            messageDiv.className = 'text-sm text-red-600';
+            messageDiv.textContent = 'Please select a vote option.';
+          }
+          return;
+        }
+
+        const comment = commentTextarea?.value.trim() || null;
+
+        // Validate comment requirement
+        if ((selectedVote === 'DENY' || selectedVote === 'RETURN') && !comment) {
+          if (messageDiv) {
+            messageDiv.className = 'text-sm text-red-600';
+            messageDiv.textContent = `Comment is required when voting to ${selectedVote}.`;
+          }
+          return;
+        }
+
+        // Disable submit button
+        submitButton.disabled = true;
+        if (messageDiv) {
+          messageDiv.className = 'text-sm text-blue-600';
+          messageDiv.textContent = 'Submitting vote...';
+        }
+
+        try {
+          const csrfToken = (form.querySelector('input[name="csrfToken"]') as HTMLInputElement)?.value;
+
+          const response = await fetch('/api/arb-vote', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              requestId,
+              vote: selectedVote,
+              comment,
+              csrfToken,
+            }),
+          });
+
+          const result = (await response.json()) as { success?: boolean; error?: string };
+
+          if (response.ok && result.success) {
+            if (messageDiv) {
+              messageDiv.className = 'text-sm text-green-600 font-semibold';
+              messageDiv.textContent = 'Vote submitted successfully!';
+            }
+
+            // Reload page after short delay to show updated results
+            setTimeout(() => {
+              window.location.reload();
+            }, 1500);
+          } else {
+            throw new Error(result.error || 'Failed to submit vote');
+          }
+        } catch (error) {
+          if (messageDiv) {
+            messageDiv.className = 'text-sm text-red-600';
+            messageDiv.textContent = error instanceof Error ? error.message : 'Failed to submit vote. Please try again.';
+          }
+          submitButton.disabled = false;
+        }
+      });
+    });
+  });
+</script>

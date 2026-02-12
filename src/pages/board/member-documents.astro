@@ -1,14 +1,16 @@
 ---
 export const prerender = false;
 
-import BoardLayout from '../../layouts/BoardLayout.astro';
 import { getBoardContext } from '../../lib/board-context';
+import { getPortalBadgeCounts } from '../../lib/portal-badge-counts';
 import { isBoardOnly } from '../../lib/auth';
 import { listMemberDocuments } from '../../lib/member-documents-db';
 import { MEMBER_DOC_CATEGORIES, MEMBER_DOC_CATEGORY_LABELS } from '../../lib/member-documents-db';
-import { listArbRequestsByHousehold } from '../../lib/arb-db';
 import { sanitizeForScriptInjection } from '../../lib/sanitize';
+import PortalLayout from '../../layouts/PortalLayout.astro';
+import PortalPage from '../../components/PortalPage.astro';
 
+import BoardNav from '../../components/BoardNav.astro';
 const ctx = await getBoardContext(Astro);
 if ('redirect' in ctx) return Astro.redirect(ctx.redirect);
 const { env, session, effectiveRole } = ctx;
@@ -40,9 +42,10 @@ function memberDocsPageUrl(value: number): string {
 }
 
 const db = env?.DB;
+const { email, role, name } = session;
+const badges = await getPortalBadgeCounts(db, email, role, name);
 const docs = db ? await listMemberDocuments(db, pageSize, (page - 1) * pageSize) : [];
-const allRequests = db ? await listArbRequestsByHousehold(db, session.email) : [];
-const draftCount = allRequests.filter((r) => r.status === 'pending').length;
+
 
 function formatDate(s: string | null): string {
   if (!s) return '-';
@@ -60,17 +63,34 @@ const docsByCategory = MEMBER_DOC_CATEGORIES.map((cat) => ({
 }));
 ---
 
-<BoardLayout title="Member documents" subtitle="Redacted minutes, budgets, and other member-only files" draftCount={draftCount} role={effectiveRole} session={session} elevatedUntil={session.elevated_until}>
-  <div class="mb-8 p-4 rounded-xl bg-blue-50 border border-blue-200 text-blue-900" role="alert">
+<PortalLayout title="Member documents | Board | Member Portal | Crooked Lake Reserve HOA">
+  <PortalPage
+    currentPath="/board/member-documents"
+    pageTitle="Member documents"
+    userName={badges.displayName ?? undefined}
+    userEmail={email}
+    effectiveRole={effectiveRole}
+    draftCount={badges.draftCount}
+    role={effectiveRole}
+    staffRole={role ?? ''}
+    arbInReviewCount={badges.arbInReviewCount}
+    vendorPendingCount={badges.vendorPendingCount}
+    maintenanceOpenCount={badges.maintenanceOpenCount}
+    meetingsRsvpCount={badges.meetingsRsvpCount}
+  >
+    <BoardNav currentPath="/board/member-documents" />
+
+unt}
+<div class="mb-8 p-4 rounded-xl bg-blue-50 border border-blue-200 text-blue-900" role="alert">
     <p class="font-semibold">Members only.</p>
-    <p class="text-sm mt-1">These files are visible only to logged-in members on the <a href="/portal/documents" class="underline font-medium" target="_blank" rel="noopener noreferrer">Documents page <span class="text-blue-700/80">(opens in new tab)</span></a>. Use for redacted minutes, budgets, and other member-only content.</p>
-    <p class="text-sm mt-2 font-medium">Meeting minutes must be redacted before upload.</p>
-    <p class="text-sm mt-0.5">Remove or black out any confidential or sensitive content (e.g. legal, personnel, or private owner details) prior to uploading.</p>
+    <p class="text-base mt-1">These files are visible only to logged-in members on the <a href="/portal/documents" class="underline font-medium" target="_blank" rel="noopener noreferrer">Documents page <span class="text-blue-700/80">(opens in new tab)</span></a>. Use for redacted minutes, budgets, and other member-only content.</p>
+    <p class="text-base mt-2 font-medium">Meeting minutes must be redacted before upload.</p>
+    <p class="text-base mt-0.5">Remove or black out any confidential or sensitive content (e.g. legal, personnel, or private owner details) prior to uploading.</p>
   </div>
 
   <div id="member-doc-message" class="hidden mb-4 p-4 rounded-xl border" role="status" aria-live="polite" aria-atomic="true"></div>
 
-  <h2 class="text-lg font-heading font-semibold text-clr-green mb-3">Upload a document</h2>
+  <h2 class="text-2xl font-heading font-semibold text-clr-green mb-3">Upload a document</h2>
   <form id="member-doc-form" class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-8 space-y-4">
     <input type="hidden" name="csrf_token" value={session.csrfToken ?? ''} />
         <div>
@@ -93,10 +113,10 @@ const docsByCategory = MEMBER_DOC_CATEGORIES.map((cat) => ({
           <input type="file" id="member-doc-file" name="file" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.csv,.xls,.xlsx,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,image/jpeg,image/png,image/gif,image/webp" class="mt-1 block w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border file:border-gray-300 file:bg-gray-50 file:text-gray-700 hover:file:bg-gray-100" required data-accept-minutes=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" data-accept-all=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.csv,.xls,.xlsx,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,image/jpeg,image/png,image/gif,image/webp" />
           <p class="text-xs text-gray-500 mt-1" id="member-doc-file-hint">Minutes: PDF or Word. Budgets / Other: PDF, Word, CSV, Excel (.xls, .xlsx), or images (resized on upload).</p>
         </div>
-        <button type="submit" id="member-doc-submit" class="px-4 py-2 bg-clr-green text-white rounded-lg font-medium hover:brightness-110 disabled:opacity-70 disabled:cursor-not-allowed" aria-busy="false">Upload</button>
+        <button type="submit" id="member-doc-submit" class="px-5 py-2.5 bg-clr-green text-white rounded-lg font-medium hover:brightness-110 disabled:opacity-70 disabled:cursor-not-allowed" aria-busy="false">Upload</button>
   </form>
 
-  <h2 class="text-lg font-heading font-semibold text-clr-green mb-3">Current documents</h2>
+  <h2 class="text-2xl font-heading font-semibold text-clr-green mb-3">Current documents</h2>
   {docs.length === 0 && page === 1 ? (
         <p class="text-gray-500">No member documents yet. Upload one above.</p>
       ) : (
@@ -151,10 +171,11 @@ const docsByCategory = MEMBER_DOC_CATEGORIES.map((cat) => ({
         </>
       )}
 
-  <p class="mt-8 text-sm text-gray-500">
+  <p class="mt-8 text-base text-gray-500">
     Members see these documents grouped by category on <a href="/portal/documents" class="text-clr-green hover:underline" target="_blank" rel="noopener noreferrer">Portal &gt; Documents <span class="text-gray-400">(opens in new tab)</span></a>.
   </p>
-</BoardLayout>
+  </PortalPage>
+</PortalLayout>
 
 <script is:inline define:vars={{ csrfToken: sanitizeForScriptInjection(session?.csrfToken ?? '') }}>
   (function () {

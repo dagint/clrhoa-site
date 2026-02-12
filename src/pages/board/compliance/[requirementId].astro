@@ -55,6 +55,19 @@ function formatDateShort(s: string | null): string {
   }
 }
 
+function getDocumentYear(dateStr: string | null): number {
+  if (!dateStr) return 0;
+  try {
+    return new Date(dateStr).getFullYear();
+  } catch {
+    return 0;
+  }
+}
+
+const currentYear = new Date().getFullYear();
+const documentYear = currentDocument ? getDocumentYear(currentDocument.document_date) : 0;
+const isOutdated = requirement.requires_annual_update === 1 && documentYear > 0 && documentYear < currentYear;
+
 function getStatusBadgeClass(statusStr: string): string {
   switch (statusStr) {
     case 'COMPLIANT':
@@ -170,6 +183,29 @@ const pageTitle = `${requirement.id}: ${requirement.title}`;
       </div>
     </div>
   </div>
+
+  <!-- Annual Update Warning (if outdated) -->
+  {isOutdated && (
+    <div class="mb-6 p-6 rounded-2xl bg-amber-50 border-2 border-amber-300">
+      <div class="flex items-start gap-3">
+        <div class="text-2xl">⚠️</div>
+        <div>
+          <h3 class="font-semibold text-amber-900 mb-1">Annual Update Required</h3>
+          <p class="text-sm text-amber-800 mb-2">
+            This document requires annual updates and the current version is from {documentYear}.
+            Please upload a {currentYear} version to maintain compliance.
+          </p>
+          <button
+            type="button"
+            onclick="document.getElementById('upload-section')?.scrollIntoView({ behavior: 'smooth' })"
+            class="text-sm text-amber-900 hover:text-amber-700 font-medium underline"
+          >
+            Upload {currentYear} Version →
+          </button>
+        </div>
+      </div>
+    </div>
+  )}
 
   <!-- Current Document Section -->
   {currentDocument ? (

@@ -136,6 +136,18 @@ if (!request) {
   });
 }
 
+// Check workflow version - v2 requests should use /api/arb-vote
+if (request.workflow_version === 2) {
+  return new Response(
+    JSON.stringify({
+      error: 'This request uses the multi-stage voting workflow. Please use /api/arb-vote to cast your vote instead.',
+      use_endpoint: '/api/arb-vote',
+      workflow_version: 2,
+    }),
+    { status: 400, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+
 // Request revision: in_review → pending (revision notes required)
 if (action === 'request_revision' || action === 'request revision') {
   if (request.status !== 'in_review') {
