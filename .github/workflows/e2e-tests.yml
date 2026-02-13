@@ -47,6 +47,7 @@ jobs:
         run: npm run preview:test &
         env:
           SESSION_SECRET: ${{ secrets.SESSION_SECRET_TEST }}
+          NODE_ENV: test
 
       - name: Wait for server to be ready
         run: |
@@ -115,6 +116,7 @@ jobs:
         run: npm run preview:test &
         env:
           SESSION_SECRET: ${{ secrets.SESSION_SECRET_TEST }}
+          NODE_ENV: test
 
       - name: Wait for server
         run: |

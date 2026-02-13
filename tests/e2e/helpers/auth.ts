@@ -12,21 +12,9 @@ import { execSync } from 'child_process';
 import { writeFileSync, unlinkSync } from 'fs';
 import { join } from 'path';
 
-const SESSION_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
-const PIM_ELEVATION_TTL_MS = 30 * 60 * 1000; // 30 minutes
-const ASSUMED_ROLE_TTL_MS = 2 * 60 * 60 * 1000; // 2 hours
-
-/**
- * Generate a Lucia-compatible session ID (40-character hex string).
- */
-function generateSessionId(): string {
-  const array = new Uint8Array(20);
-  crypto.getRandomValues(array);
-  return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
-}
-
 /**
  * Execute wrangler D1 command with --local flag.
+ * Used for cleanup operations.
  */
 function executeD1Command(sql: string, dbName: string = 'clrhoa_db'): void {
   const tmpFile = join(process.cwd(), `.tmp-sql-${Date.now()}.sql`);
@@ -61,9 +49,10 @@ export interface SessionOptions {
 }
 
 /**
- * Create a Lucia session in the D1 database for a test user.
+ * Create a Lucia session via the test API endpoint.
  *
- * Inserts a session row into the sessions table with appropriate PIM/role assumption settings.
+ * Uses the /api/test/create-session endpoint to create proper Lucia sessions
+ * that will be validated correctly by the wrangler dev server.
  *
  * @param user - Test user to create session for
  * @param options - Session options (elevation, role assumption, etc.)
@@ -74,60 +63,28 @@ export async function createTestSession(
   options: SessionOptions = {}
 ): Promise<string> {
   const { elevated = false, assumeRole } = options;
-  const sessionId = generateSessionId();
-  const now = Date.now();
-  const expiresAt = now + SESSION_MAX_AGE_MS;
 
-  // Convert timestamps to Unix seconds for Lucia D1 adapter
-  // Lucia stores timestamps as INTEGER (Unix seconds) even though schema says DATETIME
-  const expiresAtUnix = Math.floor(expiresAt / 1000);
-  const createdAtUnix = Math.floor(now / 1000);
+  // Call the test API endpoint to create a session
+  const baseURL = process.env.PUBLIC_SITE_URL || 'http://127.0.0.1:8788';
+  const response = await fetch(`${baseURL}/api/test/create-session`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      userId: user.email,
+      elevated,
+      assumeRole,
+    }),
+  });
 
-  // Build session attributes
-  const elevatedRoles = ['arb', 'board', 'arb_board', 'admin'];
-  const shouldElevate = elevated && elevatedRoles.includes(user.role);
-  const elevatedUntil = shouldElevate ? now + PIM_ELEVATION_TTL_MS : null;
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+    throw new Error(`Failed to create test session: ${response.status} - ${JSON.stringify(error)}`);
+  }
 
-  const shouldAssumeRole = assumeRole && (user.role === 'admin' || user.role === 'arb_board');
-  const assumedAt = shouldAssumeRole ? now : null;
-  const assumedUntil = shouldAssumeRole ? now + ASSUMED_ROLE_TTL_MS : null;
-
-  // Insert session into D1
-  // IMPORTANT: Lucia D1 adapter stores timestamps as INTEGER (Unix seconds), not DATETIME strings
-  const sql = `
-    INSERT INTO sessions (
-      id,
-      user_id,
-      expires_at,
-      created_at,
-      last_activity,
-      ip_address,
-      user_agent,
-      fingerprint,
-      is_active,
-      elevated_until,
-      assumed_role,
-      assumed_at,
-      assumed_until
-    ) VALUES (
-      '${sessionId}',
-      '${user.email}',
-      ${expiresAtUnix},
-      ${createdAtUnix},
-      ${createdAtUnix},
-      '127.0.0.1',
-      'Playwright-Test',
-      'test-fingerprint',
-      1,
-      ${elevatedUntil},
-      ${assumeRole ? `'${assumeRole}'` : 'NULL'},
-      ${assumedAt},
-      ${assumedUntil}
-    )
-  `;
-
-  executeD1Command(sql);
-  return sessionId;
+  const data = await response.json() as { sessionId: string; expiresAt: number };
+  return data.sessionId;
 }
 
 /**
