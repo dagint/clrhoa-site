@@ -76,11 +76,11 @@ export async function createTestSession(
   const { elevated = false, assumeRole } = options;
   const sessionId = generateSessionId();
   const now = Date.now();
-  const expiresAt = new Date(now + SESSION_MAX_AGE_MS);
+  const expiresAt = now + SESSION_MAX_AGE_MS;
 
-  // Format dates for SQLite
-  const expiresAtISO = expiresAt.toISOString().replace('T', ' ').replace('Z', '');
-  const createdAtISO = new Date(now).toISOString().replace('T', ' ').replace('Z', '');
+  // Convert timestamps to Unix seconds for SQLite INTEGER storage
+  const expiresAtUnix = Math.floor(expiresAt / 1000);
+  const createdAtUnix = Math.floor(now / 1000);
 
   // Build session attributes
   const elevatedRoles = ['arb', 'board', 'arb_board', 'admin'];
@@ -92,6 +92,10 @@ export async function createTestSession(
   const assumedUntil = shouldAssumeRole ? now + ASSUMED_ROLE_TTL_MS : null;
 
   // Insert session into D1
+  // Format dates for SQLite DATETIME type (ISO8601 format)
+  const expiresAtISO = new Date(expiresAt).toISOString();
+  const createdAtISO = new Date(now).toISOString();
+
   const sql = `
     INSERT INTO sessions (
       id,
