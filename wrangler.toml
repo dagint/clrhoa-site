@@ -22,12 +22,12 @@ pages_build_output_dir = "./dist"
 [[d1_databases]]
 binding = "DB"
 database_name = "clrhoa_db"
-database_id = "a214f9da-3577-4ee7-bc50-bc9b9754a79c"
+database_id = "66c2da44-c133-4e57-9352-e72637901cb4"
 
 # KV: email whitelist (key = lowercase email, value = "1" or JSON { "role": "admin" })
 [[kv_namespaces]]
 binding = "CLRHOA_USERS"
-id = "e936ea7760c04b268c4472eb24575d46"
+id = "45ba5f4e64864c1eb5fcc7a6705b0a70"
 
 # KV: SESSION storage for Lucia auth
 [[kv_namespaces]]
