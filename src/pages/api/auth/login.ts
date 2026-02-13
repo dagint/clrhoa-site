@@ -101,6 +101,8 @@ export const POST: APIRoute = async ({ request, locals, cookies }) => {
     );
   }
 
+  try {
+
   // Parse request body
   let body: LoginRequest;
   try {
@@ -439,4 +441,32 @@ export const POST: APIRoute = async ({ request, locals, cookies }) => {
       headers: { 'Content-Type': 'application/json' },
     }
   );
+  } catch (error) {
+    console.error('Login error:', error);
+
+    // Log critical error
+    if (db) {
+      await logSecurityEvent(db, {
+        eventType: 'login_error',
+        severity: 'critical',
+        details: {
+          error: error instanceof Error ? error.message : 'Unknown error',
+          stack: error instanceof Error ? error.stack : undefined,
+        },
+      }).catch(() => {
+        // Ignore logging errors
+      });
+    }
+
+    return new Response(
+      JSON.stringify({
+        success: false,
+        message: 'An error occurred during login. Please try again.',
+      } satisfies LoginResponse),
+      {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
+  }
 };
