@@ -15,11 +15,11 @@ crons = ["0 2 * * *"]
 [[d1_databases]]
 binding = "DB"
 database_name = "clrhoa_db"
-database_id = "a214f9da-3577-4ee7-bc50-bc9b9754a79c"
+database_id = "66c2da44-c133-4e57-9352-e72637901cb4"
 
 [[kv_namespaces]]
 binding = "CLOURHOA_USERS"
-id = "e936ea7760c04b268c4472eb24575d46"
+id = "45ba5f4e64864c1eb5fcc7a6705b0a70"
 
 [[r2_buckets]]
 binding = "BACKUP_R2"
@@ -30,7 +30,7 @@ bucket_name = "clrhoa-files"
 # If you use CI/CD, ensure this value is your real account ID (e.g. edd8cf1c48ad414729e72fb0bf468543).
 CLOUDFLARE_ACCOUNT_ID = "edd8cf1c48ad414729e72fb0bf468543"
 # D1 database UUID (same as main app wrangler.toml)
-D1_DATABASE_ID = "a214f9da-3577-4ee7-bc50-bc9b9754a79c"
+D1_DATABASE_ID = "66c2da44-c133-4e57-9352-e72637901cb4"
 # Retention: keep daily backups this many days
 BACKUP_RETENTION_DAYS = "30"
 
