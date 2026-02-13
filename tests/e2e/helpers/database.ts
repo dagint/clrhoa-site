@@ -81,8 +81,8 @@ function executeKVCommand(
  * This function is called by global-setup.ts before tests run.
  * Test users are inserted with test-specific emails (@clrhoa.test domain).
  *
- * NOTE: We only seed D1, not KV. E2E tests create session cookies directly
- * using createSessionCookieValue(), bypassing the login flow that checks KV.
+ * NOTE: We only seed users table, not passwords. E2E tests create Lucia sessions
+ * directly in the sessions table, bypassing the login flow that validates passwords.
  */
 export async function seedTestUsers(): Promise<void> {
   console.log('[database] Seeding test users...');
@@ -205,6 +205,14 @@ export async function resetPermissions(): Promise<void> {
  */
 export async function cleanupTestData(): Promise<void> {
   console.log('[database] Starting full test data cleanup...');
+
+  // Clean up sessions first (foreign key constraint)
+  try {
+    const { cleanupTestSessions } = await import('./auth.js');
+    await cleanupTestSessions();
+  } catch (error) {
+    console.error('[database] Failed to clean up sessions:', error);
+  }
 
   await cleanupTestUsers();
   await resetPermissions();

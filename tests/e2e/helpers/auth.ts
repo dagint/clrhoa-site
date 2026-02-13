@@ -1,58 +1,53 @@
 /**
  * Authentication helpers for E2E tests.
  *
- * Provides utilities to programmatically authenticate as any role using real session cookies.
- * Reuses the production `createSessionCookieValue()` function for authentic testing.
+ * Provides utilities to programmatically authenticate as any role using Lucia sessions.
+ * Creates actual database sessions for authentic testing.
  */
 
 import { type BrowserContext, type Page } from '@playwright/test';
-import { SESSION_COOKIE_NAME, PIM_ELEVATION_TTL_MS, ASSUMED_ROLE_TTL_MS } from '../../../src/lib/auth.js';
-import type { SessionPayload } from '../../../src/lib/auth.js';
+import { SESSION_COOKIE_NAME } from '../../../src/lib/auth/middleware.js';
 import { TEST_USERS, type TestUser } from '../fixtures/testUsers.js';
+import { execSync } from 'child_process';
+import { writeFileSync, unlinkSync } from 'fs';
+import { join } from 'path';
 
-const SESSION_MAX_AGE_SEC = 60 * 60 * 24 * 7; // 7 days
-
-/**
- * Generate a CSRF token.
- */
-function generateCsrfToken(): string {
-  const array = new Uint8Array(32);
-  crypto.getRandomValues(array);
-  return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
-}
+const SESSION_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+const PIM_ELEVATION_TTL_MS = 30 * 60 * 1000; // 30 minutes
+const ASSUMED_ROLE_TTL_MS = 2 * 60 * 60 * 1000; // 2 hours
 
 /**
- * Generate a unique session ID.
+ * Generate a Lucia-compatible session ID (40-character hex string).
  */
 function generateSessionId(): string {
-  const array = new Uint8Array(16);
+  const array = new Uint8Array(20);
   crypto.getRandomValues(array);
   return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
 /**
- * Sign payload with HMAC-SHA256 using SESSION_SECRET.
+ * Execute wrangler D1 command with --local flag.
  */
-async function signPayload(payload: SessionPayload, secret: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(JSON.stringify(payload));
-  const key = await crypto.subtle.importKey(
-    'raw',
-    encoder.encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign']
-  );
-  const sig = await crypto.subtle.sign('HMAC', key, data);
-  const payloadB64 = btoa(String.fromCharCode(...new Uint8Array(data)))
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
-  const sigB64 = btoa(String.fromCharCode(...new Uint8Array(sig)))
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
-  return `${payloadB64}.${sigB64}`;
+function executeD1Command(sql: string, dbName: string = 'clrhoa_db'): void {
+  const tmpFile = join(process.cwd(), `.tmp-sql-${Date.now()}.sql`);
+
+  try {
+    writeFileSync(tmpFile, sql, 'utf-8');
+    execSync(`npx wrangler d1 execute ${dbName} --local --file="${tmpFile}"`, {
+      encoding: 'utf-8',
+      stdio: 'pipe',
+      cwd: process.cwd(),
+    });
+  } catch (error) {
+    console.error(`[auth] D1 command failed: ${sql}`);
+    throw error;
+  } finally {
+    try {
+      unlinkSync(tmpFile);
+    } catch {
+      // Ignore cleanup errors
+    }
+  }
 }
 
 /**
@@ -63,81 +58,86 @@ export interface SessionOptions {
   elevated?: boolean;
   /** For admin/arb_board: which role to assume (board or arb) */
   assumeRole?: 'board' | 'arb';
-  /** Custom expiration time (defaults to session max age) */
-  expiresIn?: number;
 }
 
 /**
- * Get session secret from environment.
- * Throws if SESSION_SECRET is not set.
- */
-function getSessionSecret(): string {
-  const secret = process.env.SESSION_SECRET;
-  if (!secret) {
-    throw new Error('SESSION_SECRET environment variable is not set. Check .env.test file.');
-  }
-  return secret;
-}
-
-/**
- * Create a signed session cookie value for a test user.
+ * Create a Lucia session in the D1 database for a test user.
  *
- * Creates a legacy session WITHOUT fingerprint to avoid fingerprint mismatch
- * issues in E2E tests. Legacy sessions are still supported (grace period until 2026-05-10).
+ * Inserts a session row into the sessions table with appropriate PIM/role assumption settings.
  *
  * @param user - Test user to create session for
  * @param options - Session options (elevation, role assumption, etc.)
- * @returns Signed session cookie value
+ * @returns Lucia session ID
  */
 export async function createTestSession(
   user: TestUser,
   options: SessionOptions = {}
 ): Promise<string> {
   const { elevated = false, assumeRole } = options;
-  const secret = getSessionSecret();
-  const now = Math.floor(Date.now() / 1000);
+  const sessionId = generateSessionId();
+  const now = Date.now();
+  const expiresAt = new Date(now + SESSION_MAX_AGE_MS);
 
-  // Base session payload (WITHOUT fingerprint for E2E tests)
-  const payload: SessionPayload = {
-    email: user.email,
-    role: user.role,
-    name: user.name,
-    exp: now + SESSION_MAX_AGE_SEC,
-    csrfToken: generateCsrfToken(),
-    lastActivity: now,
-    sessionId: generateSessionId(),
-    createdAt: now,
-    // NO fingerprint - this makes it a legacy session that will be accepted
-  };
+  // Format dates for SQLite
+  const expiresAtISO = expiresAt.toISOString().replace('T', ' ').replace('Z', '');
+  const createdAtISO = new Date(now).toISOString().replace('T', ' ').replace('Z', '');
 
-  // Add elevation if requested and role is elevated
+  // Build session attributes
   const elevatedRoles = ['arb', 'board', 'arb_board', 'admin'];
-  if (elevated && elevatedRoles.includes(user.role)) {
-    payload.elevated_until = Date.now() + PIM_ELEVATION_TTL_MS;
-  }
+  const shouldElevate = elevated && elevatedRoles.includes(user.role);
+  const elevatedUntil = shouldElevate ? now + PIM_ELEVATION_TTL_MS : null;
 
-  // Add assumed role if requested (admin or arb_board only)
-  if (assumeRole && (user.role === 'admin' || user.role === 'arb_board')) {
-    payload.assumed_role = assumeRole;
-    payload.assumed_at = Date.now();
-    payload.assumed_until = Date.now() + ASSUMED_ROLE_TTL_MS;
-  }
+  const shouldAssumeRole = assumeRole && (user.role === 'admin' || user.role === 'arb_board');
+  const assumedAt = shouldAssumeRole ? now : null;
+  const assumedUntil = shouldAssumeRole ? now + ASSUMED_ROLE_TTL_MS : null;
 
-  // Sign the payload
-  const sessionValue = await signPayload(payload, secret);
-  return sessionValue;
+  // Insert session into D1
+  const sql = `
+    INSERT INTO sessions (
+      id,
+      user_id,
+      expires_at,
+      created_at,
+      last_activity,
+      ip_address,
+      user_agent,
+      fingerprint,
+      is_active,
+      elevated_until,
+      assumed_role,
+      assumed_at,
+      assumed_until
+    ) VALUES (
+      '${sessionId}',
+      '${user.email}',
+      '${expiresAtISO}',
+      '${createdAtISO}',
+      '${createdAtISO}',
+      '127.0.0.1',
+      'Playwright-Test',
+      'test-fingerprint',
+      1,
+      ${elevatedUntil},
+      ${assumeRole ? `'${assumeRole}'` : 'NULL'},
+      ${assumedAt},
+      ${assumedUntil}
+    )
+  `;
+
+  executeD1Command(sql);
+  return sessionId;
 }
 
 /**
- * Set session cookie in browser context.
+ * Set Lucia session cookie in browser context.
  *
  * @param context - Playwright browser context
- * @param sessionValue - Signed session cookie value
+ * @param sessionId - Lucia session ID
  * @param baseURL - Base URL (defaults to PUBLIC_SITE_URL from env or http://127.0.0.1:8788)
  */
 export async function setSessionCookie(
   context: BrowserContext,
-  sessionValue: string,
+  sessionId: string,
   baseURL?: string
 ): Promise<void> {
   const url = new URL(baseURL || process.env.PUBLIC_SITE_URL || 'http://127.0.0.1:8788');
@@ -145,7 +145,7 @@ export async function setSessionCookie(
   await context.addCookies([
     {
       name: SESSION_COOKIE_NAME,
-      value: sessionValue,
+      value: sessionId,
       domain: url.hostname,
       path: '/',
       httpOnly: true,
@@ -158,7 +158,7 @@ export async function setSessionCookie(
 /**
  * Login as a specific role in a browser context.
  *
- * Creates a new browser context with a session cookie for the specified role.
+ * Creates a Lucia session in the D1 database and sets the session cookie.
  * This is the primary authentication method for E2E tests.
  *
  * @param context - Playwright browser context
@@ -188,17 +188,44 @@ export async function loginAs(
     throw new Error(`Test user not found for role: ${role}`);
   }
 
-  const sessionValue = await createTestSession(user, options);
-  await setSessionCookie(context, sessionValue);
+  const sessionId = await createTestSession(user, options);
+  await setSessionCookie(context, sessionId);
 }
 
 /**
  * Logout by clearing session cookie.
  *
+ * Note: This does NOT delete the session from the database. Sessions will be
+ * cleaned up by global-teardown.ts after all tests complete.
+ *
  * @param context - Playwright browser context
  */
 export async function logout(context: BrowserContext): Promise<void> {
   await context.clearCookies();
+}
+
+/**
+ * Clean up all test sessions from the database.
+ *
+ * Called by global-teardown.ts to remove all sessions for test users.
+ */
+export async function cleanupTestSessions(): Promise<void> {
+  console.log('[auth] Cleaning up test sessions...');
+
+  const testUsers = Object.values(TEST_USERS);
+
+  for (const user of testUsers) {
+    try {
+      const sql = `DELETE FROM sessions WHERE user_id = '${user.email}'`;
+      executeD1Command(sql);
+      console.log(`[auth] ✓ Cleaned up sessions for: ${user.email}`);
+    } catch (error) {
+      console.error(`[auth] ✗ Failed to clean up sessions for: ${user.email}`);
+      // Continue cleanup even if one fails
+    }
+  }
+
+  console.log('[auth] Test session cleanup complete');
 }
 
 /**

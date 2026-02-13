@@ -118,6 +118,14 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
         return context.redirect(`/portal/request-elevated-access?return=${encodeURIComponent(pathname)}`);
       }
 
+      // Check PIM elevation status
+      const elevatedUntil = (session as any).elevated_until;
+      const now = Date.now();
+      if (!elevatedUntil || elevatedUntil < now) {
+        // User has elevated role but no active elevation - require PIM elevation
+        return context.redirect(`/portal/request-elevated-access?return=${encodeURIComponent(pathname)}`);
+      }
+
       // Check role-based access using centralized logic
       if (!hasRouteAccess(userRole, pathname)) {
         return context.redirect(getAccessDeniedRedirect(userRole));
@@ -148,6 +156,14 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
         return context.redirect(getRoleLandingZone(userRole));
       }
 
+      // Check PIM elevation status
+      const elevatedUntil = (session as any).elevated_until;
+      const now = Date.now();
+      if (!elevatedUntil || elevatedUntil < now) {
+        // Admin needs active elevation - require PIM elevation
+        return context.redirect(`/portal/request-elevated-access?return=${encodeURIComponent(pathname)}`);
+      }
+
       // Store user in context for use in pages
       context.locals.user = user;
       context.locals.session = session;
@@ -171,6 +187,17 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
 
         if (!isElevatedRole(userRole)) {
           return new Response(JSON.stringify({ error: 'Forbidden', success: false }), {
+            status: 403,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+
+        // Check PIM elevation status
+        const elevatedUntil = (session as any).elevated_until;
+        const now = Date.now();
+        if (!elevatedUntil || elevatedUntil < now) {
+          // User has elevated role but no active elevation
+          return new Response(JSON.stringify({ error: 'Forbidden: Elevation required', success: false }), {
             status: 403,
             headers: { 'Content-Type': 'application/json' },
           });
@@ -214,17 +241,41 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
         if (!isAdminRole(userRole)) {
           return context.redirect(getRoleLandingZone(userRole));
         }
+        // Check PIM elevation for admin
+        const elevatedUntil = (session as any).elevated_until;
+        const now = Date.now();
+        if (!elevatedUntil || elevatedUntil < now) {
+          return context.redirect(`/portal/request-elevated-access?return=${encodeURIComponent(pathname)}`);
+        }
       } else if (pathname === '/portal/board' || pathname === '/portal/board/') {
         if (userRole !== 'board' && userRole !== 'arb_board') {
           return context.redirect(getRoleLandingZone(userRole));
+        }
+        // Check PIM elevation for board
+        const elevatedUntil = (session as any).elevated_until;
+        const now = Date.now();
+        if (!elevatedUntil || elevatedUntil < now) {
+          return context.redirect(`/portal/request-elevated-access?return=${encodeURIComponent(pathname)}`);
         }
       } else if (pathname === '/portal/arb' || pathname === '/portal/arb/') {
         if (userRole !== 'arb' && userRole !== 'arb_board') {
           return context.redirect(getRoleLandingZone(userRole));
         }
+        // Check PIM elevation for ARB
+        const elevatedUntil = (session as any).elevated_until;
+        const now = Date.now();
+        if (!elevatedUntil || elevatedUntil < now) {
+          return context.redirect(`/portal/request-elevated-access?return=${encodeURIComponent(pathname)}`);
+        }
       } else if ((pathname === '/portal/usage' || pathname.startsWith('/portal/usage')) && !pathname.startsWith('/portal/admin/')) {
         if (!isAdminRole(userRole)) {
           return context.redirect(getRoleLandingZone(userRole));
+        }
+        // Check PIM elevation for usage
+        const elevatedUntil = (session as any).elevated_until;
+        const now = Date.now();
+        if (!elevatedUntil || elevatedUntil < now) {
+          return context.redirect(`/portal/request-elevated-access?return=${encodeURIComponent(pathname)}`);
         }
       }
 
