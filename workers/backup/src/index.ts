@@ -620,44 +620,6 @@ async function listAllR2Files(env: Env): Promise<R2FileMetadata[]> {
 }
 
 /**
- * Cleanup old data from D1 database to keep it lean.
- * - Contact submissions older than 1 year
- * - Rate limits older than 7 days
- * - Directory logs older than 1 year
- */
-async function cleanupOldData(env: Env): Promise<void> {
-  if (!env.DB) return;
-
-  try {
-    // Delete contact submissions >1 year
-    const contactResult = await env.DB.prepare(
-      "DELETE FROM contact_submissions WHERE created_at < datetime('now', '-1 year')"
-    ).run();
-    if (contactResult.meta.changes > 0) {
-      console.log(`Cleaned up ${contactResult.meta.changes} old contact submissions`);
-    }
-
-    // Delete rate limits >7 days
-    const rateLimitResult = await env.DB.prepare(
-      "DELETE FROM rate_limits WHERE created_at < datetime('now', '-7 days')"
-    ).run();
-    if (rateLimitResult.meta.changes > 0) {
-      console.log(`Cleaned up ${rateLimitResult.meta.changes} old rate limits`);
-    }
-
-    // Delete directory logs >1 year
-    const directoryResult = await env.DB.prepare(
-      "DELETE FROM directory_logs WHERE viewed_at < datetime('now', '-1 year')"
-    ).run();
-    if (directoryResult.meta.changes > 0) {
-      console.log(`Cleaned up ${directoryResult.meta.changes} old directory logs`);
-    }
-  } catch (e) {
-    console.warn("Data cleanup encountered an error:", e);
-  }
-}
-
-/**
  * Get the last R2 backup state from Google Drive.
  * This tracks which files have already been uploaded to avoid re-uploading unchanged files.
  */
