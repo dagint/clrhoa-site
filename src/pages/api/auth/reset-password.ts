@@ -33,6 +33,7 @@
  * - 429: Rate limit exceeded
  * - 500: Server error
  */
+export const prerender = false;
 
 import type { APIRoute } from 'astro';
 import { hashPassword } from '../../../lib/password';
