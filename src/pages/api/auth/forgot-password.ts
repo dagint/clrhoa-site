@@ -31,6 +31,7 @@ import type { APIRoute } from 'astro';
 import { checkRateLimit } from '../../../lib/rate-limit';
 import { logSecurityEvent } from '../../../lib/audit-log';
 import { generateResetToken, sendResetEmail } from '../../../lib/auth/reset-tokens';
+import { getResendClient } from '../../../lib/resend-client';
 import crypto from 'node:crypto';
 import type { ResendClient } from '../../../types/resend';
 
@@ -48,7 +49,7 @@ export const prerender = false;
 export const POST: APIRoute = async ({ request, locals }) => {
   const db = locals.runtime.env.DB;
   const kv = locals.runtime?.env?.CLRHOA_USERS as KVNamespace | undefined;
-  const resend = locals.runtime?.env?.RESEND as ResendClient | undefined;
+  const resend = getResendClient(locals.runtime.env);
   const ipAddress = request.headers.get('cf-connecting-ip') || 'unknown';
   const userAgent = request.headers.get('user-agent') || 'unknown';
 
