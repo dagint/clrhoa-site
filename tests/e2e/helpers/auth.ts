@@ -78,7 +78,8 @@ export async function createTestSession(
   const now = Date.now();
   const expiresAt = now + SESSION_MAX_AGE_MS;
 
-  // Convert timestamps to Unix seconds for SQLite INTEGER storage
+  // Convert timestamps to Unix seconds for Lucia D1 adapter
+  // Lucia stores timestamps as INTEGER (Unix seconds) even though schema says DATETIME
   const expiresAtUnix = Math.floor(expiresAt / 1000);
   const createdAtUnix = Math.floor(now / 1000);
 
@@ -92,10 +93,7 @@ export async function createTestSession(
   const assumedUntil = shouldAssumeRole ? now + ASSUMED_ROLE_TTL_MS : null;
 
   // Insert session into D1
-  // Format dates for SQLite DATETIME type (ISO8601 format)
-  const expiresAtISO = new Date(expiresAt).toISOString();
-  const createdAtISO = new Date(now).toISOString();
-
+  // IMPORTANT: Lucia D1 adapter stores timestamps as INTEGER (Unix seconds), not DATETIME strings
   const sql = `
     INSERT INTO sessions (
       id,
@@ -114,9 +112,9 @@ export async function createTestSession(
     ) VALUES (
       '${sessionId}',
       '${user.email}',
-      '${expiresAtISO}',
-      '${createdAtISO}',
-      '${createdAtISO}',
+      ${expiresAtUnix},
+      ${createdAtUnix},
+      ${createdAtUnix},
       '127.0.0.1',
       'Playwright-Test',
       'test-fingerprint',
