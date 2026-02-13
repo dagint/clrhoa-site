@@ -30,7 +30,7 @@ export function createLucia(db: D1Database) {
 
   return new Lucia(adapter, {
     sessionCookie: {
-      name: 'clrhoa_lucia_session',
+      name: 'clrhoa_session',
       expires: false, // Session cookies (expires when browser closes)
       attributes: {
         secure: true, // HTTPS only in production

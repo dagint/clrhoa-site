@@ -8,13 +8,9 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie } from '../lib/auth';
-
-const runtime = Astro.locals.runtime;
-const env = runtime?.env;
-const secret = env?.SESSION_SECRET;
-const cookieHeader = Astro.request.headers.get('cookie') ?? undefined;
-const session = await getSessionFromCookie(cookieHeader, secret);
+// Read user and session from middleware (Lucia auth)
+const user = Astro.locals.user;
+const session = Astro.locals.session;
 ---
 
 {!session ? (
