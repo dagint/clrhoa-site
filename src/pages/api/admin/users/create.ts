@@ -35,7 +35,7 @@ import { requireRole } from '../../../../lib/auth/middleware';
 import { generateSetupToken, sendSetupEmail } from '../../../../lib/auth/setup-tokens';
 import { logAuditEvent } from '../../../../lib/audit-log';
 import { getUserEmail } from '../../../../types/auth';
-import type { ResendClient } from '../../../../types/resend';
+import { getResendClient } from '../../../../lib/resend-client';
 import { handleDatabaseError, getDatabaseErrorStatus, isDuplicateKeyError } from '../../../../lib/db-errors';
 import { validateAndNormalizeEmail } from '../../../../lib/email-validation';
 
@@ -60,7 +60,7 @@ export const POST: APIRoute = async (context) => {
   }
 
   const db = context.locals.runtime?.env?.DB;
-  const resend = context.locals.runtime?.env?.RESEND as ResendClient | undefined;
+  const resend = getResendClient(context.locals.runtime.env);
 
   if (!db) {
     return new Response(

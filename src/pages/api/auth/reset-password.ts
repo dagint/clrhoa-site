@@ -38,7 +38,7 @@ import type { APIRoute } from 'astro';
 import { hashPassword } from '../../../lib/password';
 import { logSecurityEvent } from '../../../lib/audit-log';
 import { checkRateLimit } from '../../../lib/rate-limit';
-import type { ResendClient } from '../../../types/resend';
+import { getResendClient } from '../../../lib/resend-client';
 import { handleDatabaseError, getDatabaseErrorStatus } from '../../../lib/db-errors';
 import { createLucia } from '../../../lib/lucia';
 import crypto from 'node:crypto';
@@ -84,7 +84,7 @@ function validatePassword(password: string): { valid: boolean; error?: string } 
 export const POST: APIRoute = async ({ request, locals }) => {
   const db = locals.runtime.env.DB;
   const kv = locals.runtime?.env?.CLRHOA_USERS as KVNamespace | undefined;
-  const resend = locals.runtime?.env?.RESEND as ResendClient | undefined;
+  const resend = getResendClient(locals.runtime.env);
   const ipAddress = request.headers.get('cf-connecting-ip') || 'unknown';
   const userAgent = request.headers.get('user-agent') || 'unknown';
 
