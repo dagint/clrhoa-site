@@ -1,0 +1,20 @@
+---
+export const prerender = false;
+
+const token = Astro.url.searchParams.get('token');
+const allParams = Object.fromEntries(Astro.url.searchParams.entries());
+---
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Token</title>
+</head>
+<body>
+    <h1>Debug Token Test</h1>
+    <p><strong>Full URL:</strong> {Astro.url.href}</p>
+    <p><strong>Token from query:</strong> {token || 'NULL'}</p>
+    <p><strong>All query params:</strong> {JSON.stringify(allParams)}</p>
+    <p><strong>Search string:</strong> {Astro.url.search}</p>
+</body>
+</html>
