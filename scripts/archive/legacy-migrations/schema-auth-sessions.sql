@@ -5,7 +5,7 @@
 CREATE TABLE IF NOT EXISTS sessions (
   id TEXT PRIMARY KEY, -- Session ID (cryptographically random)
   user_id TEXT NOT NULL, -- References users.email
-  expires_at DATETIME NOT NULL, -- Absolute expiration (max 24 hours from creation)
+  expires_at INTEGER NOT NULL, -- Unix timestamp (seconds since epoch) - required by Lucia
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   last_activity DATETIME DEFAULT CURRENT_TIMESTAMP, -- Sliding window (15 min)
   ip_address TEXT DEFAULT NULL,

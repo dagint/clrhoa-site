@@ -407,13 +407,26 @@ export const POST: APIRoute = async ({ request, locals, cookies }) => {
   }
 
   // No MFA - create session directly
-  const hostname = new URL(request.url).hostname;
-  const lucia = createLucia(db, hostname);
+  const requestUrl = request.url;
+  const lucia = createLucia(db, requestUrl);
   const session = await createSession(db, lucia, normalizedEmail, ipAddress, userAgent);
+
+  console.log('[LOGIN DEBUG] Created session:', session.id.substring(0, 10) + '...');
+  console.log('[LOGIN DEBUG] Session expires at:', session.expiresAt);
+
+  // Verify session was saved to database
+  const dbSession = await db.prepare('SELECT * FROM sessions WHERE id = ?').bind(session.id).first();
+  console.log('[LOGIN DEBUG] Session in database:', !!dbSession);
+  if (dbSession) {
+    console.log('[LOGIN DEBUG] DB session user_id:', dbSession.user_id);
+    console.log('[LOGIN DEBUG] DB session expires_at:', dbSession.expires_at);
+  }
 
   // Set session cookie
   const sessionCookie = lucia.createSessionCookie(session.id);
-  console.log('[LOGIN DEBUG] Setting cookie:', sessionCookie.name, 'with attributes:', sessionCookie.attributes);
+  console.log('[LOGIN DEBUG] Cookie name:', sessionCookie.name);
+  console.log('[LOGIN DEBUG] Cookie attributes:', JSON.stringify(sessionCookie.attributes));
+  console.log('[LOGIN DEBUG] Cookie secure:', sessionCookie.attributes.secure);
   cookies.set(sessionCookie.name, sessionCookie.value, sessionCookie.attributes);
 
   // Log successful login

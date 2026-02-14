@@ -227,7 +227,7 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
     if (env?.DB) {
       const sessionId = getSessionId(context);
       console.log('[AUTH DEBUG] Session ID:', sessionId ? sessionId.substring(0, 10) + '...' : 'null');
-      const { session, user } = await validateSession(env.DB, sessionId, context.url.hostname);
+      const { session, user } = await validateSession(env.DB, sessionId, context.url.href);
       console.log('[AUTH DEBUG] Validation result - session:', !!session, 'user:', !!user);
 
       if (!session || !user) {

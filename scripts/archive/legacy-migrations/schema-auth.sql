@@ -65,7 +65,7 @@ CREATE INDEX IF NOT EXISTS idx_password_setup_tokens_used ON password_setup_toke
 CREATE TABLE IF NOT EXISTS sessions (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL,
-  expires_at DATETIME NOT NULL,
+  expires_at INTEGER NOT NULL, -- Unix timestamp (seconds since epoch) - required by Lucia
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   last_activity DATETIME DEFAULT CURRENT_TIMESTAMP,
   ip_address TEXT DEFAULT NULL,

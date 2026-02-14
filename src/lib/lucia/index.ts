@@ -17,29 +17,64 @@ export interface DatabaseUserAttributes {
 }
 
 /**
+ * Determine if we're running in production based on environment.
+ * Checks common environment indicators.
+ */
+function isProductionEnvironment(url?: string): boolean {
+  // Check Node.js NODE_ENV (if available in serverless context)
+  if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'production') {
+    return true;
+  }
+
+  // If a URL is provided, check if it's a production domain
+  if (url) {
+    const hostname = new URL(url).hostname;
+    // Development indicators: localhost, 127.0.0.1, .local, or Astro preview ports
+    const isDev = hostname.includes('localhost') ||
+                  hostname.includes('127.0.0.1') ||
+                  hostname.includes('.local') ||
+                  hostname.includes(':4321') || // Astro default dev port
+                  hostname.includes(':3000');
+    return !isDev;
+  }
+
+  // Default to production (safer)
+  return true;
+}
+
+/**
  * Create Lucia instance configured for D1 database.
  *
  * @param db - D1 database instance
- * @param hostname - Optional hostname for cookie domain configuration
+ * @param urlOrIsProduction - URL string to detect environment, or boolean for explicit production mode (default: true)
  * @returns Configured Lucia instance
  */
-export function createLucia(db: D1Database, hostname?: string) {
+export function createLucia(db: D1Database, urlOrIsProduction?: string | boolean) {
   const adapter = new D1Adapter(db, {
     user: 'users',
     session: 'sessions',
   });
 
-  // Determine if we're in a secure context (HTTPS)
-  // For localhost/development, allow insecure cookies
-  const isLocalhost = hostname?.includes('localhost') || hostname?.includes('127.0.0.1') || hostname?.includes('.local');
-  const isSecure = !isLocalhost;
+  // Determine production mode
+  let isProduction: boolean;
+  if (typeof urlOrIsProduction === 'boolean') {
+    isProduction = urlOrIsProduction;
+  } else if (typeof urlOrIsProduction === 'string') {
+    isProduction = isProductionEnvironment(urlOrIsProduction);
+  } else {
+    isProduction = true; // Default to production (safer)
+  }
+
+  // Use secure cookies in production, allow insecure in development
+  // This is more reliable than hostname-based detection
+  const isSecure = isProduction;
 
   return new Lucia(adapter, {
     sessionCookie: {
       name: 'clrhoa_session',
       expires: false, // Session cookies (expires when browser closes)
       attributes: {
-        secure: isSecure, // HTTPS only in production, HTTP for localhost
+        secure: isSecure, // HTTPS only in production, HTTP in development
         sameSite: 'lax', // CSRF protection
         path: '/',
         // Don't set domain - let it default to current hostname
