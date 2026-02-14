@@ -58,12 +58,6 @@ const mainNavItems = [
   { label: 'Library', href: '/portal/library', icon: 'book', badge: 0 },
 ];
 
-const helpNavItems = [
-  { label: 'News', href: '/portal/news', icon: 'bell' },
-  { label: 'Documentation', href: '/portal/docs', icon: 'help' },
-  { label: 'FAQ', href: '/portal/faq', icon: 'question' },
-];
-
 // Icon SVG paths
 const icons: Record<string, string> = {
   home: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6',
@@ -85,15 +79,35 @@ const icons: Record<string, string> = {
 
 <aside
   id="portal-sidebar"
-  class="portal-sidebar fixed top-0 left-0 h-screen w-72 bg-white border-r border-gray-200 shadow-sm z-40 transition-transform duration-300 -translate-x-full lg:translate-x-0 overflow-y-auto"
+  class="portal-sidebar fixed top-0 left-0 h-screen w-72 bg-clr-green border-r border-clr-green-dark shadow-sm z-40 transition-all duration-300 -translate-x-full lg:translate-x-0 overflow-y-auto"
   aria-label="Main navigation"
+  data-collapsed="false"
 >
   <!-- Sidebar Header -->
-  <div class="p-6 border-b border-gray-200">
-    <a href="/portal/dashboard" class="flex flex-col">
-      <span class="text-xl font-heading font-bold text-clr-green">Member Portal</span>
-      <span class="text-xs text-gray-500 mt-1">Crooked Lake Reserve HOA</span>
-    </a>
+  <div class="p-6 border-b border-clr-green-dark/30">
+    <div class="flex items-center justify-between">
+      <a href="/portal/dashboard" class="flex flex-col sidebar-logo">
+        <span class="text-xl font-heading font-bold text-white">Member Portal</span>
+        <span class="text-xs text-white/80 mt-1">Crooked Lake Reserve HOA</span>
+      </a>
+      <a href="/portal/dashboard" class="sidebar-icon-logo hidden">
+        <span class="text-2xl font-heading font-bold text-white">MP</span>
+      </a>
+      <button
+        type="button"
+        id="sidebar-collapse-btn"
+        class="hidden lg:flex p-2 rounded-lg text-white/80 hover:bg-white/10 transition-colors"
+        aria-label="Toggle sidebar width"
+        title="Collapse sidebar"
+      >
+        <svg class="w-5 h-5 sidebar-collapse-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+        </svg>
+        <svg class="w-5 h-5 sidebar-expand-icon hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+        </svg>
+      </button>
+    </div>
   </div>
 
   <!-- Main Navigation -->
@@ -103,10 +117,11 @@ const icons: Record<string, string> = {
         <li>
           <a
             href={item.href}
+            title={item.label}
             class={`flex items-center gap-3 px-4 py-3 rounded-lg text-base font-medium transition-colors ${
               isCurrent(item.href)
-                ? 'bg-clr-green/10 text-clr-green'
-                : 'text-gray-700 hover:bg-gray-100 hover:text-clr-green'
+                ? 'bg-white text-clr-green'
+                : 'text-white/90 hover:bg-white/10 hover:text-white'
             }`}
           >
             <svg
@@ -136,8 +151,8 @@ const icons: Record<string, string> = {
   <!-- Elevated Access Section -->
   {isStaffFromWhitelist && elevatedLink && (
     <div class="px-4 pb-4">
-      <div class="border-t border-gray-200 pt-4">
-        <p class="px-4 py-1 text-xs font-semibold text-amber-700 uppercase tracking-wide">
+      <div class="border-t border-white/20 pt-4">
+        <p class="px-4 py-1 text-xs font-semibold text-amber-200 uppercase tracking-wide">
           Elevated Access
         </p>
         <ul class="space-y-1 mt-2">
@@ -148,10 +163,11 @@ const icons: Record<string, string> = {
                   ? elevatedLink.href
                   : `/portal/request-elevated-access?return=${encodeURIComponent(elevatedLink.href)}`
               }
+              title={elevatedLink.label}
               class={`flex items-center gap-3 px-4 py-3 rounded-lg text-base font-medium transition-colors ${
                 isCurrent(elevatedLink.href)
-                  ? 'bg-amber-50 text-amber-900'
-                  : 'text-amber-700 hover:bg-amber-50'
+                  ? 'bg-amber-500 text-white'
+                  : 'text-amber-200 hover:bg-amber-600/30 hover:text-amber-100'
               }`}
             >
               <svg
@@ -165,7 +181,7 @@ const icons: Record<string, string> = {
               </svg>
               <span class="flex-1">{elevatedLink.label}</span>
               {!isElevated && (
-                <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <svg class="w-4 h-4 text-amber-200" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                 </svg>
               )}
@@ -180,40 +196,6 @@ const icons: Record<string, string> = {
       </div>
     </div>
   )}
-
-  <!-- Help & Support Section (at bottom) -->
-  <div class="mt-auto px-4 pb-6">
-    <div class="border-t border-gray-200 pt-4">
-      <p class="px-4 py-1 text-xs font-semibold text-gray-500 uppercase tracking-wide">
-        Help & Support
-      </p>
-      <ul class="space-y-1 mt-2">
-        {helpNavItems.map((item) => (
-          <li>
-            <a
-              href={item.href}
-              class={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-                isCurrent(item.href)
-                  ? 'bg-gray-100 text-clr-green'
-                  : 'text-gray-600 hover:bg-gray-50 hover:text-clr-green'
-              }`}
-            >
-              <svg
-                class="w-4 h-4 shrink-0"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-              >
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={icons[item.icon]} />
-              </svg>
-              <span>{item.label}</span>
-            </a>
-          </li>
-        ))}
-      </ul>
-    </div>
-  </div>
 </aside>
 
 <!-- Mobile sidebar overlay -->
@@ -224,9 +206,26 @@ const icons: Record<string, string> = {
 ></div>
 
 <style>
+  /* CLR Green colors */
+  .bg-clr-green {
+    background-color: #1e5f38;
+  }
+
+  .bg-clr-green-dark {
+    background-color: #164529;
+  }
+
+  .border-clr-green-dark {
+    border-color: #164529;
+  }
+
+  .text-clr-green {
+    color: #1e5f38;
+  }
+
   .portal-sidebar {
     scrollbar-width: thin;
-    scrollbar-color: rgb(209 213 219) transparent;
+    scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
   }
 
   .portal-sidebar::-webkit-scrollbar {
@@ -238,12 +237,40 @@ const icons: Record<string, string> = {
   }
 
   .portal-sidebar::-webkit-scrollbar-thumb {
-    background: rgb(209 213 219);
+    background: rgba(255, 255, 255, 0.3);
     border-radius: 3px;
   }
 
   .portal-sidebar::-webkit-scrollbar-thumb:hover {
-    background: rgb(156 163 175);
+    background: rgba(255, 255, 255, 0.5);
+  }
+
+  /* Hide text in collapsed mode */
+  .sidebar-text-hidden {
+    display: none !important;
+  }
+
+  /* Tooltips for collapsed mode */
+  .portal-sidebar[data-collapsed="true"] nav a {
+    position: relative;
+    justify-content: center;
+  }
+
+  .portal-sidebar[data-collapsed="true"] nav a:hover::after {
+    content: attr(title);
+    position: absolute;
+    left: 100%;
+    top: 50%;
+    transform: translateY(-50%);
+    margin-left: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background: rgb(31 41 55);
+    color: white;
+    font-size: 0.875rem;
+    white-space: nowrap;
+    border-radius: 0.5rem;
+    z-index: 50;
+    pointer-events: none;
   }
 </style>
 
@@ -251,8 +278,77 @@ const icons: Record<string, string> = {
   (function () {
     const sidebar = document.getElementById('portal-sidebar');
     const overlay = document.getElementById('sidebar-overlay');
+    const collapseBtn = document.getElementById('sidebar-collapse-btn');
+    const header = document.querySelector('.portal-header');
+    const STORAGE_KEY = 'clrhoa_sidebar_collapsed';
 
     if (!sidebar || !overlay) return;
+
+    // Toggle sidebar collapse (icon-only mode)
+    function toggleSidebarCollapse() {
+      const isCollapsed = sidebar.getAttribute('data-collapsed') === 'true';
+      const newState = !isCollapsed;
+
+      sidebar.setAttribute('data-collapsed', String(newState));
+
+      if (newState) {
+        // Collapse to icon-only
+        sidebar.classList.remove('w-72');
+        sidebar.classList.add('w-20');
+        sidebar.querySelectorAll('.sidebar-logo').forEach(el => el.classList.add('hidden'));
+        sidebar.querySelectorAll('.sidebar-icon-logo').forEach(el => el.classList.remove('hidden'));
+        sidebar.querySelectorAll('nav a span.flex-1, nav a span:not(.inline-flex)').forEach(el => {
+          if (!el.classList.contains('inline-flex')) el.classList.add('sidebar-text-hidden');
+        });
+        sidebar.querySelectorAll('.sidebar-collapse-icon').forEach(el => el.classList.add('hidden'));
+        sidebar.querySelectorAll('.sidebar-expand-icon').forEach(el => el.classList.remove('hidden'));
+
+        if (header) {
+          header.classList.remove('lg:left-72');
+          header.classList.add('lg:left-20');
+        }
+
+        collapseBtn?.setAttribute('title', 'Expand sidebar');
+      } else {
+        // Expand to full width
+        sidebar.classList.remove('w-20');
+        sidebar.classList.add('w-72');
+        sidebar.querySelectorAll('.sidebar-logo').forEach(el => el.classList.remove('hidden'));
+        sidebar.querySelectorAll('.sidebar-icon-logo').forEach(el => el.classList.add('hidden'));
+        sidebar.querySelectorAll('.sidebar-text-hidden').forEach(el => el.classList.remove('sidebar-text-hidden'));
+        sidebar.querySelectorAll('.sidebar-collapse-icon').forEach(el => el.classList.remove('hidden'));
+        sidebar.querySelectorAll('.sidebar-expand-icon').forEach(el => el.classList.add('hidden'));
+
+        if (header) {
+          header.classList.remove('lg:left-20');
+          header.classList.add('lg:left-72');
+        }
+
+        collapseBtn?.setAttribute('title', 'Collapse sidebar');
+      }
+
+      // Save preference
+      try {
+        localStorage.setItem(STORAGE_KEY, String(newState));
+      } catch (e) {
+        // Ignore localStorage errors
+      }
+    }
+
+    // Restore saved state on load
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved === 'true') {
+        toggleSidebarCollapse();
+      }
+    } catch (e) {
+      // Ignore localStorage errors
+    }
+
+    // Collapse button click handler
+    if (collapseBtn) {
+      collapseBtn.addEventListener('click', toggleSidebarCollapse);
+    }
 
     // Toggle sidebar on mobile
     window.togglePortalSidebar = function () {
