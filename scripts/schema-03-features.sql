@@ -262,7 +262,8 @@ CREATE TABLE IF NOT EXISTS assessment_payments (
   amount REAL,
   payment_method TEXT DEFAULT 'check',  -- From schema-assessment-payments-method-check.sql
   balance_after REAL,
-  recorded_by_email TEXT,  -- From schema-assessment-payments-recorded-by.sql
+  recorded_by TEXT,  -- From schema-assessment-payments-recorded-by.sql (email of user who recorded)
+  check_number TEXT,  -- Check number if payment_method is 'check'
   created TEXT DEFAULT (datetime('now')),
   FOREIGN KEY (owner_email) REFERENCES assessments(owner_email) ON DELETE CASCADE
 );
@@ -347,7 +348,7 @@ CREATE TABLE IF NOT EXISTS vendors (
   website TEXT,  -- From schema-vendors-website.sql
   notes TEXT,
   files JSON,
-  show_on_public_site INTEGER DEFAULT 0,  -- From schema-vendors-show-on-public.sql
+  show_on_public INTEGER DEFAULT 0,  -- From schema-vendors-show-on-public.sql
   created DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT NULL,
   updated_by TEXT DEFAULT NULL
