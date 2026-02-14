@@ -217,7 +217,7 @@ export function getRoleLandingZone(role: string): string {
 
   switch (normalized) {
     case 'admin':
-      return '/portal/admin';
+      return '/portal/dashboard'; // Admins start at dashboard, navigate to /admin when needed
     case 'board':
     case 'arb_board':
       return '/portal/board';
