@@ -7,6 +7,7 @@ import { getPortalContext } from '../../lib/portal-context';
 import { getPortalBadgeCounts } from '../../lib/portal-badge-counts';
 import { listDirectoryLogsByViewer } from '../../lib/directory-db';
 import { listArbAuditLogForOwner } from '../../lib/arb-db';
+import { getLastLogonTime, listLoginHistoryByEmail } from '../../lib/login-history-db';
 
 const { env, session, effectiveRole } = await getPortalContext(Astro);
 if (!session) return Astro.redirect('/auth/login');
@@ -26,6 +27,7 @@ const getLimit = (): number => {
 };
 const dirPage = getPage('dir_page');
 const arbPage = getPage('arb_page');
+const loginPage = getPage('login_page');
 const pageSize = getLimit();
 
 function activityPageUrl(key: string, value: number): string {
@@ -41,6 +43,8 @@ const db = env?.DB;
 const badges = await getPortalBadgeCounts(db, email, role, name);
 const dirLogs = db ? await listDirectoryLogsByViewer(db, email, pageSize, (dirPage - 1) * pageSize) : [];
 const arbLogs = db ? await listArbAuditLogForOwner(db, email, pageSize, (arbPage - 1) * pageSize) : [];
+const lastLogon = db ? await getLastLogonTime(db, email) : null;
+const loginHistory = db ? await listLoginHistoryByEmail(db, email, pageSize, (loginPage - 1) * pageSize) : [];
 
 const BLANK = '—';
 
@@ -52,6 +56,10 @@ function formatDate(s: string | null): string {
   } catch {
     return s ?? BLANK;
   }
+}
+
+function formatLoginTime(s: string | null): string {
+  return formatDate(s);
 }
 
 /** Describe what was revealed for "my activity" without re-displaying contact details. */
@@ -102,10 +110,54 @@ function revealType(row: { target_name: string | null; target_phone: string | nu
           u.searchParams.set('limit', limit);
           u.searchParams.delete('dir_page');
           u.searchParams.delete('arb_page');
+          u.searchParams.delete('login_page');
           if (limit === '10') u.searchParams.delete('limit');
           window.location.href = u.pathname + u.search;
         });
       </script>
+
+      <section class="mb-10" aria-labelledby="login-activity-heading">
+        <h2 id="login-activity-heading" class="text-2xl font-heading font-semibold text-clr-green mb-4">Login activity</h2>
+        <p class="text-sm text-gray-600 mb-3">Recent sign-ins to your account. If you see a time or IP address you don't recognize, change your password immediately and contact the board.</p>
+        <div class="bg-white rounded-xl border border-gray-200 overflow-hidden mb-4">
+          <div class="p-4 bg-gray-50 border-b border-gray-200">
+            <p class="text-base text-gray-700">
+              Last logon: <strong>{formatLoginTime(lastLogon)}</strong>
+            </p>
+          </div>
+          {loginHistory.length === 0 ? (
+            <p class="p-4 text-gray-500 text-sm">No login history yet. History is recorded each time you sign in.</p>
+          ) : (
+            <>
+              <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                  <thead class="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                      <th class="text-left py-2 px-3 font-medium text-gray-700">When</th>
+                      <th class="text-left py-2 px-3 font-medium text-gray-700">IP address</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {loginHistory.map((row) => (
+                      <tr class="border-b border-gray-100 last:border-0">
+                        <td class="py-2 px-3 text-gray-600">{formatLoginTime(row.logged_at)}</td>
+                        <td class="py-2 px-3 font-mono text-gray-600">{row.ip_address?.trim() || BLANK}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <nav class="flex items-center justify-between gap-2 py-2 px-3 border-t border-gray-200 bg-gray-50 text-sm" aria-label="Login activity pagination">
+                <span class="text-gray-600">Page {loginPage}</span>
+                <div class="flex gap-2">
+                  {loginPage > 1 && <a href={activityPageUrl('login_page', loginPage - 1)} class="text-clr-green hover:underline font-medium">Previous</a>}
+                  {loginHistory.length === pageSize && <a href={activityPageUrl('login_page', loginPage + 1)} class="text-clr-green hover:underline font-medium">Next</a>}
+                </div>
+              </nav>
+            </>
+          )}
+        </div>
+      </section>
 
       <section class="mb-10" aria-labelledby="dir-activity-heading">
         <h2 id="dir-activity-heading" class="text-2xl font-heading font-semibold text-clr-green mb-4">Directory: contact I revealed</h2>

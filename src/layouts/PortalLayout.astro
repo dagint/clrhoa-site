@@ -26,6 +26,40 @@ const { title = 'Member Portal | Crooked Lake Reserve HOA' } = Astro.props;
     <link rel="manifest" href="/manifest.json" />
     <meta name="theme-color" content="#1e5f38" />
     <meta name="robots" content="noindex, nofollow" />
+
+    <!-- Prevent sidebar collapse flash on page load -->
+    <script is:inline>
+      (function() {
+        try {
+          const collapsed = localStorage.getItem('clrhoa_sidebar_collapsed') === 'true';
+          if (collapsed) {
+            document.documentElement.style.setProperty('--sidebar-width', '5rem');
+            document.documentElement.style.setProperty('--content-margin', '5rem');
+            document.documentElement.setAttribute('data-sidebar-init', 'collapsed');
+          } else {
+            document.documentElement.style.setProperty('--sidebar-width', '18rem');
+            document.documentElement.style.setProperty('--content-margin', '18rem');
+            document.documentElement.setAttribute('data-sidebar-init', 'expanded');
+          }
+        } catch(e) {
+          // Fallback to expanded if localStorage fails
+          document.documentElement.style.setProperty('--sidebar-width', '18rem');
+          document.documentElement.style.setProperty('--content-margin', '18rem');
+          document.documentElement.setAttribute('data-sidebar-init', 'expanded');
+        }
+      })();
+    </script>
+
+    <style is:inline>
+      @media (min-width: 1024px) {
+        #portal-sidebar {
+          width: var(--sidebar-width, 18rem) !important;
+        }
+        #portal-content {
+          margin-left: var(--content-margin, 18rem) !important;
+        }
+      }
+    </style>
   </head>
   <body class="min-h-screen bg-gray-50 text-gray-900 font-body">
     <!-- Main layout: sidebar + content area -->
