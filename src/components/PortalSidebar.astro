@@ -90,25 +90,27 @@ const icons: Record<string, string> = {
         <span class="text-xl font-heading font-bold text-white">Member Portal</span>
         <span class="text-xs text-white/80 mt-1">Crooked Lake Reserve HOA</span>
       </a>
-      <a href="/portal/dashboard" class="sidebar-icon-logo hidden">
+      <a href="/portal/dashboard" class="sidebar-icon-logo hidden flex flex-col items-center">
         <span class="text-2xl font-heading font-bold text-white">MP</span>
       </a>
-      <button
-        type="button"
-        id="sidebar-collapse-btn"
-        class="hidden lg:flex p-2 rounded-lg text-white/80 hover:bg-white/10 transition-colors"
-        aria-label="Toggle sidebar width"
-        title="Collapse sidebar"
-      >
-        <svg class="w-5 h-5 sidebar-collapse-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
-        </svg>
-        <svg class="w-5 h-5 sidebar-expand-icon hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
-        </svg>
-      </button>
     </div>
   </div>
+
+  <!-- Floating Collapse/Expand Button (always visible) -->
+  <button
+    type="button"
+    id="sidebar-collapse-btn"
+    class="hidden lg:flex absolute top-20 -right-3 z-50 w-6 h-12 items-center justify-center bg-clr-green border border-white/20 rounded-r-lg text-white hover:bg-clr-green-dark transition-colors shadow-lg"
+    aria-label="Toggle sidebar width"
+    title="Collapse sidebar"
+  >
+    <svg class="w-4 h-4 sidebar-collapse-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+    </svg>
+    <svg class="w-4 h-4 sidebar-expand-icon hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+    </svg>
+  </button>
 
   <!-- Main Navigation -->
   <nav class="p-4" aria-label="Primary">
@@ -346,14 +348,26 @@ const icons: Record<string, string> = {
       }
     }
 
-    // Restore saved state on load
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved === 'true') {
-        toggleSidebarCollapse();
+    // Restore saved state on load (wait for DOM to be ready)
+    function restoreSavedState() {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved === 'true') {
+          // Use setTimeout to ensure content element exists
+          setTimeout(() => {
+            toggleSidebarCollapse();
+          }, 50);
+        }
+      } catch (e) {
+        // Ignore localStorage errors
       }
-    } catch (e) {
-      // Ignore localStorage errors
+    }
+
+    // Run restore after a brief delay to ensure content element exists
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', restoreSavedState);
+    } else {
+      restoreSavedState();
     }
 
     // Collapse button click handler
