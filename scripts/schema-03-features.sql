@@ -281,7 +281,8 @@ CREATE TABLE IF NOT EXISTS special_assessments (
   paid_at TEXT,  -- From schema-phase5-special-assessments.sql
   status TEXT DEFAULT 'active',
   created_by TEXT,
-  created_at TEXT DEFAULT (datetime('now'))
+  created_at TEXT DEFAULT (datetime('now')),  -- Legacy column (keep for backward compatibility)
+  created TEXT DEFAULT (datetime('now'))  -- Used by assessments-db.ts
 );
 
 CREATE INDEX IF NOT EXISTS idx_special_assessments_owner ON special_assessments(owner_email);
