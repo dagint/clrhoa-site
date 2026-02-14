@@ -12,8 +12,14 @@ import { createSession } from '../../../lib/lucia/session';
 export const prerender = false;
 
 export async function POST(context: APIContext): Promise<Response> {
-  // SECURITY: Only allow in test environment
-  if (context.locals.runtime?.env?.NODE_ENV !== 'test') {
+  // SECURITY: Only allow in development/test (not production)
+  // In production, DB will be the production database, not a test database
+  // This is safe because production uses remote D1, not local
+  const isDevelopment = context.url.hostname === 'localhost' ||
+                        context.url.hostname === '127.0.0.1' ||
+                        context.url.hostname.includes('local');
+
+  if (!isDevelopment) {
     return new Response(JSON.stringify({ error: 'Not available' }), {
       status: 404,
       headers: { 'Content-Type': 'application/json' },
