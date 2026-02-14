@@ -1,5 +1,318 @@
 ---
+/**
+ * User Preferences Page
+ * Privacy settings and notification preferences
+ */
 export const prerender = false;
-// Redirect to combined Profile page
-return Astro.redirect('/portal/profile');
+
+import PortalLayout from '../../layouts/PortalLayout.astro';
+import PortalPage from '../../components/PortalPage.astro';
+import { getPortalContext } from '../../lib/portal-context';
+import { getPortalBadgeCounts } from '../../lib/portal-badge-counts';
+import { getUserByEmail, type NotificationPreferences } from '../../lib/db';
+import { getOwnerByEmail } from '../../lib/directory-db';
+import { NOTIFICATION_TYPES } from '../../lib/notifications';
+
+const { env, session, effectiveRole } = await getPortalContext(Astro);
+if (!session) return Astro.redirect('/auth/login');
+
+const { email, role, name } = session;
+const db = env?.DB;
+const badges = await getPortalBadgeCounts(db, email, role, name);
+
+// Get user notification preferences
+let sms_optin = false;
+let notification_preferences: NotificationPreferences = {};
+if (db) {
+  const user = await getUserByEmail(db, email);
+  if (user) {
+    sms_optin = user.sms_optin === 1 || user.sms_optin === true;
+    if (user.notification_preferences?.trim()) {
+      try {
+        notification_preferences = JSON.parse(user.notification_preferences) as NotificationPreferences;
+      } catch {}
+    }
+  }
+}
+
+// Get owner privacy settings
+const owner = db ? await getOwnerByEmail(db, email) : null;
+const pushEnabled = notification_preferences['push_enabled'] === true;
 ---
+
+<PortalLayout title="Preferences | Member Portal | Crooked Lake Reserve HOA">
+  <PortalPage
+    currentPath="/portal/preferences"
+    pageTitle="Preferences"
+    userName={badges.displayName ?? undefined}
+    userEmail={email}
+    effectiveRole={effectiveRole}
+    draftCount={badges.draftCount}
+    role={effectiveRole}
+    staffRole={role ?? ''}
+    arbInReviewCount={badges.arbInReviewCount}
+    vendorPendingCount={badges.vendorPendingCount}
+    maintenanceOpenCount={badges.maintenanceOpenCount}
+    meetingsRsvpCount={badges.meetingsRsvpCount}
+    feedbackDueCount={badges.feedbackDueCount}
+  >
+    <!-- Page Header -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8 mb-8">
+      <h1 class="text-3xl font-heading font-bold text-clr-green mb-3">Preferences</h1>
+      <p class="text-gray-600 text-lg">
+        Manage your privacy settings and notification preferences.
+      </p>
+    </div>
+
+    <!-- Messages -->
+    <div id="pref-message" class="hidden mb-6 p-4 rounded-xl border" role="alert"></div>
+
+    <!-- Preferences Form -->
+    <form id="preferences-form" class="space-y-8">
+
+      <!-- Privacy Settings Section -->
+      <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8">
+        <h2 class="text-2xl font-heading font-semibold text-clr-green mb-4">Privacy Settings</h2>
+
+        <div class="space-y-4">
+          <div>
+            <label class="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                id="share-contact-with-members"
+                name="share_contact_with_members"
+                class="mt-1 w-5 h-5 rounded border-gray-300 text-clr-green focus:ring-clr-green"
+                checked={owner?.share_contact_with_members !== 0}
+              />
+              <div>
+                <p class="text-base font-semibold text-gray-900">Share my contact info with members</p>
+                <p class="text-sm text-gray-600 mt-1">Allow other HOA members to see your phone number and email in the member directory.</p>
+              </div>
+            </label>
+          </div>
+
+          <div class="text-base text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-4">
+            <p class="font-semibold mb-1">Note about privacy:</p>
+            <p>Even if you opt out, Board members, ARB members, and Admins can see your phone and email when needed to run the HOA. All such access is logged in the audit log for transparency.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Notification Preferences Section -->
+      <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8">
+        <h2 class="text-2xl font-heading font-semibold text-clr-green mb-4">Notification Preferences</h2>
+
+        <!-- Email Notifications -->
+        <div class="mb-6">
+          <p class="text-base font-semibold text-gray-900 mb-3">Email notifications</p>
+          <p class="text-sm text-gray-600 mb-4">Choose which types of updates you'd like to receive via email.</p>
+
+          <ul class="space-y-3" aria-label="Notification type toggles">
+            {NOTIFICATION_TYPES.map((t) => (
+              <li>
+                <label class="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    name="notification_type"
+                    value={t.id}
+                    data-notification-id={t.id}
+                    class="mt-0.5 w-5 h-5 rounded border-gray-300 text-clr-green focus:ring-clr-green notification-type-cb"
+                    checked={notification_preferences[t.id] !== false}
+                  />
+                  <div>
+                    <p class="text-base font-medium text-gray-900">{t.label}</p>
+                    <p class="text-sm text-gray-600">{t.description}</p>
+                  </div>
+                </label>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <!-- SMS Notifications -->
+        <div class="mb-6 pb-6 border-b border-gray-200">
+          <p class="text-base font-semibold text-gray-900 mb-3">SMS text alerts (optional)</p>
+          <p class="text-sm text-gray-600 mb-4">Opt in to receive urgent notifications via text message. Standard messaging rates apply.</p>
+
+          <label class="flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              id="sms_optin"
+              name="sms_optin"
+              class="mt-0.5 w-5 h-5 rounded border-gray-300 text-clr-green focus:ring-clr-green"
+              checked={sms_optin}
+            />
+            <div>
+              <p class="text-base font-medium text-gray-900">Enable SMS alerts</p>
+              <p class="text-sm text-gray-600">You'll need to provide a phone number in your profile.</p>
+            </div>
+          </label>
+        </div>
+
+        <!-- Browser Push Notifications -->
+        <div class="mb-6">
+          <p class="text-base font-semibold text-gray-900 mb-3">Browser push notifications</p>
+          <p class="text-sm text-gray-600 mb-4">Get instant notifications in your browser even when the portal is closed.</p>
+
+          <div class="flex gap-3">
+            <button
+              type="button"
+              id="btn-enable-push"
+              class="px-4 py-2 bg-clr-green text-white rounded-lg hover:brightness-110 font-medium text-sm transition-colors disabled:opacity-50"
+              disabled={pushEnabled}
+            >
+              {pushEnabled ? 'Push notifications enabled' : 'Enable push notifications'}
+            </button>
+            {pushEnabled && (
+              <button
+                type="button"
+                id="btn-disable-push"
+                class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium text-sm transition-colors"
+              >
+                Disable push
+              </button>
+            )}
+          </div>
+        </div>
+
+        <!-- Save Button -->
+        <div class="pt-4">
+          <button
+            type="submit"
+            class="bg-clr-green hover:brightness-110 text-white px-6 py-3 rounded-xl font-semibold text-base transition-all"
+          >
+            Save preferences
+          </button>
+        </div>
+      </div>
+    </form>
+
+  </PortalPage>
+</PortalLayout>
+
+<script>
+  const form = document.getElementById('preferences-form') as HTMLFormElement;
+  const messageEl = document.getElementById('pref-message');
+
+  function showMessage(text: string, isError: boolean) {
+    if (!messageEl) return;
+    messageEl.textContent = text;
+    messageEl.classList.remove('hidden', 'bg-green-50', 'border-green-200', 'text-green-800', 'bg-red-50', 'border-red-200', 'text-red-800');
+    if (isError) {
+      messageEl.classList.add('bg-red-50', 'border-red-200', 'text-red-800');
+    } else {
+      messageEl.classList.add('bg-green-50', 'border-green-200', 'text-green-800');
+    }
+    setTimeout(() => messageEl.classList.add('hidden'), 5000);
+  }
+
+  function getCurrentNotificationPrefs() {
+    const prefs: Record<string, boolean> = {};
+    form.querySelectorAll('.notification-type-cb').forEach(function (cb) {
+      const checkbox = cb as HTMLInputElement;
+      prefs[checkbox.dataset.notificationId || checkbox.value] = checkbox.checked;
+    });
+    return prefs;
+  }
+
+  // Save preferences
+  form.addEventListener('submit', async function (e) {
+    e.preventDefault();
+
+    const shareContactEl = document.getElementById('share-contact-with-members') as HTMLInputElement;
+    const smsEl = document.getElementById('sms_optin') as HTMLInputElement;
+
+    const share_contact_with_members = shareContactEl?.checked ?? true;
+    const sms_optin = smsEl?.checked ?? false;
+    const notification_preferences = getCurrentNotificationPrefs();
+
+    try {
+      const res = await fetch('/api/preferences', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          share_contact_with_members,
+          sms_optin,
+          notification_preferences,
+        }),
+        credentials: 'same-origin',
+      });
+
+      const data = await res.json() as { success: boolean; message?: string };
+      if (data.success) {
+        showMessage('Preferences saved successfully!', false);
+      } else {
+        showMessage(data.message || 'Failed to save preferences', true);
+      }
+    } catch (error) {
+      showMessage('An error occurred. Please try again.', true);
+    }
+  });
+
+  // Push notification handlers
+  const enablePushBtn = document.getElementById('btn-enable-push') as HTMLButtonElement | null;
+  const disablePushBtn = document.getElementById('btn-disable-push') as HTMLButtonElement | null;
+
+  function updatePushUI(enabled: boolean) {
+    if (enablePushBtn) {
+      enablePushBtn.disabled = enabled;
+      enablePushBtn.textContent = enabled ? 'Push notifications enabled' : 'Enable push notifications';
+    }
+    if (disablePushBtn) {
+      disablePushBtn.style.display = enabled ? 'block' : 'none';
+    }
+  }
+
+  async function savePushPreference(enabled: boolean): Promise<{ success: boolean }> {
+    const smsEl = document.getElementById('sms_optin') as HTMLInputElement;
+    const sms_optin = smsEl?.checked ?? false;
+    const notification_preferences = getCurrentNotificationPrefs();
+    notification_preferences.push_enabled = enabled;
+
+    try {
+      const res = await fetch('/api/preferences', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sms_optin,
+          notification_preferences,
+        }),
+      });
+      return await res.json() as { success: boolean };
+    } catch (error) {
+      return { success: false };
+    }
+  }
+
+  enablePushBtn?.addEventListener('click', async function () {
+    if (!('Notification' in window)) {
+      showMessage('Push notifications are not supported in this browser.', true);
+      return;
+    }
+
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission === 'granted') {
+        const data = await savePushPreference(true);
+        if (data.success) {
+          updatePushUI(true);
+          showMessage('Push notifications enabled!', false);
+        } else {
+          showMessage('Failed to enable push notifications', true);
+        }
+      }
+    } catch (error) {
+      showMessage('Failed to enable push notifications', true);
+    }
+  });
+
+  disablePushBtn?.addEventListener('click', async function () {
+    const data = await savePushPreference(false);
+    if (data.success) {
+      updatePushUI(false);
+      showMessage('Push notifications disabled.', false);
+    } else {
+      showMessage('Failed to disable push notifications', true);
+    }
+  });
+</script>
