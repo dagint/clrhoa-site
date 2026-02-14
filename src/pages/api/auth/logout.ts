@@ -63,7 +63,8 @@ export const POST: APIRoute = async ({ request, locals, cookies }) => {
     );
   }
 
-  const lucia = createLucia(db);
+  const hostname = new URL(request.url).hostname;
+  const lucia = createLucia(db, hostname);
 
   // Get session ID from cookie
   const sessionCookie = cookies.get('clrhoa_session');
