@@ -280,6 +280,7 @@ const icons: Record<string, string> = {
     const overlay = document.getElementById('sidebar-overlay');
     const collapseBtn = document.getElementById('sidebar-collapse-btn');
     const header = document.querySelector('.portal-header');
+    const content = document.getElementById('portal-content');
     const STORAGE_KEY = 'clrhoa_sidebar_collapsed';
 
     if (!sidebar || !overlay) return;
@@ -308,6 +309,11 @@ const icons: Record<string, string> = {
           header.classList.add('lg:left-20');
         }
 
+        if (content) {
+          content.classList.remove('lg:ml-72');
+          content.classList.add('lg:ml-20');
+        }
+
         collapseBtn?.setAttribute('title', 'Expand sidebar');
       } else {
         // Expand to full width
@@ -322,6 +328,11 @@ const icons: Record<string, string> = {
         if (header) {
           header.classList.remove('lg:left-20');
           header.classList.add('lg:left-72');
+        }
+
+        if (content) {
+          content.classList.remove('lg:ml-20');
+          content.classList.add('lg:ml-72');
         }
 
         collapseBtn?.setAttribute('title', 'Collapse sidebar');
