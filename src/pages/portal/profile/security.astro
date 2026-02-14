@@ -12,14 +12,23 @@ export const prerender = false;
 
 import PortalLayout from '../../../layouts/PortalLayout.astro';
 import ProtectedPage from '../../../components/ProtectedPage.astro';
-import PortalNav from '../../../components/PortalNav.astro';
+import PortalSidebar from '../../../components/PortalSidebar.astro';
+import PortalHeader from '../../../components/PortalHeader.astro';
 import { getPortalContext } from '../../../lib/portal-context';
-import { getUserByEmail } from '../../../lib/db';
+import { getOwnerByEmail } from '../../../lib/directory-db';
 
 const { env, session, effectiveRole } = await getPortalContext(Astro);
 if (!session) return Astro.redirect('/auth/login');
 
+const { email, role, name } = session;
 const db = env?.DB;
+
+// Use session name when set; otherwise fall back to directory (owner) name
+let displayName = name?.trim() || null;
+if (!displayName && db) {
+  const owner = await getOwnerByEmail(db, email);
+  displayName = owner?.name?.trim() || null;
+}
 
 // Query MFA status directly (getUserByEmail doesn't include MFA fields)
 const mfaUser = db
@@ -55,10 +64,23 @@ function formatDate(iso: string | null | undefined): string {
 
 <PortalLayout title="Security Settings | Member Portal | Crooked Lake Reserve HOA">
   <ProtectedPage>
-  <div class="min-h-screen portal-theme-bg font-body">
-    <PortalNav currentPath="/portal/profile/security" role={effectiveRole} staffRole={session?.role ?? ''} />
+    <!-- Sidebar Navigation -->
+    <PortalSidebar
+      currentPath="/portal/profile/security"
+      role={effectiveRole}
+      staffRole={role ?? ''}
+    />
 
-    <main class="max-w-3xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+    <!-- Main Content Area -->
+    <div class="flex-1 flex flex-col overflow-hidden">
+      <!-- Top Header -->
+      <PortalHeader userName={displayName ?? undefined} userEmail={email} effectiveRole={effectiveRole}>
+        <span slot="title">Security Settings</span>
+      </PortalHeader>
+
+      <!-- Scrollable Content -->
+      <main class="flex-1 overflow-y-auto pt-16 lg:pt-16">
+        <div class="max-w-3xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
       <!-- Header -->
       <div class="mb-8">
         <h2 class="text-2xl font-heading font-bold text-clr-green mb-2">Security Settings</h2>
@@ -302,8 +324,9 @@ function formatDate(iso: string | null | undefined): string {
           Change Password
         </a>
       </div>
-    </main>
-  </div>
+        </div>
+      </main>
+    </div>
   </ProtectedPage>
 </PortalLayout>
 
@@ -513,18 +536,3 @@ function formatDate(iso: string | null | undefined): string {
     showError('Regenerate backup codes feature coming soon!');
   });
 </script>
-
-<style>
-  .portal-theme-bg {
-    background-color: #f9fafb;
-  }
-  .clr-green {
-    color: #1e5f38;
-  }
-  .bg-clr-green {
-    background-color: #1e5f38;
-  }
-  .bg-clr-green-dark {
-    background-color: #164529;
-  }
-</style>
