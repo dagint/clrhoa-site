@@ -274,14 +274,17 @@ CREATE INDEX IF NOT EXISTS idx_assessment_payments_paid_at ON assessment_payment
 -- Special Assessments (one-time charges)
 CREATE TABLE IF NOT EXISTS special_assessments (
   id TEXT PRIMARY KEY,
+  owner_email TEXT NOT NULL,  -- From schema-phase5-special-assessments.sql
   description TEXT NOT NULL,
   amount REAL NOT NULL,
   due_date TEXT,
+  paid_at TEXT,  -- From schema-phase5-special-assessments.sql
   status TEXT DEFAULT 'active',
   created_by TEXT,
   created_at TEXT DEFAULT (datetime('now'))
 );
 
+CREATE INDEX IF NOT EXISTS idx_special_assessments_owner ON special_assessments(owner_email);
 CREATE INDEX IF NOT EXISTS idx_special_assessments_status ON special_assessments(status);
 CREATE INDEX IF NOT EXISTS idx_special_assessments_due_date ON special_assessments(due_date);
 
