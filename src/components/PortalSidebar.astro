@@ -282,7 +282,6 @@ const icons: Record<string, string> = {
     const overlay = document.getElementById('sidebar-overlay');
     const collapseBtn = document.getElementById('sidebar-collapse-btn');
     const header = document.querySelector('.portal-header');
-    const content = document.getElementById('portal-content');
     const STORAGE_KEY = 'clrhoa_sidebar_collapsed';
 
     if (!sidebar || !overlay) return;
@@ -311,10 +310,9 @@ const icons: Record<string, string> = {
           header.classList.add('lg:left-20');
         }
 
-        if (content) {
-          content.classList.remove('lg:ml-72');
-          content.classList.add('lg:ml-20');
-        }
+        // Update CSS variables for immediate visual update
+        document.documentElement.style.setProperty('--sidebar-width', '5rem');
+        document.documentElement.style.setProperty('--content-margin', '5rem');
 
         collapseBtn?.setAttribute('title', 'Expand sidebar');
       } else {
@@ -332,10 +330,9 @@ const icons: Record<string, string> = {
           header.classList.add('lg:left-72');
         }
 
-        if (content) {
-          content.classList.remove('lg:ml-20');
-          content.classList.add('lg:ml-72');
-        }
+        // Update CSS variables for immediate visual update
+        document.documentElement.style.setProperty('--sidebar-width', '18rem');
+        document.documentElement.style.setProperty('--content-margin', '18rem');
 
         collapseBtn?.setAttribute('title', 'Collapse sidebar');
       }
@@ -348,27 +345,34 @@ const icons: Record<string, string> = {
       }
     }
 
-    // Restore saved state on load (wait for DOM to be ready)
-    function restoreSavedState() {
-      try {
-        const saved = localStorage.getItem(STORAGE_KEY);
-        if (saved === 'true') {
-          // Use setTimeout to ensure content element exists
-          setTimeout(() => {
-            toggleSidebarCollapse();
-          }, 50);
+    // Apply initial state based on early-load script
+    function applyInitialState() {
+      const initState = document.documentElement.getAttribute('data-sidebar-init');
+
+      if (initState === 'collapsed') {
+        // Apply collapsed state without animation
+        sidebar.setAttribute('data-collapsed', 'true');
+        sidebar.classList.remove('w-72');
+        sidebar.classList.add('w-20');
+        sidebar.querySelectorAll('.sidebar-logo').forEach(el => el.classList.add('hidden'));
+        sidebar.querySelectorAll('.sidebar-icon-logo').forEach(el => el.classList.remove('hidden'));
+        sidebar.querySelectorAll('nav a span.flex-1, nav a span:not(.inline-flex)').forEach(el => {
+          if (!el.classList.contains('inline-flex')) el.classList.add('sidebar-text-hidden');
+        });
+        sidebar.querySelectorAll('.sidebar-collapse-icon').forEach(el => el.classList.add('hidden'));
+        sidebar.querySelectorAll('.sidebar-expand-icon').forEach(el => el.classList.remove('hidden'));
+
+        if (header) {
+          header.classList.remove('lg:left-72');
+          header.classList.add('lg:left-20');
         }
-      } catch (e) {
-        // Ignore localStorage errors
+
+        collapseBtn?.setAttribute('title', 'Expand sidebar');
       }
     }
 
-    // Run restore after a brief delay to ensure content element exists
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', restoreSavedState);
-    } else {
-      restoreSavedState();
-    }
+    // Apply initial state immediately
+    applyInitialState();
 
     // Collapse button click handler
     if (collapseBtn) {
