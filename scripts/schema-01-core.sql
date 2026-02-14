@@ -118,16 +118,20 @@ CREATE INDEX IF NOT EXISTS idx_directory_logs_viewer_role ON directory_logs(view
 -- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS login_history (
   id TEXT PRIMARY KEY,
-  user_email TEXT,
-  login_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+  user_email TEXT,  -- Legacy column (keep for backward compatibility)
+  login_time DATETIME DEFAULT CURRENT_TIMESTAMP,  -- Legacy column (keep for backward compatibility)
   ip_address TEXT,
   user_agent TEXT,
-  session_id TEXT
+  session_id TEXT,
+  email TEXT,  -- Used by login-history-db.ts
+  logged_at DATETIME DEFAULT CURRENT_TIMESTAMP  -- Used by login-history-db.ts
 );
 
 CREATE INDEX IF NOT EXISTS idx_login_history_user_email ON login_history(user_email);
 CREATE INDEX IF NOT EXISTS idx_login_history_login_time ON login_history(login_time);
 CREATE INDEX IF NOT EXISTS idx_login_history_session_id ON login_history(session_id);
+CREATE INDEX IF NOT EXISTS idx_login_history_email ON login_history(email);
+CREATE INDEX IF NOT EXISTS idx_login_history_logged_at ON login_history(logged_at DESC);
 
 -- ============================================================================
 -- End of Core Schema
