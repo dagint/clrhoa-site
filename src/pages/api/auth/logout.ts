@@ -54,7 +54,7 @@ export const POST: APIRoute = async ({ request, locals, cookies }) => {
       JSON.stringify({
         success: true,
         message: 'Logged out successfully',
-        redirectTo: '/portal/login',
+        redirectTo: '/auth/login',
       } satisfies LogoutResponse),
       {
         status: 200,
