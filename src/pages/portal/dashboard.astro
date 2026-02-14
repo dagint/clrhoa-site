@@ -17,7 +17,7 @@ import { listUpcomingWithCountsAndUser, householdHasRsvpd } from '../../lib/meet
 import { listActiveFeedbackDocs, getFeedbackResponse, householdHasResponded } from '../../lib/feedback-db';
 import { getDismissedKeys } from '../../lib/notification-dismissals';
 
-const { env, session, effectiveRole } = await getPortalContext(Astro, { fingerprint: true });
+const { env, session, effectiveRole } = await getPortalContext(Astro);
 if (!session) return Astro.redirect('/auth/login');
 
 const { email, role, name } = session;
