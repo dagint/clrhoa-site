@@ -427,7 +427,21 @@ export const POST: APIRoute = async ({ request, locals, cookies }) => {
   console.log('[LOGIN DEBUG] Cookie name:', sessionCookie.name);
   console.log('[LOGIN DEBUG] Cookie attributes:', JSON.stringify(sessionCookie.attributes));
   console.log('[LOGIN DEBUG] Cookie secure:', sessionCookie.attributes.secure);
-  cookies.set(sessionCookie.name, sessionCookie.value, sessionCookie.attributes);
+
+  // Build Set-Cookie header value manually
+  const cookieValue = sessionCookie.value;
+  const attrs = sessionCookie.attributes;
+  let setCookieHeader = `${sessionCookie.name}=${cookieValue}`;
+
+  if (attrs.maxAge) setCookieHeader += `; Max-Age=${attrs.maxAge}`;
+  if (attrs.expires) setCookieHeader += `; Expires=${attrs.expires.toUTCString()}`;
+  if (attrs.path) setCookieHeader += `; Path=${attrs.path}`;
+  if (attrs.domain) setCookieHeader += `; Domain=${attrs.domain}`;
+  if (attrs.secure) setCookieHeader += '; Secure';
+  if (attrs.httpOnly) setCookieHeader += '; HttpOnly';
+  if (attrs.sameSite) setCookieHeader += `; SameSite=${attrs.sameSite}`;
+
+  console.log('[LOGIN DEBUG] Set-Cookie header:', setCookieHeader);
 
   // Log successful login
   await logAuthEvent(db, {
@@ -444,7 +458,7 @@ export const POST: APIRoute = async ({ request, locals, cookies }) => {
     },
   });
 
-  // Return success
+  // Return success with Set-Cookie header
   return new Response(
     JSON.stringify({
       success: true,
@@ -453,7 +467,10 @@ export const POST: APIRoute = async ({ request, locals, cookies }) => {
     } satisfies LoginResponse),
     {
       status: 200,
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Set-Cookie': setCookieHeader,
+      },
     }
   );
   } catch (error) {

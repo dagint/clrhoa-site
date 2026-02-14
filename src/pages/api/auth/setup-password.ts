@@ -296,7 +296,19 @@ export const POST: APIRoute = async ({ request, locals, cookies }) => {
 
     // 11. Set session cookie
     const sessionCookie = lucia.createSessionCookie(session.id);
-    cookies.set(sessionCookie.name, sessionCookie.value, sessionCookie.attributes);
+
+    // Build Set-Cookie header value manually
+    const cookieValue = sessionCookie.value;
+    const attrs = sessionCookie.attributes;
+    let setCookieHeader = `${sessionCookie.name}=${cookieValue}`;
+
+    if (attrs.maxAge) setCookieHeader += `; Max-Age=${attrs.maxAge}`;
+    if (attrs.expires) setCookieHeader += `; Expires=${attrs.expires.toUTCString()}`;
+    if (attrs.path) setCookieHeader += `; Path=${attrs.path}`;
+    if (attrs.domain) setCookieHeader += `; Domain=${attrs.domain}`;
+    if (attrs.secure) setCookieHeader += '; Secure';
+    if (attrs.httpOnly) setCookieHeader += '; HttpOnly';
+    if (attrs.sameSite) setCookieHeader += `; SameSite=${attrs.sameSite}`;
 
     // 12. Log successful password setup
     await logSecurityEvent(db, {
@@ -311,7 +323,7 @@ export const POST: APIRoute = async ({ request, locals, cookies }) => {
       },
     });
 
-    // 13. Return success response with session info
+    // 13. Return success response with Set-Cookie header
     return new Response(
       JSON.stringify({
         success: true,
@@ -323,7 +335,10 @@ export const POST: APIRoute = async ({ request, locals, cookies }) => {
       }),
       {
         status: 200,
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Set-Cookie': setCookieHeader,
+        },
       }
     );
   } catch (error) {

@@ -292,11 +292,19 @@ export const POST: APIRoute = async (context) => {
 
     // 11. Set session cookie
     const sessionCookie = lucia.createSessionCookie(session.id);
-    context.cookies.set(
-      sessionCookie.name,
-      sessionCookie.value,
-      sessionCookie.attributes
-    );
+
+    // Build Set-Cookie header value manually
+    const cookieValue = sessionCookie.value;
+    const attrs = sessionCookie.attributes;
+    let setCookieHeader = `${sessionCookie.name}=${cookieValue}`;
+
+    if (attrs.maxAge) setCookieHeader += `; Max-Age=${attrs.maxAge}`;
+    if (attrs.expires) setCookieHeader += `; Expires=${attrs.expires.toUTCString()}`;
+    if (attrs.path) setCookieHeader += `; Path=${attrs.path}`;
+    if (attrs.domain) setCookieHeader += `; Domain=${attrs.domain}`;
+    if (attrs.secure) setCookieHeader += '; Secure';
+    if (attrs.httpOnly) setCookieHeader += '; HttpOnly';
+    if (attrs.sameSite) setCookieHeader += `; SameSite=${attrs.sameSite}`;
 
     // 12. Update last login timestamp
     await db
@@ -324,7 +332,7 @@ export const POST: APIRoute = async (context) => {
       },
     });
 
-    // 14. Return success
+    // 14. Return success with Set-Cookie header
     return new Response(
       JSON.stringify({
         success: true,
@@ -338,7 +346,10 @@ export const POST: APIRoute = async (context) => {
       }),
       {
         status: 200,
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Set-Cookie': setCookieHeader,
+        },
       }
     );
   } catch (error) {
