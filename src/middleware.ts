@@ -284,7 +284,8 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
       }
 
       // Profile completeness check (avoids "response already sent" when component would redirect)
-      if (!isProfilePage) {
+      // Skip for admin users (they may be service providers, not homeowners)
+      if (!isProfilePage && userRole !== 'admin') {
         const userEmail = getUserEmail(user);
         if (!userEmail) {
           return context.redirect('/auth/login');
