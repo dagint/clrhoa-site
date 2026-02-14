@@ -207,25 +207,16 @@ export async function requireRole(
 }
 
 /**
- * Get the landing zone (home page) for a given role.
+ * Get the landing zone (home page) for all users.
+ * All users land on the same dashboard regardless of role.
+ * Role-based access differentiation happens only when users actively elevate permissions via PIM.
  *
- * @param role - User role
- * @returns Path to role's landing zone
+ * @param role - User role (parameter kept for backwards compatibility, but not used)
+ * @returns Path to landing zone (always /portal/dashboard)
  */
-export function getRoleLandingZone(role: string): string {
-  const normalized = role?.toLowerCase() || 'member';
-
-  switch (normalized) {
-    case 'admin':
-      return '/portal/dashboard'; // Admins start at dashboard, navigate to /admin when needed
-    case 'board':
-    case 'arb_board':
-      return '/portal/board';
-    case 'arb':
-      return '/portal/arb';
-    default:
-      return '/portal/dashboard';
-  }
+export function getRoleLandingZone(role?: string): string {
+  // All users land on dashboard - role differentiation happens via PIM elevation
+  return '/portal/dashboard';
 }
 
 /**
