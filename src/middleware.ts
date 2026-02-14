@@ -219,16 +219,20 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
 
     // Protected portal route: no cookie => redirect to login
     if (!context.cookies.has(SESSION_COOKIE_NAME)) {
+      console.log('[AUTH DEBUG] No session cookie found for', pathname);
       return context.redirect(`/auth/login?return=${encodeURIComponent(pathname)}`);
     }
 
     // Validate Lucia session
     if (env?.DB) {
       const sessionId = getSessionId(context);
+      console.log('[AUTH DEBUG] Session ID:', sessionId ? sessionId.substring(0, 10) + '...' : 'null');
       const { session, user } = await validateSession(env.DB, sessionId, context.url.hostname);
+      console.log('[AUTH DEBUG] Validation result - session:', !!session, 'user:', !!user);
 
       if (!session || !user) {
         // Invalid session - redirect to login
+        console.log('[AUTH DEBUG] Session validation failed, redirecting to login');
         return context.redirect(`/auth/login?return=${encodeURIComponent(pathname)}`);
       }
 

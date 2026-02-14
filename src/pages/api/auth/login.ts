@@ -413,6 +413,7 @@ export const POST: APIRoute = async ({ request, locals, cookies }) => {
 
   // Set session cookie
   const sessionCookie = lucia.createSessionCookie(session.id);
+  console.log('[LOGIN DEBUG] Setting cookie:', sessionCookie.name, 'with attributes:', sessionCookie.attributes);
   cookies.set(sessionCookie.name, sessionCookie.value, sessionCookie.attributes);
 
   // Log successful login
