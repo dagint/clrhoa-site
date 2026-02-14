@@ -1,287 +1,128 @@
-# Database Migrations
+# CLRHOA Database Schema
 
-## Consolidated Schema (Recommended)
+This directory contains the **consolidated database schema** for the CLRHOA Portal. These 5 files represent the complete state of all 52 tables including all incremental migrations.
 
-The database schema is organized into **4 logical bundles** for easy management:
+## Schema Files (Execute in Order)
 
-### 1. Core Schema (`schema-core.sql`)
-**Foundation tables that everything depends on**
+1. **schema-01-core.sql** - Foundation tables
+   - users (with all auth fields)
+   - owners (with phone2, phone3, audit fields)
+   - directory_logs (with email, IP, role tracking)
+   - login_history
 
-```bash
-npm run db:schema:core:local   # Local development
-npm run db:schema:core          # Production
-```
+2. **schema-02-auth-sessions.sql** - Authentication & Sessions
+   - sessions (Lucia v3 with PIM columns: elevated_until, assumed_role, etc.)
+   - password_reset_tokens
+   - password_setup_tokens
+   - mfa_backup_codes
+   - audit_logs
+   - security_events
+   - pim_elevation_logs
 
-**Includes:**
-- `users` - User accounts with roles, contact info, and auth fields
-- `owners` - Property directory with privacy settings
-- `directory_logs` - Audit trail for contact access
-- `login_history` - Session tracking
+3. **schema-03-features.sql** - Application Features (24+ tables)
+   - ARB tables (arb_requests with ALL v2-v8 columns, arb_files, arb_audit_log, arc_request_votes, arb_notification_debounce)
+   - Electronic signatures (electronic_signatures, esignature_audit_log)
+   - Meetings (meetings with post_to_public_news, meeting_rsvps)
+   - Maintenance (maintenance_requests)
+   - Assessments (assessments, assessment_payments, special_assessments)
+   - Feedback (feedback_docs, feedback_responses, site_feedback)
+   - Vendors (vendors, vendor_submissions, vendor_audit_log)
+   - News (news_items with image fields)
+   - Documents (public_documents, member_documents)
+   - Preapproval (preapproval_items)
+   - Contact (contact_submissions)
+   - Notifications (notification_types, user_notifications, notification_dismissals, sms_feature_requests)
 
-**Use cases:**
-- Fresh database setup
-- New development environment
-- Core table structure changes
+4. **schema-04-admin-compliance.sql** - Admin & Compliance
+   - RBAC (route_permissions)
+   - Compliance (compliance_requirements, compliance_documents, compliance_audit_log)
+   - Backups (backup_config)
+   - Analytics (page_views, signature_analytics, arb_analytics, daily_stats)
+   - Admin Logs (owner_contact_audit_log, assumed_role_audit_log)
 
----
-
-### 2. RBAC Schema (`schema-rbac.sql`)
-**Role-Based Access Control & Route Permissions**
-
-```bash
-npm run db:schema:rbac:local   # Local development
-npm run db:schema:rbac          # Production
-```
-
-**Includes:**
-- `route_permissions` - Dynamic permission overrides
-
-**Use cases:**
-- Setting up access control
-- Permission system changes
-- RBAC updates
-
----
-
-### 3. Features Schema (`schema-features.sql`)
-**All application features and business logic**
-
-```bash
-npm run db:schema:features:local   # Local development
-npm run db:schema:features          # Production
-```
-
-**Includes:**
-- **ARB:** `arb_requests`, `arb_files` - Architectural review workflow
-- **Meetings:** `meetings`, `meeting_rsvps` - Meeting scheduling
-- **Maintenance:** `maintenance_requests` - Common area requests
-- **Assessments:** `assessments`, `assessment_payments` - HOA dues (view-only)
-- **Feedback:** `feedback_docs`, `feedback_responses` - Member feedback
-- **Vendors:** `vendors` - Approved contractor directory
-
-**Use cases:**
-- Adding new features
-- Feature table modifications
-- Complete feature rollout
-
----
-
-### 4. Auth Schema (`schema-auth.sql`)
-**Password-based authentication & security**
-
-```bash
-npm run db:schema:auth:local   # Local development
-npm run db:schema:auth          # Production
-```
-
-**Includes:**
-- `password_reset_tokens` - Password reset flow
-- `password_setup_tokens` - New user onboarding
-- `sessions` - DB-backed session management
-- `mfa_backup_codes` - MFA recovery codes
-- `audit_logs` - Comprehensive security audit trail (365 day retention)
-- `security_events` - Critical security monitoring (730 day retention)
-
-**Use cases:**
-- Implementing password-based auth
-- Security auditing
-- MFA setup
-- Session management
-
----
+5. **schema-05-seed-data.sql** - Initial Data
+   - 15 Florida HOA compliance requirements (§720.303(4))
+   - 4 public document placeholders (bylaws, covenants, proxy, ARB form)
+   - Default backup configuration
 
 ## Quick Start
 
-### Fresh Database Setup (All Schemas)
-
+### Initialize Fresh Database
 ```bash
-# Local development
-npm run db:schema:all:local
+# Local
+for f in scripts/schema-0*.sql; do
+  npx wrangler d1 execute clrhoa_db --local --file="$f"
+done
 
-# Production
-npm run db:schema:all
+# Remote
+for f in scripts/schema-0*.sql; do
+  npx wrangler d1 execute clrhoa_db --remote --file="$f"
+done
 ```
 
-This runs all 4 schemas in order: core → rbac → features → auth
-
----
-
-### CI/CD (GitHub Actions)
-
-The E2E test workflow uses the consolidated schemas:
-
-```yaml
-- name: Initialize local D1 database
-  run: |
-    npm run db:schema:core:local
-    npm run db:schema:rbac:local
-    npm run db:schema:features:local
-    npm run db:schema:auth:local
-```
-
-**Benefits:**
-- ✅ Clear and maintainable
-- ✅ Easy to understand what's being installed
-- ✅ Logical grouping by concern
-- ✅ Fast execution (4 scripts vs 10+)
-
----
-
-## Migration Strategy
-
-### For Fresh Installs (New Environments)
-Run all consolidated schemas in order:
+### Individual File Execution
 ```bash
-npm run db:schema:all:local
+# Local
+npx wrangler d1 execute clrhoa_db --local --file=./scripts/schema-01-core.sql
+npx wrangler d1 execute clrhoa_db --local --file=./scripts/schema-02-auth-sessions.sql
+npx wrangler d1 execute clrhoa_db --local --file=./scripts/schema-03-features.sql
+npx wrangler d1 execute clrhoa_db --local --file=./scripts/schema-04-admin-compliance.sql
+npx wrangler d1 execute clrhoa_db --local --file=./scripts/schema-05-seed-data.sql
+
+# Remote
+npx wrangler d1 execute clrhoa_db --remote --file=./scripts/schema-01-core.sql
+npx wrangler d1 execute clrhoa_db --remote --file=./scripts/schema-02-auth-sessions.sql
+npx wrangler d1 execute clrhoa_db --remote --file=./scripts/schema-03-features.sql
+npx wrangler d1 execute clrhoa_db --remote --file=./scripts/schema-04-admin-compliance.sql
+npx wrangler d1 execute clrhoa_db --remote --file=./scripts/schema-05-seed-data.sql
 ```
 
-### For Production Updates (Incremental Changes)
-Use individual schemas as needed:
+## Verification
+
+After running schemas, verify with:
 ```bash
-# Add new feature tables only
-npm run db:schema:features
+# Check tables exist (should show 52 tables)
+npx wrangler d1 execute clrhoa_db --remote --command="SELECT COUNT(*) as table_count FROM sqlite_master WHERE type='table'"
 
-# Update auth system only
-npm run db:schema:auth
+# Check specific table structure
+npx wrangler d1 execute clrhoa_db --remote --command="PRAGMA table_info(sessions)"
+npx wrangler d1 execute clrhoa_db --remote --command="PRAGMA table_info(arb_requests)"
 ```
 
-### For Specific Column Additions
-Use the legacy individual migration scripts (still available):
-```bash
-npm run db:owners-lot-number       # Add lot_number column
-npm run db:phase35                  # Add phone/sms_optin to users
-```
+## Benefits
 
----
+1. **Single Source of Truth** - 5 files instead of 83+ fragmented migrations
+2. **Idempotent** - Safe to run multiple times (uses `CREATE TABLE IF NOT EXISTS`, `INSERT OR IGNORE`)
+3. **Complete** - Each file represents the FINAL state of all tables with all columns
+4. **Documented** - Extensive comments explaining features and compliance requirements
+5. **Fast** - Execute all schemas in ~15 seconds
 
-## Legacy Scripts (Deprecated)
+## Archived Migrations
 
-The following scripts are **deprecated** in favor of consolidated schemas:
+The original 81 incremental migration files have been archived to `archive/legacy-migrations/` for historical reference. See `archive/README.md` for details.
 
-### Old Phased Approach ❌
-```bash
-db:init:local
-db:phase3:local
-db:owners-audit-contact:local
-db:owners-created-at:local
-db:owners-lot-number:local
-db:owners-primary:local
-db:phase35:local
-db:phase4:local
-db:phase5:local
-db:route-permissions:local
-```
+**Do not use archived files** - they are preserved for git history context only.
 
-### New Consolidated Approach ✅
-```bash
-db:schema:core:local
-db:schema:rbac:local
-db:schema:features:local
-db:schema:auth:local
-```
+## Maintenance
 
-**Why consolidate?**
-- Reduces 10+ scripts to 4 logical bundles
-- Easier to understand dependencies
-- Simpler CI/CD configuration
-- Clearer separation of concerns
-- Faster execution
+When adding new features:
 
----
+1. **For existing databases**: Create an incremental migration file (e.g., `schema-new-feature.sql`)
+2. **Update consolidated file**: Add the new columns/tables to the appropriate consolidated schema
+3. **Run on remote**: Execute the incremental migration on remote database
+4. **Archive old migration**: Move to `archive/legacy-migrations/` if desired
 
-## Schema Dependencies
+This ensures both incremental updates (for existing databases) and consolidated schemas (for fresh installs) stay in sync.
 
-```
-schema-core.sql
-  ↓
-  ├── schema-rbac.sql (depends on users)
-  ├── schema-features.sql (depends on users, owners)
-  └── schema-auth.sql (depends on users)
-```
+## What Was Consolidated
 
-**Always run `schema-core.sql` first!**
+These 5 files consolidate 81 incremental migrations including:
 
-Other schemas can run in any order after core, but recommended order is:
-1. Core (foundation)
-2. RBAC (access control)
-3. Features (business logic)
-4. Auth (security)
+- **ARB workflow**: 13 files (v2-v8, voting, audit, e-signatures)
+- **Auth & Sessions**: 8 files (PIM, password tokens, MFA, audit logs)
+- **Core tables**: 10 files (owners, directory logs, login history)
+- **Features**: 25+ files (vendors, news, documents, assessments, notifications)
+- **Admin/Compliance**: 15+ files (RBAC, compliance tracking, analytics, backups)
+- **Seed data**: Initial compliance requirements and config
 
----
-
-## Troubleshooting
-
-### "table users already exists"
-This is **normal** for consolidated schemas with `CREATE TABLE IF NOT EXISTS`. The script is idempotent.
-
-### "table users has no column named phone"
-Run `schema-core.sql` which includes all user columns.
-
-### "FOREIGN KEY constraint failed"
-Ensure `schema-core.sql` ran first (creates parent tables: users, owners).
-
-### E2E tests failing with missing columns
-Check that CI workflow runs all 4 consolidated schemas:
-```yaml
-npm run db:schema:core:local
-npm run db:schema:rbac:local
-npm run db:schema:features:local
-npm run db:schema:auth:local
-```
-
----
-
-## Future: Version-Tracked Migrations
-
-For production-grade migration tracking, consider:
-
-**Option A: Drizzle ORM**
-```bash
-npm install drizzle-orm drizzle-kit
-npx drizzle-kit generate:sqlite
-npx drizzle-kit push:sqlite
-```
-
-**Option B: Custom Migration Tracker**
-```sql
-CREATE TABLE schema_migrations (
-  version INTEGER PRIMARY KEY,
-  name TEXT NOT NULL,
-  applied_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-```
-
-**Benefits:**
-- Prevents duplicate migrations
-- Tracks what's been applied
-- Rollback support
-- Automated migration ordering
-
-Currently using **manual consolidation** (this approach) for simplicity.
-
----
-
-## Contributing
-
-When adding new tables:
-
-1. Determine which bundle they belong to:
-   - Core? (foundational user/owner data)
-   - RBAC? (permissions/access control)
-   - Features? (business logic/features)
-   - Auth? (security/authentication)
-
-2. Add to appropriate `schema-*.sql` file
-
-3. Update this README
-
-4. Test with `npm run db:schema:all:local`
-
-5. Verify E2E tests pass in CI
-
----
-
-## Questions?
-
-See `/docs/AUTH_IMPLEMENTATION.md` for authentication architecture.
-See `/tests/e2e/README.md` for E2E test setup.
+See `archive/legacy-migrations/` for the complete list.

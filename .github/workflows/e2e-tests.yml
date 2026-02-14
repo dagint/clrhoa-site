@@ -38,11 +38,11 @@ jobs:
 
       - name: Initialize local D1 database
         run: |
-          npm run db:schema:core:local
-          npm run db:schema:rbac:local
-          npm run db:schema:features:local
-          npm run db:schema:auth:local
-          npm run db:schema:sessions:local
+          npx wrangler d1 execute clrhoa_db --local --file=./scripts/schema-01-core.sql
+          npx wrangler d1 execute clrhoa_db --local --file=./scripts/schema-02-auth-sessions.sql
+          npx wrangler d1 execute clrhoa_db --local --file=./scripts/schema-03-features.sql
+          npx wrangler d1 execute clrhoa_db --local --file=./scripts/schema-04-admin-compliance.sql
+          npx wrangler d1 execute clrhoa_db --local --file=./scripts/schema-05-seed-data.sql
 
       - name: Start wrangler dev server
         run: npm run preview:test &
@@ -108,11 +108,11 @@ jobs:
 
       - name: Initialize local D1 database
         run: |
-          npm run db:schema:core:local
-          npm run db:schema:rbac:local
-          npm run db:schema:features:local
-          npm run db:schema:auth:local
-          npm run db:schema:sessions:local
+          npx wrangler d1 execute clrhoa_db --local --file=./scripts/schema-01-core.sql
+          npx wrangler d1 execute clrhoa_db --local --file=./scripts/schema-02-auth-sessions.sql
+          npx wrangler d1 execute clrhoa_db --local --file=./scripts/schema-03-features.sql
+          npx wrangler d1 execute clrhoa_db --local --file=./scripts/schema-04-admin-compliance.sql
+          npx wrangler d1 execute clrhoa_db --local --file=./scripts/schema-05-seed-data.sql
 
       - name: Start wrangler dev server
         run: npm run preview:test &
