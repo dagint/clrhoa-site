@@ -33,21 +33,42 @@ export const SESSION_COOKIE_NAME = 'clrhoa_session';
 export async function validateSession(
   db: D1Database,
   sessionId: string | null | undefined,
-  hostname?: string
+  url?: string
 ): Promise<{
   session: Session | null;
   user: User | null;
 }> {
   if (!sessionId) {
+    console.log('[VALIDATE DEBUG] No sessionId provided');
     return { session: null, user: null };
   }
 
   try {
-    const lucia = createLucia(db, hostname);
+    // Check if session exists in database BEFORE validation
+    const dbSession = await db.prepare('SELECT * FROM sessions WHERE id = ?').bind(sessionId).first();
+    console.log('[VALIDATE DEBUG] Session in database:', !!dbSession);
+    if (dbSession) {
+      console.log('[VALIDATE DEBUG] DB session user_id:', dbSession.user_id);
+      console.log('[VALIDATE DEBUG] DB session expires_at:', dbSession.expires_at);
+      const now = Math.floor(Date.now() / 1000);
+      const expiresAt = dbSession.expires_at as number;
+      console.log('[VALIDATE DEBUG] Current time:', now, 'Expires at:', expiresAt, 'Expired:', now > expiresAt);
+    } else {
+      console.log('[VALIDATE DEBUG] Session NOT found in database');
+    }
+
+    const lucia = createLucia(db, url);
+    console.log('[VALIDATE DEBUG] Created Lucia instance, validating session:', sessionId.substring(0, 10) + '...');
     const result = await lucia.validateSession(sessionId);
+    console.log('[VALIDATE DEBUG] Validation complete - session:', !!result.session, 'user:', !!result.user);
+
+    if (!result.session || !result.user) {
+      console.log('[VALIDATE DEBUG] Session validation returned null/invalid');
+    }
+
     return result;
   } catch (error) {
-    console.error('Session validation error:', error);
+    console.error('[VALIDATE DEBUG] Session validation error:', error);
     return { session: null, user: null };
   }
 }
@@ -79,8 +100,8 @@ export async function getSession(context: APIContext): Promise<{
   }
 
   const sessionId = getSessionId(context);
-  const hostname = context.url.hostname;
-  return await validateSession(db, sessionId, hostname);
+  const url = context.url.href;
+  return await validateSession(db, sessionId, url);
 }
 
 /**
@@ -263,8 +284,8 @@ export function setSessionCookie(
   db: D1Database,
   sessionId: string
 ): void {
-  const hostname = context.url.hostname;
-  const lucia = createLucia(db, hostname);
+  const url = context.url.href;
+  const lucia = createLucia(db, url);
   const sessionCookie = lucia.createSessionCookie(sessionId);
 
   context.cookies.set(
@@ -281,8 +302,8 @@ export function setSessionCookie(
  * @param db - D1 database instance
  */
 export function clearSessionCookie(context: APIContext, db: D1Database): void {
-  const hostname = context.url.hostname;
-  const lucia = createLucia(db, hostname);
+  const url = context.url.href;
+  const lucia = createLucia(db, url);
   const blankCookie = lucia.createBlankSessionCookie();
 
   context.cookies.set(
