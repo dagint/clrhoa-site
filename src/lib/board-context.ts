@@ -69,7 +69,7 @@ export async function getAdminContext(astro: RoleContextAstro): Promise<GetRoleC
 
   // Check if user is authenticated via Lucia and env is available
   if (!user || !luciaSession || !env) {
-    return { redirect: '/portal/login' };
+    return { redirect: '/auth/login' };
   }
 
   // Convert Lucia user to SessionPayload format for compatibility
@@ -126,7 +126,7 @@ export async function getBoardContext(astro: RoleContextAstro): Promise<GetRoleC
 
   // Check if user is authenticated via Lucia and env is available
   if (!user || !luciaSession || !env) {
-    return { redirect: '/portal/login' };
+    return { redirect: '/auth/login' };
   }
 
   // Convert Lucia user to SessionPayload format for compatibility
@@ -183,7 +183,7 @@ export async function getArbContext(astro: RoleContextAstro): Promise<GetRoleCon
 
   // Check if user is authenticated via Lucia and env is available
   if (!user || !luciaSession || !env) {
-    return { redirect: '/portal/login' };
+    return { redirect: '/auth/login' };
   }
 
   // Convert Lucia user to SessionPayload format for compatibility

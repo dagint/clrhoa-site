@@ -12,7 +12,7 @@ import { getOwnerByEmail, getPhonesArray } from '../../lib/directory-db';
 import { getPreapprovalById } from '../../lib/preapproval-db';
 
 const { env, session: sessionFromContext, effectiveRole } = await getPortalContext(Astro, { fingerprint: true });
-if (!sessionFromContext) return Astro.redirect('/portal/login');
+if (!sessionFromContext) return Astro.redirect('/auth/login');
 let session = sessionFromContext;
 
 // Always ensure session has a CSRF token (update activity and refresh token if needed)
@@ -64,7 +64,7 @@ if (!session.csrfToken && env?.SESSION_SECRET) {
 
 // Final check: if session still doesn't have CSRF token, something is wrong
 if (!session.csrfToken) {
-  return Astro.redirect('/portal/login');
+  return Astro.redirect('/auth/login');
 }
 
 // Get badge counts for navigation

@@ -17,7 +17,7 @@ import { batchLoadElectronicSignatures } from '../../lib/esignature-db';
 import type { ElectronicSignature } from '../../lib/esignature-db';
 
 const { env, session, effectiveRole } = await getPortalContext(Astro);
-if (!session) return Astro.redirect('/portal/login');
+if (!session) return Astro.redirect('/auth/login');
 
 const allowedRoles = ['arb', 'board', 'admin', 'arb_board'];
 if (!allowedRoles.includes(effectiveRole)) {

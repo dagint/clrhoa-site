@@ -17,7 +17,7 @@ import { getPortalContext } from '../../../lib/portal-context';
 import { getUserByEmail } from '../../../lib/db';
 
 const { env, session, effectiveRole } = await getPortalContext(Astro);
-if (!session) return Astro.redirect('/portal/login');
+if (!session) return Astro.redirect('/auth/login');
 
 const db = env?.DB;
 
