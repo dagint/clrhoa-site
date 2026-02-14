@@ -9,7 +9,7 @@ import { listUpcomingWithCountsAndUser, getHouseholdRsvps } from '../../lib/meet
 import type { MeetingWithCounts } from '../../lib/meetings-db';
 
 const { env, session, effectiveRole } = await getPortalContext(Astro, { fingerprint: true });
-if (!session) return Astro.redirect('/portal/login');
+if (!session) return Astro.redirect('/auth/login');
 
 const { email, role, name } = session;
 const db = env?.DB;

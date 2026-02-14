@@ -9,7 +9,7 @@ import { getPortalBadgeCounts } from '../../lib/portal-badge-counts';
 import { getDashboardMetrics } from '../../lib/analytics';
 
 const { env, session, effectiveRole } = await getPortalContext(Astro);
-if (!session) return Astro.redirect('/portal/login');
+if (!session) return Astro.redirect('/auth/login');
 
 const allowedRoles = ['board', 'admin', 'arb_board'];
 if (!allowedRoles.includes(effectiveRole)) {

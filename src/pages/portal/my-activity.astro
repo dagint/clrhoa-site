@@ -9,7 +9,7 @@ import { listDirectoryLogsByViewer } from '../../lib/directory-db';
 import { listArbAuditLogForOwner } from '../../lib/arb-db';
 
 const { env, session, effectiveRole } = await getPortalContext(Astro);
-if (!session) return Astro.redirect('/portal/login');
+if (!session) return Astro.redirect('/auth/login');
 
 const ACTIVITY_PAGE_SIZES = [10, 25, 50, 100] as const;
 const DEFAULT_PAGE_SIZE = 10;

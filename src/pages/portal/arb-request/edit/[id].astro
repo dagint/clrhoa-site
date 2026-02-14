@@ -12,7 +12,7 @@ import type { ArbFile } from '../../../../lib/arb-db';
 
 const { id } = Astro.params;
 const { env, session: sessionFromContext, effectiveRole } = await getPortalContext(Astro, { fingerprint: true });
-if (!sessionFromContext) return Astro.redirect('/portal/login');
+if (!sessionFromContext) return Astro.redirect('/auth/login');
 let session = sessionFromContext;
 
 // Always ensure session has a CSRF token (update activity and refresh token if needed)
@@ -24,14 +24,14 @@ if (!session.csrfToken && env?.SESSION_SECRET) {
   const array = new Uint8Array(32);
   crypto.getRandomValues(array);
   const csrfToken = Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
-  
+
   // Update session payload with CSRF token
   const updatedPayload = {
     ...session,
     csrfToken,
     lastActivity: Math.floor(Date.now() / 1000),
   };
-  
+
   // Sign the updated payload
   const encoder = new TextEncoder();
   const data = encoder.encode(JSON.stringify(updatedPayload));
@@ -52,7 +52,7 @@ if (!session.csrfToken && env?.SESSION_SECRET) {
     .replace(/\//g, '_')
     .replace(/=+$/, '');
   const newCookieValue = `${payloadB64}.${sigB64}`;
-  
+
   // Update session object and set cookie
   session = updatedPayload;
   const isSecure = Astro.url.protocol === 'https:';
@@ -66,7 +66,7 @@ if (!session.csrfToken && env?.SESSION_SECRET) {
 // Final check: if session still doesn't have CSRF token, something is wrong
 if (!session.csrfToken) {
   // This shouldn't happen, but if it does, redirect to force re-login
-  return Astro.redirect('/portal/login');
+  return Astro.redirect('/auth/login');
 }
 
 const db = env?.DB;
@@ -416,7 +416,7 @@ const selectedTypes = req.application_type ? req.application_type.split(',').map
       if (typeof window !== 'undefined') {
         window.csrfToken = csrfToken;
       }
-      
+
       // Add CSRF token to form
       const form = document.getElementById('arb-edit-form');
       if (form) {
@@ -426,27 +426,27 @@ const selectedTypes = req.application_type ? req.application_type.split(',').map
         csrfInput.value = csrfToken;
         form.appendChild(csrfInput);
       }
-      
+
       // Session timeout: Auto-logout after 30 minutes of inactivity
       const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
       let lastActivity = Date.now();
       let timeoutWarningShown = false;
-      
+
       function resetActivity() {
         lastActivity = Date.now();
         timeoutWarningShown = false;
       }
-      
+
       function checkSessionTimeout() {
         const elapsed = Date.now() - lastActivity;
         const remaining = SESSION_TIMEOUT_MS - elapsed;
-        
+
         if (remaining <= 0) {
           alert('Your session has expired due to inactivity. You will be redirected to the login page.');
           window.location.href = '/portal/login';
           return;
         }
-        
+
         if (remaining <= 2 * 60 * 1000 && !timeoutWarningShown) {
           timeoutWarningShown = true;
           const confirmed = confirm('Your session will expire in 2 minutes due to inactivity. Click OK to stay logged in, or Cancel to log out now.');
@@ -459,11 +459,11 @@ const selectedTypes = req.application_type ? req.application_type.split(',').map
           }
         }
       }
-      
+
       ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'].forEach(function (event) {
         document.addEventListener(event, resetActivity, { passive: true });
       });
-      
+
       setInterval(checkSessionTimeout, 60 * 1000);
     })();
   </script>

@@ -14,7 +14,7 @@ import { listActiveFeedbackDocs, getFeedbackResponse, householdHasResponded } fr
 import { calculatePagination, getOffset, getPageNumbers } from '../../utils/pagination';
 
 const { env, session, effectiveRole } = await getPortalContext(Astro, { fingerprint: true });
-if (!session) return Astro.redirect('/portal/login');
+if (!session) return Astro.redirect('/auth/login');
 
 const { email, role, name } = session;
 const db = env?.DB;

@@ -18,6 +18,7 @@
 -- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS users (
   email TEXT PRIMARY KEY,
+  id TEXT UNIQUE,  -- Required by Lucia D1 adapter (same as email for compatibility)
   role TEXT DEFAULT 'member',
   name TEXT,
   created DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -53,6 +54,7 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
 CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_id ON users(id);
 CREATE INDEX IF NOT EXISTS idx_users_phone ON users(phone);
 
 -- ----------------------------------------------------------------------------
@@ -65,6 +67,7 @@ CREATE TABLE IF NOT EXISTS owners (
   phone TEXT,
   phone2 TEXT,  -- Additional phone number
   phone3 TEXT,  -- Third phone number
+  phones TEXT DEFAULT NULL,  -- JSON array of all phone numbers (for directory queries)
   email TEXT UNIQUE,
 
   -- Privacy & contact sharing

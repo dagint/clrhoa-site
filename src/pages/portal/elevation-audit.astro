@@ -14,7 +14,7 @@ import { listPimElevationLog } from '../../lib/pim-db';
 import { ELEVATED_ROLES } from '../../lib/auth';
 
 const { env, session, effectiveRole } = await getPortalContext(Astro);
-if (!session) return Astro.redirect('/portal/login');
+if (!session) return Astro.redirect('/auth/login');
 
 const whitelistRole = (session.role ?? 'member').toLowerCase();
 const canView = ELEVATED_ROLES.has(whitelistRole);

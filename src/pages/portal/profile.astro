@@ -15,7 +15,7 @@ const LOGIN_PAGE_SIZES = [10, 25, 50, 100] as const;
 const DEFAULT_LOGIN_PAGE_SIZE = 10;
 
 const { env, session, effectiveRole } = await getPortalContext(Astro);
-if (!session) return Astro.redirect('/portal/login');
+if (!session) return Astro.redirect('/auth/login');
 
 const { email, role, name } = session;
 const db = env?.DB;

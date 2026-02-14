@@ -8,7 +8,7 @@ import { getPortalBadgeCounts } from '../../lib/portal-badge-counts';
 import { listPortalNewsItems, getNewsItemImageKeys } from '../../lib/news-items-db';
 
 const { env, session, effectiveRole } = await getPortalContext(Astro);
-if (!session) return Astro.redirect('/portal/login');
+if (!session) return Astro.redirect('/auth/login');
 
 const { email, role, name } = session;
 const db = env?.DB;

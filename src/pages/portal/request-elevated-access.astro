@@ -8,7 +8,7 @@ import { getPortalBadgeCounts } from '../../lib/portal-badge-counts';
 import { isElevatedRole, getEffectiveRole } from '../../lib/auth';
 
 const { env, session, effectiveRole } = await getPortalContext(Astro, { fingerprint: true });
-if (!session) return Astro.redirect('/portal/login');
+if (!session) return Astro.redirect('/auth/login');
 
 const whitelistRole = session.role?.toLowerCase() ?? 'member';
 const hasStaffWhitelistRole = isElevatedRole(whitelistRole);
