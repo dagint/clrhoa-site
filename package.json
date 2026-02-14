@@ -189,7 +189,8 @@
     "vars:export": "node scripts/export-github-vars-template.js",
     "vars:update": "node scripts/update-github-vars-from-file.js",
     "pages:sync-env": "node scripts/sync-secrets-to-cloudflare-pages-wrangler.js",
-    "pages:sync-env-api": "node scripts/sync-secrets-to-cloudflare-pages.js"
+    "pages:sync-env-api": "node scripts/sync-secrets-to-cloudflare-pages.js",
+    "db:schema:sessions:local": "wrangler d1 execute clrhoa_db --local --file=./scripts/schema-auth-sessions.sql"
   },
   "dependencies": {
     "@astrojs/cloudflare": "^12.0.0",
