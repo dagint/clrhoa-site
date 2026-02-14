@@ -87,7 +87,7 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
     if (isPublicAuthRoute && context.cookies.has(SESSION_COOKIE_NAME) && env?.DB) {
       // User is already logged in, validate their session
       const sessionId = getSessionId(context);
-      const { session, user } = await validateSession(env.DB, sessionId);
+      const { session, user } = await validateSession(env.DB, sessionId, context.url.hostname);
 
       if (session && user) {
         // Valid session - redirect to appropriate landing zone
@@ -106,7 +106,7 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
     }
     if (env?.DB) {
       const sessionId = getSessionId(context);
-      const { session, user } = await validateSession(env.DB, sessionId);
+      const { session, user } = await validateSession(env.DB, sessionId, context.url.hostname);
 
       if (!session || !user) {
         return context.redirect(`/auth/login?return=${encodeURIComponent(pathname)}`);
@@ -144,7 +144,7 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
     }
     if (env?.DB) {
       const sessionId = getSessionId(context);
-      const { session, user } = await validateSession(env.DB, sessionId);
+      const { session, user } = await validateSession(env.DB, sessionId, context.url.hostname);
 
       if (!session || !user) {
         return context.redirect(`/auth/login?return=${encodeURIComponent(pathname)}`);
@@ -180,7 +180,7 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
   if (env?.DB && !isOwnProfileApi && !isMemberArbNotesApi && ELEVATED_API_PREFIXES.some((p) => pathname.startsWith(p))) {
     if (context.cookies.has(SESSION_COOKIE_NAME)) {
       const sessionId = getSessionId(context);
-      const { session, user } = await validateSession(env.DB, sessionId);
+      const { session, user } = await validateSession(env.DB, sessionId, context.url.hostname);
 
       if (session && user) {
         const userRole = getUserRole(user)?.toLowerCase() || 'member';
@@ -225,7 +225,7 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
     // Validate Lucia session
     if (env?.DB) {
       const sessionId = getSessionId(context);
-      const { session, user } = await validateSession(env.DB, sessionId);
+      const { session, user } = await validateSession(env.DB, sessionId, context.url.hostname);
 
       if (!session || !user) {
         // Invalid session - redirect to login

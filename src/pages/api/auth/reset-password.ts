@@ -285,7 +285,8 @@ export const POST: APIRoute = async ({ request, locals }) => {
       .run();
 
     // 10. Revoke all existing sessions for this user (force re-login)
-    const lucia = createLucia(db);
+    const hostname = new URL(request.url).hostname;
+    const lucia = createLucia(db, hostname);
     await lucia.invalidateUserSessions(resetTokenResult.user_id);
 
     await logSecurityEvent(db, {

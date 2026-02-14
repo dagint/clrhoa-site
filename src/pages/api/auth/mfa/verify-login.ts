@@ -280,7 +280,8 @@ export const POST: APIRoute = async (context) => {
     await kv.delete(`mfa_temp_token:${tempToken}`);
 
     // 10. Create session (complete login)
-    const lucia = createLucia(db);
+    const hostname = context.url.hostname;
+    const lucia = createLucia(db, hostname);
     const session = await createSession(
       db,
       lucia,

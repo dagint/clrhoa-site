@@ -27,7 +27,7 @@ export async function POST(context: APIContext): Promise<Response> {
   }
 
   try {
-    const body = await context.request.json();
+    const body = await context.request.json() as { userId?: string; elevated?: boolean; assumeRole?: string };
     const { userId, elevated = false, assumeRole } = body;
 
     if (!userId) {
@@ -45,7 +45,8 @@ export async function POST(context: APIContext): Promise<Response> {
       });
     }
 
-    const lucia = createLucia(env.DB);
+    const hostname = context.url.hostname;
+    const lucia = createLucia(env.DB, hostname);
 
     // Create session with Lucia
     const session = await createSession(

@@ -284,7 +284,8 @@ export const POST: APIRoute = async ({ request, locals, cookies }) => {
     ]);
 
     // 10. Create session and log user in automatically
-    const lucia = createLucia(db);
+    const hostname = new URL(request.url).hostname;
+    const lucia = createLucia(db, hostname);
     const session = await createSession(
       db,
       lucia,

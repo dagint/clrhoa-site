@@ -32,7 +32,8 @@ export const SESSION_COOKIE_NAME = 'clrhoa_session';
  */
 export async function validateSession(
   db: D1Database,
-  sessionId: string | null | undefined
+  sessionId: string | null | undefined,
+  hostname?: string
 ): Promise<{
   session: Session | null;
   user: User | null;
@@ -42,7 +43,7 @@ export async function validateSession(
   }
 
   try {
-    const lucia = createLucia(db);
+    const lucia = createLucia(db, hostname);
     const result = await lucia.validateSession(sessionId);
     return result;
   } catch (error) {
@@ -78,7 +79,8 @@ export async function getSession(context: APIContext): Promise<{
   }
 
   const sessionId = getSessionId(context);
-  return await validateSession(db, sessionId);
+  const hostname = context.url.hostname;
+  return await validateSession(db, sessionId, hostname);
 }
 
 /**
@@ -261,7 +263,8 @@ export function setSessionCookie(
   db: D1Database,
   sessionId: string
 ): void {
-  const lucia = createLucia(db);
+  const hostname = context.url.hostname;
+  const lucia = createLucia(db, hostname);
   const sessionCookie = lucia.createSessionCookie(sessionId);
 
   context.cookies.set(
@@ -278,7 +281,8 @@ export function setSessionCookie(
  * @param db - D1 database instance
  */
 export function clearSessionCookie(context: APIContext, db: D1Database): void {
-  const lucia = createLucia(db);
+  const hostname = context.url.hostname;
+  const lucia = createLucia(db, hostname);
   const blankCookie = lucia.createBlankSessionCookie();
 
   context.cookies.set(

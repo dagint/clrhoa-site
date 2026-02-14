@@ -407,7 +407,8 @@ export const POST: APIRoute = async ({ request, locals, cookies }) => {
   }
 
   // No MFA - create session directly
-  const lucia = createLucia(db);
+  const hostname = new URL(request.url).hostname;
+  const lucia = createLucia(db, hostname);
   const session = await createSession(db, lucia, normalizedEmail, ipAddress, userAgent);
 
   // Set session cookie

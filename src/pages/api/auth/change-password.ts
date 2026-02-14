@@ -245,7 +245,8 @@ export const POST: APIRoute = async ({ request, locals, cookies }) => {
 
     // 8. Optionally revoke other sessions (not current one)
     if (revokeOtherSessions && session.id) {
-      const lucia = createLucia(db);
+      const hostname = new URL(request.url).hostname;
+      const lucia = createLucia(db, hostname);
 
       // Get all sessions for this user
       const allSessions = await db
