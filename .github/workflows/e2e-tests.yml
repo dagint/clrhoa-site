@@ -42,6 +42,7 @@ jobs:
           npm run db:schema:rbac:local
           npm run db:schema:features:local
           npm run db:schema:auth:local
+          npx wrangler d1 execute clrhoa_db --local --file=./scripts/schema-auth-sessions.sql
 
       - name: Start wrangler dev server
         run: npm run preview:test &
@@ -111,6 +112,7 @@ jobs:
           npm run db:schema:rbac:local
           npm run db:schema:features:local
           npm run db:schema:auth:local
+          npx wrangler d1 execute clrhoa_db --local --file=./scripts/schema-auth-sessions.sql
 
       - name: Start wrangler dev server
         run: npm run preview:test &
