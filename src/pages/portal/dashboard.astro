@@ -115,7 +115,7 @@ const showActionNeededBanner = showActionFeedback || showActionMaintenance || sh
     />
 
     <!-- Main Content Area -->
-    <div class="flex-1 flex flex-col overflow-hidden">
+    <div id="portal-content" class="flex-1 flex flex-col overflow-hidden lg:ml-72 transition-all duration-300">
       <!-- Top Header -->
       <PortalHeader userName={displayName ?? undefined} userEmail={email} effectiveRole={effectiveRole}>
         <span slot="title">Dashboard</span>
