@@ -81,8 +81,8 @@ function executeKVCommand(
  * This function is called by global-setup.ts before tests run.
  * Test users are inserted with test-specific emails (@clrhoa.test domain).
  *
- * NOTE: We only seed D1, not KV. E2E tests create session cookies directly
- * using createSessionCookieValue(), bypassing the login flow that checks KV.
+ * NOTE: We only seed users table, not passwords. E2E tests create Lucia sessions
+ * directly in the sessions table, bypassing the login flow that validates passwords.
  */
 export async function seedTestUsers(): Promise<void> {
   console.log('[database] Seeding test users...');
@@ -206,10 +206,56 @@ export async function resetPermissions(): Promise<void> {
 export async function cleanupTestData(): Promise<void> {
   console.log('[database] Starting full test data cleanup...');
 
+  // Clean up sessions first (foreign key constraint)
+  try {
+    const { cleanupTestSessions } = await import('./auth.js');
+    await cleanupTestSessions();
+  } catch (error) {
+    console.error('[database] Failed to clean up sessions:', error);
+  }
+
   await cleanupTestUsers();
   await resetPermissions();
 
   console.log('[database] Full test data cleanup complete');
+}
+
+/**
+ * Apply PIM migrations to sessions table.
+ *
+ * Adds PIM columns (elevated_until, assumed_role, etc.) if they don't exist.
+ */
+export async function applyPIMMigrations(): Promise<void> {
+  console.log('[database] Applying PIM migrations to sessions table...');
+
+  try {
+    // Check if PIM columns already exist
+    const checkSQL = "SELECT sql FROM sqlite_master WHERE type='table' AND name='sessions'";
+    const result = executeD1Command(checkSQL);
+
+    if (result.includes('elevated_until')) {
+      console.log('[database] ✓ PIM columns already exist, skipping migration');
+      return;
+    }
+
+    // Apply PIM migrations
+    const migrationSQL = `
+      -- Add PIM columns to sessions table
+      ALTER TABLE sessions ADD COLUMN elevated_until INTEGER DEFAULT NULL;
+      ALTER TABLE sessions ADD COLUMN assumed_role TEXT DEFAULT NULL;
+      ALTER TABLE sessions ADD COLUMN assumed_at INTEGER DEFAULT NULL;
+      ALTER TABLE sessions ADD COLUMN assumed_until INTEGER DEFAULT NULL;
+
+      -- Create index on elevated_until for efficient queries
+      CREATE INDEX IF NOT EXISTS idx_sessions_elevated ON sessions(elevated_until);
+    `;
+
+    executeD1Command(migrationSQL);
+    console.log('[database] ✓ PIM migrations applied successfully');
+  } catch (error) {
+    console.error('[database] ✗ Failed to apply PIM migrations');
+    throw error;
+  }
 }
 
 /**
@@ -227,6 +273,14 @@ export async function verifyDatabaseSetup(): Promise<void> {
 
     if (!usersResult.includes('users')) {
       throw new Error('Users table not found in D1 database');
+    }
+
+    // Check if sessions table exists
+    const checkSessionsSQL = "SELECT name FROM sqlite_master WHERE type='table' AND name='sessions'";
+    const sessionsResult = executeD1Command(checkSessionsSQL);
+
+    if (!sessionsResult.includes('sessions')) {
+      throw new Error('Sessions table not found in D1 database');
     }
 
     // Check if route_permissions table exists

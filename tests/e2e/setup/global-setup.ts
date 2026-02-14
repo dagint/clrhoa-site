@@ -9,7 +9,7 @@
  * - Checks wrangler dev server availability
  */
 
-import { seedTestUsers, resetPermissions, verifyDatabaseSetup } from '../helpers/database.js';
+import { seedTestUsers, resetPermissions, verifyDatabaseSetup, applyPIMMigrations } from '../helpers/database.js';
 
 async function globalSetup() {
   console.log('\n=== E2E Test Environment Setup ===\n');
@@ -18,10 +18,13 @@ async function globalSetup() {
     // 1. Verify database setup
     await verifyDatabaseSetup();
 
-    // 2. Reset permissions to defaults
+    // 2. Apply PIM migrations (add elevated_until columns to sessions table)
+    await applyPIMMigrations();
+
+    // 3. Reset permissions to defaults
     await resetPermissions();
 
-    // 3. Seed test users
+    // 4. Seed test users
     await seedTestUsers();
 
     // 4. Verify wrangler dev server (optional - tests will fail if not running)

@@ -42,11 +42,13 @@ jobs:
           npm run db:schema:rbac:local
           npm run db:schema:features:local
           npm run db:schema:auth:local
+          npm run db:schema:sessions:local
 
       - name: Start wrangler dev server
         run: npm run preview:test &
         env:
           SESSION_SECRET: ${{ secrets.SESSION_SECRET_TEST }}
+          NODE_ENV: test
 
       - name: Wait for server to be ready
         run: |
@@ -110,11 +112,13 @@ jobs:
           npm run db:schema:rbac:local
           npm run db:schema:features:local
           npm run db:schema:auth:local
+          npm run db:schema:sessions:local
 
       - name: Start wrangler dev server
         run: npm run preview:test &
         env:
           SESSION_SECRET: ${{ secrets.SESSION_SECRET_TEST }}
+          NODE_ENV: test
 
       - name: Wait for server
         run: |

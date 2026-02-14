@@ -58,9 +58,9 @@ export async function createSession(
   // Create session with Lucia
   const session = await lucia.createSession(userId, {
     fingerprint: await generateSessionFingerprint(ipAddress || 'unknown', userAgent || 'unknown'),
-    ipAddress: ipAddress || null,
-    userAgent: userAgent || null,
-    createdAt: Math.floor(Date.now() / 1000),
+    ip_address: ipAddress || null,
+    user_agent: userAgent || null,
+    created_at: Math.floor(Date.now() / 1000),
   });
 
   return session;
