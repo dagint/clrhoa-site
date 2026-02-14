@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS users (
   -- Contact information (phase 3.5)
   phone TEXT,
   sms_optin INTEGER DEFAULT 0,
+  notification_preferences TEXT,  -- JSON: per-type email notification opt-in/out
 
   -- Password authentication fields
   password_hash TEXT DEFAULT NULL,
