@@ -43,6 +43,12 @@ CREATE TABLE IF NOT EXISTS arb_requests (
   arb_esign TEXT,
   signature_id TEXT,  -- Links to electronic_signatures.id
 
+  -- v4 copy tracking
+  copied_from_id TEXT,  -- Source request ID when this request was created by copy
+
+  -- v5 revision notes
+  revision_notes TEXT,  -- ARB provides context when returning request for revision
+
   -- v6 notes fields
   arb_internal_notes TEXT,
   owner_notes TEXT,
@@ -83,7 +89,8 @@ CREATE TABLE IF NOT EXISTS arb_files (
   filename TEXT NOT NULL,
   r2_keys TEXT NOT NULL,
   original_size INTEGER NOT NULL,
-  uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  reference_only INTEGER DEFAULT 0  -- 1 = pointer to R2 objects owned by another request
 );
 
 CREATE INDEX IF NOT EXISTS idx_arb_files_request ON arb_files(request_id);
@@ -504,13 +511,13 @@ CREATE INDEX IF NOT EXISTS idx_user_notifications_user ON user_notifications(use
 
 -- Notification dismissals (for banner notifications)
 CREATE TABLE IF NOT EXISTS notification_dismissals (
-  user_email TEXT NOT NULL,
-  notification_id TEXT NOT NULL,
-  dismissed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (user_email, notification_id)
+  email TEXT NOT NULL,
+  notification_key TEXT NOT NULL,
+  dismissed_at TEXT NOT NULL,
+  PRIMARY KEY (email, notification_key)
 );
 
-CREATE INDEX IF NOT EXISTS idx_notification_dismissals_user ON notification_dismissals(user_email);
+CREATE INDEX IF NOT EXISTS idx_notification_dismissals_user ON notification_dismissals(email);
 
 -- SMS Feature Requests (track member interest in SMS notifications)
 CREATE TABLE IF NOT EXISTS sms_feature_requests (
