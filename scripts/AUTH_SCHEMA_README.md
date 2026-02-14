@@ -1,129 +1,62 @@
-# Authentication Schema Migration - Phase 1
+# Authentication Schema - Consolidated
 
-This directory contains database schema migrations for implementing comprehensive password-based authentication, replacing the KV whitelist system.
+> **⚠️ NOTE:** This documentation has been updated for the consolidated schema approach.
+> Individual migration files have been archived to `archive/legacy-migrations/`.
+> All auth tables are now created via `schema-02-auth-sessions.sql`.
 
 ## Overview
 
-**Current State:** KV whitelist-based authentication (email only, no passwords)
-**Target State:** Full password-based authentication with MFA, sessions, and audit logging
+**Current State:** Full password-based authentication with Lucia v3, MFA, sessions, and audit logging
+**Schema File:** `scripts/schema-02-auth-sessions.sql`
 
-**Migration Strategy:** Backward compatible during transition period
-- Users with `password_hash = NULL` fall back to KV whitelist (legacy)
-- Users with `password_hash != NULL` use password authentication (new)
-- After all users migrate, KV whitelist can be deprecated
-
----
-
-## Schema Files
-
-Run these migrations **in order**:
-
-### 1. `schema-auth-users-migration.sql`
-**Purpose:** Add password auth, MFA, and security columns to existing `users` table
-
-**New Columns:**
-- **Password Auth:** `password_hash`, `password_changed_at`, `previous_password_hashes`
-- **Account Security:** `status`, `failed_login_attempts`, `last_failed_login`, `locked_until`
-- **MFA:** `mfa_enabled`, `mfa_enabled_at` (secrets stored encrypted in KV)
-- **Login Tracking:** `last_login`, `last_login_ip`, `last_login_user_agent`
-- **Audit:** `created_by`, `updated_at`, `updated_by`
-- **Contact:** `phone`, `sms_optin`
-
-**Backward Compatibility:** All columns are nullable/default, won't break existing users
+**Migration Strategy:** Idempotent - safe to run multiple times
+- Uses `CREATE TABLE IF NOT EXISTS`
+- All columns have defaults where appropriate
+- Backward compatible with existing data
 
 ---
 
-### 2. `schema-auth-password-tokens.sql`
-**Purpose:** Password reset and setup token storage
+## Consolidated Schema
 
-**Tables:**
-- `password_reset_tokens` - Forgot password flow (1-2 hour expiry)
-- `password_setup_tokens` - New user onboarding (24-48 hour expiry)
+The consolidated `schema-02-auth-sessions.sql` creates all auth-related tables:
 
-**Security Features:**
-- Tokens hashed (SHA-256) before storage
-- Single-use enforcement (`used` flag)
-- Expiration timestamps
-- IP and User-Agent tracking
+### Tables Included
 
----
+1. **sessions** - Lucia v3 database-backed sessions with PIM support
+2. **password_reset_tokens** - Forgot password flow
+3. **password_setup_tokens** - New user onboarding
+4. **mfa_backup_codes** - MFA backup codes
+5. **audit_logs** - Comprehensive security audit trail
+6. **security_events** - Critical security monitoring
+7. **pim_elevation_logs** - Privilege elevation tracking
 
-### 3. `schema-auth-sessions.sql`
-**Purpose:** Database-backed session storage (replaces cookie-only sessions)
+### Key Features
 
-**Table:** `sessions`
+**Password Security:**
+- Passwords hashed with bcrypt (cost factor 10)
+- Password history tracking (prevent reuse of last 5 passwords)
+- Automatic lockout after 5 failed attempts (15 min cooldown)
+- Password strength requirements enforced
 
-**Features:**
-- Session revocation support
-- Concurrent session limit (3 per user)
-- Anomaly detection (fingerprint, IP, User-Agent tracking)
-- Sliding window expiration (15 min) + absolute timeout (24 hours)
-- Session metadata (device, location)
+**Session Management (Lucia v3):**
+- HttpOnly session cookies (XSS protection)
+- Session fingerprinting (IP + User-Agent hash)
+- Automatic expiration (30 days default)
+- Admin can revoke sessions remotely
+- Database-backed for advanced features
 
-**Benefits over cookie-only:**
-- Admin can view/revoke user sessions
-- User can view/revoke their own sessions
-- Better security monitoring
+**PIM (Privileged Identity Management):**
+- Just-In-Time (JIT) privilege elevation
+- Time-limited elevation (30 min default)
+- Automatic de-elevation on timeout
+- Role assumption for admin users (board/arb)
+- Full audit trail of elevation events
 
----
-
-### 4. `schema-auth-audit-logs.sql`
-**Purpose:** Comprehensive audit logging for compliance and security
-
-**Table:** `audit_logs`
-
-**Logs:**
-- Authentication events (login, logout, password changes)
-- Authorization events (permission denials, role changes)
-- Administrative events (user creation, role assignments)
-- Security events (rate limits, suspicious activity)
-
-**Fields:**
-- Event classification (type, category, severity)
-- Actor and target users
-- Request context (IP, User-Agent, session, correlation ID)
-- Action outcome and details (JSON)
-
-**Retention:** 90 days minimum, 1 year recommended
-
----
-
-### 5. `schema-auth-security-events.sql`
-**Purpose:** Security incident tracking and alerting
-
-**Table:** `security_events`
-
-**Tracks:**
-- Rate limit violations
-- Account lockouts
-- Suspicious login attempts
-- Session hijacking detection
-- Token reuse attempts
-
-**Features:**
-- Severity classification (info, warning, critical)
-- Resolution tracking (who resolved, when, notes)
-- Auto-remediation support (automated responses)
-
-**Use Cases:**
-- Security dashboard
-- Admin alerts
-- Incident response
-
----
-
-### 6. `schema-auth-mfa-backup-codes.sql`
-**Purpose:** MFA backup codes for account recovery
-
-**Table:** `mfa_backup_codes`
-
-**Features:**
-- 10 single-use backup codes per user
-- Codes hashed with bcrypt (NOT stored in plain text)
-- Used flag prevents reuse
-- Regeneration support
-
-**Note:** TOTP secrets stored encrypted in KV, backup codes in D1
+**Audit Logging:**
+- All auth events logged (login, logout, password change)
+- Authorization events (permission checks, access denials)
+- Administrative events (role changes, user creation)
+- Retention: 365 days for audit_logs, 730 days for security_events
 
 ---
 
@@ -132,67 +65,75 @@ Run these migrations **in order**:
 ### Local Development
 
 ```bash
-# Run all auth migrations in order
-npm run db:migrate:auth:local
+# Run consolidated auth schema
+npm run db:schema:auth:local
 
-# Or run individually
-wrangler d1 execute clrhoa_db --local --file=scripts/schema-auth-users-migration.sql
-wrangler d1 execute clrhoa_db --local --file=scripts/schema-auth-password-tokens.sql
-wrangler d1 execute clrhoa_db --local --file=scripts/schema-auth-sessions.sql
-wrangler d1 execute clrhoa_db --local --file=scripts/schema-auth-audit-logs.sql
-wrangler d1 execute clrhoa_db --local --file=scripts/schema-auth-security-events.sql
-wrangler d1 execute clrhoa_db --local --file=scripts/schema-auth-mfa-backup-codes.sql
+# Or directly with wrangler
+npx wrangler d1 execute clrhoa_db --local --file=./scripts/schema-02-auth-sessions.sql
+
+# Or run ALL schemas at once
+npm run db:init:local
 ```
 
 ### Production
 
 ```bash
-# Run all auth migrations in order
-npm run db:migrate:auth
+# Run consolidated auth schema
+npm run db:schema:auth
 
-# Or run individually (remove --local flag)
-wrangler d1 execute clrhoa_db --file=scripts/schema-auth-users-migration.sql
-# ... repeat for each file
+# Or directly with wrangler
+npx wrangler d1 execute clrhoa_db --remote --file=./scripts/schema-02-auth-sessions.sql
+
+# Or run ALL schemas at once
+npm run db:init
+```
+
+### Using Helper Script
+
+```bash
+# Local
+bash scripts/migrate-auth-all.sh local
+
+# Remote
+bash scripts/migrate-auth-all.sh remote
 ```
 
 ---
 
 ## Verification
 
-After running migrations, verify tables exist:
+After running the schema, verify tables exist:
 
 ```bash
 # Local
-wrangler d1 execute clrhoa_db --local --command="SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;"
+npx wrangler d1 execute clrhoa_db --local --command="SELECT name FROM sqlite_master WHERE type='table' AND name IN ('sessions', 'password_reset_tokens', 'password_setup_tokens', 'audit_logs', 'security_events', 'mfa_backup_codes', 'pim_elevation_logs') ORDER BY name;"
 
-# Check users table columns
-wrangler d1 execute clrhoa_db --local --command="PRAGMA table_info(users);"
-
-# Count tables (should be 6 new tables + existing tables)
-wrangler d1 execute clrhoa_db --local --command="SELECT COUNT(*) as table_count FROM sqlite_master WHERE type='table';"
+# Check sessions table structure (should include PIM columns)
+npx wrangler d1 execute clrhoa_db --local --command="PRAGMA table_info(sessions);"
 ```
 
-Expected new tables:
+Expected tables:
+- `sessions` (with PIM columns: elevated_until, assumed_role, assumed_at, assumed_until)
 - `password_reset_tokens`
 - `password_setup_tokens`
-- `sessions`
 - `audit_logs`
 - `security_events`
 - `mfa_backup_codes`
+- `pim_elevation_logs`
 
 ---
 
 ## Database Size Impact
 
 **Estimated storage (1000 users):**
-- Users table: ~500 KB (existing) → ~1.5 MB (with new columns)
 - Sessions: ~2 MB (avg 2 active sessions per user)
 - Audit logs: ~10 MB (first year, depends on activity)
 - Security events: ~1 MB (first year)
 - Tokens: ~100 KB (active tokens only, cleaned up regularly)
 - MFA backup codes: ~50 KB (only for users with MFA enabled)
+- PIM elevation logs: ~500 KB (first year)
 
-**Total:** ~15 MB for 1000 users (well within D1 free tier: 5 GB)
+**Total:** ~14 MB for 1000 users (well within D1 free tier: 5 GB)
 
 ---
 
@@ -215,49 +156,34 @@ DELETE FROM audit_logs WHERE timestamp < datetime('now', '-365 days');
 
 -- Clean up resolved security events (keep 2 years)
 DELETE FROM security_events WHERE timestamp < datetime('now', '-730 days') AND resolved = 1;
+
+-- Clean up old PIM elevation logs (keep 1 year)
+DELETE FROM pim_elevation_logs WHERE elevated_at < datetime('now', '-365 days');
 ```
 
 ---
 
-## Migration Rollback
+## Legacy Migrations
 
-**WARNING:** Rolling back will delete all auth data. Only do this in development.
+The original incremental migration files have been **archived** to `scripts/archive/legacy-migrations/`:
+- schema-auth-users-migration.sql
+- schema-auth-password-tokens.sql
+- schema-auth-sessions.sql
+- schema-auth-audit-logs.sql
+- schema-auth-security-events.sql
+- schema-auth-mfa-backup-codes.sql
+- schema-pim-elevation.sql
+- schema-sessions-pim.sql
 
-```bash
-# Drop all auth tables (LOCAL ONLY)
-wrangler d1 execute clrhoa_db --local --command="DROP TABLE IF EXISTS mfa_backup_codes;"
-wrangler d1 execute clrhoa_db --local --command="DROP TABLE IF EXISTS security_events;"
-wrangler d1 execute clrhoa_db --local --command="DROP TABLE IF EXISTS audit_logs;"
-wrangler d1 execute clrhoa_db --local --command="DROP TABLE IF EXISTS sessions;"
-wrangler d1 execute clrhoa_db --local --command="DROP TABLE IF EXISTS password_setup_tokens;"
-wrangler d1 execute clrhoa_db --local --command="DROP TABLE IF EXISTS password_reset_tokens;"
-
-# Users table: Can't easily rollback ALTER TABLE in SQLite
-# Safer to restore from backup or recreate database
-```
-
-**Best Practice:** Test migrations in local environment first, then production.
-
----
-
-## Next Steps
-
-After schema is deployed:
-
-1. **PR #2:** Implement audit logging library (`src/lib/audit-log.ts`)
-2. **PR #3:** Implement rate limiting and security utilities
-3. **PR #4:** Implement password hashing and validation
-4. **PR #5:** Integrate Lucia auth library with D1 session adapter
-5. **PR #6:** Implement email/password login endpoint
-6. **PR #7:** Implement logout and session management
-7. **PR #8-14:** Password setup, reset, MFA, admin tools, security hardening
+These files are preserved for historical reference and git history context.
+**Do not use these files** - use the consolidated `schema-02-auth-sessions.sql` instead.
 
 ---
 
 ## Security Considerations
 
 **What's in D1 (SQLite):**
-- Password hashes (bcrypt/argon2, safe to store)
+- Password hashes (bcrypt, safe to store)
 - Token hashes (SHA-256, safe to store)
 - Backup code hashes (bcrypt, safe to store)
 - Audit logs (no sensitive data)
@@ -274,6 +200,20 @@ After schema is deployed:
 
 ---
 
+## Next Steps
+
+After schema is deployed:
+
+1. ✅ **Schema deployed** - All auth tables exist
+2. ✅ **Lucia integration** - Session management implemented
+3. ✅ **PIM framework** - Elevation columns added (flow needs implementation - see Issue #110)
+4. 🔄 **Complete PIM** - Implement elevation UI and flow
+5. 🔄 **MFA** - Implement TOTP enrollment and verification
+6. 🔄 **Admin tools** - Session management, user administration
+
+---
+
 ## Questions?
 
-See main documentation: `/docs/AUTH_IMPLEMENTATION.md`
+See consolidated schema documentation: `scripts/README.md`
+See archived migrations: `scripts/archive/README.md`
