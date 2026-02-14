@@ -470,7 +470,7 @@ function formatLoginTime(iso: string | null): string {
         e.preventDefault();
         if (!messageEl) return;
         messageEl.textContent = '';
-        const _token = (csrfInput && csrfInput.value) || '';
+        const token = (csrfInput && csrfInput.value) || '';
         const phones = [];
         container?.querySelectorAll('.phone-input').forEach((input) => {
           const v = input.value?.trim();
