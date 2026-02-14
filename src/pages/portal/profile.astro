@@ -7,12 +7,6 @@ import FormField from '../../components/FormField.astro';
 import { getPortalContext } from '../../lib/portal-context';
 import { getPortalBadgeCounts } from '../../lib/portal-badge-counts';
 import { getOwnerByEmail, getPhonesArray, listHouseholdMembersWithLogin } from '../../lib/directory-db';
-import { getUserByEmail, type NotificationPreferences } from '../../lib/db';
-import { getLastLogonTime, listLoginHistoryByEmail } from '../../lib/login-history-db';
-import { NOTIFICATION_TYPES } from '../../lib/notifications';
-
-const LOGIN_PAGE_SIZES = [10, 25, 50, 100] as const;
-const DEFAULT_LOGIN_PAGE_SIZE = 10;
 
 const { env, session, effectiveRole } = await getPortalContext(Astro);
 if (!session) return Astro.redirect('/auth/login');
@@ -21,47 +15,9 @@ const { email, role, name } = session;
 const db = env?.DB;
 const badges = await getPortalBadgeCounts(db, email, role, name);
 
-const url = Astro.url;
-const getPage = (key: string): number => {
-  const p = url.searchParams.get(key);
-  const n = p ? parseInt(p, 10) : 1;
-  return Number.isNaN(n) || n < 1 ? 1 : Math.min(n, 500);
-};
-const getLimit = (): number => {
-  const p = url.searchParams.get('login_limit');
-  const n = p ? parseInt(p, 10) : DEFAULT_LOGIN_PAGE_SIZE;
-  return LOGIN_PAGE_SIZES.includes(n as (typeof LOGIN_PAGE_SIZES)[number]) ? n : DEFAULT_LOGIN_PAGE_SIZE;
-};
-const loginPage = getPage('login_page');
-const loginPageSize = getLimit();
-
-function loginActivityPageUrl(key: string, value: number): string {
-  const u = new URL(url);
-  if (value <= 1) u.searchParams.delete(key);
-  else u.searchParams.set(key, String(value));
-  if (loginPageSize !== DEFAULT_LOGIN_PAGE_SIZE) u.searchParams.set('login_limit', String(loginPageSize));
-  return u.pathname + u.search;
-}
-
 const owner = db ? await getOwnerByEmail(db, email) : null;
 const phonesInitial = owner ? getPhonesArray(owner) : [];
 if (phonesInitial.length === 0) phonesInitial.push('');
-
-let smsPhone = '';
-let sms_optin = false;
-let notification_preferences: NotificationPreferences = {};
-if (db) {
-  const user = await getUserByEmail(db, email);
-  if (user) {
-    smsPhone = user.phone?.trim() ?? '';
-    sms_optin = user.sms_optin === 1 || user.sms_optin === true;
-    if (user.notification_preferences?.trim()) {
-      try {
-        notification_preferences = JSON.parse(user.notification_preferences) as NotificationPreferences;
-      } catch {}
-    }
-  }
-}
 
 const hasName = !!(owner?.name?.trim());
 const hasAddress = !!(owner?.address?.trim());
@@ -71,22 +27,8 @@ const profileComplete =
   effectiveRole === 'admin' ? hasName && hasPhones : hasName && hasAddress && hasPhones;
 const requiredParam = Astro.url.searchParams.get('required') === '1';
 const startInEditMode = !profileComplete || requiredParam;
-const pushEnabled = notification_preferences['push_enabled'] === true;
-
-const lastLogon = db ? await getLastLogonTime(db, email) : null;
-const loginHistory = db ? await listLoginHistoryByEmail(db, email, loginPageSize, (loginPage - 1) * loginPageSize) : [];
 
 const householdMembersWithLogin = db ? await listHouseholdMembersWithLogin(db, email) : [];
-
-function formatLoginTime(iso: string | null): string {
-  if (!iso) return '—';
-  try {
-    const d = new Date(iso);
-    return Number.isNaN(d.getTime()) ? iso : d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
-  } catch {
-    return iso ?? '—';
-  }
-}
 ---
 
 <PortalLayout title="Profile | Member Portal | Crooked Lake Reserve HOA">
@@ -243,151 +185,6 @@ function formatLoginTime(iso: string | null): string {
           )}
         </div>
       </section>
-
-      <!-- Section 2: Contact sharing with other members -->
-      <section aria-labelledby="profile-contact-heading" class="mb-10">
-        <h2 id="profile-contact-heading" class="text-2xl font-heading font-semibold text-clr-green mb-4">Directory contact sharing</h2>
-        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 portal-theme-card p-6 sm:p-8">
-          <label class="flex items-start gap-4 cursor-pointer">
-            <input type="checkbox" id="share-contact-with-members" name="share_contact_with_members" class="mt-1 w-5 h-5 rounded border-gray-300 text-clr-green focus:ring-clr-green" checked={owner?.share_contact_with_members !== 0} />
-            <span class="flex-1">
-              <span class="font-semibold text-gray-900 text-base">Allow other members to request my phone and email</span>
-              <p class="text-base text-gray-600 mt-2 leading-relaxed">When unchecked, your phone and email are not revealable by other members in the homeowner directory. <strong>Board, ARB, and Admin can still view your contact info for operational needs</strong>; every view is recorded in the audit log for transparency.</p>
-            </span>
-          </label>
-          <p class="text-base text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-4 mt-4">Even if you opt out, Board members, ARB members, and Admins can see your phone and email when needed to run the HOA. All such access is logged in the audit log.</p>
-          <p class="text-base text-gray-500 mt-3">Save your choice using &quot;Save notifications&quot; below.</p>
-        </div>
-      </section>
-
-      <!-- Section: Login activity -->
-      <section aria-labelledby="profile-login-heading" class="mb-10">
-        <h2 id="profile-login-heading" class="text-2xl font-heading font-semibold text-clr-green mb-4">Login activity</h2>
-        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 portal-theme-card p-6 sm:p-8">
-          <p class="text-base text-gray-600 mb-4">
-            Last logon: <strong>{formatLoginTime(lastLogon)}</strong>
-          </p>
-          <p class="text-base text-gray-500 mb-5">Recent sign-ins to your account. If you see a time or device you don't recognize, change your password (if applicable) and contact the board.</p>
-          {loginHistory.length === 0 ? (
-            <p class="text-base text-gray-500">No login history yet. History is recorded each time you sign in.</p>
-          ) : (
-            <>
-              <div class="flex flex-wrap items-center gap-3 mb-4">
-                <label for="profile-login-per-page" class="text-base text-gray-700 font-medium">Per page:</label>
-                <select id="profile-login-per-page" name="login_limit" class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-base text-gray-700 focus:border-clr-green focus:outline-none focus:ring-2 focus:ring-clr-green" aria-label="Login history entries per page">
-                  {LOGIN_PAGE_SIZES.map((size) => (
-                    <option value={size} selected={loginPageSize === size}>{size}</option>
-                  ))}
-                </select>
-              </div>
-              <div class="rounded-xl border border-gray-200 overflow-hidden">
-                <div class="overflow-x-auto">
-                  <table class="w-full text-base">
-                    <thead class="bg-gray-50 border-b border-gray-200">
-                      <tr>
-                        <th class="text-left py-4 px-6 font-semibold text-gray-700">When</th>
-                        <th class="text-left py-4 px-6 font-semibold text-gray-700">IP address</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {loginHistory.map((row) => (
-                        <tr class="border-b border-gray-100 last:border-0">
-                          <td class="py-4 px-6 text-gray-700">{formatLoginTime(row.logged_at)}</td>
-                          <td class="py-4 px-6 font-mono text-gray-600">{row.ip_address?.trim() || '—'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                <nav class="flex items-center justify-between gap-3 py-3 px-6 border-t border-gray-200 bg-gray-50 text-base" aria-label="Login activity pagination">
-                  <span class="text-gray-700 font-medium">Page {loginPage}</span>
-                  <div class="flex gap-3">
-                    {loginPage > 1 && <a href={loginActivityPageUrl('login_page', loginPage - 1)} class="text-clr-orange hover:underline font-semibold">Previous</a>}
-                    {loginHistory.length === loginPageSize && <a href={loginActivityPageUrl('login_page', loginPage + 1)} class="text-clr-orange hover:underline font-semibold">Next</a>}
-                  </div>
-                </nav>
-              </div>
-              <script is:inline>
-                document.getElementById('profile-login-per-page')?.addEventListener('change', function () {
-                  const limit = this.value;
-                  const u = new URL(window.location.href);
-                  u.searchParams.set('login_limit', limit);
-                  u.searchParams.delete('login_page');
-                  if (limit === '10') u.searchParams.delete('login_limit');
-                  window.location.href = u.pathname + u.search;
-                });
-              </script>
-            </>
-          )}
-        </div>
-      </section>
-
-      <!-- Section 3: Notifications -->
-      <section aria-labelledby="profile-notif-heading">
-        <h2 id="profile-notif-heading" class="text-2xl font-heading font-semibold text-clr-green mb-4">Notifications</h2>
-        <form id="preferences-form" class="bg-white rounded-2xl shadow-sm border border-gray-100 portal-theme-card p-6 sm:p-8 space-y-6">
-          <div>
-            <p class="text-base font-semibold text-gray-700 mb-3">Email notification types</p>
-            <p class="text-base text-gray-600 mb-5">Uncheck any type to stop receiving those emails. Account email: <strong>{email}</strong></p>
-            <ul class="space-y-4" aria-label="Notification type toggles">
-              {NOTIFICATION_TYPES.map((t) => (
-                <li class="flex flex-col gap-2">
-                  <label class="flex items-center gap-3 cursor-pointer">
-                    <input type="checkbox" name="notification_type" value={t.id} data-notification-id={t.id} class="w-5 h-5 rounded border-gray-300 text-clr-green focus:ring-clr-green notification-type-cb" checked={notification_preferences[t.id] !== false} />
-                    <span class="text-base font-semibold text-gray-700">{t.label}</span>
-                  </label>
-                  <span class="text-base text-gray-600 ml-8">{t.description}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div class="rounded-lg border border-amber-200 bg-amber-50 p-5">
-            <p class="text-base font-semibold text-amber-900 mb-2">SMS notifications (not yet available)</p>
-            <p class="text-base text-amber-800 mb-3 leading-relaxed">Sending text alerts would <strong>cost the HOA money</strong> (carrier fees per message). No SMS messages are sent until the board enables this feature.</p>
-            <p class="text-base text-amber-800 mb-4 leading-relaxed">If you want SMS alerts when they become available, click below. The board will see how many members want SMS.</p>
-            <div class="flex flex-wrap items-center gap-3">
-              <button type="button" id="btn-request-sms" class="bg-amber-600 hover:bg-amber-700 text-white px-5 py-3 rounded-lg font-semibold text-base transition-colors">Request SMS (costs HOA money)</button>
-              <span id="sms-request-message" class="text-base text-amber-800 hidden"></span>
-            </div>
-          </div>
-          <div class="opacity-75" aria-describedby="sms-locked-note">
-            <p id="sms-locked-note" class="text-sm text-gray-500 mb-3">Your preferences below will apply when SMS is enabled. No messages are sent until then.</p>
-            <p class="text-base font-semibold text-gray-700 mb-2">SMS alerts (opt-in)</p>
-            <label class="flex items-center gap-3 cursor-pointer">
-              <input type="checkbox" id="sms_optin" name="sms_optin" class="w-5 h-5 rounded border-gray-300 text-clr-green focus:ring-clr-green" checked={sms_optin} />
-              <span class="text-base font-medium text-gray-700">Receive SMS alerts</span>
-            </label>
-            <p class="text-base text-gray-500 mt-2">Text alerts for important HOA updates. Standard messaging rates may apply.</p>
-          </div>
-          <div class="opacity-75">
-            <FormField
-              id="phone"
-              name="phone"
-              label="Phone number for SMS"
-              type="tel"
-              value={smsPhone}
-              placeholder="+1 555 123 4567"
-              description="Used for SMS alerts when enabled. If this number is not already in your directory listing above, it will be added when you save."
-              labelClass="block text-base font-semibold text-gray-700 mb-2"
-              inputClass="mt-1 block w-full rounded-lg border border-gray-300 px-4 py-3 text-base focus:border-clr-green focus:outline-none focus:ring-2 focus:ring-clr-green"
-            />
-          </div>
-          <div class="flex flex-wrap gap-4 pt-2">
-            <button type="submit" class="bg-clr-green hover:brightness-110 text-white px-6 py-3 rounded-xl font-semibold text-base transition-all">Save notifications</button>
-            <button type="button" id="btn-test-sms" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-6 py-3 rounded-xl font-semibold text-base transition-colors" disabled title="SMS sending is disabled until the board enables it">Send test SMS</button>
-          </div>
-          <div class="pt-6 border-t border-gray-200">
-            <p class="text-base font-semibold text-gray-700 mb-2">Browser push notifications</p>
-            <p class="text-base text-gray-600 mb-3 leading-relaxed">Receive push alerts in this browser when enabled. You can enable or disable at any time.</p>
-            <p id="push-status" class="text-base text-gray-700 mb-4 font-medium">{pushEnabled ? 'Push is enabled.' : 'Push is disabled.'}</p>
-            <div class="flex flex-wrap gap-3">
-              <button type="button" id="btn-enable-push" class="bg-clr-green hover:brightness-110 text-white px-5 py-3 rounded-lg font-semibold text-base transition-all">{pushEnabled ? 'Push enabled' : 'Enable push'}</button>
-              <button type="button" id="btn-disable-push" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-5 py-3 rounded-lg font-semibold text-base transition-colors">Disable push</button>
-            </div>
-          </div>
-          <p id="pref-message" class="text-base hidden"></p>
-        </form>
-      </section>
     </div>
 
   <script is:inline>
@@ -480,7 +277,7 @@ function formatLoginTime(iso: string | null): string {
         const payload = { name: document.getElementById('my-info-name')?.value?.trim() || null, address: document.getElementById('my-info-address')?.value?.trim() || null, lot_number: lotNumber, phones: phones.length ? phones : [], csrf_token: token };
         submitBtn.disabled = true;
         try {
-          const res = await fetch('/api/owners/me', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+          const res = await fetch('/api/owners/me', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), credentials: 'same-origin' });
           const data = await res.json();
           if (res.ok && data.success) {
             messageEl.textContent = data.created ? 'Saved. You are now in the directory.' : 'Saved.';
@@ -497,131 +294,6 @@ function formatLoginTime(iso: string | null): string {
           messageEl.className = 'text-base text-red-600 font-semibold';
         } finally {
           submitBtn.disabled = false;
-        }
-      });
-
-      const prefForm = document.getElementById('preferences-form');
-      const prefMsg = document.getElementById('pref-message');
-      function showPrefMsg(text, isError) {
-        if (!prefMsg) return;
-        prefMsg.textContent = text;
-        prefMsg.classList.remove('hidden', 'text-red-600', 'text-green-600');
-        prefMsg.classList.add(isError ? 'text-red-600' : 'text-green-600');
-      }
-      prefForm?.addEventListener('submit', async function (e) {
-        e.preventDefault();
-        const phoneEl = prefForm.querySelector('#phone');
-        const phone = (phoneEl && phoneEl.value) ? String(phoneEl.value).trim() : '';
-        const smsEl = prefForm.querySelector('#sms_optin');
-        const sms_optin = !!(smsEl && smsEl.checked);
-        const shareContactEl = document.getElementById('share-contact-with-members');
-        const share_contact_with_members = !!(shareContactEl && shareContactEl.checked);
-        const notification_preferences = {};
-        prefForm.querySelectorAll('.notification-type-cb').forEach(function (cb) {
-          notification_preferences[cb.dataset.notificationId || cb.value] = cb.checked;
-        });
-        try {
-          const res = await fetch('/api/preferences', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone, sms_optin, notification_preferences, share_contact_with_members }), credentials: 'same-origin' });
-          const data = await res.json();
-          if (data.success) showPrefMsg('Notifications saved.', false);
-          else showPrefMsg(data.error || 'Failed to save', true);
-        } catch (err) {
-          showPrefMsg('Network error. Please try again.', true);
-        }
-      });
-      document.getElementById('btn-request-sms')?.addEventListener('click', async function () {
-        const btn = document.getElementById('btn-request-sms');
-        const msgEl = document.getElementById('sms-request-message');
-        if (!btn || !msgEl) return;
-        btn.disabled = true;
-        msgEl.classList.remove('hidden');
-        msgEl.textContent = 'Recording…';
-        try {
-          const res = await fetch('/api/sms-feature-request', { method: 'POST', credentials: 'same-origin' });
-          const data = await res.json().catch(function () { return {}; });
-          if (res.ok && data.success) {
-            msgEl.textContent = 'Request recorded. The board will see how many members want SMS.';
-          } else {
-            msgEl.textContent = data.error || 'Request failed. Try again.';
-            msgEl.classList.add('text-red-600');
-          }
-        } catch (err) {
-          msgEl.textContent = 'Network error. Try again.';
-          msgEl.classList.add('text-red-600');
-        }
-        btn.disabled = false;
-      });
-
-      document.getElementById('btn-test-sms')?.addEventListener('click', async function () {
-        const phone = (prefForm?.querySelector('#phone'))?.value?.trim();
-        if (!phone) { showPrefMsg('Enter a phone number and save first, then try again.', true); return; }
-        try {
-          const res = await fetch('/api/preferences', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone, sms_optin: true, send_test_sms: 1 }), credentials: 'same-origin' });
-          const data = await res.json();
-          if (data.success && data.sms_test !== false) showPrefMsg('Test SMS sent. Check your phone.', false);
-          else if (data.sms_error) showPrefMsg('SMS failed: ' + data.sms_error, true);
-          else showPrefMsg('Preferences saved. Test SMS may not have been sent.', false);
-        } catch (err) {
-          showPrefMsg('Network error.', true);
-        }
-      });
-
-      function getCurrentNotificationPrefs() {
-        const prefs = {};
-        prefForm.querySelectorAll('.notification-type-cb').forEach(function (cb) {
-          prefs[cb.dataset.notificationId || cb.value] = cb.checked;
-        });
-        return prefs;
-      }
-      function savePushEnabled(value) {
-        const phoneEl = prefForm.querySelector('#phone');
-        const smsEl = prefForm.querySelector('#sms_optin');
-        const phone = (phoneEl && phoneEl.value) ? String(phoneEl.value).trim() : '';
-        const sms_optin = !!(smsEl && smsEl.checked);
-        const notification_preferences = getCurrentNotificationPrefs();
-        notification_preferences.push_enabled = value;
-        const csrfEl = document.getElementById('my-info-csrf');
-        const _token = (csrfEl && csrfEl.value) || '';
-        return fetch('/api/preferences', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ phone, sms_optin, notification_preferences }),
-          credentials: 'same-origin'
-        });
-      }
-      function updatePushUI(enabled) {
-        const statusEl = document.getElementById('push-status');
-        const enableBtn = document.getElementById('btn-enable-push');
-        if (statusEl) statusEl.textContent = enabled ? 'Push is enabled.' : 'Push is disabled.';
-        if (enableBtn) { enableBtn.textContent = enabled ? 'Push enabled' : 'Enable push'; enableBtn.disabled = enabled; }
-      }
-
-      document.getElementById('btn-enable-push')?.addEventListener('click', async function () {
-        const btn = this;
-        if (btn.disabled) return;
-        if (!('Notification' in window)) { showPrefMsg('Push notifications are not supported in this browser.', true); return; }
-        try {
-          const permission = await Notification.requestPermission();
-          if (permission === 'granted') {
-            const res = await savePushEnabled(true);
-            const data = await res.json();
-            if (data.success) { updatePushUI(true); showPrefMsg('Push notifications enabled.', false); }
-            else showPrefMsg(data.error || 'Failed to save', true);
-          } else {
-            showPrefMsg('Permission denied or dismissed.', true);
-          }
-        } catch (err) {
-          showPrefMsg('Could not enable push. Try again.', true);
-        }
-      });
-      document.getElementById('btn-disable-push')?.addEventListener('click', async function () {
-        try {
-          const res = await savePushEnabled(false);
-          const data = await res.json();
-          if (data.success) { updatePushUI(false); document.getElementById('btn-enable-push').disabled = false; document.getElementById('btn-enable-push').textContent = 'Enable push'; showPrefMsg('Push notifications disabled.', false); }
-          else showPrefMsg(data.error || 'Failed to save', true);
-        } catch (err) {
-          showPrefMsg('Could not disable push. Try again.', true);
         }
       });
     })();
