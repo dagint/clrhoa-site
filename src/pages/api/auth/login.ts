@@ -37,6 +37,7 @@ import { createSession } from '../../../lib/lucia/session';
 import { verifyPassword } from '../../../lib/password';
 import { checkRateLimit } from '../../../lib/rate-limit';
 import { logSecurityEvent, logAuthEvent } from '../../../lib/audit-log';
+import { insertLoginHistory } from '../../../lib/login-history-db';
 import crypto from 'node:crypto';
 
 export const prerender = false;
@@ -456,6 +457,11 @@ export const POST: APIRoute = async ({ request, locals, cookies }) => {
       role: user.role,
       mfa_enabled: false,
     },
+  });
+
+  // Record login for "last logon" and login history
+  await insertLoginHistory(db, normalizedEmail, ipAddress, userAgent).catch((err) => {
+    console.error('[login] Failed to record login history:', err instanceof Error ? err.message : String(err));
   });
 
   // Return success with Set-Cookie header
