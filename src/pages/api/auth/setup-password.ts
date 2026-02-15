@@ -130,7 +130,7 @@ export const POST: APIRoute = async ({ request, locals, cookies }) => {
     }
 
     // 2. Rate limiting - prevent token brute force (10 attempts per hour per IP)
-    const kv = locals.runtime?.env?.CLRHOA_USERS as KVNamespace | undefined;
+    const kv = locals.runtime?.env?.KV as KVNamespace | undefined;
     const rateLimitResult = await checkRateLimit(
       kv,
       '/api/auth/setup-password',

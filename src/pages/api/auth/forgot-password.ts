@@ -48,7 +48,7 @@ export const prerender = false;
 
 export const POST: APIRoute = async ({ request, locals }) => {
   const db = locals.runtime.env.DB;
-  const kv = locals.runtime?.env?.CLRHOA_USERS as KVNamespace | undefined;
+  const kv = locals.runtime?.env?.KV as KVNamespace | undefined;
   const resend = getResendClient(locals.runtime.env);
   const ipAddress = request.headers.get('cf-connecting-ip') || 'unknown';
   const userAgent = request.headers.get('user-agent') || 'unknown';

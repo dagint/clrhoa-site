@@ -87,7 +87,7 @@ function getClientIP(request: Request): string {
  */
 export const POST: APIRoute = async ({ request, locals, cookies }) => {
   const db = locals.runtime?.env?.DB as D1Database | undefined;
-  const kv = locals.runtime?.env?.CLRHOA_USERS as KVNamespace | undefined;
+  const kv = locals.runtime?.env?.KV as KVNamespace | undefined;
 
   if (!db || !kv) {
     return new Response(
