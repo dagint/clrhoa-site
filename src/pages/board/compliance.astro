@@ -1,7 +1,7 @@
 ---
 export const prerender = false;
 
-import { getBoardContext } from '../../lib/board-context';
+import { getAdminContext } from '../../lib/board-context';
 import { getPortalBadgeCounts } from '../../lib/portal-badge-counts';
 import { isBoardOnly } from '../../lib/auth';
 import { getComplianceStatus } from '../../lib/compliance-db';
@@ -9,13 +9,12 @@ import { getUpcomingMeetingsWithCompliance, formatAdvanceNotice } from '../../li
 import PortalLayout from '../../layouts/PortalLayout.astro';
 import PortalPage from '../../components/PortalPage.astro';
 
-import BoardNav from '../../components/BoardNav.astro';
-const ctx = await getBoardContext(Astro);
+import AdminNav from '../../components/AdminNav.astro';
+const ctx = await getAdminContext(Astro);
 if ('redirect' in ctx) return Astro.redirect(ctx.redirect);
 const { env, session, effectiveRole } = ctx;
 
-const isBoard = isBoardOnly(effectiveRole) || effectiveRole === 'admin';
-if (!isBoard) return Astro.redirect('/portal/dashboard');
+// Admin-only page - already enforced by getAdminContext
 
 const db = env?.DB;
 const { email, role, name } = session;
@@ -116,7 +115,7 @@ function getCategoryLabel(category: string): string {
     maintenanceOpenCount={badges.maintenanceOpenCount}
     meetingsRsvpCount={badges.meetingsRsvpCount}
   >
-    <BoardNav currentPath="/board/compliance" />
+    <AdminNav currentPath="/board/compliance" />
 
 unt}
 <!-- Action Required Alert (if any PARTIAL items) -->

@@ -1,15 +1,15 @@
 ---
 export const prerender = false;
 
-import { getBoardContext } from '../../lib/board-context';
+import { getAdminContext } from '../../lib/board-context';
 import { getPortalBadgeCounts } from '../../lib/portal-badge-counts';
 import { isBoardOnly } from '../../lib/auth';
 import { listAllMaintenance, parsePhotosJson } from '../../lib/maintenance-db';
 import PortalLayout from '../../layouts/PortalLayout.astro';
 import PortalPage from '../../components/PortalPage.astro';
 
-import BoardNav from '../../components/BoardNav.astro';
-const ctx = await getBoardContext(Astro);
+import AdminNav from '../../components/BoardNav.astro';
+const ctx = await getAdminContext(Astro);
 if ('redirect' in ctx) return Astro.redirect(ctx.redirect);
 const { env, session, effectiveRole } = ctx;
 const isBoard = isBoardOnly(effectiveRole) || effectiveRole === 'admin';
@@ -76,7 +76,7 @@ function categoryLabel(cat: string): string {
     maintenanceOpenCount={badges.maintenanceOpenCount}
     meetingsRsvpCount={badges.meetingsRsvpCount}
   >
-    <BoardNav currentPath="/board/maintenance" />
+    <AdminNav currentPath="/board/maintenance" />
 
 unt}
 <h2 class="text-3xl font-heading font-bold text-clr-green mb-4">Maintenance requests</h2>

@@ -1,7 +1,7 @@
 ---
 export const prerender = false;
 
-import { getBoardContext } from '../../lib/board-context';
+import { getAdminContext } from '../../lib/board-context';
 import { getPortalBadgeCounts } from '../../lib/portal-badge-counts';
 import { listOwners, listDirectoryLogs } from '../../lib/directory-db';
 import { listAssessmentPaymentsForAudit } from '../../lib/assessments-db';
@@ -18,8 +18,8 @@ import { listArbAuditLog } from '../../lib/arb-db';
 import PortalLayout from '../../layouts/PortalLayout.astro';
 import PortalPage from '../../components/PortalPage.astro';
 
-import BoardNav from '../../components/BoardNav.astro';
-const ctx = await getBoardContext(Astro);
+import AdminNav from '../../components/BoardNav.astro';
+const ctx = await getAdminContext(Astro);
 if ('redirect' in ctx) return Astro.redirect(ctx.redirect);
 const { env, session, effectiveRole } = ctx;
 
@@ -117,7 +117,7 @@ function formatDate(s: string | null): string {
     maintenanceOpenCount={badges.maintenanceOpenCount}
     meetingsRsvpCount={badges.meetingsRsvpCount}
   >
-    <BoardNav currentPath="/board/audit-logs" />
+    <AdminNav currentPath="/board/audit-logs" />
 
 unt}
 <p class="text-gray-600 mb-4">

@@ -1,7 +1,7 @@
 ---
 export const prerender = false;
 
-import { getBoardContext } from '../../lib/board-context';
+import { getAdminContext } from '../../lib/board-context';
 import { getPortalBadgeCounts } from '../../lib/portal-badge-counts';
 import { isBoardOnly } from '../../lib/auth';
 import { listAllNewsItems, getNewsItemImageKeys } from '../../lib/news-items-db';
@@ -9,8 +9,8 @@ import { escapeHtml } from '../../lib/sanitize';
 import PortalLayout from '../../layouts/PortalLayout.astro';
 import PortalPage from '../../components/PortalPage.astro';
 
-import BoardNav from '../../components/BoardNav.astro';
-const ctx = await getBoardContext(Astro);
+import AdminNav from '../../components/BoardNav.astro';
+const ctx = await getAdminContext(Astro);
 if ('redirect' in ctx) return Astro.redirect(ctx.redirect);
 const { env, session, effectiveRole } = ctx;
 const isBoard = isBoardOnly(effectiveRole) || effectiveRole === 'admin';
@@ -71,7 +71,7 @@ function formatDate(s: string | null): string {
     maintenanceOpenCount={badges.maintenanceOpenCount}
     meetingsRsvpCount={badges.meetingsRsvpCount}
   >
-    <BoardNav currentPath="/board/news" />
+    <AdminNav currentPath="/board/news" />
 
 unt}
 <div id="csrf-holder" class="hidden" data-csrf={escapeHtml(session.csrfToken ?? '')} aria-hidden="true"></div>
