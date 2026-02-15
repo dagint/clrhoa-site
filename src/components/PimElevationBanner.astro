@@ -50,7 +50,8 @@ const { elevatedUntil } = Astro.props;
       const until = typeof elevatedUntil === 'number' ? elevatedUntil : 0;
       if (until <= now) {
         if (timerEl) timerEl.textContent = 'expired';
-        if (form) (form as HTMLFormElement).submit();
+        // Reload page - middleware will redirect expired elevation to /portal/dashboard
+        window.location.reload();
         return;
       }
       const sec = Math.floor((until - now) / 1000);

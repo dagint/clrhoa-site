@@ -48,17 +48,17 @@ const db = env?.DB as D1Database | undefined;
 if (db) {
   try {
     const row = await db.prepare(
-      `SELECT last_r2_backup_at, last_google_backup_at, schedule_type, schedule_hour_utc, schedule_day_of_week, google_drive_enabled FROM backup_config WHERE id = 1`
+      `SELECT last_backup_at, google_last_backup_at, schedule_type, schedule_hour_utc, schedule_day_of_week, google_drive_enabled FROM backup_config WHERE id = 1`
     ).first<{
-      last_r2_backup_at: string | null;
-      last_google_backup_at: string | null;
+      last_backup_at: string | null;
+      google_last_backup_at: string | null;
       schedule_type?: string;
       schedule_hour_utc?: number;
       schedule_day_of_week?: number | null;
       google_drive_enabled?: number;
     }>();
-    if (row?.last_r2_backup_at) last_r2_backup_at = row.last_r2_backup_at;
-    if (row?.last_google_backup_at) last_google_backup_at = row.last_google_backup_at;
+    if (row?.last_backup_at) last_r2_backup_at = row.last_backup_at;
+    if (row?.google_last_backup_at) last_google_backup_at = row.google_last_backup_at;
     if (row?.schedule_type) schedule_type = row.schedule_type;
     if (row?.schedule_hour_utc !== undefined) schedule_hour_utc = row.schedule_hour_utc;
     if (row?.schedule_day_of_week !== undefined) schedule_day_of_week = row.schedule_day_of_week;
