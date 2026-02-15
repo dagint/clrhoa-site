@@ -24,6 +24,15 @@ if (!canManageBackup) {
   return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403, headers: { 'Content-Type': 'application/json' } });
 }
 
+// Debug: Log what we're seeing
+console.log('[BACKUP DEBUG] Checking env vars:', {
+  hasAccountId: !!env?.CLOUDFLARE_ACCOUNT_ID,
+  hasBackupToken: !!env?.CLOUDFLARE_BACKUP_API_TOKEN,
+  accountIdType: typeof env?.CLOUDFLARE_ACCOUNT_ID,
+  backupTokenType: typeof env?.CLOUDFLARE_BACKUP_API_TOKEN,
+  envKeys: env ? Object.keys(env).filter(k => k.includes('CLOUDFLARE')).join(', ') : 'no env'
+});
+
 const manual_download_configured = Boolean(
   env?.CLOUDFLARE_ACCOUNT_ID && String(env.CLOUDFLARE_ACCOUNT_ID).trim() !== '' &&
   env?.CLOUDFLARE_BACKUP_API_TOKEN && String(env.CLOUDFLARE_BACKUP_API_TOKEN).trim() !== ''
