@@ -85,6 +85,7 @@ export async function getPortalContext(
         exp: Math.floor(luciaSession.expiresAt.getTime() / 1000), // Convert Date to Unix timestamp in seconds
         elevated_until: (luciaSession as any).elevated_until,
         sessionId: luciaSession.id,
+        csrfToken: luciaSession.id, // Use session ID as CSRF token for Lucia sessions
         createdAt: (luciaSession as any).created_at,
         fingerprint: (luciaSession as any).fingerprint,
       };
