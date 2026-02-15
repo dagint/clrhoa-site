@@ -277,27 +277,24 @@ export async function verifyDatabaseSetup(): Promise<void> {
   console.log('[database] Verifying database setup...');
 
   try {
-    // Check if users table exists
-    const checkUsersSQL = "SELECT name FROM sqlite_master WHERE type='table' AND name='users'";
-    const usersResult = executeD1Command(checkUsersSQL);
-
-    if (!usersResult.includes('users')) {
+    // Check if users table exists by trying to query it
+    try {
+      executeD1Command("SELECT COUNT(*) FROM users LIMIT 1");
+    } catch (error) {
       throw new Error('Users table not found in D1 database');
     }
 
     // Check if sessions table exists
-    const checkSessionsSQL = "SELECT name FROM sqlite_master WHERE type='table' AND name='sessions'";
-    const sessionsResult = executeD1Command(checkSessionsSQL);
-
-    if (!sessionsResult.includes('sessions')) {
+    try {
+      executeD1Command("SELECT COUNT(*) FROM sessions LIMIT 1");
+    } catch (error) {
       throw new Error('Sessions table not found in D1 database');
     }
 
     // Check if route_permissions table exists
-    const checkPermissionsSQL = "SELECT name FROM sqlite_master WHERE type='table' AND name='route_permissions'";
-    const permissionsResult = executeD1Command(checkPermissionsSQL);
-
-    if (!permissionsResult.includes('route_permissions')) {
+    try {
+      executeD1Command("SELECT COUNT(*) FROM route_permissions LIMIT 1");
+    } catch (error) {
       console.warn('[database] Warning: route_permissions table not found (permission tests may fail)');
     }
 
