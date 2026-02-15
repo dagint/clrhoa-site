@@ -63,13 +63,13 @@ const errorParam = url.searchParams.get('error') ?? '';
     <p class="text-base text-gray-600 mb-3">
       Get a ZIP with the current database (SQL) and whitelist (JSON) to save on your computer.
     </p>
-    <a
-      href="/api/board/backup-download"
-      class="inline-flex items-center gap-2 bg-clr-green hover:brightness-110 text-white px-5 py-2.5 rounded-xl font-semibold text-sm"
-      download
+    <button
+      id="download-backup-btn"
+      type="button"
+      class="inline-flex items-center gap-2 bg-clr-green hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed text-white px-5 py-2.5 rounded-xl font-semibold text-sm"
     >
-      Download backup (ZIP)
-    </a>
+      <span id="download-backup-text">Download backup (ZIP)</span>
+    </button>
   </section>
 
   <section class="mb-8" aria-labelledby="automated-heading">
@@ -153,6 +153,62 @@ const errorParam = url.searchParams.get('error') ?? '';
 
   <script is:inline define:vars={{}}>
     (function () {
+      // Download backup button handler
+      const downloadBtn = document.getElementById('download-backup-btn');
+      const downloadText = document.getElementById('download-backup-text');
+      if (downloadBtn && downloadText) {
+        downloadBtn.addEventListener('click', async function () {
+          // Prevent multiple clicks
+          if (downloadBtn.disabled) return;
+
+          downloadBtn.disabled = true;
+          downloadText.textContent = 'Downloading...';
+
+          try {
+            const response = await fetch('/api/board/backup-download');
+
+            if (!response.ok) {
+              const errorData = await response.json().catch(() => ({ error: 'Download failed' }));
+              throw new Error(errorData.error || 'Download failed');
+            }
+
+            // Get the blob and create a download link
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+
+            // Extract filename from Content-Disposition header or use default
+            const disposition = response.headers.get('Content-Disposition');
+            let filename = 'clrhoa-backup.zip';
+            if (disposition && disposition.includes('filename=')) {
+              const matches = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(disposition);
+              if (matches != null && matches[1]) {
+                filename = matches[1].replace(/['"]/g, '');
+              }
+            }
+            a.download = filename;
+
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+
+            downloadText.textContent = 'Downloaded!';
+            setTimeout(function () {
+              downloadText.textContent = 'Download backup (ZIP)';
+              downloadBtn.disabled = false;
+            }, 2000);
+          } catch (error) {
+            downloadText.textContent = 'Error: ' + error.message;
+            setTimeout(function () {
+              downloadText.textContent = 'Download backup (ZIP)';
+              downloadBtn.disabled = false;
+            }, 3000);
+          }
+        });
+      }
+
       const form = document.getElementById('backup-config-form');
       const scheduleType = document.getElementById('schedule_type');
       const dayWrap = document.getElementById('schedule_day_wrap');
