@@ -102,7 +102,7 @@ let bookmark = start.result.at_bookmark;
 // Poll until complete (reduced iterations to fit within Pages Function timeout)
 for (let i = 0; i < 8; i++) {
   await new Promise((r) => setTimeout(r, 1500));
-  res = await fetch(base, { method: 'POST', headers, body: JSON.stringify({ current_bookmark: bookmark }) });
+  res = await fetch(base, { method: 'POST', headers, body: JSON.stringify({ output_format: 'polling', current_bookmark: bookmark }) });
   if (!res.ok) {
     const errorText = await res.text();
     console.error('[BACKUP POLL] Fetch failed', { iteration: i, status: res.status, error: errorText, bookmark });
