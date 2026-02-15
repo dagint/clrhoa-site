@@ -5,7 +5,7 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie, getEffectiveRole } from '../../../lib/auth';
+import { getUserRole } from '../../../types/auth';
 import { buildZip } from '../../../lib/zip-simple';
 
 const runtime = Astro.locals.runtime;
@@ -15,19 +15,18 @@ const env = runtime?.env as Env & {
   D1_DATABASE_ID?: string;
 };
 
-const session = await getSessionFromCookie(
-  Astro.request.headers.get('cookie') ?? undefined,
-  env?.SESSION_SECRET
-);
+// Use session from middleware (already validated by middleware for /api/board/* routes)
+const user = Astro.locals.user;
+const luciaSession = Astro.locals.session;
 
-if (!session) {
+if (!user || !luciaSession) {
   return new Response(JSON.stringify({ error: 'Unauthorized' }), {
     status: 401,
     headers: { 'Content-Type': 'application/json' },
   });
 }
 
-const effectiveRole = getEffectiveRole(session);
+const effectiveRole = getUserRole(user)?.toLowerCase() || 'member';
 const canDownloadBackup = effectiveRole === 'board' || effectiveRole === 'admin' || effectiveRole === 'arb_board';
 if (!canDownloadBackup) {
   return new Response(JSON.stringify({ error: 'Forbidden' }), {
