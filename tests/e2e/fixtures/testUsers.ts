@@ -7,6 +7,7 @@
 
 export interface TestUser {
   email: string;
+  password: string; // Plain text password for testing (will be hashed when seeded)
   role: 'member' | 'admin' | 'board' | 'arb' | 'arb_board';
   name: string;
   address: string;
@@ -22,6 +23,7 @@ export interface TestUser {
 export const TEST_USERS: Record<string, TestUser> = {
   member: {
     email: 'test-member@clrhoa.test',
+    password: 'TestPassword123!',
     role: 'member',
     name: 'Test Member',
     address: '123 Test Lane',
@@ -30,6 +32,7 @@ export const TEST_USERS: Record<string, TestUser> = {
 
   arb: {
     email: 'test-arb@clrhoa.test',
+    password: 'TestPassword123!',
     role: 'arb',
     name: 'Test ARB Committee',
     address: '456 ARB Street',
@@ -38,6 +41,7 @@ export const TEST_USERS: Record<string, TestUser> = {
 
   board: {
     email: 'test-board@clrhoa.test',
+    password: 'TestPassword123!',
     role: 'board',
     name: 'Test Board Member',
     address: '789 Board Avenue',
@@ -46,6 +50,7 @@ export const TEST_USERS: Record<string, TestUser> = {
 
   arb_board: {
     email: 'test-arb-board@clrhoa.test',
+    password: 'TestPassword123!',
     role: 'arb_board',
     name: 'Test ARB & Board',
     address: '321 Dual Role Drive',
@@ -54,6 +59,7 @@ export const TEST_USERS: Record<string, TestUser> = {
 
   admin: {
     email: 'test-admin@clrhoa.test',
+    password: 'TestPassword123!',
     role: 'admin',
     name: 'Test Administrator',
     address: '654 Admin Way',

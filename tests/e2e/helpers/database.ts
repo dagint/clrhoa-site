@@ -11,9 +11,10 @@ import { join } from 'path';
 import { getAllTestUsers, isTestUser } from '../fixtures/testUsers.js';
 
 /**
- * Execute wrangler D1 command with --local flag.
+ * Execute wrangler D1 command with --local or --remote flag.
  *
  * Uses temporary file approach for cross-platform compatibility (Windows/Linux/Mac).
+ * Respects USE_REMOTE_D1 environment variable to use remote D1 in CI.
  *
  * @param sql - SQL command to execute
  * @param dbName - Database name (defaults to clrhoa_db)
@@ -26,8 +27,9 @@ function executeD1Command(sql: string, dbName: string = 'clrhoa_db'): string {
     // Write SQL to temporary file
     writeFileSync(tmpFile, sql, 'utf-8');
 
-    // Execute using --file flag (cross-platform compatible)
-    const command = `wrangler d1 execute ${dbName} --local --file="${tmpFile}"`;
+    // Use --remote flag if USE_REMOTE_D1 env var is set, otherwise --local
+    const locationFlag = process.env.USE_REMOTE_D1 === 'true' ? '--remote' : '--local';
+    const command = `wrangler d1 execute ${dbName} ${locationFlag} --file="${tmpFile}"`;
     const output = execSync(command, {
       encoding: 'utf-8',
       stdio: 'pipe',
@@ -76,30 +78,38 @@ function executeKVCommand(
 }
 
 /**
- * Seed test users into D1 users and owners tables.
+ * Seed test users into D1 users and owners tables with passwords.
  *
  * This function is called by global-setup.ts before tests run.
  * Test users are inserted with test-specific emails (@clrhoa.test domain).
  *
- * NOTE: We only seed users table, not passwords. E2E tests create Lucia sessions
- * directly in the sessions table, bypassing the login flow that validates passwords.
+ * Uses a simple bcrypt hash approach for test passwords (lower cost factor for speed).
  */
 export async function seedTestUsers(): Promise<void> {
   console.log('[database] Seeding test users...');
 
   const testUsers = getAllTestUsers();
 
+  // Simple test password hash (bcrypt cost factor 4 for speed)
+  // Hash of "TestPassword123!" with cost factor 4
+  // Generated with: bcrypt.hashSync('TestPassword123!', 4)
+  const testPasswordHash = '$2b$04$7ly9sFcdzGJ3ARw9hlwYXOH4gpkbgRLncnVCEG0WAPEyW22RnLiha';
+
   for (const user of testUsers) {
     try {
-      // Insert into D1 users table
+      // Insert into D1 users table with password hash
       const insertUserSQL = `
-        INSERT OR REPLACE INTO users (email, role, name, phone, sms_optin)
+        INSERT OR REPLACE INTO users (
+          email, password_hash, role, name, phone, sms_optin, status
+        )
         VALUES (
           '${user.email}',
+          '${testPasswordHash}',
           '${user.role}',
           '${user.name}',
           '${user.phone}',
-          0
+          0,
+          'active'
         )
       `;
 
@@ -136,7 +146,7 @@ export async function seedTestUsers(): Promise<void> {
     }
   }
 
-  console.log(`[database] Successfully seeded ${testUsers.length} test users`);
+  console.log(`[database] Successfully seeded ${testUsers.length} test users with passwords`);
 }
 
 /**
@@ -267,27 +277,24 @@ export async function verifyDatabaseSetup(): Promise<void> {
   console.log('[database] Verifying database setup...');
 
   try {
-    // Check if users table exists
-    const checkUsersSQL = "SELECT name FROM sqlite_master WHERE type='table' AND name='users'";
-    const usersResult = executeD1Command(checkUsersSQL);
-
-    if (!usersResult.includes('users')) {
+    // Check if users table exists by trying to query it
+    try {
+      executeD1Command("SELECT COUNT(*) FROM users LIMIT 1");
+    } catch (error) {
       throw new Error('Users table not found in D1 database');
     }
 
     // Check if sessions table exists
-    const checkSessionsSQL = "SELECT name FROM sqlite_master WHERE type='table' AND name='sessions'";
-    const sessionsResult = executeD1Command(checkSessionsSQL);
-
-    if (!sessionsResult.includes('sessions')) {
+    try {
+      executeD1Command("SELECT COUNT(*) FROM sessions LIMIT 1");
+    } catch (error) {
       throw new Error('Sessions table not found in D1 database');
     }
 
     // Check if route_permissions table exists
-    const checkPermissionsSQL = "SELECT name FROM sqlite_master WHERE type='table' AND name='route_permissions'";
-    const permissionsResult = executeD1Command(checkPermissionsSQL);
-
-    if (!permissionsResult.includes('route_permissions')) {
+    try {
+      executeD1Command("SELECT COUNT(*) FROM route_permissions LIMIT 1");
+    } catch (error) {
       console.warn('[database] Warning: route_permissions table not found (permission tests may fail)');
     }
 

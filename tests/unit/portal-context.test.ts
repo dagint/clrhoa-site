@@ -1,25 +1,36 @@
 /**
  * Unit tests for src/lib/portal-context.ts.
+ *
+ * Updated for Lucia session integration.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { getSessionFromCookie } from '../../src/lib/auth';
 import { getPortalContext } from '../../src/lib/portal-context';
-
-vi.mock('../../src/lib/auth', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../src/lib/auth')>();
-  return {
-    ...actual,
-    getSessionFromCookie: vi.fn(),
-  };
-});
+import type { User, Session } from 'lucia';
 
 function mockRequest(overrides?: Partial<Request>): Request {
   const headers = new Headers();
-  headers.set('cookie', 'clrhoa_session=abc');
   headers.set('user-agent', 'Mozilla/5.0');
   headers.set('cf-connecting-ip', '192.168.1.1');
   return { headers, ...overrides } as unknown as Request;
+}
+
+function mockLuciaUser(email: string, role: string): User {
+  return {
+    id: email,
+    email,
+    role,
+    status: 'active',
+  } as User;
+}
+
+function mockLuciaSession(userId: string): Session {
+  return {
+    id: 'session-123',
+    userId,
+    expiresAt: new Date(Date.now() + 3600000), // 1 hour from now
+    fresh: true,
+  } as Session;
 }
 
 describe('getPortalContext', () => {
@@ -27,72 +38,115 @@ describe('getPortalContext', () => {
     vi.clearAllMocks();
   });
 
-  it('returns env and null session when no SESSION_SECRET', async () => {
+  it('returns env and null session when no user in locals', async () => {
     const astro = {
       request: mockRequest(),
-      locals: { runtime: { env: { DB: {} as unknown as D1Database } } },
+      locals: {
+        runtime: { env: { DB: {} as unknown as D1Database } },
+        user: null,
+        session: null,
+      },
     };
     const result = await getPortalContext(astro);
     expect(result.session).toBeNull();
     expect(result.env).toBeDefined();
-    expect(vi.mocked(getSessionFromCookie)).not.toHaveBeenCalled();
+    expect(result.effectiveRole).toBe('member');
   });
 
-  it('returns null session when getSessionFromCookie returns null', async () => {
-    vi.mocked(getSessionFromCookie).mockResolvedValue(null);
+  it('returns session from Lucia user and session', async () => {
+    const user = mockLuciaUser('user@example.com', 'member');
+    const session = mockLuciaSession('user@example.com');
+
     const astro = {
       request: mockRequest(),
-      locals: { runtime: { env: { SESSION_SECRET: 'secret' } } },
+      locals: {
+        runtime: { env: { SESSION_SECRET: 'secret' } },
+        user,
+        session,
+      },
     };
+
     const result = await getPortalContext(astro);
-    expect(result.session).toBeNull();
-    expect((result.env as unknown as { SESSION_SECRET?: string })?.SESSION_SECRET).toBe('secret');
-    expect(vi.mocked(getSessionFromCookie)).toHaveBeenCalledWith(
-      expect.any(String),
-      'secret'
-    );
+    expect(result.session).toBeDefined();
+    expect(result.session?.email).toBe('user@example.com');
+    expect(result.session?.role).toBe('member');
+    expect(result.session?.sessionId).toBe('session-123');
+    expect(result.session?.csrfToken).toBe('session-123');
+    expect(result.env).toBeDefined();
   });
 
-  it('returns session when getSessionFromCookie returns session', async () => {
+  it('returns effective role as member when no elevation', async () => {
+    const user = mockLuciaUser('board@example.com', 'board');
+    const session = mockLuciaSession('board@example.com');
+
+    const astro = {
+      request: mockRequest(),
+      locals: {
+        runtime: { env: {} },
+        user,
+        session,
+      },
+    };
+
+    const result = await getPortalContext(astro);
+    expect(result.session?.role).toBe('board');
+    expect(result.effectiveRole).toBe('member'); // No elevation = member
+  });
+
+  it('returns effective role when elevated', async () => {
+    const user = mockLuciaUser('board@example.com', 'board');
     const session = {
-      email: 'u@example.com',
-      role: 'member',
-      name: 'User',
-      exp: Math.floor(Date.now() / 1000) + 3600,
-    };
-    vi.mocked(getSessionFromCookie).mockResolvedValue(session);
-    const astro = {
-      request: mockRequest(),
-      locals: { runtime: { env: { SESSION_SECRET: 'secret' } } },
-    };
-    const result = await getPortalContext(astro);
-    expect(result.session).toEqual(session);
-    expect((result.env as unknown as { SESSION_SECRET?: string })?.SESSION_SECRET).toBe('secret');
-  });
+      ...mockLuciaSession('board@example.com'),
+      elevated_until: Date.now() + 3600000, // Elevated for 1 hour
+    } as unknown as Session;
 
-  it('with fingerprint: true passes userAgent and ipAddress', async () => {
-    vi.mocked(getSessionFromCookie).mockResolvedValue(null);
     const astro = {
       request: mockRequest(),
-      locals: { runtime: { env: { SESSION_SECRET: 's' } } },
+      locals: {
+        runtime: { env: {} },
+        user,
+        session,
+      },
     };
-    await getPortalContext(astro, { fingerprint: true });
-    expect(vi.mocked(getSessionFromCookie)).toHaveBeenCalledWith(
-      expect.any(String),
-      's',
-      'Mozilla/5.0',
-      '192.168.1.1'
-    );
+
+    const result = await getPortalContext(astro);
+    expect(result.session?.role).toBe('board');
+    expect(result.effectiveRole).toBe('board'); // Elevated = board
   });
 
   it('includes userAgent and ipAddress in result', async () => {
-    vi.mocked(getSessionFromCookie).mockResolvedValue(null);
+    const user = mockLuciaUser('user@example.com', 'member');
+    const session = mockLuciaSession('user@example.com');
+
     const astro = {
       request: mockRequest(),
-      locals: { runtime: { env: { SESSION_SECRET: 's' } } },
+      locals: {
+        runtime: { env: { SESSION_SECRET: 's' } },
+        user,
+        session,
+      },
     };
+
     const result = await getPortalContext(astro);
     expect(result.userAgent).toBe('Mozilla/5.0');
     expect(result.ipAddress).toBe('192.168.1.1');
+  });
+
+  it('sets csrfToken to session ID for Lucia sessions', async () => {
+    const user = mockLuciaUser('user@example.com', 'member');
+    const session = mockLuciaSession('user@example.com');
+
+    const astro = {
+      request: mockRequest(),
+      locals: {
+        runtime: { env: {} },
+        user,
+        session,
+      },
+    };
+
+    const result = await getPortalContext(astro);
+    expect(result.session?.csrfToken).toBe('session-123');
+    expect(result.session?.sessionId).toBe('session-123');
   });
 });

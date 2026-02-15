@@ -45,8 +45,8 @@ export async function POST(context: APIContext): Promise<Response> {
       });
     }
 
-    const hostname = context.url.hostname;
-    const lucia = createLucia(env.DB, hostname);
+    // Pass full URL to createLucia (it calls new URL() internally)
+    const lucia = createLucia(env.DB, context.url.href);
 
     // Create session with Lucia
     const session = await createSession(

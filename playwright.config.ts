@@ -77,30 +77,42 @@ export default defineConfig({
 
   // Configure projects for major browsers
   projects: [
+    // Setup project - runs first to create authenticated sessions
+    {
+      name: 'setup',
+      testMatch: /.*\.setup\.ts/,
+    },
+
+    // Main test project - depends on setup
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
+      dependencies: ['setup'],
     },
 
     // Commented out - install with: npx playwright install firefox webkit
     // {
     //   name: 'firefox',
     //   use: { ...devices['Desktop Firefox'] },
+    //   dependencies: ['setup'],
     // },
 
     // {
     //   name: 'webkit',
     //   use: { ...devices['Desktop Safari'] },
+    //   dependencies: ['setup'],
     // },
 
     // Mobile browsers (optional, comment out for faster test runs)
     // {
     //   name: 'Mobile Chrome',
     //   use: { ...devices['Pixel 5'] },
+    //   dependencies: ['setup'],
     // },
     // {
     //   name: 'Mobile Safari',
     //   use: { ...devices['iPhone 12'] },
+    //   dependencies: ['setup'],
     // },
   ],
 
