@@ -4,7 +4,7 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie, getEffectiveRole } from '../../../lib/auth';
+import { getUserRole } from '../../../types/auth';
 import { encryptRefreshToken } from '../../../lib/backup-encrypt';
 
 const runtime = Astro.locals.runtime;
@@ -13,13 +13,18 @@ const env = runtime?.env as Env & {
   GOOGLE_CLIENT_SECRET?: string;
   BACKUP_ENCRYPTION_KEY?: string;
 };
-const session = await getSessionFromCookie(
-  Astro.request.headers.get('cookie') ?? undefined,
-  env?.SESSION_SECRET
-);
-const effectiveRole = session ? getEffectiveRole(session) : 'member';
-if (!session || (effectiveRole !== 'board' && effectiveRole !== 'admin')) {
-  return Astro.redirect('/portal/login');
+
+// Use session from middleware (already validated by middleware for /api/board/* routes)
+const user = Astro.locals.user;
+const luciaSession = Astro.locals.session;
+
+if (!user || !luciaSession) {
+  return Astro.redirect('/portal/login?error=session_expired');
+}
+
+const effectiveRole = getUserRole(user)?.toLowerCase() || 'member';
+if (effectiveRole !== 'board' && effectiveRole !== 'admin' && effectiveRole !== 'arb_board') {
+  return Astro.redirect('/portal/login?error=forbidden');
 }
 
 const url = new URL(Astro.request.url);
@@ -67,7 +72,7 @@ if (!db) return Astro.redirect('/board/backups?error=db');
 
 await db.prepare(
   `UPDATE backup_config SET google_refresh_token_encrypted = ?, updated_by = ?, updated_at = datetime('now') WHERE id = 1`
-).bind(encrypted, session.email).run();
+).bind(encrypted, user.email).run();
 
 return Astro.redirect('/board/backups?connected=1');
 ---
