@@ -434,18 +434,30 @@ const errorParam = url.searchParams.get('error') ?? '';
           include_r2_manifest: r2Manifest?.checked ?? true,
           include_r2_files: r2Files?.checked ?? false,
         };
-        const r = await fetch('/api/board/backup-config', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-        if (r.ok) {
-          const btn = form.querySelector('button[type="submit"]');
-          if (btn) {
-            const orig = btn.textContent;
-            btn.textContent = 'Saved';
-            setTimeout(() => { btn.textContent = orig; }, 2000);
+        console.log('[BACKUP CONFIG] Saving:', payload);
+        try {
+          const r = await fetch('/api/board/backup-config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          console.log('[BACKUP CONFIG] Response status:', r.status);
+          if (r.ok) {
+            const btn = form.querySelector('button[type="submit"]');
+            if (btn) {
+              const orig = btn.textContent;
+              btn.textContent = 'Saved';
+              setTimeout(() => { btn.textContent = orig; }, 2000);
+            }
+            console.log('[BACKUP CONFIG] Saved successfully!');
+          } else {
+            const error = await r.text();
+            console.error('[BACKUP CONFIG] Save failed:', r.status, error);
+            alert('Failed to save settings: ' + error);
           }
+        } catch (error) {
+          console.error('[BACKUP CONFIG] Error:', error);
+          alert('Error saving settings: ' + error.message);
         }
       });
     })();
