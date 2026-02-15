@@ -72,16 +72,42 @@ const errorParam = url.searchParams.get('error') ?? '';
     </button>
   </section>
 
-  <section class="mb-8" aria-labelledby="automated-heading">
-    <h2 id="automated-heading" class="text-2xl font-heading font-semibold text-clr-green mb-3">Automated backups (Cloudflare R2)</h2>
+  <section class="mb-8" aria-labelledby="backup-status-heading">
+    <h2 id="backup-status-heading" class="text-2xl font-heading font-semibold text-clr-green mb-3">Backup Status</h2>
     <p class="text-base text-gray-600 mb-3">
-      The backup Worker runs daily at 2:00 AM UTC. It exports D1 and the whitelist and stores them in R2 under <code class="bg-gray-100 px-1 rounded">backups/d1/</code> and <code class="bg-gray-100 px-1 rounded">backups/kv/</code>. Retention is applied (default 30 days).
+      Overview of all backup methods. Automated backups export D1 and the whitelist to R2 under <code class="bg-gray-100 px-1 rounded">backups/d1/</code> and <code class="bg-gray-100 px-1 rounded">backups/kv/</code>. Retention is applied (default 30 days).
     </p>
-    <div id="backup-status" class="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700 space-y-1.5" role="status" aria-live="polite">
-      <p class="font-medium text-gray-800">Status</p>
-      <p id="backup-status-manual">Checking…</p>
-      <p id="backup-status-r2">Checking…</p>
-      <p id="backup-status-google">Checking…</p>
+    <div class="overflow-x-auto rounded-xl border border-gray-200">
+      <table class="min-w-full divide-y divide-gray-200" role="status" aria-live="polite">
+        <thead class="bg-gray-50">
+          <tr>
+            <th scope="col" class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Type</th>
+            <th scope="col" class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Status</th>
+            <th scope="col" class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Last Successful</th>
+            <th scope="col" class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Next Run</th>
+          </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-gray-200 text-sm">
+          <tr>
+            <td class="px-4 py-3 font-medium text-gray-900">Manual Download</td>
+            <td id="backup-status-manual" class="px-4 py-3 text-gray-700">Checking…</td>
+            <td class="px-4 py-3 text-gray-500">On demand</td>
+            <td class="px-4 py-3 text-gray-500">—</td>
+          </tr>
+          <tr>
+            <td class="px-4 py-3 font-medium text-gray-900">Automated (R2)</td>
+            <td id="backup-status-r2" class="px-4 py-3 text-gray-700">Checking…</td>
+            <td id="backup-status-r2-last" class="px-4 py-3 text-gray-700">—</td>
+            <td id="backup-status-r2-next" class="px-4 py-3 text-gray-700">—</td>
+          </tr>
+          <tr>
+            <td class="px-4 py-3 font-medium text-gray-900">Google Drive</td>
+            <td id="backup-status-google" class="px-4 py-3 text-gray-700">Checking…</td>
+            <td id="backup-status-google-last" class="px-4 py-3 text-gray-700">—</td>
+            <td id="backup-status-google-next" class="px-4 py-3 text-gray-700">—</td>
+          </tr>
+        </tbody>
+      </table>
     </div>
     <p class="text-xs text-gray-500 mt-2">
       Deploy the Worker with <code class="bg-gray-100 px-1 rounded">npm run backup:deploy</code> and set <code class="bg-gray-100 px-1 rounded">CLOUDFLARE_BACKUP_API_TOKEN</code> and <code class="bg-gray-100 px-1 rounded">CLOUDFLARE_ACCOUNT_ID</code> for the Worker (and for manual download above).
@@ -242,39 +268,94 @@ const errorParam = url.searchParams.get('error') ?? '';
       (function loadBackupStatus() {
         const manualEl = document.getElementById('backup-status-manual');
         const r2El = document.getElementById('backup-status-r2');
+        const r2LastEl = document.getElementById('backup-status-r2-last');
+        const r2NextEl = document.getElementById('backup-status-r2-next');
         const googleEl = document.getElementById('backup-status-google');
+        const googleLastEl = document.getElementById('backup-status-google-last');
+        const googleNextEl = document.getElementById('backup-status-google-next');
+
         if (!manualEl || !r2El || !googleEl) return;
+
+        function calculateNextRun(scheduleType, hourUtc, dayOfWeek, lastRun) {
+          const now = new Date();
+          let next = new Date();
+          next.setUTCHours(hourUtc, 0, 0, 0);
+
+          if (scheduleType === 'daily') {
+            // If today's run time has passed, schedule for tomorrow
+            if (next <= now) {
+              next.setUTCDate(next.getUTCDate() + 1);
+            }
+          } else if (scheduleType === 'weekly') {
+            // Find next occurrence of the specified day of week
+            const currentDay = next.getUTCDay();
+            let daysUntil = (dayOfWeek - currentDay + 7) % 7;
+
+            // If it's today but the time has passed, add 7 days
+            if (daysUntil === 0 && next <= now) {
+              daysUntil = 7;
+            }
+
+            next.setUTCDate(next.getUTCDate() + daysUntil);
+          }
+
+          return next.toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' }) + ' UTC';
+        }
+
+        function formatDate(dateStr) {
+          if (!dateStr) return '—';
+          const d = new Date(dateStr);
+          if (isNaN(d.getTime())) return dateStr;
+          return d.toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' }) + ' UTC';
+        }
+
+        function getStatusBadge(configured) {
+          return configured
+            ? '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Configured</span>'
+            : '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">Not configured</span>';
+        }
+
         fetch('/api/board/backup-status', { credentials: 'same-origin' })
           .then(function (r) { return r.json(); })
           .then(function (data) {
             if (data.error) {
-              manualEl.textContent = 'Could not load status.';
-              r2El.textContent = '';
-              googleEl.textContent = '';
+              manualEl.innerHTML = 'Could not load';
+              r2El.innerHTML = 'Could not load';
+              googleEl.innerHTML = 'Could not load';
               return;
             }
-            manualEl.textContent = data.manual_download_configured
-              ? 'Manual download: Configured. (CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_BACKUP_API_TOKEN are set.)'
-              : 'Manual download: Not configured. Set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_BACKUP_API_TOKEN in your deployment to enable "Download backup (ZIP)".';
-            if (data.last_r2_backup_at) {
-              var d = new Date(data.last_r2_backup_at);
-              var label = isNaN(d.getTime()) ? data.last_r2_backup_at : d.toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' }) + ' UTC';
-              r2El.textContent = 'Automated R2 backups: Last run at ' + label + '.';
+
+            // Manual download status
+            manualEl.innerHTML = getStatusBadge(data.manual_download_configured);
+
+            // R2 automated backup status
+            const r2Configured = data.last_r2_backup_at || data.manual_download_configured;
+            r2El.innerHTML = getStatusBadge(r2Configured);
+            r2LastEl.textContent = formatDate(data.last_r2_backup_at);
+            if (r2Configured) {
+              r2NextEl.textContent = calculateNextRun('daily', 2, null, data.last_r2_backup_at);
             } else {
-              r2El.textContent = 'Automated R2 backups: No run recorded yet. Deploy the backup Worker (npm run backup:deploy) and set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_BACKUP_API_TOKEN for the Worker.';
+              r2NextEl.textContent = 'Not scheduled';
             }
-            if (data.last_google_backup_at) {
-              var gd = new Date(data.last_google_backup_at);
-              var glabel = isNaN(gd.getTime()) ? data.last_google_backup_at : gd.toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' }) + ' UTC';
-              googleEl.textContent = 'Google Drive: Last run at ' + glabel + '.';
+
+            // Google Drive backup status
+            googleEl.innerHTML = getStatusBadge(data.google_drive_enabled);
+            googleLastEl.textContent = formatDate(data.last_google_backup_at);
+            if (data.google_drive_enabled) {
+              googleNextEl.textContent = calculateNextRun(
+                data.schedule_type || 'daily',
+                data.schedule_hour_utc ?? 2,
+                data.schedule_day_of_week,
+                data.last_google_backup_at
+              );
             } else {
-              googleEl.textContent = 'Google Drive: No run recorded yet. Enable Google Drive backup and set a folder to see last run time.';
+              googleNextEl.textContent = 'Not scheduled';
             }
           })
           .catch(function () {
-            manualEl.textContent = 'Could not load status.';
-            r2El.textContent = '';
-            if (googleEl) googleEl.textContent = '';
+            manualEl.innerHTML = 'Error loading';
+            r2El.innerHTML = 'Error loading';
+            googleEl.innerHTML = 'Error loading';
           });
       })();
 
