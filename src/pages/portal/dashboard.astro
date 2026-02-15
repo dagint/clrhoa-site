@@ -449,16 +449,7 @@ const showActionNeededBanner = showActionFeedback || showActionMaintenance || sh
 
     <script is:inline>
       document.getElementById('pim-elevate-btn')?.addEventListener('click', function () {
-        const btn = this;
-        btn.disabled = true;
-        fetch('/api/pim/elevate', { method: 'POST', credentials: 'same-origin' })
-          .then(function (r) {
-            if (r.ok) window.location.reload();
-            else btn.disabled = false;
-          })
-          .catch(function () {
-            btn.disabled = false;
-          });
+        window.location.href = '/portal/request-elevated-access?return=' + encodeURIComponent(window.location.pathname);
       });
 
       document.querySelectorAll('.notification-dismiss').forEach(function (btn) {

@@ -43,7 +43,21 @@ wrangler d1 execute clrhoa_db --local --command="SELECT name FROM sqlite_master 
 | `add-users-id-column.sql` | Add id column to users table | 2026-02-14 | Applied |
 | `add-owners-phones-column.sql` | Add phones column to owners table | 2026-02-14 | Applied |
 | `fix-sessions-expires-at.sql` | Fix sessions expires_at column type | 2026-02-14 | Applied |
-| `add-pim-elevation-log-table.sql` | Add PIM elevation audit log table | 2026-02-15 | **Pending** |
+| `add-pim-elevation-log-table.sql` | Add PIM elevation audit log table | 2026-02-15 | Applied |
+| `add-lot-number-to-sms-requests.sql` | Add lot_number column to sms_feature_requests | 2026-02-15 | ✅ **Applied** |
+| `fix-site-feedback-schema-safe.sql` | Fix site_feedback schema (url/thumbs/comment) | 2026-02-15 | ✅ **Applied** |
+
+### ✅ Migration Status
+
+All required migrations have been successfully applied to both local and production databases as of 2026-02-15.
+
+**Production fixes completed:**
+- ✅ `site_feedback` table recreated with correct schema (url, thumbs, comment)
+- ✅ `sms_feature_requests` table now has `lot_number` column
+
+The following pages should now work without errors:
+- https://www.clrhoa.com/portal/admin/feedback
+- https://www.clrhoa.com/portal/admin/sms-requests
 
 ## Best Practices
 

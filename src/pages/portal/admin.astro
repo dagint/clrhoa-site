@@ -52,47 +52,136 @@ const badges = await getPortalBadgeCounts(db, email, role, name);
 
     <div class="mb-8">
       <h1 class="text-3xl font-heading font-bold text-clr-green mb-2">Admin</h1>
-      <p class="text-gray-600 text-lg">Site operations: feedback, SMS requests, test email, usage, and audit logs.</p>
+      <p class="text-gray-600 text-lg">Site operations, content management, and system administration.</p>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <section class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6" aria-labelledby="admin-feedback-heading">
-        <h2 id="admin-feedback-heading" class="text-base font-semibold text-gray-500 uppercase tracking-wide mb-4">Feedback &amp; requests</h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <!-- Site Management -->
+      <section class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6" aria-labelledby="admin-site-heading">
+        <h2 id="admin-site-heading" class="text-base font-semibold text-gray-500 uppercase tracking-wide mb-4">Site Management</h2>
         <ul class="space-y-3">
           <li>
             <a href="/portal/admin/feedback" class="flex items-center justify-between gap-3 p-4 rounded-xl border border-gray-100 hover:border-clr-green hover:bg-clr-green/5 transition-colors">
               <span class="font-semibold text-clr-green text-base">Site feedback</span>
-              <span class="text-sm text-gray-400">Widget submissions</span>
+              <span class="text-sm text-gray-400">User feedback</span>
             </a>
           </li>
           <li>
             <a href="/portal/admin/sms-requests" class="flex items-center justify-between gap-3 p-4 rounded-xl border border-gray-100 hover:border-clr-green hover:bg-clr-green/5 transition-colors">
               <span class="font-semibold text-clr-green text-base">SMS requests</span>
-              <span class="text-sm text-gray-400">Members who want SMS</span>
+              <span class="text-sm text-gray-400">SMS opt-ins</span>
             </a>
           </li>
           <li>
             <a href="/portal/admin/test-email" class="flex items-center justify-between gap-3 p-4 rounded-xl border border-gray-100 hover:border-clr-green hover:bg-clr-green/5 transition-colors">
               <span class="font-semibold text-clr-green text-base">Test email</span>
-              <span class="text-sm text-gray-400">Send test message</span>
+              <span class="text-sm text-gray-400">Send test</span>
             </a>
           </li>
         </ul>
       </section>
 
-      <section class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6" aria-labelledby="admin-usage-heading">
-        <h2 id="admin-usage-heading" class="text-base font-semibold text-gray-500 uppercase tracking-wide mb-4">Usage &amp; audit</h2>
+      <!-- System & Data -->
+      <section class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6" aria-labelledby="admin-system-heading">
+        <h2 id="admin-system-heading" class="text-base font-semibold text-gray-500 uppercase tracking-wide mb-4">System &amp; Data</h2>
         <ul class="space-y-3">
           <li>
-            <a href="/portal/usage" class="flex items-center justify-between gap-3 p-4 rounded-xl border border-gray-100 hover:border-clr-green hover:bg-clr-green/5 transition-colors">
+            <a href="/portal/admin/usage" class="flex items-center justify-between gap-3 p-4 rounded-xl border border-gray-100 hover:border-clr-green hover:bg-clr-green/5 transition-colors">
               <span class="font-semibold text-clr-green text-base">Site usage</span>
-              <span class="text-sm text-gray-400">Page views &amp; stats</span>
+              <span class="text-sm text-gray-400">Analytics</span>
             </a>
           </li>
           <li>
-            <a href="/board/audit-logs" class="flex items-center justify-between gap-3 p-4 rounded-xl border border-gray-100 hover:border-clr-green hover:bg-clr-green/5 transition-colors">
+            <a href="/portal/admin/audit-logs" class="flex items-center justify-between gap-3 p-4 rounded-xl border border-gray-100 hover:border-clr-green hover:bg-clr-green/5 transition-colors">
               <span class="font-semibold text-clr-green text-base">Audit logs</span>
-              <span class="text-sm text-gray-400">PIM, directory, ARB</span>
+              <span class="text-sm text-gray-400">Activity logs</span>
+            </a>
+          </li>
+          <li>
+            <a href="/portal/admin/users" class="flex items-center justify-between gap-3 p-4 rounded-xl border border-gray-100 hover:border-clr-green hover:bg-clr-green/5 transition-colors">
+              <span class="font-semibold text-clr-green text-base">Users</span>
+              <span class="text-sm text-gray-400">Accounts</span>
+            </a>
+          </li>
+          <li>
+            <a href="/portal/admin/permissions" class="flex items-center justify-between gap-3 p-4 rounded-xl border border-gray-100 hover:border-clr-green hover:bg-clr-green/5 transition-colors">
+              <span class="font-semibold text-clr-green text-base">Permissions</span>
+              <span class="text-sm text-gray-400">RBAC roles</span>
+            </a>
+          </li>
+          <li>
+            <a href="/board/compliance" class="flex items-center justify-between gap-3 p-4 rounded-xl border border-gray-100 hover:border-clr-green hover:bg-clr-green/5 transition-colors">
+              <span class="font-semibold text-clr-green text-base">Compliance</span>
+              <span class="text-sm text-gray-400">FL HOA reqs</span>
+            </a>
+          </li>
+          <li>
+            <a href="/portal/admin/backups" class="flex items-center justify-between gap-3 p-4 rounded-xl border border-gray-100 hover:border-clr-green hover:bg-clr-green/5 transition-colors">
+              <span class="font-semibold text-clr-green text-base">Backups</span>
+              <span class="text-sm text-gray-400">DB backups</span>
+            </a>
+          </li>
+        </ul>
+      </section>
+
+      <!-- Content Management -->
+      <section class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6" aria-labelledby="admin-content-heading">
+        <h2 id="admin-content-heading" class="text-base font-semibold text-gray-500 uppercase tracking-wide mb-4">Content</h2>
+        <ul class="space-y-3">
+          <li>
+            <a href="/portal/admin/news" class="flex items-center justify-between gap-3 p-4 rounded-xl border border-gray-100 hover:border-clr-green hover:bg-clr-green/5 transition-colors">
+              <span class="font-semibold text-clr-green text-base">News</span>
+              <span class="text-sm text-gray-400">Announcements</span>
+            </a>
+          </li>
+          <li>
+            <a href="/portal/admin/member-documents" class="flex items-center justify-between gap-3 p-4 rounded-xl border border-gray-100 hover:border-clr-green hover:bg-clr-green/5 transition-colors">
+              <span class="font-semibold text-clr-green text-base">Member docs</span>
+              <span class="text-sm text-gray-400">Protected</span>
+            </a>
+          </li>
+          <li>
+            <a href="/portal/admin/public-documents" class="flex items-center justify-between gap-3 p-4 rounded-xl border border-gray-100 hover:border-clr-green hover:bg-clr-green/5 transition-colors">
+              <span class="font-semibold text-clr-green text-base">Public docs</span>
+              <span class="text-sm text-gray-400">Public access</span>
+            </a>
+          </li>
+        </ul>
+      </section>
+
+      <!-- Directory & People -->
+      <section class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6" aria-labelledby="admin-people-heading">
+        <h2 id="admin-people-heading" class="text-base font-semibold text-gray-500 uppercase tracking-wide mb-4">Directory &amp; People</h2>
+        <ul class="space-y-3">
+          <li>
+            <a href="/portal/admin/directory" class="flex items-center justify-between gap-3 p-4 rounded-xl border border-gray-100 hover:border-clr-green hover:bg-clr-green/5 transition-colors">
+              <span class="font-semibold text-clr-green text-base">Directory</span>
+              <span class="text-sm text-gray-400">Member list</span>
+            </a>
+          </li>
+          <li>
+            <a href="/portal/admin/contacts" class="flex items-center justify-between gap-3 p-4 rounded-xl border border-gray-100 hover:border-clr-green hover:bg-clr-green/5 transition-colors">
+              <span class="font-semibold text-clr-green text-base">Contacts</span>
+              <span class="text-sm text-gray-400">Submissions</span>
+            </a>
+          </li>
+        </ul>
+      </section>
+
+      <!-- Services & Operations -->
+      <section class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6" aria-labelledby="admin-services-heading">
+        <h2 id="admin-services-heading" class="text-base font-semibold text-gray-500 uppercase tracking-wide mb-4">Services</h2>
+        <ul class="space-y-3">
+          <li>
+            <a href="/portal/admin/vendors" class="flex items-center justify-between gap-3 p-4 rounded-xl border border-gray-100 hover:border-clr-green hover:bg-clr-green/5 transition-colors">
+              <span class="font-semibold text-clr-green text-base">Vendors</span>
+              <span class="text-sm text-gray-400">Contractors</span>
+            </a>
+          </li>
+          <li>
+            <a href="/portal/admin/maintenance" class="flex items-center justify-between gap-3 p-4 rounded-xl border border-gray-100 hover:border-clr-green hover:bg-clr-green/5 transition-colors">
+              <span class="font-semibold text-clr-green text-base">Maintenance</span>
+              <span class="text-sm text-gray-400">Requests</span>
             </a>
           </li>
         </ul>
