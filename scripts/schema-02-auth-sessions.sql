@@ -168,28 +168,21 @@ CREATE INDEX IF NOT EXISTS idx_security_events_resolved ON security_events(resol
 CREATE INDEX IF NOT EXISTS idx_security_events_correlation_id ON security_events(correlation_id);
 
 -- ----------------------------------------------------------------------------
--- PIM Elevation Logs (Track privilege elevation events)
+-- PIM Elevation Log (Track privilege elevation events)
 -- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS pim_elevation_logs (
-  id TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL,
-  elevated_from_role TEXT NOT NULL,  -- Base role (admin, arb_board)
-  elevated_to_role TEXT,              -- Assumed role (board, arb) or NULL for base elevation
-  elevated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  elevated_until DATETIME NOT NULL,
-  elevation_duration_minutes INTEGER NOT NULL,
-  elevation_reason TEXT,
-  ip_address TEXT,
-  user_agent TEXT,
-  session_id TEXT,
-  ended_at DATETIME DEFAULT NULL,
-  ended_reason TEXT,  -- 'expired', 'revoked', 'logout'
-  FOREIGN KEY (user_id) REFERENCES users(email) ON DELETE CASCADE
+-- Simple audit log for elevation requests and drops.
+-- Used by /api/pim/elevate and /api/pim/drop endpoints.
+CREATE TABLE IF NOT EXISTS pim_elevation_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  email TEXT NOT NULL,
+  role TEXT NOT NULL,
+  action TEXT NOT NULL,                          -- 'elevate' or 'drop'
+  elevated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  expires_at TEXT                                -- ISO timestamp for when elevation expires (NULL for 'drop' action)
 );
 
-CREATE INDEX IF NOT EXISTS idx_pim_elevation_user ON pim_elevation_logs(user_id);
-CREATE INDEX IF NOT EXISTS idx_pim_elevation_timestamp ON pim_elevation_logs(elevated_at);
-CREATE INDEX IF NOT EXISTS idx_pim_elevation_active ON pim_elevation_logs(elevated_until);
+CREATE INDEX IF NOT EXISTS idx_pim_elevation_email ON pim_elevation_log(email);
+CREATE INDEX IF NOT EXISTS idx_pim_elevation_at ON pim_elevation_log(elevated_at);
 
 -- ============================================================================
 -- Notes on Authentication System
