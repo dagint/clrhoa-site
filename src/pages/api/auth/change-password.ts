@@ -80,7 +80,7 @@ export const prerender = false;
 
 export const POST: APIRoute = async ({ request, locals, cookies }) => {
   const db = locals.runtime?.env?.DB as D1Database | undefined;
-  const kv = locals.runtime?.env?.CLRHOA_USERS as KVNamespace | undefined;
+  const kv = locals.runtime?.env?.KV as KVNamespace | undefined;
   const resend = getResendClient(locals.runtime.env);
   const session = locals.session;
   const user = locals.user as AuthenticatedUser | null;

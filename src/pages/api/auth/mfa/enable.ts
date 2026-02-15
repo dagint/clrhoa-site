@@ -64,7 +64,7 @@ export const POST: APIRoute = async (context) => {
   const userEmail = getUserEmail(user) || 'unknown';
 
   const db = context.locals.runtime?.env?.DB;
-  const kv = context.locals.runtime?.env?.CLRHOA_USERS as KVNamespace | undefined;
+  const kv = context.locals.runtime?.env?.KV as KVNamespace | undefined;
   const sessionSecret = context.locals.runtime?.env?.SESSION_SECRET;
   const ipAddress = context.request.headers.get('cf-connecting-ip') || 'unknown';
   const userAgent = context.request.headers.get('user-agent') || 'unknown';
