@@ -109,6 +109,18 @@ const errorParam = url.searchParams.get('error') ?? '';
         </tbody>
       </table>
     </div>
+    <div class="mt-4 flex items-center gap-4">
+      <button
+        id="test-backup-btn"
+        type="button"
+        class="inline-flex items-center gap-2 bg-clr-orange hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-xl font-semibold text-sm"
+      >
+        <span id="test-backup-text">Test Backup Now</span>
+      </button>
+      <p class="text-xs text-gray-500">
+        Manually trigger an immediate backup to test your configuration. This runs all configured backups (R2 + Google Drive if enabled).
+      </p>
+    </div>
     <p class="text-xs text-gray-500 mt-2">
       Deploy the Worker with <code class="bg-gray-100 px-1 rounded">npm run backup:deploy</code> and set <code class="bg-gray-100 px-1 rounded">CLOUDFLARE_BACKUP_API_TOKEN</code> and <code class="bg-gray-100 px-1 rounded">CLOUDFLARE_ACCOUNT_ID</code> for the Worker (and for manual download above).
     </p>
@@ -179,6 +191,46 @@ const errorParam = url.searchParams.get('error') ?? '';
 
   <script is:inline define:vars={{}}>
     (function () {
+      // Test backup button handler
+      const testBackupBtn = document.getElementById('test-backup-btn');
+      const testBackupText = document.getElementById('test-backup-text');
+      if (testBackupBtn && testBackupText) {
+        testBackupBtn.addEventListener('click', async function () {
+          if (testBackupBtn.disabled) return;
+
+          const confirmed = confirm('This will trigger an immediate backup to R2 and Google Drive (if configured). This may take 30-60 seconds. Continue?');
+          if (!confirmed) return;
+
+          testBackupBtn.disabled = true;
+          testBackupText.textContent = 'Running backup...';
+
+          try {
+            const response = await fetch('/api/board/backup-trigger', {
+              method: 'POST',
+              credentials: 'same-origin',
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+              throw new Error(data.error || 'Backup failed');
+            }
+
+            testBackupText.textContent = 'Backup complete!';
+            // Reload backup status to show updated last run time
+            setTimeout(function () {
+              window.location.reload();
+            }, 1500);
+          } catch (error) {
+            testBackupText.textContent = 'Error: ' + error.message;
+            setTimeout(function () {
+              testBackupText.textContent = 'Test Backup Now';
+              testBackupBtn.disabled = false;
+            }, 3000);
+          }
+        });
+      }
+
       // Download backup button handler
       const downloadBtn = document.getElementById('download-backup-btn');
       const downloadText = document.getElementById('download-backup-text');

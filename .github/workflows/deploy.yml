@@ -110,6 +110,7 @@ jobs:
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           BACKUP_ENCRYPTION_KEY: ${{ secrets.BACKUP_ENCRYPTION_KEY }}
+          BACKUP_TRIGGER_SECRET: ${{ secrets.BACKUP_TRIGGER_SECRET }}
           NOTIFY_BOARD_EMAIL: ${{ secrets.NOTIFY_BOARD_EMAIL }}
           NOTIFY_ARB_EMAIL: ${{ secrets.NOTIFY_ARB_EMAIL }}
           NOTIFY_NOREPLY_EMAIL: ${{ secrets.NOTIFY_NOREPLY_EMAIL }}
