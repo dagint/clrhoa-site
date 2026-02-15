@@ -5,56 +5,27 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie, verifyCsrfToken, verifyOrigin, getEffectiveRole } from '../../../lib/auth';
+import { requireSession, requireDb, jsonResponse } from '../../../lib/api-helpers';
+import { verifyCsrfToken, getEffectiveRole } from '../../../lib/auth';
 import { getOwnerByEmail, upsertOwnerByEmail, insertDirectoryLog, validateLotNumber } from '../../../lib/directory-db';
 
-const runtime = Astro.locals.runtime;
-const env = runtime?.env;
-const userAgent = Astro.request.headers.get('user-agent') ?? null;
-const ipAddress = Astro.request.headers.get('cf-connecting-ip') ?? 
-  Astro.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
-let session = await getSessionFromCookie(
-  Astro.request.headers.get('cookie') ?? undefined,
-  env?.SESSION_SECRET,
-  userAgent,
-  ipAddress
-);
+const auth = await requireSession(Astro);
+if ('response' in auth) return auth.response;
+const { session } = auth;
 
-if (!session) {
-  return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-    status: 401,
-    headers: { 'Content-Type': 'application/json' },
-  });
-}
-
-const origin = Astro.request.headers.get('origin');
-const referer = Astro.request.headers.get('referer');
-const expectedOrigin = Astro.url.origin;
-if (!verifyOrigin(origin, referer, expectedOrigin)) {
-  return new Response(JSON.stringify({ error: 'Invalid origin.' }), {
-    status: 403,
-    headers: { 'Content-Type': 'application/json' },
-  });
-}
-
-const db = env?.DB;
-if (!db) {
-  return new Response(JSON.stringify({ error: 'Server configuration error' }), {
-    status: 503,
-    headers: { 'Content-Type': 'application/json' },
-  });
-}
+const dbResult = requireDb(Astro.locals.runtime?.env);
+if ('response' in dbResult) return dbResult.response;
+const { db } = dbResult;
 
 const email = session.email.trim().toLowerCase();
+const ipAddress = Astro.request.headers.get('cf-connecting-ip') ??
+  Astro.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
 
 // GET: return current user's owner row (or null)
 if (Astro.request.method === 'GET') {
   const owner = await getOwnerByEmail(db, email);
   if (!owner) {
-    return new Response(JSON.stringify({ owner: null }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return jsonResponse({ owner: null });
   }
   const phones = owner.phones ? (() => {
     try {
@@ -62,7 +33,7 @@ if (Astro.request.method === 'GET') {
       return Array.isArray(arr) ? arr.filter((p): p is string => typeof p === 'string') : [];
     } catch { return []; }
   })() : (owner.phone ? [owner.phone] : []);
-  return new Response(JSON.stringify({
+  return jsonResponse({
     owner: {
       id: owner.id,
       name: owner.name,
@@ -72,35 +43,23 @@ if (Astro.request.method === 'GET') {
       phones,
       email: owner.email,
     },
-  }), {
-    status: 200,
-    headers: { 'Content-Type': 'application/json' },
   });
 }
 
 // PUT: update or create
 if (Astro.request.method !== 'PUT') {
-  return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-    status: 405,
-    headers: { 'Content-Type': 'application/json' },
-  });
+  return jsonResponse({ error: 'Method not allowed' }, 405);
 }
 
 let body: { name?: string; address?: string; lot_number?: string; phones?: string[]; csrf_token?: string; csrfToken?: string };
 try {
   body = await Astro.request.json();
 } catch {
-  return new Response(JSON.stringify({ error: 'Invalid JSON' }), {
-    status: 400,
-    headers: { 'Content-Type': 'application/json' },
-  });
+  return jsonResponse({ error: 'Invalid JSON' }, 400);
 }
 
 if (!verifyCsrfToken(session, body.csrf_token ?? body.csrfToken)) {
-  return new Response(JSON.stringify({ error: 'Invalid security token.' }), {
-    status: 403,
-    headers: { 'Content-Type': 'application/json' },
-  });
+  return jsonResponse({ error: 'Invalid security token.' }, 403);
 }
 
 const name = typeof body.name === 'string' ? body.name.trim() || null : undefined;
@@ -114,10 +73,7 @@ const phonesJson = phonesArr !== undefined ? JSON.stringify(phonesArr) : undefin
 // If lot number is provided, validate format (1–25). Empty/null is allowed (optional field).
 if (lotNumber !== undefined && lotNumber !== null && lotNumber !== '') {
   if (!validateLotNumber(lotNumber)) {
-    return new Response(JSON.stringify({ error: 'Lot number must be 1–25 when provided.' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return jsonResponse({ error: 'Lot number must be 1–25 when provided.' }, 400);
   }
 }
 
@@ -126,12 +82,9 @@ const result = await upsertOwnerByEmail(db, email, { name, address, lot_number: 
 const clientIp = Astro.clientAddress || Astro.request.headers.get('cf-connecting-ip') || null;
 await insertDirectoryLog(db, session.email, '(directory info updated)', null, null, getEffectiveRole(session) ?? null, clientIp);
 
-return new Response(JSON.stringify({
+return jsonResponse({
   success: true,
   id: result.id,
   created: result.created,
-}), {
-  status: 200,
-  headers: { 'Content-Type': 'application/json' },
 });
 ---
