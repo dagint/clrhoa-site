@@ -39,6 +39,15 @@ const accountId = env?.CLOUDFLARE_ACCOUNT_ID;
 const apiToken = env?.CLOUDFLARE_BACKUP_API_TOKEN;
 const databaseId = env?.D1_DATABASE_ID ?? 'a214f9da-3577-4ee7-bc50-bc9b9754a79c';
 
+// Debug: What's in env?
+console.log('[BACKUP DOWNLOAD DEBUG]', {
+  hasAccountId: !!accountId,
+  hasApiToken: !!apiToken,
+  hasDatabaseId: !!databaseId,
+  envKeys: env ? Object.keys(env).filter(k => k.includes('CLOUDFLARE') || k.includes('D1')).join(', ') : 'no env',
+  allEnvKeys: env ? Object.keys(env).length + ' total keys' : 'no env'
+});
+
 if (!accountId || !apiToken) {
   return new Response(JSON.stringify({ error: 'Backup not configured (missing Cloudflare backup API credentials)' }), {
     status: 503,
