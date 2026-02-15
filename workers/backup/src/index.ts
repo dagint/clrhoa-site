@@ -74,7 +74,7 @@ export default {
       // Retention only after backup succeeds
       await applyRetention(env);
       await recordLastBackupTime(env);
-      await maybeUploadToGoogleDrive(env, date);
+      await maybeUploadToGoogleDrive(env, date, true); // true = skip schedule check for manual trigger
       await cleanupOldData(env);
       return new Response(JSON.stringify({ ok: true, date }), {
         headers: { "Content-Type": "application/json" },
@@ -358,7 +358,7 @@ async function cleanupOldData(env: Env): Promise<void> {
  * Phase 3: read backup_config from D1; if Google Drive enabled and schedule matches, upload to Drive.
  * Any future retention (deleting oldest on Drive) must run only after all uploads for this run succeed.
  */
-async function maybeUploadToGoogleDrive(env: Env, date: string): Promise<void> {
+async function maybeUploadToGoogleDrive(env: Env, date: string, skipScheduleCheck = false): Promise<void> {
   if (!env.DB) return;
   const row = await env.DB.prepare(
     "SELECT google_refresh_token_encrypted, google_drive_folder_id, schedule_type, schedule_hour_utc, schedule_day_of_week, include_r2_manifest, include_r2_files FROM backup_config WHERE google_drive_enabled = 1 LIMIT 1"
@@ -373,12 +373,15 @@ async function maybeUploadToGoogleDrive(env: Env, date: string): Promise<void> {
   }>();
   if (!row?.google_drive_folder_id || !row.google_refresh_token_encrypted) return;
 
-  const now = new Date();
-  const hourUtc = now.getUTCHours();
-  const dayOfWeek = now.getUTCDay(); // 0 = Sunday
-  if (row.schedule_type === "daily" && row.schedule_hour_utc != null && row.schedule_hour_utc !== hourUtc) return;
-  if (row.schedule_type === "weekly" && (row.schedule_day_of_week != null && row.schedule_day_of_week !== dayOfWeek || row.schedule_hour_utc != null && row.schedule_hour_utc !== hourUtc))
-    return;
+  // Skip schedule check if manually triggered (test button)
+  if (!skipScheduleCheck) {
+    const now = new Date();
+    const hourUtc = now.getUTCHours();
+    const dayOfWeek = now.getUTCDay(); // 0 = Sunday
+    if (row.schedule_type === "daily" && row.schedule_hour_utc != null && row.schedule_hour_utc !== hourUtc) return;
+    if (row.schedule_type === "weekly" && (row.schedule_day_of_week != null && row.schedule_day_of_week !== dayOfWeek || row.schedule_hour_utc != null && row.schedule_hour_utc !== hourUtc))
+      return;
+  }
 
   const encryptionKey = (env as unknown as { BACKUP_ENCRYPTION_KEY?: string }).BACKUP_ENCRYPTION_KEY;
   const clientId = (env as unknown as { GOOGLE_CLIENT_ID?: string }).GOOGLE_CLIENT_ID;
