@@ -115,15 +115,15 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
       const userRole = getUserRole(user)?.toLowerCase() || 'member';
 
       if (!isElevatedRole(userRole)) {
-        return context.redirect(`/portal/request-elevated-access?return=${encodeURIComponent(pathname)}`);
+        return context.redirect('/portal/dashboard');
       }
 
-      // Check PIM elevation status
+      // Check PIM elevation status - gracefully downgrade to member access
       const elevatedUntil = (session as any).elevated_until;
       const now = Date.now();
       if (!elevatedUntil || elevatedUntil < now) {
-        // User has elevated role but no active elevation - require PIM elevation
-        return context.redirect(`/portal/request-elevated-access?return=${encodeURIComponent(pathname)}`);
+        // User has elevated role but no active elevation - downgrade to member access
+        return context.redirect('/portal/dashboard');
       }
 
       // Check role-based access using centralized logic
@@ -156,12 +156,12 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
         return context.redirect(getRoleLandingZone(userRole));
       }
 
-      // Check PIM elevation status
+      // Check PIM elevation status - gracefully downgrade to member access
       const elevatedUntil = (session as any).elevated_until;
       const now = Date.now();
       if (!elevatedUntil || elevatedUntil < now) {
-        // Admin needs active elevation - require PIM elevation
-        return context.redirect(`/portal/request-elevated-access?return=${encodeURIComponent(pathname)}`);
+        // Admin needs active elevation - downgrade to member access
+        return context.redirect('/portal/dashboard');
       }
 
       // Store user in context for use in pages
@@ -270,41 +270,41 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
         if (!isAdminRole(userRole)) {
           return context.redirect(getRoleLandingZone(userRole));
         }
-        // Check PIM elevation for admin
+        // Check PIM elevation for admin - gracefully downgrade to member access
         const elevatedUntil = (session as any).elevated_until;
         const now = Date.now();
         if (!elevatedUntil || elevatedUntil < now) {
-          return context.redirect(`/portal/request-elevated-access?return=${encodeURIComponent(pathname)}`);
+          return context.redirect('/portal/dashboard');
         }
       } else if (pathname === '/portal/board' || pathname === '/portal/board/') {
         if (userRole !== 'board' && userRole !== 'arb_board') {
           return context.redirect(getRoleLandingZone(userRole));
         }
-        // Check PIM elevation for board
+        // Check PIM elevation for board - gracefully downgrade to member access
         const elevatedUntil = (session as any).elevated_until;
         const now = Date.now();
         if (!elevatedUntil || elevatedUntil < now) {
-          return context.redirect(`/portal/request-elevated-access?return=${encodeURIComponent(pathname)}`);
+          return context.redirect('/portal/dashboard');
         }
       } else if (pathname === '/portal/arb' || pathname === '/portal/arb/') {
         if (userRole !== 'arb' && userRole !== 'arb_board') {
           return context.redirect(getRoleLandingZone(userRole));
         }
-        // Check PIM elevation for ARB
+        // Check PIM elevation for ARB - gracefully downgrade to member access
         const elevatedUntil = (session as any).elevated_until;
         const now = Date.now();
         if (!elevatedUntil || elevatedUntil < now) {
-          return context.redirect(`/portal/request-elevated-access?return=${encodeURIComponent(pathname)}`);
+          return context.redirect('/portal/dashboard');
         }
       } else if ((pathname === '/portal/usage' || pathname.startsWith('/portal/usage')) && !pathname.startsWith('/portal/admin/')) {
         if (!isAdminRole(userRole)) {
           return context.redirect(getRoleLandingZone(userRole));
         }
-        // Check PIM elevation for usage
+        // Check PIM elevation for usage - gracefully downgrade to member access
         const elevatedUntil = (session as any).elevated_until;
         const now = Date.now();
         if (!elevatedUntil || elevatedUntil < now) {
-          return context.redirect(`/portal/request-elevated-access?return=${encodeURIComponent(pathname)}`);
+          return context.redirect('/portal/dashboard');
         }
       }
 
