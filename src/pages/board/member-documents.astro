@@ -1,7 +1,7 @@
 ---
 export const prerender = false;
 
-import { getBoardContext } from '../../lib/board-context';
+import { getAdminContext } from '../../lib/board-context';
 import { getPortalBadgeCounts } from '../../lib/portal-badge-counts';
 import { isBoardOnly } from '../../lib/auth';
 import { listMemberDocuments } from '../../lib/member-documents-db';
@@ -10,8 +10,8 @@ import { sanitizeForScriptInjection } from '../../lib/sanitize';
 import PortalLayout from '../../layouts/PortalLayout.astro';
 import PortalPage from '../../components/PortalPage.astro';
 
-import BoardNav from '../../components/BoardNav.astro';
-const ctx = await getBoardContext(Astro);
+import AdminNav from '../../components/BoardNav.astro';
+const ctx = await getAdminContext(Astro);
 if ('redirect' in ctx) return Astro.redirect(ctx.redirect);
 const { env, session, effectiveRole } = ctx;
 const isBoard = isBoardOnly(effectiveRole) || effectiveRole === 'admin';
@@ -78,7 +78,7 @@ const docsByCategory = MEMBER_DOC_CATEGORIES.map((cat) => ({
     maintenanceOpenCount={badges.maintenanceOpenCount}
     meetingsRsvpCount={badges.meetingsRsvpCount}
   >
-    <BoardNav currentPath="/board/member-documents" />
+    <AdminNav currentPath="/board/member-documents" />
 
 unt}
 <div class="mb-8 p-4 rounded-xl bg-blue-50 border border-blue-200 text-blue-900" role="alert">

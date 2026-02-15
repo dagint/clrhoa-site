@@ -1,16 +1,16 @@
 ---
 export const prerender = false;
 
-import { getBoardContext } from '../../lib/board-context';
+import { getAdminContext } from '../../lib/board-context';
 import { getPortalBadgeCounts } from '../../lib/portal-badge-counts';
 import PortalLayout from '../../layouts/PortalLayout.astro';
 import PortalPage from '../../components/PortalPage.astro';
-import BoardNav from '../../components/BoardNav.astro';
+import AdminNav from '../../components/AdminNav.astro';
 
-const ctx = await getBoardContext(Astro);
+const ctx = await getAdminContext(Astro);
 if ('redirect' in ctx) return Astro.redirect(ctx.redirect);
 const { env, session, effectiveRole } = ctx;
-if (effectiveRole !== 'board' && effectiveRole !== 'admin') return Astro.redirect('/portal/dashboard');
+// Admin-only page - already enforced by getAdminContext
 
 const db = env?.DB;
 const { email, role, name } = session;
@@ -36,7 +36,7 @@ const errorParam = url.searchParams.get('error') ?? '';
     maintenanceOpenCount={badges.maintenanceOpenCount}
     meetingsRsvpCount={badges.meetingsRsvpCount}
   >
-    <BoardNav currentPath="/board/backups" />
+    <AdminNav currentPath="/board/backups" />
 
 <p class="text-gray-600 mb-6">
     Database (D1) and login whitelist (KV) backups. Automated backups run daily to Cloudflare R2; you can also send a copy to a Google Workspace Drive folder.
