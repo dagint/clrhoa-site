@@ -11,9 +11,10 @@ import { join } from 'path';
 import { getAllTestUsers, isTestUser } from '../fixtures/testUsers.js';
 
 /**
- * Execute wrangler D1 command with --local flag.
+ * Execute wrangler D1 command with --local or --remote flag.
  *
  * Uses temporary file approach for cross-platform compatibility (Windows/Linux/Mac).
+ * Respects USE_REMOTE_D1 environment variable to use remote D1 in CI.
  *
  * @param sql - SQL command to execute
  * @param dbName - Database name (defaults to clrhoa_db)
@@ -26,8 +27,9 @@ function executeD1Command(sql: string, dbName: string = 'clrhoa_db'): string {
     // Write SQL to temporary file
     writeFileSync(tmpFile, sql, 'utf-8');
 
-    // Execute using --file flag (cross-platform compatible)
-    const command = `wrangler d1 execute ${dbName} --local --file="${tmpFile}"`;
+    // Use --remote flag if USE_REMOTE_D1 env var is set, otherwise --local
+    const locationFlag = process.env.USE_REMOTE_D1 === 'true' ? '--remote' : '--local';
+    const command = `wrangler d1 execute ${dbName} ${locationFlag} --file="${tmpFile}"`;
     const output = execSync(command, {
       encoding: 'utf-8',
       stdio: 'pipe',

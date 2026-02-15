@@ -68,6 +68,9 @@ jobs:
           PUBLIC_SITE_URL: http://localhost:8788
           NODE_ENV: test
           CI: true
+          USE_REMOTE_D1: true
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4
@@ -149,6 +152,9 @@ jobs:
         env:
           SESSION_SECRET: ${{ secrets.SESSION_SECRET_TEST }}
           CI: true
+          USE_REMOTE_D1: true
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       - name: Upload smoke test report
         uses: actions/upload-artifact@v4
