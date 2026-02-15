@@ -77,10 +77,16 @@ const showPimBanner = actualElevatedUntil && actualElevatedUntil > now;
     </PortalHeader>
 
     <!-- PIM Elevation Banner (shown when user has elevated access) -->
-    {showPimBanner && <PimElevationBanner elevatedUntil={actualElevatedUntil!} role={effectiveRole} />}
+    <!-- Position below fixed header (h-16 = 64px) -->
+    {showPimBanner && (
+      <div class="mt-16">
+        <PimElevationBanner elevatedUntil={actualElevatedUntil!} role={effectiveRole} />
+      </div>
+    )}
 
     <!-- Scrollable Content -->
-    <main class="flex-1 overflow-y-auto pt-16 lg:pt-16">
+    <!-- Padding adjusted based on whether banner is shown -->
+    <main class={showPimBanner ? "flex-1 overflow-y-auto" : "flex-1 overflow-y-auto pt-16 lg:pt-16"}>
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <slot />
       </div>
