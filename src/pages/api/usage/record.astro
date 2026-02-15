@@ -1,11 +1,12 @@
 ---
 /**
  * POST /api/usage/record — Record a page view (path from body).
- * Sets _usage_sid cookie if missing for anonymous session. Optionally attaches user_id from auth.
+ * Sets _usage_sid cookie if missing for anonymous session. Optionally attaches user_id from Lucia auth.
  */
 export const prerender = false;
 
-import { getSessionFromCookie } from '../../../lib/auth';
+import { validateSession, getSessionId } from '../../../lib/auth/middleware';
+import { getUserEmail } from '../../../types/auth';
 import { insertPageView } from '../../../lib/usage-db';
 
 const USAGE_SID_COOKIE = '_usage_sid';
@@ -44,13 +45,15 @@ if (!sessionId) {
   });
 }
 
+// Get user ID from Lucia session if authenticated
 let userId: string | null = null;
-if (env?.SESSION_SECRET) {
-  const session = await getSessionFromCookie(
-    Astro.request.headers.get('cookie') ?? undefined,
-    env.SESSION_SECRET
-  );
-  if (session?.email) userId = session.email.trim();
+const luciaSessionId = getSessionId(Astro);
+if (luciaSessionId && db) {
+  const { session, user } = await validateSession(db, luciaSessionId, Astro.url.href);
+  if (session && user) {
+    const email = getUserEmail(user);
+    if (email) userId = email.trim();
+  }
 }
 
 await insertPageView(db, { path, session_id: sessionId, user_id: userId });
