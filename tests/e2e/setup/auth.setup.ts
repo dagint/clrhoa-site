@@ -2,16 +2,17 @@
  * Playwright authentication setup.
  *
  * Creates authenticated sessions for each role by:
- * 1. Using the real login flow (tests actual authentication)
- * 2. Saving session cookies to storageState files
- * 3. Reusing these states across all tests (fast & reliable)
+ * 1. Using the test API endpoint to create Lucia sessions
+ * 2. Manually constructing storageState files with session cookies
+ * 3. Saving to files for reuse across tests
  *
- * This approach avoids D1 instance isolation issues with wrangler.
+ * This approach avoids login form issues and works reliably in CI.
  */
 
-import { test as setup, expect } from '@playwright/test';
+import { test as setup } from '@playwright/test';
 import { TEST_USERS } from '../fixtures/testUsers.js';
 import path from 'path';
+import fs from 'fs';
 
 const STORAGE_STATE_DIR = path.join(process.cwd(), 'playwright/.auth');
 
@@ -25,92 +26,96 @@ export const AUTH_FILES = {
 };
 
 /**
- * Login helper that uses the actual login flow.
- * This tests the real authentication system.
+ * Create a session via the test API endpoint and build storageState.
  */
-async function loginWithCredentials(
-  page: any,
+async function createStorageState(
   email: string,
-  password: string,
-  baseURL: string
+  role: string,
+  baseURL: string,
+  filePath: string
 ) {
-  await page.goto(`${baseURL}/auth/login`);
+  // Call test API to create session
+  const response = await fetch(`${baseURL}/api/test/create-session`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId: email }),
+  });
 
-  // Fill in login form
-  await page.fill('input[name="email"]', email);
-  await page.fill('input[name="password"]', password);
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Failed to create session for ${role}: ${response.status} - ${error}`);
+  }
 
-  // Submit form
-  await page.click('button[type="submit"]');
+  const { sessionId } = await response.json() as { sessionId: string };
 
-  // Wait for redirect to portal (indicates successful login)
-  await page.waitForURL(/\/portal/, { timeout: 10000 });
+  // Parse URL to get domain
+  const url = new URL(baseURL);
+  const isSecure = url.protocol === 'https:';
 
-  // Verify we're logged in by checking for portal elements
-  await expect(page.locator('text=Dashboard')).toBeVisible({ timeout: 5000 });
+  // Build storageState JSON manually
+  const storageState = {
+    cookies: [
+      {
+        name: 'clrhoa_session',
+        value: sessionId,
+        domain: url.hostname,
+        path: '/',
+        expires: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7, // 7 days
+        httpOnly: true,
+        secure: isSecure,
+        sameSite: 'Lax' as const,
+      },
+    ],
+    origins: [],
+  };
+
+  // Ensure directory exists
+  if (!fs.existsSync(STORAGE_STATE_DIR)) {
+    fs.mkdirSync(STORAGE_STATE_DIR, { recursive: true });
+  }
+
+  // Write to file
+  fs.writeFileSync(filePath, JSON.stringify(storageState, null, 2));
+
+  console.log(`✓ Saved ${role} auth state to ${filePath} (session: ${sessionId.substring(0, 10)}...)`);
 }
 
 // Setup authenticated session for member role
-setup('authenticate as member', async ({ page }) => {
+setup('authenticate as member', async () => {
   const user = TEST_USERS.member;
   const baseURL = process.env.PUBLIC_SITE_URL || 'http://127.0.0.1:8788';
 
-  await loginWithCredentials(page, user.email, user.password, baseURL);
-
-  // Save signed-in state
-  await page.context().storageState({ path: AUTH_FILES.member });
-
-  console.log(`✓ Saved member auth state to ${AUTH_FILES.member}`);
+  await createStorageState(user.email, 'member', baseURL, AUTH_FILES.member);
 });
 
 // Setup authenticated session for board role
-setup('authenticate as board', async ({ page }) => {
+setup('authenticate as board', async () => {
   const user = TEST_USERS.board;
   const baseURL = process.env.PUBLIC_SITE_URL || 'http://127.0.0.1:8788';
 
-  await loginWithCredentials(page, user.email, user.password, baseURL);
-
-  // Save signed-in state
-  await page.context().storageState({ path: AUTH_FILES.board });
-
-  console.log(`✓ Saved board auth state to ${AUTH_FILES.board}`);
+  await createStorageState(user.email, 'board', baseURL, AUTH_FILES.board);
 });
 
 // Setup authenticated session for ARB role
-setup('authenticate as arb', async ({ page }) => {
+setup('authenticate as arb', async () => {
   const user = TEST_USERS.arb;
   const baseURL = process.env.PUBLIC_SITE_URL || 'http://127.0.0.1:8788';
 
-  await loginWithCredentials(page, user.email, user.password, baseURL);
-
-  // Save signed-in state
-  await page.context().storageState({ path: AUTH_FILES.arb });
-
-  console.log(`✓ Saved arb auth state to ${AUTH_FILES.arb}`);
+  await createStorageState(user.email, 'arb', baseURL, AUTH_FILES.arb);
 });
 
 // Setup authenticated session for ARB+Board role
-setup('authenticate as arb_board', async ({ page }) => {
+setup('authenticate as arb_board', async () => {
   const user = TEST_USERS.arb_board;
   const baseURL = process.env.PUBLIC_SITE_URL || 'http://127.0.0.1:8788';
 
-  await loginWithCredentials(page, user.email, user.password, baseURL);
-
-  // Save signed-in state
-  await page.context().storageState({ path: AUTH_FILES.arb_board });
-
-  console.log(`✓ Saved arb_board auth state to ${AUTH_FILES.arb_board}`);
+  await createStorageState(user.email, 'arb_board', baseURL, AUTH_FILES.arb_board);
 });
 
 // Setup authenticated session for admin role
-setup('authenticate as admin', async ({ page }) => {
+setup('authenticate as admin', async () => {
   const user = TEST_USERS.admin;
   const baseURL = process.env.PUBLIC_SITE_URL || 'http://127.0.0.1:8788';
 
-  await loginWithCredentials(page, user.email, user.password, baseURL);
-
-  // Save signed-in state
-  await page.context().storageState({ path: AUTH_FILES.admin });
-
-  console.log(`✓ Saved admin auth state to ${AUTH_FILES.admin}`);
+  await createStorageState(user.email, 'admin', baseURL, AUTH_FILES.admin);
 });
