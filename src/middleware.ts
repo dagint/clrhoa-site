@@ -49,12 +49,41 @@ const ELEVATED_API_PREFIXES = [
   '/api/arb-export',
 ];
 
+/** Suspicious path patterns commonly used in credential scanning attacks. Block these early. */
+const SUSPICIOUS_PATHS = [
+  // API keys and secrets
+  /\.(env|ini|conf|config|key|secret|token|credentials)$/i,
+  /(api[-_]?key|secret|token|password|credential)[s]?\.(txt|json|xml|yaml|yml)$/i,
+  // Service-specific credential files
+  /(sendgrid|mailchimp|stripe|twilio|aws|google|firebase|cloudflare)[-_]?(api|key|token|secret|config|credentials)/i,
+  // Hidden config files
+  /^\/\.(git|svn|hg|env|aws|azure|gcloud|docker|npm|ssh)/,
+  // Common backend files that should never be public
+  /\.(php|asp|aspx|jsp|cgi)$/i,
+  // Service directories
+  /^\/(storage|secrets|config|keys|credentials|api-keys)\//i,
+  // Framework-specific
+  /^\/(node_modules|vendor|\.git|\.svn)\//i,
+];
+
 export const onRequest: MiddlewareHandler = async (context, next) => {
   const pathname = context.url.pathname;
   // During static prerender, request.headers is not available; skip auth and pass through to avoid warnings
   const hasHeaders = typeof context.request?.headers?.get === 'function';
   if (!hasHeaders) {
     return await next();
+  }
+
+  // Block credential scanning attempts early
+  const isSuspiciousPath = SUSPICIOUS_PATHS.some((pattern) => pattern.test(pathname));
+  if (isSuspiciousPath) {
+    return new Response('Forbidden', {
+      status: 403,
+      headers: {
+        'Content-Type': 'text/plain',
+        'X-Robots-Tag': 'noindex',
+      },
+    });
   }
 
   // Generate correlation ID for request tracing (check for existing one from upstream, e.g., Cloudflare)
