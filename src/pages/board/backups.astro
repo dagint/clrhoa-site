@@ -212,18 +212,22 @@ const errorParam = url.searchParams.get('error') ?? '';
               credentials: 'same-origin',
             });
 
+            console.log('[TEST BACKUP] Response status:', response.status);
             const data = await response.json();
+            console.log('[TEST BACKUP] Response data:', data);
 
             if (!response.ok) {
               throw new Error(data.error || 'Backup failed');
             }
 
             testBackupText.textContent = 'Backup complete!';
+            console.log('[TEST BACKUP] Success! Reloading page in 1.5s...');
             // Reload backup status to show updated last run time
             setTimeout(function () {
               window.location.reload();
             }, 1500);
           } catch (error) {
+            console.error('[TEST BACKUP] Error:', error);
             testBackupText.textContent = 'Error: ' + error.message;
             setTimeout(function () {
               testBackupText.textContent = 'Test Backup Now';
