@@ -164,7 +164,7 @@ async function exportD1(env: Env): Promise<string> {
     res = await fetch(base, {
       method: "POST",
       headers,
-      body: JSON.stringify({ current_bookmark: bookmark }),
+      body: JSON.stringify({ output_format: "polling", current_bookmark: bookmark }),
     });
     if (!res.ok) throw new Error(`D1 export poll failed: ${res.status}`);
     const poll = (await res.json()) as { result?: ExportResult; success?: boolean };
