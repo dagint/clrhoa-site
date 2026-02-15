@@ -73,16 +73,14 @@ export async function getAdminContext(astro: RoleContextAstro): Promise<GetRoleC
   }
 
   // Convert Lucia user to SessionPayload format for compatibility
-  // TEMPORARY: Auto-elevate all elevated roles until PIM is fully migrated to Lucia
-  // TODO: Implement proper PIM elevation flow with Lucia sessions (see schema-sessions-pim.sql)
-  const isElevated = ['admin', 'board', 'arb', 'arb_board'].includes(user.role.toLowerCase());
+  // Read actual PIM elevation status from session (not auto-elevated)
   const session: SessionPayload = {
     email: user.email,
     role: user.role,
     name: null, // Not stored in Lucia user, would need to fetch from owners table
     exp: Math.floor(luciaSession.expiresAt.getTime() / 1000),
     sessionId: luciaSession.id,
-    elevated_until: isElevated ? luciaSession.expiresAt.getTime() : undefined,
+    elevated_until: (luciaSession as any).elevated_until,
   };
 
   const effectiveRole = getEffectiveRole(session);
@@ -130,16 +128,14 @@ export async function getBoardContext(astro: RoleContextAstro): Promise<GetRoleC
   }
 
   // Convert Lucia user to SessionPayload format for compatibility
-  // TEMPORARY: Auto-elevate all elevated roles until PIM is fully migrated to Lucia
-  // TODO: Implement proper PIM elevation flow with Lucia sessions (see schema-sessions-pim.sql)
-  const isElevated = ['admin', 'board', 'arb', 'arb_board'].includes(user.role.toLowerCase());
+  // Read actual PIM elevation status from session (not auto-elevated)
   const session: SessionPayload = {
     email: user.email,
     role: user.role,
     name: null, // Not stored in Lucia user, would need to fetch from owners table
     exp: Math.floor(luciaSession.expiresAt.getTime() / 1000),
     sessionId: luciaSession.id,
-    elevated_until: isElevated ? luciaSession.expiresAt.getTime() : undefined,
+    elevated_until: (luciaSession as any).elevated_until,
   };
 
   const effectiveRole = getEffectiveRole(session);
@@ -187,16 +183,14 @@ export async function getArbContext(astro: RoleContextAstro): Promise<GetRoleCon
   }
 
   // Convert Lucia user to SessionPayload format for compatibility
-  // TEMPORARY: Auto-elevate all elevated roles until PIM is fully migrated to Lucia
-  // TODO: Implement proper PIM elevation flow with Lucia sessions (see schema-sessions-pim.sql)
-  const isElevated = ['admin', 'board', 'arb', 'arb_board'].includes(user.role.toLowerCase());
+  // Read actual PIM elevation status from session (not auto-elevated)
   const session: SessionPayload = {
     email: user.email,
     role: user.role,
     name: null, // Not stored in Lucia user, would need to fetch from owners table
     exp: Math.floor(luciaSession.expiresAt.getTime() / 1000),
     sessionId: luciaSession.id,
-    elevated_until: isElevated ? luciaSession.expiresAt.getTime() : undefined,
+    elevated_until: (luciaSession as any).elevated_until,
   };
 
   const effectiveRole = getEffectiveRole(session);
