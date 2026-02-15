@@ -360,7 +360,7 @@ CREATE TABLE IF NOT EXISTS vendors (
 
 CREATE INDEX IF NOT EXISTS idx_vendors_category ON vendors(category);
 CREATE INDEX IF NOT EXISTS idx_vendors_name ON vendors(name);
-CREATE INDEX IF NOT EXISTS idx_vendors_show_on_public ON vendors(show_on_public_site);
+CREATE INDEX IF NOT EXISTS idx_vendors_show_on_public ON vendors(show_on_public);
 
 -- Vendor Submissions (member-suggested vendors pending approval)
 CREATE TABLE IF NOT EXISTS vendor_submissions (
