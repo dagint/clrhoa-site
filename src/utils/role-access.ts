@@ -104,22 +104,13 @@ export function hasRouteAccess(
 
 /**
  * Get the appropriate redirect path when access is denied.
- * Returns the landing page for the user's role.
+ * All users land on the same dashboard regardless of role.
+ * Role-based access differentiation happens only when users actively elevate permissions via PIM.
  *
- * @param role - The user's effective role (string for flexibility)
- * @returns Redirect path for the role
+ * @param role - The user's effective role (parameter kept for backwards compatibility, but not used)
+ * @returns Redirect path (always /portal/dashboard)
  */
-export function getAccessDeniedRedirect(role: string): string {
-  switch (role) {
-    case 'admin':
-      return '/portal/admin';
-    case 'arb':
-    case 'arb_board':
-      return '/portal/arb';
-    case 'board':
-      return '/board';
-    case 'member':
-    default:
-      return '/portal/dashboard';
-  }
+export function getAccessDeniedRedirect(role?: string): string {
+  // All users land on dashboard - role differentiation happens via PIM elevation
+  return '/portal/dashboard';
 }
