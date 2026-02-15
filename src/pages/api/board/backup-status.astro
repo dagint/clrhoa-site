@@ -5,20 +5,21 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie, getEffectiveRole } from '../../../lib/auth';
+import { getUserRole } from '../../../types/auth';
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env as Record<string, unknown> & { CLOUDFLARE_ACCOUNT_ID?: string; CLOUDFLARE_BACKUP_API_TOKEN?: string };
-const session = await getSessionFromCookie(
-  Astro.request.headers.get('cookie') ?? undefined,
-  env?.SESSION_SECRET as string | undefined
-);
 
-if (!session) {
+// Use session from middleware (already validated by middleware for /api/board/* routes)
+const user = Astro.locals.user;
+const luciaSession = Astro.locals.session;
+
+if (!user || !luciaSession) {
   return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
 }
-const effectiveRole = getEffectiveRole(session);
-const canManageBackup = effectiveRole === 'board' || effectiveRole === 'admin' || effectiveRole === 'arb_board';
+
+const userRole = getUserRole(user)?.toLowerCase() || 'member';
+const canManageBackup = userRole === 'board' || userRole === 'admin' || userRole === 'arb_board';
 if (!canManageBackup) {
   return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403, headers: { 'Content-Type': 'application/json' } });
 }
