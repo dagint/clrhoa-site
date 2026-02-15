@@ -16,10 +16,13 @@ const { elevatedUntil } = Astro.props;
     <span id="pim-elevation-label">Elevated access</span>
     <span id="pim-elevation-timer" class="ml-2 font-mono">—</span>
   </span>
-  <form id="pim-drop-form" method="post" action="/api/pim/drop" class="inline">
-    <input type="hidden" name="_method" value="POST" />
-    <button type="submit" class="text-amber-900 underline font-medium text-sm hover:no-underline">Drop access</button>
-  </form>
+  <div class="flex items-center gap-3">
+    <button id="pim-extend-btn" type="button" class="hidden text-amber-900 underline font-medium text-sm hover:no-underline">Extend access (+45 min)</button>
+    <form id="pim-drop-form" method="post" action="/api/pim/drop" class="inline">
+      <input type="hidden" name="_method" value="POST" />
+      <button type="submit" class="text-amber-900 underline font-medium text-sm hover:no-underline">Drop access</button>
+    </form>
+  </div>
 </div>
 
 <script>
@@ -27,8 +30,20 @@ const { elevatedUntil } = Astro.props;
     const timerEl = document.getElementById('pim-elevation-timer');
     const form = document.getElementById('pim-drop-form') as HTMLFormElement | null;
     const bannerEl = document.getElementById('pim-elevation-banner');
+    const extendBtn = document.getElementById('pim-extend-btn') as HTMLButtonElement | null;
     if (!timerEl || !bannerEl) return;
-    const elevatedUntil = parseInt(bannerEl.getAttribute('data-elevated-until') || '0', 10);
+
+    let elevatedUntil = parseInt(bannerEl.getAttribute('data-elevated-until') || '0', 10);
+    const EXTENSION_THRESHOLD_MS = 15 * 60 * 1000; // 15 minutes
+
+    interface ExtendResponse {
+      success: boolean;
+      elevated_until?: number;
+      total_minutes_remaining?: number;
+      extension_granted_minutes?: number;
+      error?: string;
+      minutes_remaining?: number;
+    }
 
     function updateTimer() {
       const now = Date.now();
@@ -42,10 +57,70 @@ const { elevatedUntil } = Astro.props;
       const m = Math.floor(sec / 60);
       const s = sec % 60;
       if (timerEl) timerEl.textContent = `expires in ${m}:${String(s).padStart(2, '0')}`;
+
+      // Show extend button if 15 minutes or less remaining
+      const timeRemaining = until - now;
+      if (extendBtn) {
+        if (timeRemaining <= EXTENSION_THRESHOLD_MS) {
+          extendBtn.classList.remove('hidden');
+        } else {
+          extendBtn.classList.add('hidden');
+        }
+      }
     }
 
     updateTimer();
     const interval = setInterval(updateTimer, 1000);
+
+    // Handle extend button click
+    extendBtn?.addEventListener('click', function () {
+      const originalText = extendBtn.textContent;
+      extendBtn.disabled = true;
+      extendBtn.textContent = 'Extending...';
+
+      fetch('/api/pim/extend', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' }
+      })
+        .then(function (r) {
+          return r.json().then(function (data) {
+            return { ok: r.ok, data: data as ExtendResponse };
+          });
+        })
+        .then(function (result) {
+          if (result.ok && result.data.success) {
+            // Update elevated_until with new expiration
+            if (result.data.elevated_until) {
+              elevatedUntil = result.data.elevated_until;
+              bannerEl.setAttribute('data-elevated-until', String(elevatedUntil));
+            }
+            if (extendBtn) {
+              extendBtn.textContent = '✓ Extended';
+              setTimeout(function () {
+                if (extendBtn) {
+                  extendBtn.textContent = originalText || 'Extend access (+45 min)';
+                  extendBtn.disabled = false;
+                }
+              }, 2000);
+            }
+          } else {
+            const errorMsg = result.data.error || 'Extension failed';
+            alert(errorMsg);
+            if (extendBtn) {
+              extendBtn.textContent = originalText || 'Extend access (+45 min)';
+              extendBtn.disabled = false;
+            }
+          }
+        })
+        .catch(function (err) {
+          alert('Failed to extend access. Please try again.');
+          if (extendBtn) {
+            extendBtn.textContent = originalText || 'Extend access (+45 min)';
+            extendBtn.disabled = false;
+          }
+        });
+    });
 
     form?.addEventListener('submit', function (e) {
       e.preventDefault();
