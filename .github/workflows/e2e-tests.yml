@@ -44,7 +44,7 @@ jobs:
           npx wrangler d1 execute clrhoa_db --remote --file=./scripts/schema-04-admin-compliance.sql
           npx wrangler d1 execute clrhoa_db --remote --file=./scripts/schema-05-seed-data.sql
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_BACKUP_API_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       - name: Start wrangler dev server (with remote D1)
@@ -92,7 +92,7 @@ jobs:
           npx wrangler d1 execute clrhoa_db --remote --command="DELETE FROM owners WHERE email LIKE '%@clrhoa.test'"
           npx wrangler d1 execute clrhoa_db --remote --command="DELETE FROM users WHERE email LIKE '%@clrhoa.test'"
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_BACKUP_API_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
   smoke-tests:
@@ -129,7 +129,7 @@ jobs:
           npx wrangler d1 execute clrhoa_db --remote --file=./scripts/schema-04-admin-compliance.sql
           npx wrangler d1 execute clrhoa_db --remote --file=./scripts/schema-05-seed-data.sql
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_BACKUP_API_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       - name: Start wrangler dev server (with remote D1)
@@ -165,5 +165,5 @@ jobs:
           npx wrangler d1 execute clrhoa_db --remote --command="DELETE FROM owners WHERE email LIKE '%@clrhoa.test'"
           npx wrangler d1 execute clrhoa_db --remote --command="DELETE FROM users WHERE email LIKE '%@clrhoa.test'"
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_BACKUP_API_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
