@@ -17,7 +17,7 @@ import { insertPimElevationLog } from '../../../lib/pim-db';
 
 export const prerender = false;
 
-const ELEVATION_DURATION_MS = 30 * 60 * 1000; // 30 minutes
+const ELEVATION_DURATION_MS = 60 * 60 * 1000; // 60 minutes
 
 export async function POST(context: APIContext): Promise<Response> {
   const env = context.locals.runtime?.env;
@@ -127,7 +127,7 @@ export async function POST(context: APIContext): Promise<Response> {
     return new Response(JSON.stringify({
       success: true,
       elevated_until: elevatedUntil,
-      expires_in_minutes: 30,
+      expires_in_minutes: 60,
     }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
