@@ -41,9 +41,14 @@ const databaseId = env?.D1_DATABASE_ID ?? 'a214f9da-3577-4ee7-bc50-bc9b9754a79c'
 
 // Debug: What's in env?
 console.log('[BACKUP DOWNLOAD DEBUG]', {
-  hasAccountId: !!accountId,
-  hasApiToken: !!apiToken,
-  hasDatabaseId: !!databaseId,
+  accountId_type: typeof accountId,
+  accountId_value: accountId === undefined ? 'undefined' : accountId === null ? 'null' : accountId === '' ? 'EMPTY_STRING' : `"${String(accountId).slice(0, 10)}..."`,
+  accountId_length: accountId ? String(accountId).length : 0,
+  apiToken_type: typeof apiToken,
+  apiToken_value: apiToken === undefined ? 'undefined' : apiToken === null ? 'null' : apiToken === '' ? 'EMPTY_STRING' : 'HAS_VALUE',
+  apiToken_length: apiToken ? String(apiToken).length : 0,
+  databaseId_type: typeof databaseId,
+  databaseId_value: databaseId ? `"${String(databaseId).slice(0, 20)}..."` : 'NONE',
   envKeys: env ? Object.keys(env).filter(k => k.includes('CLOUDFLARE') || k.includes('D1')).join(', ') : 'no env',
   allEnvKeys: env ? Object.keys(env).length + ' total keys' : 'no env'
 });
