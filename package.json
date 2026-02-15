@@ -174,7 +174,7 @@
     "test:e2e:report": "playwright show-report playwright-report",
     "test:smoke": "playwright test tests/e2e/smoke",
     "preview:test": "wrangler pages dev ./dist --local --port=8788 --d1=DB=clrhoa_db --kv=SESSION --kv=CLOURHOA_USERS --kv=KV --r2=CLOURHOA_FILES",
-    "preview:test:remote": "wrangler pages dev ./dist --port=8788 --d1=DB=clrhoa_db --kv=SESSION --kv=CLOURHOA_USERS --kv=KV --r2=CLOURHOA_FILES",
+    "preview:test:remote": "wrangler pages dev ./dist --port=8788",
     "lint": "astro check",
     "audit": "npm audit",
     "audit:fix": "npm audit fix",

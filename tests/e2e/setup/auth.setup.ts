@@ -11,19 +11,11 @@
 
 import { test as setup } from '@playwright/test';
 import { TEST_USERS } from '../fixtures/testUsers.js';
+import { AUTH_FILES } from './auth-paths.js';
 import path from 'path';
 import fs from 'fs';
 
 const STORAGE_STATE_DIR = path.join(process.cwd(), 'playwright/.auth');
-
-// Storage state file paths for each role
-export const AUTH_FILES = {
-  member: path.join(STORAGE_STATE_DIR, 'member.json'),
-  board: path.join(STORAGE_STATE_DIR, 'board.json'),
-  arb: path.join(STORAGE_STATE_DIR, 'arb.json'),
-  arb_board: path.join(STORAGE_STATE_DIR, 'arb_board.json'),
-  admin: path.join(STORAGE_STATE_DIR, 'admin.json'),
-};
 
 /**
  * Create a session via the test API endpoint and build storageState.

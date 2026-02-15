@@ -5,7 +5,7 @@
  */
 
 import { test, expect } from '@playwright/test';
-import { AUTH_FILES } from '../setup/auth.setup.js';
+import { AUTH_FILES } from '../setup/auth-paths.js';
 
 // Example 1: Test with member authentication
 test.describe('Member Dashboard', () => {

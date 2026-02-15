@@ -6,7 +6,7 @@
  */
 
 import { type BrowserContext, type Page } from '@playwright/test';
-import { AUTH_FILES } from '../setup/auth.setup.js';
+import { AUTH_FILES } from '../setup/auth-paths.js';
 
 /**
  * Get the storageState file path for a given role.
