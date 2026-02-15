@@ -64,6 +64,14 @@ export async function validateSession(
 
     if (!result.session || !result.user) {
       console.log('[VALIDATE DEBUG] Session validation returned null/invalid');
+      return result;
+    }
+
+    // Manually fetch custom session attributes (Lucia D1 adapter doesn't include them)
+    // This includes elevated_until for PIM (Privileged Identity Management)
+    if (result.session && dbSession) {
+      (result.session as any).elevated_until = dbSession.elevated_until;
+      console.log('[VALIDATE DEBUG] Added elevated_until to session:', dbSession.elevated_until);
     }
 
     return result;
