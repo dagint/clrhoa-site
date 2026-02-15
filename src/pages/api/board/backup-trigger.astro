@@ -1,0 +1,75 @@
+---
+/**
+ * POST /api/board/backup-trigger — Board/Admin only. Manually triggers backup Worker.
+ * Calls the backup Worker's /trigger endpoint to run an immediate backup.
+ */
+export const prerender = false;
+
+import { getUserRole } from '../../../types/auth';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env as Env & {
+  BACKUP_TRIGGER_SECRET?: string;
+  BACKUP_WORKER_URL?: string;
+};
+
+// Use session from middleware (already validated by middleware for /api/board/* routes)
+const user = Astro.locals.user;
+const luciaSession = Astro.locals.session;
+
+if (!user || !luciaSession) {
+  return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+    status: 401,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const effectiveRole = getUserRole(user)?.toLowerCase() || 'member';
+if (effectiveRole !== 'board' && effectiveRole !== 'admin' && effectiveRole !== 'arb_board') {
+  return new Response(JSON.stringify({ error: 'Forbidden' }), {
+    status: 403,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const triggerSecret = env?.BACKUP_TRIGGER_SECRET;
+const workerUrl = env?.BACKUP_WORKER_URL || 'https://clrhoa-backup.dagint.workers.dev';
+
+if (!triggerSecret) {
+  return new Response(
+    JSON.stringify({ error: 'Backup trigger not configured (missing BACKUP_TRIGGER_SECRET)' }),
+    { status: 503, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+
+try {
+  const response = await fetch(`${workerUrl}/trigger`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${triggerSecret}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('[BACKUP TRIGGER] Worker returned error:', response.status, errorText);
+    return new Response(
+      JSON.stringify({ error: `Backup trigger failed: ${errorText}` }),
+      { status: response.status, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+
+  const result = await response.json();
+  return new Response(JSON.stringify(result), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
+} catch (err) {
+  console.error('[BACKUP TRIGGER] Error calling worker:', err);
+  return new Response(
+    JSON.stringify({ error: err instanceof Error ? err.message : 'Unknown error' }),
+    { status: 500, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+---
