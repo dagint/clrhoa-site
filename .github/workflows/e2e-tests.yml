@@ -1,11 +1,10 @@
 name: E2E RBAC Tests
 
 on:
-  pull_request:
-    branches: [main]
-  push:
-    branches: [main]
-  workflow_dispatch: # Allow manual trigger
+  # E2E tests are currently disabled in CI due to D1 instance isolation issues
+  # with wrangler tooling. See tests/e2e/README.md for details.
+  # Run tests locally before merging: npm run build && npm run preview:test (in one terminal) && npm run test:e2e (in another)
+  workflow_dispatch: # Manual trigger only
 
 jobs:
   e2e-tests:
