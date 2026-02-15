@@ -48,7 +48,8 @@ console.log('[BACKUP DOWNLOAD DEBUG]', {
   apiToken_value: apiToken === undefined ? 'undefined' : apiToken === null ? 'null' : apiToken === '' ? 'EMPTY_STRING' : 'HAS_VALUE',
   apiToken_length: apiToken ? String(apiToken).length : 0,
   databaseId_type: typeof databaseId,
-  databaseId_value: databaseId ? `"${String(databaseId).slice(0, 20)}..."` : 'NONE',
+  databaseId_value_FULL: databaseId, // Show FULL value to debug
+  env_D1_DATABASE_ID_FULL: env?.D1_DATABASE_ID, // Show what's actually in env
   envKeys: env ? Object.keys(env).filter(k => k.includes('CLOUDFLARE') || k.includes('D1')).join(', ') : 'no env',
   allEnvKeys: env ? Object.keys(env).length + ' total keys' : 'no env'
 });
