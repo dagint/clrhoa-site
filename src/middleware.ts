@@ -170,6 +170,31 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
     }
   }
 
+  // PIM APIs: require authenticated session but not elevation (these manage elevation itself)
+  if (pathname.startsWith('/api/pim')) {
+    if (!context.cookies.has(SESSION_COOKIE_NAME)) {
+      return new Response(JSON.stringify({ error: 'Unauthorized', success: false }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    if (env?.DB) {
+      const sessionId = getSessionId(context);
+      const { session, user } = await validateSession(env.DB, sessionId, context.url.hostname);
+
+      if (!session || !user) {
+        return new Response(JSON.stringify({ error: 'Unauthorized', success: false }), {
+          status: 401,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Store user in context for PIM API handlers
+      context.locals.user = user;
+      context.locals.session = session;
+    }
+  }
+
   // Elevated APIs: 403 if session exists but role is not elevated
   // Exceptions (allow any logged-in user; handler enforces owner vs elevated):
   //   /api/owners/me — members update own directory info
