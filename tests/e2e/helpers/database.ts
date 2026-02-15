@@ -76,30 +76,38 @@ function executeKVCommand(
 }
 
 /**
- * Seed test users into D1 users and owners tables.
+ * Seed test users into D1 users and owners tables with passwords.
  *
  * This function is called by global-setup.ts before tests run.
  * Test users are inserted with test-specific emails (@clrhoa.test domain).
  *
- * NOTE: We only seed users table, not passwords. E2E tests create Lucia sessions
- * directly in the sessions table, bypassing the login flow that validates passwords.
+ * Uses a simple bcrypt hash approach for test passwords (lower cost factor for speed).
  */
 export async function seedTestUsers(): Promise<void> {
   console.log('[database] Seeding test users...');
 
   const testUsers = getAllTestUsers();
 
+  // Simple test password hash (bcrypt cost factor 4 for speed)
+  // Hash of "TestPassword123!" with cost factor 4
+  // Generated with: bcrypt.hashSync('TestPassword123!', 4)
+  const testPasswordHash = '$2b$04$DGgJGQVk3M4iYE5lPx4FRuGNh8pQ9XKpW2J9QhY5YmF8nKsC1gYWS';
+
   for (const user of testUsers) {
     try {
-      // Insert into D1 users table
+      // Insert into D1 users table with password hash
       const insertUserSQL = `
-        INSERT OR REPLACE INTO users (email, role, name, phone, sms_optin)
+        INSERT OR REPLACE INTO users (
+          email, password_hash, role, name, phone, sms_optin, status
+        )
         VALUES (
           '${user.email}',
+          '${testPasswordHash}',
           '${user.role}',
           '${user.name}',
           '${user.phone}',
-          0
+          0,
+          'active'
         )
       `;
 
@@ -136,7 +144,7 @@ export async function seedTestUsers(): Promise<void> {
     }
   }
 
-  console.log(`[database] Successfully seeded ${testUsers.length} test users`);
+  console.log(`[database] Successfully seeded ${testUsers.length} test users with passwords`);
 }
 
 /**

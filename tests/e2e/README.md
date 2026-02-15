@@ -136,82 +136,78 @@ tests/e2e/
 │   ├── testUsers.ts          # Test user definitions (5 roles)
 │   └── routes.ts             # Re-export PROTECTED_ROUTES
 ├── helpers/
-│   ├── auth.ts               # loginAs(), createTestSession()
+│   ├── auth-new.ts           # storageState helpers (current)
+│   ├── auth.ts               # DEPRECATED - old session creation
 │   └── database.ts           # seedTestUsers(), cleanupTestUsers()
 ├── rbac/
 │   ├── route-access.spec.ts  # 250+ route access tests
 │   └── menu-visibility.spec.ts # Menu rendering per role
 ├── smoke/
 │   └── critical-paths.spec.ts # Quick smoke tests (5 min)
+├── examples/
+│   └── auth-example.spec.ts  # storageState usage examples
 └── setup/
+    ├── auth.setup.ts         # Create authenticated sessions (NEW)
     ├── global-setup.ts       # Seed test data before all tests
     └── global-teardown.ts    # Cleanup after all tests
 ```
 
 ## Writing Tests
 
+> **Note:** We use Playwright's `storageState` feature for authentication. See [MIGRATION_GUIDE.md](./MIGRATION_GUIDE.md) for details.
+
 ### Basic Authentication Test
 
 ```typescript
 import { test, expect } from '@playwright/test';
-import { loginAs } from '../helpers/auth.js';
+import { AUTH_FILES } from './setup/auth.setup.js';
 
-test('member can access dashboard', async ({ browser }) => {
-  // Create new browser context
-  const context = await browser.newContext();
+test.describe('Member Dashboard', () => {
+  // Load pre-authenticated session
+  test.use({ storageState: AUTH_FILES.member });
 
-  // Login as member
-  await loginAs(context, 'member');
-
-  // Create page
-  const page = await context.newPage();
-
-  // Navigate and assert
-  await page.goto('/portal/dashboard');
-  await expect(page).toHaveURL(/\/portal\/dashboard/);
-
-  // Cleanup
-  await context.close();
+  test('member can access dashboard', async ({ page }) => {
+    // Already logged in!
+    await page.goto('/portal/dashboard');
+    await expect(page).toHaveURL(/\/portal\/dashboard/);
+  });
 });
 ```
 
-### Elevated Role Test
+### Testing Multiple Roles
 
 ```typescript
-test('board can access board directory with elevation', async ({ browser }) => {
-  const context = await browser.newContext();
+import { AUTH_FILES } from './setup/auth.setup.js';
 
-  // Login with elevation
-  await loginAs(context, 'board', { elevated: true });
+test.describe('Board Features', () => {
+  test.use({ storageState: AUTH_FILES.board });
 
-  const page = await context.newPage();
-  await page.goto('/board/directory');
+  test('board can access board directory', async ({ page }) => {
+    await page.goto('/board/directory');
+    await expect(page).toHaveURL(/\/board\/directory/);
+  });
+});
 
-  await expect(page).toHaveURL(/\/board\/directory/);
+test.describe('Admin Features', () => {
+  test.use({ storageState: AUTH_FILES.admin });
 
-  await context.close();
+  test('admin can access admin panel', async ({ page }) => {
+    await page.goto('/portal/admin');
+    await expect(page).toHaveURL(/\/portal\/admin/);
+  });
 });
 ```
 
-### Admin Role Assumption Test
+### Testing Unauthenticated Access
 
 ```typescript
-test('admin assuming board role can access board routes', async ({ browser }) => {
-  const context = await browser.newContext();
+test.describe('Public Pages', () => {
+  // No storageState = unauthenticated
 
-  // Login as admin assuming board role
-  await loginAs(context, 'admin', { elevated: true, assumeRole: 'board' });
-
-  const page = await context.newPage();
-  await page.goto('/board/assessments');
-
-  // Should access route
-  await expect(page).toHaveURL(/\/board\/assessments/);
-
-  // Should show assumption indicator
-  await expect(page.locator('text=/acting as.*board/i')).toBeVisible();
-
-  await context.close();
+  test('unauthenticated user redirected to login', async ({ page }) => {
+    await page.goto('/portal/dashboard');
+    await expect(page).toHaveURL(/\/auth\/login/);
+  });
 });
 ```
 
@@ -376,20 +372,20 @@ npm run db:route-permissions:local
 
 ### ✅ Do
 
-- Use `loginAs()` helper for authentication
-- Close browser contexts after tests (`await context.close()`)
+- Use `storageState` for authentication (see examples above)
+- Group related tests with `test.describe()`
 - Use specific selectors (`a[href="/portal/admin"]`)
 - Test both positive and negative cases
 - Use descriptive test names
-- Group related tests with `test.describe()`
+- Check [MIGRATION_GUIDE.md](./MIGRATION_GUIDE.md) for authentication patterns
 
 ### ❌ Don't
 
-- Hardcode session cookies (use `createTestSession()`)
-- Reuse browser contexts across tests (creates flaky tests)
+- Create sessions programmatically in tests (use `storageState` instead)
+- Call `loginAs()` or `createTestSession()` (deprecated - see migration guide)
 - Use vague selectors (`text=Link`)
-- Skip cleanup (causes test pollution)
 - Test implementation details (test behavior, not code structure)
+- Skip the setup project (auth states won't be created)
 
 ## Performance
 

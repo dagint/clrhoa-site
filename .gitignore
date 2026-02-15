@@ -74,4 +74,5 @@ $RECYCLE.BIN/
 playwright-report/
 test-results/
 /playwright/.cache/
+/playwright/.auth/
 .tmp-sql-*.sql
