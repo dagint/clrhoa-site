@@ -527,12 +527,11 @@ CREATE INDEX IF NOT EXISTS idx_notification_dismissals_user ON notification_dism
 -- SMS Feature Requests (track member interest in SMS notifications)
 CREATE TABLE IF NOT EXISTS sms_feature_requests (
   id TEXT PRIMARY KEY,
-  user_email TEXT NOT NULL,
-  phone TEXT,
-  requested_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  lot_number TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_sms_feature_requests_user ON sms_feature_requests(user_email);
+CREATE INDEX IF NOT EXISTS idx_sms_feature_requests_lot ON sms_feature_requests(lot_number);
 
 -- ============================================================================
 -- Notes on Feature Tables
