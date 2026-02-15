@@ -7,6 +7,7 @@
 import ProtectedPage from './ProtectedPage.astro';
 import PortalSidebar from './PortalSidebar.astro';
 import PortalHeader from './PortalHeader.astro';
+import PimElevationBanner from './PimElevationBanner.astro';
 
 interface Props {
   currentPath: string;
@@ -22,6 +23,7 @@ interface Props {
   maintenanceOpenCount?: number;
   meetingsRsvpCount?: number;
   feedbackDueCount?: number;
+  elevatedUntil?: number | null;
 }
 
 const {
@@ -38,7 +40,19 @@ const {
   maintenanceOpenCount = 0,
   meetingsRsvpCount = 0,
   feedbackDueCount = 0,
+  elevatedUntil = null,
 } = Astro.props;
+
+// Get session from Astro.locals (set by middleware) to check elevation status
+const session = Astro.locals.session;
+const sessionElevatedUntil = (session as any)?.elevated_until;
+
+// Use prop if provided, otherwise check session
+const actualElevatedUntil = elevatedUntil ?? sessionElevatedUntil ?? null;
+
+// Check if PIM elevation banner should be shown
+const now = Date.now();
+const showPimBanner = actualElevatedUntil && actualElevatedUntil > now;
 ---
 
 <ProtectedPage>
@@ -61,6 +75,9 @@ const {
     <PortalHeader userName={userName} userEmail={userEmail} effectiveRole={effectiveRole}>
       <span slot="title">{pageTitle}</span>
     </PortalHeader>
+
+    <!-- PIM Elevation Banner (shown when user has elevated access) -->
+    {showPimBanner && <PimElevationBanner elevatedUntil={actualElevatedUntil!} role={effectiveRole} />}
 
     <!-- Scrollable Content -->
     <main class="flex-1 overflow-y-auto pt-16 lg:pt-16">
