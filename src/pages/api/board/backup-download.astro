@@ -99,9 +99,9 @@ if (!start.success || !start.result?.at_bookmark) {
 }
 let bookmark = start.result.at_bookmark;
 
-// Poll until complete
-for (let i = 0; i < 60; i++) {
-  await new Promise((r) => setTimeout(r, 3000));
+// Poll until complete (reduced iterations to fit within Pages Function timeout)
+for (let i = 0; i < 8; i++) {
+  await new Promise((r) => setTimeout(r, 1500));
   res = await fetch(base, { method: 'POST', headers, body: JSON.stringify({ current_bookmark: bookmark }) });
   if (!res.ok) break;
   const poll = (await res.json()) as { result?: { result?: { signed_url?: string }; status?: string; current_bookmark?: string }; success?: boolean };
