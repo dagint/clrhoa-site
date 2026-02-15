@@ -12,14 +12,19 @@
  */
 export const prerender = false;
 
-import BoardLayout from '../../../layouts/BoardLayout.astro';
+import PortalLayout from '../../../layouts/PortalLayout.astro';
+import PortalPage from '../../../components/PortalPage.astro';
+import AdminNav from '../../../components/AdminNav.astro';
 import { getAdminContext } from '../../../lib/board-context';
+import { getPortalBadgeCounts } from '../../../lib/portal-badge-counts';
 
 const ctx = await getAdminContext(Astro);
 if ('redirect' in ctx) return Astro.redirect(ctx.redirect);
 const { env, session, effectiveRole } = ctx;
 
+const { email, role, name } = session;
 const db = env?.DB;
+const badges = await getPortalBadgeCounts(db, email, role, name);
 
 // Query parameters for filtering
 const url = Astro.url;
@@ -71,16 +76,24 @@ if (db) {
 }
 ---
 
-<BoardLayout
-  title="User Management"
-  subtitle="Manage user accounts, roles, and permissions."
-  draftCount={0}
-  role={effectiveRole}
-  session={session}
-  elevatedUntil={session.elevated_until}
-  mainWide
-  showRoleBanner={false}
->
+<PortalLayout title="Users | Admin | Member Portal | Crooked Lake Reserve HOA">
+  <PortalPage
+    currentPath="/portal/admin/users"
+    pageTitle="Users"
+    userName={badges.displayName ?? undefined}
+    userEmail={email}
+    effectiveRole={effectiveRole}
+    draftCount={badges.draftCount}
+    role={effectiveRole}
+    staffRole={role ?? ''}
+    arbInReviewCount={badges.arbInReviewCount}
+    vendorPendingCount={badges.vendorPendingCount}
+    maintenanceOpenCount={badges.maintenanceOpenCount}
+    meetingsRsvpCount={badges.meetingsRsvpCount}
+    feedbackDueCount={badges.feedbackDueCount}
+  >
+    <AdminNav currentPath="/portal/admin/users" />
+
   <!-- Stats Dashboard -->
   <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
     <div class="rounded-lg border border-gray-200 bg-white p-4">
@@ -620,4 +633,5 @@ if (db) {
       }
     }
   </script>
-</BoardLayout>
+  </PortalPage>
+</PortalLayout>

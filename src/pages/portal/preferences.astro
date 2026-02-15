@@ -190,11 +190,12 @@ const pushEnabled = notification_preferences['push_enabled'] === true;
   </PortalPage>
 </PortalLayout>
 
-<script>
-  const form = document.getElementById('preferences-form') as HTMLFormElement;
+<script is:inline define:vars={{ csrfToken: session.csrfToken ?? '' }}>
+  (function() {
+  const form = document.getElementById('preferences-form');
   const messageEl = document.getElementById('pref-message');
 
-  function showMessage(text: string, isError: boolean) {
+  function showMessage(text, isError) {
     if (!messageEl) return;
     messageEl.textContent = text;
     messageEl.classList.remove('hidden', 'bg-green-50', 'border-green-200', 'text-green-800', 'bg-red-50', 'border-red-200', 'text-red-800');
@@ -207,9 +208,9 @@ const pushEnabled = notification_preferences['push_enabled'] === true;
   }
 
   function getCurrentNotificationPrefs() {
-    const prefs: Record<string, boolean> = {};
+    const prefs = {};
     form.querySelectorAll('.notification-type-cb').forEach(function (cb) {
-      const checkbox = cb as HTMLInputElement;
+      const checkbox = cb;
       prefs[checkbox.dataset.notificationId || checkbox.value] = checkbox.checked;
     });
     return prefs;
@@ -219,8 +220,8 @@ const pushEnabled = notification_preferences['push_enabled'] === true;
   form.addEventListener('submit', async function (e) {
     e.preventDefault();
 
-    const shareContactEl = document.getElementById('share-contact-with-members') as HTMLInputElement;
-    const smsEl = document.getElementById('sms_optin') as HTMLInputElement;
+    const shareContactEl = document.getElementById('share-contact-with-members');
+    const smsEl = document.getElementById('sms_optin');
 
     const share_contact_with_members = shareContactEl?.checked ?? true;
     const sms_optin = smsEl?.checked ?? false;
@@ -234,11 +235,12 @@ const pushEnabled = notification_preferences['push_enabled'] === true;
           share_contact_with_members,
           sms_optin,
           notification_preferences,
+          csrf_token: csrfToken,
         }),
         credentials: 'same-origin',
       });
 
-      const data = await res.json() as { success: boolean; message?: string };
+      const data = await res.json();
       if (data.success) {
         showMessage('Preferences saved successfully!', false);
       } else {
@@ -250,10 +252,10 @@ const pushEnabled = notification_preferences['push_enabled'] === true;
   });
 
   // Push notification handlers
-  const enablePushBtn = document.getElementById('btn-enable-push') as HTMLButtonElement | null;
-  const disablePushBtn = document.getElementById('btn-disable-push') as HTMLButtonElement | null;
+  const enablePushBtn = document.getElementById('btn-enable-push');
+  const disablePushBtn = document.getElementById('btn-disable-push');
 
-  function updatePushUI(enabled: boolean) {
+  function updatePushUI(enabled) {
     if (enablePushBtn) {
       enablePushBtn.disabled = enabled;
       enablePushBtn.textContent = enabled ? 'Push notifications enabled' : 'Enable push notifications';
@@ -263,8 +265,8 @@ const pushEnabled = notification_preferences['push_enabled'] === true;
     }
   }
 
-  async function savePushPreference(enabled: boolean): Promise<{ success: boolean }> {
-    const smsEl = document.getElementById('sms_optin') as HTMLInputElement;
+  async function savePushPreference(enabled) {
+    const smsEl = document.getElementById('sms_optin');
     const sms_optin = smsEl?.checked ?? false;
     const notification_preferences = getCurrentNotificationPrefs();
     notification_preferences.push_enabled = enabled;
@@ -276,9 +278,10 @@ const pushEnabled = notification_preferences['push_enabled'] === true;
         body: JSON.stringify({
           sms_optin,
           notification_preferences,
+          csrf_token: csrfToken,
         }),
       });
-      return await res.json() as { success: boolean };
+      return await res.json();
     } catch (error) {
       return { success: false };
     }
@@ -315,4 +318,5 @@ const pushEnabled = notification_preferences['push_enabled'] === true;
       showMessage('Failed to disable push notifications', true);
     }
   });
+  })();
 </script>

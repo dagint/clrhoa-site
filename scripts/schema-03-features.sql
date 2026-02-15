@@ -322,22 +322,19 @@ CREATE TABLE IF NOT EXISTS feedback_responses (
 CREATE INDEX IF NOT EXISTS idx_feedback_responses_doc ON feedback_responses(doc_id);
 CREATE INDEX IF NOT EXISTS idx_feedback_responses_owner ON feedback_responses(owner_email);
 
--- Site Feedback (member suggestions)
+-- Site Feedback (anonymous feedback widget: thumbs + 140-char comment, no PII)
 CREATE TABLE IF NOT EXISTS site_feedback (
   id TEXT PRIMARY KEY,
-  category TEXT NOT NULL,
-  message TEXT NOT NULL,
-  submitted_by TEXT,
-  status TEXT DEFAULT 'new',
-  priority TEXT DEFAULT 'normal',
-  board_notes TEXT,
-  created_at TEXT DEFAULT (datetime('now')),
-  reviewed_at TEXT,
-  reviewed_by TEXT
+  url TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  viewport TEXT,
+  session_id TEXT,
+  thumbs INTEGER NOT NULL,
+  comment TEXT
 );
 
-CREATE INDEX IF NOT EXISTS idx_site_feedback_status ON site_feedback(status);
-CREATE INDEX IF NOT EXISTS idx_site_feedback_created_at ON site_feedback(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_site_feedback_created ON site_feedback(created_at);
+CREATE INDEX IF NOT EXISTS idx_site_feedback_thumbs ON site_feedback(thumbs);
 
 -- ----------------------------------------------------------------------------
 -- Vendors (Approved Contractor Directory)
