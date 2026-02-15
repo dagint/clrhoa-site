@@ -91,7 +91,7 @@ export async function seedTestUsers(): Promise<void> {
   // Simple test password hash (bcrypt cost factor 4 for speed)
   // Hash of "TestPassword123!" with cost factor 4
   // Generated with: bcrypt.hashSync('TestPassword123!', 4)
-  const testPasswordHash = '$2b$04$DGgJGQVk3M4iYE5lPx4FRuGNh8pQ9XKpW2J9QhY5YmF8nKsC1gYWS';
+  const testPasswordHash = '$2b$04$7ly9sFcdzGJ3ARw9hlwYXOH4gpkbgRLncnVCEG0WAPEyW22RnLiha';
 
   for (const user of testUsers) {
     try {
