@@ -75,6 +75,14 @@ let res = await fetch(base, {
 });
 if (!res.ok) {
   const t = await res.text();
+  console.error('[BACKUP DOWNLOAD ERROR]', {
+    status: res.status,
+    statusText: res.statusText,
+    responseBody: t,
+    apiUrl: base,
+    accountIdLength: accountId?.length,
+    tokenLength: apiToken?.length,
+  });
   return new Response(JSON.stringify({ error: `D1 export failed: ${t}` }), {
     status: 502,
     headers: { 'Content-Type': 'application/json' },
