@@ -18,8 +18,12 @@ async function globalSetup() {
     // 1. Verify database setup
     await verifyDatabaseSetup();
 
-    // 2. Apply PIM migrations (add elevated_until columns to sessions table)
-    await applyPIMMigrations();
+    // 2. Apply PIM migrations (only for local D1 - remote D1 already has these from schema files)
+    if (process.env.USE_REMOTE_D1 !== 'true') {
+      await applyPIMMigrations();
+    } else {
+      console.log('[database] Skipping PIM migrations (remote D1 already initialized with schema)');
+    }
 
     // 3. Reset permissions to defaults
     await resetPermissions();
