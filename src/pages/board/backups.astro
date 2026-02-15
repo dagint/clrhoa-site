@@ -109,18 +109,6 @@ const errorParam = url.searchParams.get('error') ?? '';
         </tbody>
       </table>
     </div>
-    <div class="mt-4 flex items-center gap-4">
-      <button
-        id="test-backup-btn"
-        type="button"
-        class="inline-flex items-center gap-2 bg-clr-orange hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-xl font-semibold text-sm"
-      >
-        <span id="test-backup-text">Test Backup Now</span>
-      </button>
-      <p class="text-xs text-gray-500">
-        Manually trigger an immediate backup to test your configuration. This runs all configured backups (R2 + Google Drive if enabled).
-      </p>
-    </div>
     <p class="text-xs text-gray-500 mt-2">
       Deploy the Worker with <code class="bg-gray-100 px-1 rounded">npm run backup:deploy</code> and set <code class="bg-gray-100 px-1 rounded">CLOUDFLARE_BACKUP_API_TOKEN</code> and <code class="bg-gray-100 px-1 rounded">CLOUDFLARE_ACCOUNT_ID</code> for the Worker (and for manual download above).
     </p>
@@ -187,6 +175,20 @@ const errorParam = url.searchParams.get('error') ?? '';
         </button>
       </div>
     </form>
+
+    <div class="mt-6 pt-6 border-t border-gray-200">
+      <h3 class="text-lg font-semibold text-gray-900 mb-3">Test Backup</h3>
+      <p class="text-sm text-gray-600 mb-3">
+        Manually trigger an immediate backup to test your configuration. This runs all configured backups (R2 + Google Drive if enabled).
+      </p>
+      <button
+        id="test-backup-btn"
+        type="button"
+        class="inline-flex items-center gap-2 bg-clr-orange hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-xl font-semibold text-sm"
+      >
+        <span id="test-backup-text">Test Backup Now</span>
+      </button>
+    </div>
   </section>
 
   <script is:inline define:vars={{}}>
