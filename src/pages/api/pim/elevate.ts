@@ -14,6 +14,7 @@
 import type { APIContext } from 'astro';
 import bcrypt from 'bcryptjs';
 import { insertPimElevationLog } from '../../../lib/pim-db';
+import { getSecurityMonitor } from '../../../lib/monitoring';
 
 export const prerender = false;
 
@@ -23,6 +24,9 @@ export async function POST(context: APIContext): Promise<Response> {
   const env = context.locals.runtime?.env;
   const user = context.locals.user;
   const session = context.locals.session;
+
+  // Get client IP for security logging
+  const clientIp = context.clientAddress || context.request.headers.get('cf-connecting-ip') || null;
 
   // Check authentication
   if (!user || !session || !env?.DB) {
@@ -96,7 +100,23 @@ export async function POST(context: APIContext): Promise<Response> {
     const passwordValid = await bcrypt.compare(password, userRecord.password_hash);
 
     if (!passwordValid) {
-      // TODO: Log failed elevation attempt to audit log
+      // Log failed elevation attempt for security monitoring
+      const monitor = getSecurityMonitor();
+      monitor.trackFailedPIMElevation(
+        user.email,
+        clientIp,
+        userRole,
+        'Invalid password'
+      );
+
+      // Also log to pim_elevation_log for audit trail
+      await insertPimElevationLog(env.DB, {
+        email: user.email,
+        role: userRole,
+        action: 'failed_elevate' as any, // Add new action type
+        expires_at: null,
+      });
+
       return new Response(JSON.stringify({
         error: 'Invalid password',
         success: false

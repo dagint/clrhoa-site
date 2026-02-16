@@ -37,6 +37,7 @@ import { checkRateLimit } from '../../../lib/rate-limit';
 import { createLucia } from '../../../lib/lucia';
 import { getUserByEmail } from '../../../lib/db';
 import { getResendClient } from '../../../lib/resend-client';
+import { verifyCsrfToken } from '../../../lib/auth';
 import type { AuthenticatedUser } from '../../../types/auth';
 
 // Password validation constants
@@ -48,6 +49,8 @@ interface ChangePasswordRequest {
   newPassword: string;
   newPasswordConfirm: string;
   revokeOtherSessions?: boolean; // Optional: revoke all other sessions
+  csrf_token?: string;
+  csrfToken?: string;
 }
 
 interface ChangePasswordResponse {
@@ -112,6 +115,14 @@ export const POST: APIRoute = async ({ request, locals, cookies }) => {
     }
 
     const { currentPassword, newPassword, newPasswordConfirm, revokeOtherSessions = false } = body;
+
+    // CSRF token verification
+    if (!verifyCsrfToken(session as any, body.csrf_token ?? body.csrfToken)) {
+      return new Response(
+        JSON.stringify({ success: false, message: 'Invalid security token' } satisfies ChangePasswordResponse),
+        { status: 403, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
 
     // Validate required fields
     if (!currentPassword || !newPassword || !newPasswordConfirm) {

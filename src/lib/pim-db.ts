@@ -32,7 +32,7 @@ export async function listPimElevationLog(
 
 export async function insertPimElevationLog(
   db: D1Database,
-  params: { email: string; role: string; action: 'elevate' | 'drop'; expires_at?: string | null }
+  params: { email: string; role: string; action: 'elevate' | 'drop' | 'failed_elevate'; expires_at?: string | null }
 ): Promise<void> {
   await db
     .prepare(

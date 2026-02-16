@@ -77,15 +77,13 @@ if (Astro.request.method === 'POST') {
       headers: { 'Content-Type': 'application/json' },
     });
   }
-  // CSRF token verification - session from middleware doesn't have csrfToken in the same format
-  // Skipping for now as session is already validated by middleware
-  // TODO: Implement proper CSRF token handling with Lucia sessions
-  // if (!verifyCsrfToken(session as any, body.csrf_token ?? body.csrfToken)) {
-  //   return new Response(JSON.stringify({ error: 'Invalid security token.' }), {
-  //     status: 403,
-  //     headers: { 'Content-Type': 'application/json' },
-  //   });
-  // }
+  // CSRF token verification
+  if (!verifyCsrfToken(session as any, body.csrf_token ?? body.csrfToken)) {
+    return new Response(JSON.stringify({ error: 'Invalid security token.' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
   const emailRaw = body.email?.trim();
   if (!emailRaw) {
     return new Response(JSON.stringify({ error: 'Email is required when adding a user.' }), {
@@ -142,15 +140,13 @@ if (Astro.request.method === 'PUT') {
       headers: { 'Content-Type': 'application/json' },
     });
   }
-  // CSRF token verification - session from middleware doesn't have csrfToken in the same format
-  // Skipping for now as session is already validated by middleware
-  // TODO: Implement proper CSRF token handling with Lucia sessions
-  // if (!verifyCsrfToken(session as any, body.csrf_token ?? body.csrfToken)) {
-  //   return new Response(JSON.stringify({ error: 'Invalid security token.' }), {
-  //     status: 403,
-  //     headers: { 'Content-Type': 'application/json' },
-  //   });
-  // }
+  // CSRF token verification
+  if (!verifyCsrfToken(session as any, body.csrf_token ?? body.csrfToken)) {
+    return new Response(JSON.stringify({ error: 'Invalid security token.' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
   const id = (body.id ?? '').trim();
   if (!id) {
     return new Response(JSON.stringify({ error: 'id is required.' }), {
@@ -230,15 +226,13 @@ if (Astro.request.method === 'DELETE') {
       headers: { 'Content-Type': 'application/json' },
     });
   }
-  // CSRF token verification - session from middleware doesn't have csrfToken in the same format
-  // Skipping for now as session is already validated by middleware
-  // TODO: Implement proper CSRF token handling with Lucia sessions
-  // if (!verifyCsrfToken(session as any, body.csrf_token ?? body.csrfToken)) {
-  //   return new Response(JSON.stringify({ error: 'Invalid security token.' }), {
-  //     status: 403,
-  //     headers: { 'Content-Type': 'application/json' },
-  //   });
-  // }
+  // CSRF token verification
+  if (!verifyCsrfToken(session as any, body.csrf_token ?? body.csrfToken)) {
+    return new Response(JSON.stringify({ error: 'Invalid security token.' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
   const ids = Array.isArray(body.ids) ? body.ids : (body.id ? [body.id.trim()] : []);
   const trimmed = ids.map((x) => (typeof x === 'string' ? x.trim() : '')).filter(Boolean);
   if (trimmed.length === 0) {

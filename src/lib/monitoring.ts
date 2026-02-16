@@ -4,7 +4,7 @@
  */
 
 export interface SecurityEvent {
-  type: 'failed_login' | 'csrf_failure' | 'rate_limit' | 'unauthorized_access' | 'file_upload_failure' | 'api_error';
+  type: 'failed_login' | 'csrf_failure' | 'rate_limit' | 'unauthorized_access' | 'file_upload_failure' | 'api_error' | 'failed_pim_elevation';
   severity: 'low' | 'medium' | 'high' | 'critical';
   endpoint: string;
   email?: string;
@@ -144,6 +144,25 @@ export class SecurityMonitor {
         reason,
         fileName: fileInfo?.name,
         fileSize: fileInfo?.size,
+      },
+    });
+  }
+
+  /**
+   * Track failed PIM elevation attempt.
+   * This indicates a potential unauthorized privilege escalation attempt.
+   */
+  trackFailedPIMElevation(email: string, ipAddress: string | null, role: string, reason: string): void {
+    this.logEvent({
+      type: 'failed_pim_elevation',
+      severity: 'high',
+      endpoint: '/api/pim/elevate',
+      email,
+      ipAddress: ipAddress || undefined,
+      details: {
+        reason,
+        role,
+        message: 'Failed PIM elevation attempt',
       },
     });
   }

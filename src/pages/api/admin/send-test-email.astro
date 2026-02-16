@@ -26,9 +26,16 @@ if (!verifyOrigin(origin, referer, Astro.url.origin)) {
   return new Response(JSON.stringify({ error: 'Invalid origin.' }), { status: 403, headers: { 'Content-Type': 'application/json' } });
 }
 
+// Get user agent and IP for session fingerprinting
+const userAgent = Astro.request.headers.get('user-agent') ?? null;
+const ipAddress = Astro.request.headers.get('cf-connecting-ip') ??
+  Astro.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
+
 const session = await getSessionFromCookie(
   Astro.request.headers.get('cookie') ?? undefined,
-  env?.SESSION_SECRET
+  env?.SESSION_SECRET,
+  userAgent,
+  ipAddress
 );
 if (!session) {
   return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
