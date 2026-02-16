@@ -5,25 +5,34 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie, isElevatedRole, getEffectiveRole } from '../../lib/auth';
+import { getEffectiveRole, isElevatedRole } from '../../lib/auth';
 import { listOwners, getPhonesArray, insertDirectoryExportLog } from '../../lib/directory-db';
 import { escapeCsv } from '../../lib/csv-utils';
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
-const session = await getSessionFromCookie(
-  Astro.request.headers.get('cookie') ?? undefined,
-  env?.SESSION_SECRET
-);
+const user = Astro.locals.user;
+const session = Astro.locals.session;
 
-if (!session) {
+console.log('[DIRECTORY-EXPORT] Auth check:', {
+  hasUser: !!user,
+  hasSession: !!session,
+  sessionAssumedRole: (session as any)?.assumed_role,
+});
+
+if (!session || !user) {
+  console.log('[DIRECTORY-EXPORT] Unauthorized - missing session or user');
   return new Response(JSON.stringify({ error: 'Unauthorized' }), {
     status: 401,
     headers: { 'Content-Type': 'application/json' },
   });
 }
 
-if (!isElevatedRole(getEffectiveRole(session))) {
+const effectiveRole = getEffectiveRole(session as any);
+console.log('[DIRECTORY-EXPORT] Effective role:', effectiveRole);
+
+if (!isElevatedRole(effectiveRole)) {
+  console.log('[DIRECTORY-EXPORT] Forbidden - not elevated role');
   return new Response(JSON.stringify({ error: 'Forbidden' }), {
     status: 403,
     headers: { 'Content-Type': 'application/json' },
@@ -52,7 +61,7 @@ const csv = header + rows.join('\n');
 
 // Log once for this export (not per user)
 const clientIp = Astro.clientAddress || Astro.request.headers.get('cf-connecting-ip') || null;
-await insertDirectoryExportLog(db, session.email, getEffectiveRole(session), clientIp);
+await insertDirectoryExportLog(db, user.email, effectiveRole, clientIp);
 
 const filename = `directory-export-${new Date().toISOString().slice(0, 10)}.csv`;
 return new Response(csv, {
