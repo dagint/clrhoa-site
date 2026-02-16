@@ -142,12 +142,12 @@ const csrfToken = session?.csrfToken ?? '';
                 <dd class="font-mono">${data.summary.originCheck}</dd>
               </div>
               <div class="flex justify-between">
-                <dt class="text-gray-600">Session (no fingerprint):</dt>
-                <dd class="font-mono">${data.summary.sessionNoFingerprint}</dd>
+                <dt class="text-gray-600">Lucia Session (D1):</dt>
+                <dd class="font-mono">${data.summary.luciaSession}</dd>
               </div>
               <div class="flex justify-between">
-                <dt class="text-gray-600">Session (with fingerprint):</dt>
-                <dd class="font-mono">${data.summary.sessionWithFingerprint}</dd>
+                <dt class="text-gray-600">Middleware Session:</dt>
+                <dd class="font-mono">${data.summary.middlewareSession}</dd>
               </div>
               <div class="flex justify-between">
                 <dt class="text-gray-600">Effective Role:</dt>
