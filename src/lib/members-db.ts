@@ -81,41 +81,56 @@ export async function listAllMembers(
       FROM owners o
       LEFT JOIN users u ON o.email = u.email
     )
-    ORDER BY address ASC, name ASC
+    ORDER BY
+      CASE WHEN address IS NULL THEN 1 ELSE 0 END,
+      address ASC,
+      name ASC
     LIMIT ? OFFSET ?
   `;
 
-  const result = await db.prepare(query).bind(limit, offset).all<{
-    email: string;
-    name: string | null;
-    userId: string | null;
-    accountStatus: string | null;
-    role: string | null;
-    user_created_at: string | null;
-    ownerId: string | null;
-    address: string | null;
-    lot_number: string | null;
-    phone: string | null;
-    phones: string | null;
-    owner_created_at: string | null;
-  }>();
+  try {
+    const result = await db.prepare(query).bind(limit, offset).all<{
+      email: string;
+      name: string | null;
+      userId: string | null;
+      accountStatus: string | null;
+      role: string | null;
+      user_created_at: string | null;
+      ownerId: string | null;
+      address: string | null;
+      lot_number: string | null;
+      phone: string | null;
+      phones: string | null;
+      owner_created_at: string | null;
+    }>();
 
-  return (result.results || []).map(row => ({
-    email: row.email,
-    name: row.name,
-    hasAccount: !!row.userId,
-    accountStatus: row.accountStatus as 'active' | 'pending_setup' | 'suspended' | null,
-    role: row.role,
-    userId: row.userId,
-    inDirectory: !!row.ownerId,
-    ownerId: row.ownerId,
-    address: row.address,
-    lot_number: row.lot_number,
-    phone: row.phone,
-    phones: row.phones,
-    created_at: row.user_created_at || row.owner_created_at,
-    updated_at: null, // TODO: Add updated_at columns to tables if needed
-  }));
+    if (!result.success) {
+      console.error('[MEMBERS-DB] Query failed:', result.error);
+      throw new Error(`Database query failed: ${result.error || 'Unknown error'}`);
+    }
+
+    return (result.results || []).map(row => ({
+      email: row.email,
+      name: row.name,
+      hasAccount: !!row.userId,
+      accountStatus: row.accountStatus as 'active' | 'pending_setup' | 'suspended' | null,
+      role: row.role,
+      userId: row.userId,
+      inDirectory: !!row.ownerId,
+      ownerId: row.ownerId,
+      address: row.address,
+      lot_number: row.lot_number,
+      phone: row.phone,
+      phones: row.phones,
+      created_at: row.user_created_at || row.owner_created_at,
+      updated_at: null, // TODO: Add updated_at columns to tables if needed
+    }));
+  } catch (error) {
+    console.error('[MEMBERS-DB] listAllMembers error:', error);
+    console.error('[MEMBERS-DB] Query:', query);
+    console.error('[MEMBERS-DB] Params:', { limit, offset });
+    throw error;
+  }
 }
 
 /**
