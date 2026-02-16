@@ -196,6 +196,60 @@ export async function listHouseholdMembersWithLogin(
     .sort((a, b) => (a.name ?? a.email).localeCompare(b.name ?? b.email));
 }
 
+/**
+ * List ALL household members (directory entries) at the same address as current user.
+ * Includes members regardless of whether they have portal accounts.
+ * Returns name, email (if available), and whether they have a portal account.
+ */
+export async function listAllHouseholdMembers(
+  db: D1Database,
+  currentUserEmail: string
+): Promise<Array<{ name: string | null; email: string | null; hasAccount: boolean; is_primary: number }>> {
+  const current = currentUserEmail.trim().toLowerCase();
+  const owner = await getOwnerByEmail(db, current);
+  if (!owner?.address?.trim()) return [];
+
+  const key = normalizeAddress(owner.address);
+  const owners = await listOwners(db);
+  const atAddress = owners.filter((o) => normalizeAddress(o.address) === key);
+
+  // Get current user's email to exclude them
+  const othersAtAddress = atAddress.filter((o) => {
+    const e = o.email?.trim()?.toLowerCase();
+    return !e || e !== current; // Include entries without email OR different email
+  });
+
+  if (othersAtAddress.length === 0) return [];
+
+  // Check which ones have accounts
+  const emailsToCheck = othersAtAddress
+    .map((o) => o.email?.trim()?.toLowerCase())
+    .filter((e): e is string => !!e);
+
+  let hasLoginSet = new Set<string>();
+  if (emailsToCheck.length > 0) {
+    const placeholders = emailsToCheck.map(() => '?').join(',');
+    const { results: userRows } = await db
+      .prepare(`SELECT email FROM users WHERE email IN (${placeholders})`)
+      .bind(...emailsToCheck)
+      .all<{ email: string }>();
+    hasLoginSet = new Set((userRows ?? []).map((r) => r.email?.toLowerCase()).filter(Boolean));
+  }
+
+  return othersAtAddress
+    .map((o) => ({
+      name: o.name?.trim() ?? null,
+      email: o.email?.trim()?.toLowerCase() ?? null,
+      hasAccount: o.email ? hasLoginSet.has(o.email.trim().toLowerCase()) : false,
+      is_primary: (o.is_primary ?? 1) === 1 ? 1 : 0,
+    }))
+    .sort((a, b) => {
+      const aName = a.name || a.email || '';
+      const bName = b.name || b.email || '';
+      return aName.localeCompare(bName);
+    });
+}
+
 /** Count owners added in the last N days. Requires created_at column (run db:owners-created-at migration). Returns 0 if column missing. */
 export async function getRecentOwnersCount(db: D1Database, days: number): Promise<number> {
   try {

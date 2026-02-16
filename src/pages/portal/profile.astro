@@ -6,7 +6,7 @@ import PortalPage from '../../components/PortalPage.astro';
 import FormField from '../../components/FormField.astro';
 import { getPortalContext } from '../../lib/portal-context';
 import { getPortalBadgeCounts } from '../../lib/portal-badge-counts';
-import { getOwnerByEmail, getPhonesArray, listHouseholdMembersWithLogin } from '../../lib/directory-db';
+import { getOwnerByEmail, getPhonesArray, listAllHouseholdMembers } from '../../lib/directory-db';
 
 const { env, session, effectiveRole } = await getPortalContext(Astro);
 if (!session) return Astro.redirect('/auth/login');
@@ -28,7 +28,7 @@ const profileComplete =
 const requiredParam = Astro.url.searchParams.get('required') === '1';
 const startInEditMode = !profileComplete || requiredParam;
 
-const householdMembersWithLogin = db ? await listHouseholdMembersWithLogin(db, email) : [];
+const allHouseholdMembers = db ? await listAllHouseholdMembers(db, email) : [];
 ---
 
 <PortalLayout title="Profile | Member Portal | Crooked Lake Reserve HOA">
@@ -191,26 +191,33 @@ const householdMembersWithLogin = db ? await listHouseholdMembersWithLogin(db, e
         </form>
       </section>
 
-      <!-- Section: Household accounts (others at same address who can sign in) -->
+      <!-- Section: Household members (all directory entries at same address) -->
       <section aria-labelledby="profile-household-heading" class="mb-10">
-        <h2 id="profile-household-heading" class="text-2xl font-heading font-semibold text-clr-green mb-4">Household accounts</h2>
+        <h2 id="profile-household-heading" class="text-2xl font-heading font-semibold text-clr-green mb-4">Household members</h2>
         <div class="bg-white rounded-2xl shadow-sm border border-gray-100 portal-theme-card p-6 sm:p-8">
           <p class="text-base text-gray-600 mb-4 leading-relaxed">
-            Other people at your property address who are in the directory and have portal sign-in. You can see who else can log in here; each person manages their own account from My account.
+            Other people at your property address who are listed in the directory. Members with portal accounts can log in and manage their own profile.
           </p>
-          {householdMembersWithLogin.length === 0 ? (
-            <p class="text-base text-gray-500">No other household members with portal access at your address. Only directory entries with the same property address who have a portal account appear here.</p>
+          {allHouseholdMembers.length === 0 ? (
+            <p class="text-base text-gray-500">No other household members in the directory at your address.</p>
           ) : (
             <ul class="space-y-4" role="list">
-              {householdMembersWithLogin.map((m) => (
+              {allHouseholdMembers.map((m) => (
                 <li class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 py-3 border-b border-gray-100 last:border-b-0 last:pb-0">
                   <div>
-                    <span class="font-semibold text-gray-900 text-base">{m.name || 'No name'}</span>
+                    <span class="font-semibold text-gray-900 text-base">{m.name || m.email || 'No name'}</span>
                     {m.is_primary === 1 && (
                       <span class="ml-2 text-sm text-gray-500">Primary contact</span>
                     )}
+                    {!m.hasAccount && (
+                      <span class="ml-2 text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded">No portal account</span>
+                    )}
                   </div>
-                  <span class="text-base text-gray-600">{m.email}</span>
+                  {m.email ? (
+                    <span class="text-base text-gray-600">{m.email}</span>
+                  ) : (
+                    <span class="text-sm text-gray-400 italic">No email on file</span>
+                  )}
                 </li>
               ))}
             </ul>
