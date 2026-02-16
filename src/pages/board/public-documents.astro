@@ -21,6 +21,15 @@ const { email, role, name } = session;
 const badges = await getPortalBadgeCounts(db, email, role, name);
 const docs = db ? await listPublicDocuments(db) : [];
 
+console.log('[PUBLIC-DOCS-PAGE] Loaded documents:', docs.map(d => ({
+  slug: d.slug,
+  title: d.title,
+  hasFileKey: !!d.file_key,
+  file_key: d.file_key,
+  updated_at: d.updated_at,
+  updated_by_email: d.updated_by_email
+})));
+
 
 function canEdit(slug: string): boolean {
   if (BOARD_ONLY_SLUGS.includes(slug as typeof BOARD_ONLY_SLUGS[number])) return isBoard;
