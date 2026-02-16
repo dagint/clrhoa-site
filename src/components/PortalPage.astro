@@ -47,6 +47,7 @@ const {
 const session = Astro.locals.session;
 const sessionElevatedUntil = (session as any)?.elevated_until;
 const sessionAssumedRole = (session as any)?.assumed_role;
+const csrfToken = (session as any)?.csrfToken || '';
 
 // Use prop if provided, otherwise check session
 const actualElevatedUntil = elevatedUntil ?? sessionElevatedUntil ?? null;
@@ -85,7 +86,7 @@ const showPimBanner = actualElevatedUntil && actualElevatedUntil > now;
     <!-- Position below fixed header (h-16 = 64px) -->
     {showPimBanner && (
       <div class="mt-16">
-        <PimElevationBanner elevatedUntil={actualElevatedUntil!} role={effectiveRole} elevatedRole={elevatedRole} />
+        <PimElevationBanner elevatedUntil={actualElevatedUntil!} role={effectiveRole} elevatedRole={elevatedRole} csrfToken={csrfToken} />
       </div>
     )}
 

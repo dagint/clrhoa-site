@@ -22,6 +22,7 @@ if (!session) return Astro.redirect('/auth/login');
 
 const { email, role, name } = session;
 const db = env?.DB;
+const csrfToken = session.csrfToken || '';
 
 // Use session name when set; otherwise fall back to directory (owner) name
 let displayName = name?.trim() || null;
@@ -131,7 +132,7 @@ const showActionNeededBanner = showActionFeedback || showActionMaintenance || sh
           <!-- PIM Elevation Banner -->
           {showPimBanner && (
             <div class="mb-6">
-              <PimElevationBanner elevatedUntil={session.elevated_until!} role={effectiveRole} elevatedRole={elevatedRole} />
+              <PimElevationBanner elevatedUntil={session.elevated_until!} role={effectiveRole} elevatedRole={elevatedRole} csrfToken={csrfToken} />
             </div>
           )}
 

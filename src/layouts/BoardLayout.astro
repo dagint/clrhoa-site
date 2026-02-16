@@ -35,12 +35,13 @@ const showPimBanner = typeof elevatedUntil === 'number' && elevatedUntil > Date.
 // Determine the elevated role to display
 // If assumed_role is set (for admin/arb_board), use that; otherwise use role
 const elevatedRole = session?.assumed_role || role;
+const csrfToken = session?.csrfToken || '';
 ---
 
 <PortalLayout title={`${title} | Board | Member Portal | Crooked Lake Reserve HOA`}>
   <ProtectedPage>
     <div class="min-h-screen portal-theme-bg font-body">
-      {showPimBanner && <PimElevationBanner elevatedUntil={elevatedUntil!} role={role} elevatedRole={elevatedRole} />}
+      {showPimBanner && <PimElevationBanner elevatedUntil={elevatedUntil!} role={role} elevatedRole={elevatedRole} csrfToken={csrfToken} />}
       <PortalNav currentPath={currentPath} draftCount={draftCount} role={role} staffRole={session?.role ?? role} />
       {showRoleBanner && <PortalElevatedRoleBanner role={role} session={session} />}
       {role === 'admin' ? <AdminNav currentPath={currentPath} /> : role === 'arb' ? <ArbNav currentPath={currentPath} /> : <BoardNav currentPath={currentPath} />}
