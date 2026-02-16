@@ -153,10 +153,10 @@ function canRevealContact(owner: { share_contact_with_members?: number | null })
               <tr>
                 <th scope="col" class="px-6 py-4 text-left text-sm font-semibold text-gray-700 uppercase tracking-wider">Name</th>
                 <th scope="col" class="px-6 py-4 text-left text-sm font-semibold text-gray-700 uppercase tracking-wider">Role</th>
-                <th scope="col" class="px-6 py-4 text-left text-sm font-semibold text-gray-700 uppercase tracking-wider">Lot #</th>
                 <th scope="col" class="px-6 py-4 text-left text-sm font-semibold text-gray-700 uppercase tracking-wider">Address</th>
                 <th scope="col" class="px-6 py-4 text-left text-sm font-semibold text-gray-700 uppercase tracking-wider">Phone</th>
                 <th scope="col" class="px-6 py-4 text-left text-sm font-semibold text-gray-700 uppercase tracking-wider">Email</th>
+                <th scope="col" class="px-6 py-4 text-left text-sm font-semibold text-gray-700 uppercase tracking-wider">Lot #</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-100 bg-white">
@@ -174,7 +174,6 @@ function canRevealContact(owner: { share_contact_with_members?: number | null })
                       <span class="text-gray-400">-</span>
                     )}
                   </td>
-                  <td class="px-6 py-4 text-gray-700 text-base">{owner.lot_number ?? '-'}</td>
                   <td class="px-6 py-4 text-gray-700 text-base">{owner.address ?? '-'}</td>
                   <td class="px-6 py-4">
                     {canRevealContact(owner) ? (
@@ -208,6 +207,7 @@ function canRevealContact(owner: { share_contact_with_members?: number | null })
                       <span class="text-gray-400 text-sm italic">Not shared</span>
                     )}
                   </td>
+                  <td class="px-6 py-4 text-gray-700 text-base">{owner.lot_number ?? '-'}</td>
                 </tr>
                 );
               })}
