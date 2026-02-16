@@ -14,6 +14,7 @@
 
 import type { APIContext } from 'astro';
 import { insertPimElevationLog } from '../../../lib/pim-db';
+import { verifyCsrfToken } from '../../../lib/auth';
 
 export const prerender = false;
 
@@ -43,6 +44,25 @@ export async function POST(context: APIContext): Promise<Response> {
   if (!elevatedRoles.includes(userRole)) {
     return new Response(JSON.stringify({
       error: 'Your account does not have elevated access privileges',
+      success: false
+    }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  // CSRF token verification
+  let body: { csrf_token?: string; csrfToken?: string };
+  try {
+    body = await context.request.json();
+  } catch {
+    // Empty body is OK for extend operation
+    body = {};
+  }
+
+  if (!verifyCsrfToken(session as any, body.csrf_token ?? body.csrfToken)) {
+    return new Response(JSON.stringify({
+      error: 'Invalid security token',
       success: false
     }), {
       status: 403,
