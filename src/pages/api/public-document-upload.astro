@@ -77,10 +77,27 @@ if (!slug || !isManagedPublicDocSlug(slug)) {
 
 // Get effective role considering PIM elevation and assumed roles
 // The session from Astro.locals includes database attributes (assumed_role, elevated_until)
+console.log('[PUBLIC-DOC] Session data:', {
+  userId: (session as any).userId,
+  elevated_until: (session as any).elevated_until,
+  assumed_role: (session as any).assumed_role,
+  assumed_until: (session as any).assumed_until
+});
+console.log('[PUBLIC-DOC] User role:', user.role);
+
 const effectiveRole = getEffectiveRole(session as any);
+console.log('[PUBLIC-DOC] Effective role:', effectiveRole);
+
 const isBoard = effectiveRole === 'board' || effectiveRole === 'admin' || effectiveRole === 'arb_board';
 const canEditBoardDocs = isBoard;
 const canEditArbForm = isBoard || effectiveRole === 'arb';
+
+console.log('[PUBLIC-DOC] Permissions:', {
+  effectiveRole,
+  isBoard,
+  canEditBoardDocs,
+  canEditArbForm
+});
 
 const allowedBoard = BOARD_ONLY_SLUGS.includes(slug as typeof BOARD_ONLY_SLUGS[number]);
 const isArbForm = slug === ARB_FORM_SLUG;
