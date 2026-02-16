@@ -104,7 +104,7 @@ test.describe('Route Access Control', () => {
         '/portal/admin',
         '/portal/board',
         '/portal/arb',
-        '/board/directory',
+        '/board/members',
       ];
 
       for (const path of routesToTest) {

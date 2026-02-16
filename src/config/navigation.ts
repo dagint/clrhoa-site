@@ -125,7 +125,7 @@ export const adminLinks: NavLink[] = [
   { label: 'Site usage', href: '/portal/admin/usage' },
   { label: 'Audit logs', href: '/portal/admin/audit-logs' },
   { label: 'Permissions', href: '/portal/admin/permissions' },
-  { label: 'Users', href: '/portal/admin/users' },
+  { label: 'Members', href: '/board/members' },
   { label: 'Compliance', href: '/board/compliance' },
   { label: 'Vendors', href: '/portal/admin/vendors' },
   { label: 'Maintenance', href: '/portal/admin/maintenance' },
@@ -138,11 +138,11 @@ export const adminLinks: NavLink[] = [
 
 // ─── Board only ─────────────────────────────────────────────────────
 
-/** Board-only nav: board dashboard, ARB dashboard, directory, dues, vendors, meetings, maintenance, feedback, contacts, news, library, documents, audit logs, backups. */
+/** Board-only nav: board dashboard, ARB dashboard, members, dues, vendors, meetings, maintenance, feedback, contacts, news, library, documents, audit logs, backups. */
 export const boardLinks: NavLink[] = [
   { label: 'Board', href: '/portal/board' },
   { label: 'ARB Dashboard', href: '/portal/arb-dashboard' },
-  { label: 'Directory', href: '/board/directory' },
+  { label: 'Members', href: '/board/members' },
   { label: 'Dues', href: '/board/assessments' },
   { label: 'Vendors', href: '/board/vendors' },
   { label: 'Meetings', href: '/board/meetings' },

@@ -63,7 +63,7 @@ test.describe('API Access Control', () => {
       const sessionCookie = await getSessionCookieValue(page);
 
       // Make API request
-      const response = await page.request.get('/api/board/directory', {
+      const response = await page.request.get('/api/members', {
         headers: {
           Cookie: `clrhoa_session=${sessionCookie}`,
         },
@@ -83,7 +83,7 @@ test.describe('API Access Control', () => {
       const sessionCookie = await getSessionCookieValue(page);
 
       // Make API request
-      const response = await page.request.get('/api/board/directory', {
+      const response = await page.request.get('/api/members', {
         headers: {
           Cookie: `clrhoa_session=${sessionCookie}`,
         },
@@ -143,7 +143,7 @@ test.describe('API Access Control', () => {
       // Try to access protected API without session cookie
       const endpoints = [
         '/api/admin/feedback',
-        '/api/board/directory',
+        '/api/members',
         '/api/arb/requests',
       ];
 

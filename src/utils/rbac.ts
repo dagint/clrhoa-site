@@ -181,7 +181,7 @@ export const PROTECTED_ROUTES: RouteMetadata[] = [
 
   // Board routes
   { path: '/portal/board', allowedRoles: ['board', 'arb_board'], description: 'Board landing zone' },
-  { path: '/board/directory', allowedRoles: ['board', 'arb_board'], description: 'Member directory (full access)' },
+  { path: '/board/members', allowedRoles: ['board', 'arb_board'], description: 'Member management (accounts & directory)' },
   { path: '/board/assessments', allowedRoles: ['board'], description: 'Dues payment tracking and recording' },
   { path: '/board/vendors', allowedRoles: ['board', 'arb', 'arb_board'], description: 'Vendor management and approvals' },
   { path: '/board/meetings', allowedRoles: ['board', 'arb', 'arb_board'], description: 'Meeting management and minutes' },
