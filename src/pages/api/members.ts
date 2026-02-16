@@ -12,7 +12,6 @@ import { getMemberByEmail, listAllMembers } from '../../lib/members-db';
 import { getEffectiveRole, isElevatedRole, VALID_ROLES } from '../../lib/auth';
 import { insertOwner, updateOwner, deleteOwners } from '../../lib/directory-db';
 import { setLoginWhitelistRole, removeFromLoginWhitelistUnlessAdmin } from '../../lib/auth';
-import { generateId } from '../../lib/id';
 
 export const prerender = false;
 
@@ -152,7 +151,6 @@ export const POST: APIRoute = async ({ request, locals }) => {
     }
 
     // Create user account if requested (sets up in KV whitelist for password setup)
-    let userId: string | null = null;
     if (createAccount && kv) {
       await setLoginWhitelistRole(kv, email, role);
       // User will appear in users table after they set their password

@@ -33,7 +33,6 @@ import { logSecurityEvent } from '../../../lib/audit-log';
 import { generateResetToken, sendResetEmail } from '../../../lib/auth/reset-tokens';
 import { getResendClient } from '../../../lib/resend-client';
 import crypto from 'node:crypto';
-import type { ResendClient } from '../../../types/resend';
 
 /**
  * Simple email validation regex.
@@ -190,7 +189,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
           console.error('[FORGOT-PASSWORD] Failed to auto-create user:', error);
           await logSecurityEvent(db, {
             eventType: 'forgot_password_auto_create_failed',
-            severity: 'error',
+            severity: 'critical',
             details: {
               email: normalizedEmail,
               error: error instanceof Error ? error.message : 'Unknown',
