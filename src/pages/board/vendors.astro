@@ -86,7 +86,6 @@ function parseFiles(filesJson: string | null): { name: string; key: string }[] {
   >
     <AdminNav currentPath="/board/vendors" />
 
-unt}
 <div id="csrf-holder" class="hidden" data-csrf={escapeHtml(session.csrfToken ?? '')} aria-hidden="true"></div>
   <div id="vendors-message" class="hidden mb-4 p-4 rounded-xl border" role="status" aria-live="polite" aria-atomic="true"></div>
       {pendingSubmissions.length > 0 && (
