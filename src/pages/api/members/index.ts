@@ -8,10 +8,10 @@
  */
 
 import type { APIRoute } from 'astro';
-import { getMemberByEmail, listAllMembers } from '../../lib/members-db';
-import { getEffectiveRole, isElevatedRole, VALID_ROLES } from '../../lib/auth';
-import { insertOwner, updateOwner, deleteOwners } from '../../lib/directory-db';
-import { setLoginWhitelistRole, removeFromLoginWhitelistUnlessAdmin } from '../../lib/auth';
+import { getMemberByEmail, listAllMembers } from '../../../lib/members-db';
+import { getEffectiveRole, isElevatedRole, VALID_ROLES } from '../../../lib/auth';
+import { insertOwner, updateOwner, deleteOwners } from '../../../lib/directory-db';
+import { setLoginWhitelistRole, removeFromLoginWhitelistUnlessAdmin } from '../../../lib/auth';
 
 export const prerender = false;
 
@@ -57,7 +57,7 @@ export const GET: APIRoute = async ({ locals }) => {
   }
 };
 
-export const POST: APIRoute = async ({ request, locals }) => {
+export const POST: APIRoute = async ({ request, locals, clientAddress }) => {
   const user = locals.user;
   const session = locals.session;
 
@@ -84,6 +84,9 @@ export const POST: APIRoute = async ({ request, locals }) => {
       headers: { 'Content-Type': 'application/json' },
     });
   }
+
+  // Get client IP for audit logging
+  const clientIp = clientAddress || request.headers.get('cf-connecting-ip') || 'unknown';
 
   let body: {
     email: string;
@@ -146,7 +149,12 @@ export const POST: APIRoute = async ({ request, locals }) => {
           lot_number: body.lot_number?.trim() || null,
           phone: body.phone?.trim() || null,
         },
-        user.email
+        user.email,
+        {
+          ip_address: clientIp,
+          role: effectiveRole,
+          operation_type: 'manual',
+        }
       );
     }
 
@@ -183,7 +191,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
   }
 };
 
-export const PUT: APIRoute = async ({ request, locals }) => {
+export const PUT: APIRoute = async ({ request, locals, clientAddress }) => {
   const user = locals.user;
   const session = locals.session;
 
@@ -210,6 +218,9 @@ export const PUT: APIRoute = async ({ request, locals }) => {
       headers: { 'Content-Type': 'application/json' },
     });
   }
+
+  // Get client IP for audit logging
+  const clientIp = clientAddress || request.headers.get('cf-connecting-ip') || 'unknown';
 
   let body: {
     email: string;
@@ -257,7 +268,12 @@ export const PUT: APIRoute = async ({ request, locals }) => {
           lot_number: body.lot_number?.trim() || member.lot_number,
           phone: body.phone?.trim() || member.phone,
         },
-        user.email
+        user.email,
+        {
+          ip_address: clientIp,
+          role: effectiveRole,
+          operation_type: 'manual',
+        }
       );
     }
 
@@ -288,7 +304,7 @@ export const PUT: APIRoute = async ({ request, locals }) => {
   }
 };
 
-export const DELETE: APIRoute = async ({ request, locals }) => {
+export const DELETE: APIRoute = async ({ request, locals, clientAddress }) => {
   const user = locals.user;
   const session = locals.session;
 
@@ -315,6 +331,9 @@ export const DELETE: APIRoute = async ({ request, locals }) => {
       headers: { 'Content-Type': 'application/json' },
     });
   }
+
+  // Get client IP for audit logging
+  const clientIp = clientAddress || request.headers.get('cf-connecting-ip') || 'unknown';
 
   let body: { email: string };
   try {
@@ -345,7 +364,11 @@ export const DELETE: APIRoute = async ({ request, locals }) => {
 
     // Delete from directory if exists
     if (member.inDirectory && member.ownerId) {
-      await deleteOwners(db, [member.ownerId]);
+      await deleteOwners(db, [member.ownerId], user.email, {
+        ip_address: clientIp,
+        role: effectiveRole,
+        operation_type: 'manual',
+      });
     }
 
     // Delete from users table if exists
