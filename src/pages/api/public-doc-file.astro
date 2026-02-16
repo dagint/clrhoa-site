@@ -8,7 +8,9 @@ export const prerender = false;
 import { getPublicDocument } from '../../lib/public-documents-db';
 
 const slug = Astro.url.searchParams.get('slug')?.trim()?.toLowerCase();
+console.log('[PUBLIC-DOC-FILE] Request for slug:', slug);
 if (!slug) {
+  console.log('[PUBLIC-DOC-FILE] Missing slug - returning 400');
   return new Response('Missing slug', { status: 400 });
 }
 
@@ -18,16 +20,22 @@ const db = env?.DB;
 const r2 = env?.CLOURHOA_FILES;
 
 if (!db || !r2) {
+  console.log('[PUBLIC-DOC-FILE] Missing db or r2 - returning 503');
   return new Response('Service unavailable', { status: 503 });
 }
 
 const row = await getPublicDocument(db, slug);
+console.log('[PUBLIC-DOC-FILE] Database result:', { slug, hasRow: !!row, file_key: row?.file_key, content_type: row?.content_type });
 if (!row?.file_key) {
+  console.log('[PUBLIC-DOC-FILE] No file_key in database - returning 404');
   return new Response('Not found', { status: 404 });
 }
 
+console.log('[PUBLIC-DOC-FILE] Fetching from R2:', row.file_key);
 const object = await r2.get(row.file_key);
+console.log('[PUBLIC-DOC-FILE] R2 result:', { hasObject: !!object, key: row.file_key });
 if (!object) {
+  console.log('[PUBLIC-DOC-FILE] Object not found in R2 - returning 404');
   return new Response('Not found', { status: 404 });
 }
 
