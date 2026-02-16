@@ -38,6 +38,7 @@ function isProfileComplete(
 const ELEVATED_API_PREFIXES = [
   '/api/admin',
   '/api/board',
+  '/api/members',
   '/api/owners',
   '/api/meetings',
   '/api/maintenance-update',
