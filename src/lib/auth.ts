@@ -120,7 +120,7 @@ export function isArbRole(role: string): boolean {
  * For admin and arb_board: if assumed_role is set and not expired, returns that role (board or arb)
  * so they act in one capacity at a time; otherwise returns session role (admin or arb_board).
  */
-export function getEffectiveRole(session: SessionPayload | null): string {
+export function getEffectiveRole(session: SessionPayload | { role?: string; elevated_until?: number | null; assumed_role?: string | null; assumed_until?: number | null } | null): string {
   if (!session) return 'member';
   const role = session.role?.toLowerCase() ?? 'member';
   if (!ELEVATED_ROLES.has(role)) return session.role ?? 'member';
@@ -559,7 +559,7 @@ export async function createSessionCookieValue(
  * Verify CSRF token from request header or body against session.
  */
 export function verifyCsrfToken(
-  session: SessionPayload | null,
+  session: SessionPayload | { csrfToken?: string } | null,
   token: string | null | undefined
 ): boolean {
   if (!session || !token) return false;

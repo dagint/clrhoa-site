@@ -18,7 +18,7 @@ import {
 } from './lib/auth/middleware';
 import { getOwnerByEmail, getPhonesArray } from './lib/directory-db';
 import { generateCorrelationId } from './lib/logging';
-import { getUserEmail, getUserRole } from './types/auth';
+import { getUserEmail, getUserRole, type ExtendedSession } from './types/auth';
 import { hasRouteAccess, getAccessDeniedRedirect } from './utils/role-access';
 
 /** Admin accounts (e.g. service providers) are not required to have an address in the directory. */
@@ -151,7 +151,7 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
       }
 
       // Check PIM elevation status - gracefully downgrade to member access
-      const elevatedUntil = (session as any).elevated_until;
+      const elevatedUntil = (session as ExtendedSession).elevated_until;
       const now = Date.now();
       if (!elevatedUntil || elevatedUntil < now) {
         // User has elevated role but no active elevation - downgrade to member access
@@ -189,7 +189,7 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
       }
 
       // Check PIM elevation status - gracefully downgrade to member access
-      const elevatedUntil = (session as any).elevated_until;
+      const elevatedUntil = (session as ExtendedSession).elevated_until;
       const now = Date.now();
       if (!elevatedUntil || elevatedUntil < now) {
         // Admin needs active elevation - downgrade to member access
@@ -250,7 +250,7 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
         }
 
         // Check PIM elevation status
-        const elevatedUntil = (session as any).elevated_until;
+        const elevatedUntil = (session as ExtendedSession).elevated_until;
         const now = Date.now();
         if (!elevatedUntil || elevatedUntil < now) {
           // User has elevated role but no active elevation
@@ -299,7 +299,7 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
           return context.redirect(getRoleLandingZone(userRole));
         }
         // Check PIM elevation for admin - gracefully downgrade to member access
-        const elevatedUntil = (session as any).elevated_until;
+        const elevatedUntil = (session as ExtendedSession).elevated_until;
         const now = Date.now();
         if (!elevatedUntil || elevatedUntil < now) {
           return context.redirect('/portal/dashboard');
@@ -309,7 +309,7 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
           return context.redirect(getRoleLandingZone(userRole));
         }
         // Check PIM elevation for board - gracefully downgrade to member access
-        const elevatedUntil = (session as any).elevated_until;
+        const elevatedUntil = (session as ExtendedSession).elevated_until;
         const now = Date.now();
         if (!elevatedUntil || elevatedUntil < now) {
           return context.redirect('/portal/dashboard');
@@ -319,7 +319,7 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
           return context.redirect(getRoleLandingZone(userRole));
         }
         // Check PIM elevation for ARB - gracefully downgrade to member access
-        const elevatedUntil = (session as any).elevated_until;
+        const elevatedUntil = (session as ExtendedSession).elevated_until;
         const now = Date.now();
         if (!elevatedUntil || elevatedUntil < now) {
           return context.redirect('/portal/dashboard');
@@ -329,7 +329,7 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
           return context.redirect(getRoleLandingZone(userRole));
         }
         // Check PIM elevation for usage - gracefully downgrade to member access
-        const elevatedUntil = (session as any).elevated_until;
+        const elevatedUntil = (session as ExtendedSession).elevated_until;
         const now = Date.now();
         if (!elevatedUntil || elevatedUntil < now) {
           return context.redirect('/portal/dashboard');

@@ -5,6 +5,8 @@
  * Replaces usage of "any" types throughout the auth system.
  */
 
+import type { Session, User } from 'lucia';
+
 /**
  * Valid user roles in the system
  */
@@ -83,4 +85,65 @@ export function getUserRole(user: unknown): UserRole | null {
  */
 export function isValidRole(role: string): role is UserRole {
   return ['member', 'arb', 'board', 'arb_board', 'admin'].includes(role.toLowerCase());
+}
+
+/**
+ * PIM (Privileged Identity Management) session attributes
+ *
+ * These attributes are added to the session when a user elevates their privileges.
+ * They track when elevation expires and what role is assumed (for multi-role users).
+ */
+export interface PIMAttributes {
+  /** Timestamp (ms) when elevated access expires */
+  elevated_until: number | null;
+
+  /** For multi-role users (admin, arb_board): which specific role is currently assumed */
+  assumed_role: string | null;
+
+  /** Timestamp (ms) when role assumption started */
+  assumed_at: number | null;
+
+  /** Timestamp (ms) when role assumption expires */
+  assumed_until: number | null;
+}
+
+/**
+ * Extended Lucia session with custom attributes
+ *
+ * Lucia sessions are extended with:
+ * - PIM attributes for privilege elevation tracking
+ * - CSRF token for form security
+ * - Base user role for permission checks
+ */
+export interface ExtendedSession extends Session, PIMAttributes {
+  /** User's base role from the users table */
+  role: UserRole;
+
+  /** CSRF token for state-changing requests */
+  csrfToken: string;
+}
+
+/**
+ * Type guard to check if a session has PIM attributes
+ */
+export function hasPIMAttributes(session: Session | null | undefined): session is Session & PIMAttributes {
+  if (!session) return false;
+  return (
+    'elevated_until' in session ||
+    'assumed_role' in session ||
+    'assumed_at' in session ||
+    'assumed_until' in session
+  );
+}
+
+/**
+ * Type guard to check if a session is fully extended
+ */
+export function isExtendedSession(session: Session | null | undefined): session is ExtendedSession {
+  if (!session) return false;
+  return (
+    'role' in session &&
+    'csrfToken' in session &&
+    hasPIMAttributes(session)
+  );
 }
