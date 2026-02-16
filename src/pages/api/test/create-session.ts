@@ -69,7 +69,7 @@ export async function POST(context: APIContext): Promise<Response> {
     // Add role assumption if requested
     if (assumeRole) {
       const assumedAt = Date.now();
-      const assumedUntil = Date.now() + (2 * 60 * 60 * 1000); // 2 hours
+      const assumedUntil = Date.now() + (60 * 60 * 1000); // 1 hour
       await env.DB
         .prepare('UPDATE sessions SET assumed_role = ?, assumed_at = ?, assumed_until = ? WHERE id = ?')
         .bind(assumeRole, assumedAt, assumedUntil, session.id)

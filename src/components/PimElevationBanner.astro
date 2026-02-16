@@ -6,14 +6,22 @@
 interface Props {
   elevatedUntil: number;
   role?: string;
+  elevatedRole?: string;
 }
 
-const { elevatedUntil } = Astro.props;
+const { elevatedUntil, elevatedRole } = Astro.props;
+
+// Format role label for display
+const roleLabel = elevatedRole
+  ? elevatedRole === 'arb'
+    ? 'ARB'
+    : elevatedRole.charAt(0).toUpperCase() + elevatedRole.slice(1)
+  : 'elevated access';
 ---
 
 <div id="pim-elevation-banner" class="bg-amber-100 border-b border-amber-300 px-4 py-2 flex flex-wrap items-center justify-between gap-2" role="status" aria-live="polite" data-elevated-until={String(elevatedUntil)}>
   <span class="text-amber-900 text-sm font-medium">
-    <span id="pim-elevation-label">Elevated access</span>
+    <span id="pim-elevation-label">Elevated as {roleLabel}</span>
     <span id="pim-elevation-timer" class="ml-2 font-mono">—</span>
   </span>
   <div class="flex items-center gap-3">

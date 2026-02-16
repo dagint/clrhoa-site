@@ -46,9 +46,14 @@ const {
 // Get session from Astro.locals (set by middleware) to check elevation status
 const session = Astro.locals.session;
 const sessionElevatedUntil = (session as any)?.elevated_until;
+const sessionAssumedRole = (session as any)?.assumed_role;
 
 // Use prop if provided, otherwise check session
 const actualElevatedUntil = elevatedUntil ?? sessionElevatedUntil ?? null;
+
+// Determine the elevated role to display
+// If assumed_role is set (for admin/arb_board), use that; otherwise use effectiveRole
+const elevatedRole = sessionAssumedRole || effectiveRole;
 
 // Check if PIM elevation banner should be shown
 const now = Date.now();
@@ -80,7 +85,7 @@ const showPimBanner = actualElevatedUntil && actualElevatedUntil > now;
     <!-- Position below fixed header (h-16 = 64px) -->
     {showPimBanner && (
       <div class="mt-16">
-        <PimElevationBanner elevatedUntil={actualElevatedUntil!} role={effectiveRole} />
+        <PimElevationBanner elevatedUntil={actualElevatedUntil!} role={effectiveRole} elevatedRole={elevatedRole} />
       </div>
     )}
 
