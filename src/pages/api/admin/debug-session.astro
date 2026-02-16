@@ -1,0 +1,138 @@
+---
+/**
+ * POST /api/admin/debug-session — Debug endpoint to test session validation
+ *
+ * Tests session validation with fingerprinting and shows detailed diagnostic info.
+ * Admin only. Remove this endpoint after debugging is complete.
+ */
+export const prerender = false;
+
+import { getSessionFromCookie, verifyCsrfToken, verifyOrigin, getEffectiveRole } from '../../../lib/auth';
+import { isElevatedRole } from '../../../lib/auth';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+
+if (Astro.request.method !== 'POST') {
+  return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+    status: 405,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+// Get request details
+const userAgent = Astro.request.headers.get('user-agent') ?? null;
+const ipAddress = Astro.request.headers.get('cf-connecting-ip') ??
+  Astro.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
+const cookieHeader = Astro.request.headers.get('cookie') ?? undefined;
+const origin = Astro.request.headers.get('origin');
+const referer = Astro.request.headers.get('referer');
+
+// Diagnostic info object
+const diagnostic: any = {
+  timestamp: new Date().toISOString(),
+  headers: {
+    userAgent,
+    ipAddress,
+    origin,
+    referer,
+    hasCookie: !!cookieHeader,
+  },
+  tests: {},
+};
+
+// Test 1: Origin verification
+diagnostic.tests.originVerification = {
+  passed: verifyOrigin(origin, referer, Astro.url.origin),
+  expectedOrigin: Astro.url.origin,
+  actualOrigin: origin,
+  actualReferer: referer,
+};
+
+if (!diagnostic.tests.originVerification.passed) {
+  return new Response(JSON.stringify({
+    error: 'Origin verification failed',
+    diagnostic,
+  }), {
+    status: 403,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+// Test 2: Session validation without fingerprinting
+const sessionNoFingerprint = await getSessionFromCookie(
+  cookieHeader,
+  env?.SESSION_SECRET
+);
+
+diagnostic.tests.sessionWithoutFingerprint = {
+  valid: !!sessionNoFingerprint,
+  email: sessionNoFingerprint?.email,
+  role: sessionNoFingerprint?.role,
+};
+
+// Test 3: Session validation WITH fingerprinting (correct way)
+const sessionWithFingerprint = await getSessionFromCookie(
+  cookieHeader,
+  env?.SESSION_SECRET,
+  userAgent,
+  ipAddress
+);
+
+diagnostic.tests.sessionWithFingerprint = {
+  valid: !!sessionWithFingerprint,
+  email: sessionWithFingerprint?.email,
+  role: sessionWithFingerprint?.role,
+  elevated_until: sessionWithFingerprint?.elevated_until,
+  csrfToken: sessionWithFingerprint?.csrfToken?.substring(0, 10) + '...',
+};
+
+// Test 4: Effective role check
+if (sessionWithFingerprint) {
+  const effectiveRole = getEffectiveRole(sessionWithFingerprint);
+  diagnostic.tests.effectiveRole = {
+    role: effectiveRole,
+    isElevated: isElevatedRole(effectiveRole),
+  };
+}
+
+// Test 5: CSRF token validation
+let body: { csrf_token?: string; csrfToken?: string };
+try {
+  body = await Astro.request.json();
+} catch {
+  body = {};
+}
+
+diagnostic.tests.csrfValidation = {
+  tokenProvided: !!(body.csrf_token ?? body.csrfToken),
+  tokenValue: body.csrf_token ?? body.csrfToken,
+  sessionToken: sessionWithFingerprint?.csrfToken?.substring(0, 10) + '...',
+  valid: sessionWithFingerprint ? verifyCsrfToken(sessionWithFingerprint, body.csrf_token ?? body.csrfToken) : false,
+};
+
+// Final result
+const allTestsPassed =
+  diagnostic.tests.originVerification.passed &&
+  diagnostic.tests.sessionWithFingerprint.valid &&
+  diagnostic.tests.effectiveRole?.isElevated &&
+  diagnostic.tests.csrfValidation.valid;
+
+return new Response(JSON.stringify({
+  success: allTestsPassed,
+  diagnostic,
+  summary: {
+    originCheck: diagnostic.tests.originVerification.passed ? '✅ PASS' : '❌ FAIL',
+    sessionNoFingerprint: diagnostic.tests.sessionWithoutFingerprint.valid ? '✅ Valid' : '❌ Invalid',
+    sessionWithFingerprint: diagnostic.tests.sessionWithFingerprint.valid ? '✅ Valid' : '❌ Invalid',
+    effectiveRole: diagnostic.tests.effectiveRole?.isElevated ? '✅ Elevated' : '❌ Not Elevated',
+    csrfValidation: diagnostic.tests.csrfValidation.valid ? '✅ Valid' : '❌ Invalid',
+  },
+  recommendation: allTestsPassed ?
+    'All tests passed! Session validation is working correctly.' :
+    'Some tests failed. Check diagnostic details above.',
+}), {
+  status: 200,
+  headers: { 'Content-Type': 'application/json' },
+});
+---
