@@ -13,16 +13,7 @@ const env = runtime?.env;
 const user = Astro.locals.user;
 const session = Astro.locals.session;
 
-console.log('[OWNERS-API] Auth check:', {
-  hasUser: !!user,
-  hasSession: !!session,
-  method: Astro.request.method,
-  sessionAssumedRole: (session as any)?.assumed_role,
-  sessionElevatedUntil: (session as any)?.elevated_until,
-});
-
 if (!session || !user) {
-  console.log('[OWNERS-API] Unauthorized - missing session or user');
   return new Response(JSON.stringify({ error: 'Unauthorized' }), {
     status: 401,
     headers: { 'Content-Type': 'application/json' },
@@ -30,7 +21,6 @@ if (!session || !user) {
 }
 
 const effectiveRole = getEffectiveRole(session as any);
-console.log('[OWNERS-API] Effective role:', effectiveRole);
 /** List directory: any elevated role. Write: board, arb, arb_board, or admin (admins can manage directory). */
 const canManageDirectory = isElevatedRole(effectiveRole);
 const canWriteDirectory = isBoardOrArbOnly(effectiveRole) || effectiveRole === 'admin';

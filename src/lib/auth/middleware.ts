@@ -40,31 +40,17 @@ export async function validateSession(
   user: User | null;
 }> {
   if (!sessionId) {
-    console.log('[VALIDATE DEBUG] No sessionId provided');
     return { session: null, user: null };
   }
 
   try {
     // Check if session exists in database BEFORE validation
     const dbSession = await db.prepare('SELECT * FROM sessions WHERE id = ?').bind(sessionId).first();
-    console.log('[VALIDATE DEBUG] Session in database:', !!dbSession);
-    if (dbSession) {
-      console.log('[VALIDATE DEBUG] DB session user_id:', dbSession.user_id);
-      console.log('[VALIDATE DEBUG] DB session expires_at:', dbSession.expires_at);
-      const now = Math.floor(Date.now() / 1000);
-      const expiresAt = dbSession.expires_at as number;
-      console.log('[VALIDATE DEBUG] Current time:', now, 'Expires at:', expiresAt, 'Expired:', now > expiresAt);
-    } else {
-      console.log('[VALIDATE DEBUG] Session NOT found in database');
-    }
 
     const lucia = createLucia(db, url);
-    console.log('[VALIDATE DEBUG] Created Lucia instance, validating session:', sessionId.substring(0, 10) + '...');
     const result = await lucia.validateSession(sessionId);
-    console.log('[VALIDATE DEBUG] Validation complete - session:', !!result.session, 'user:', !!result.user);
 
     if (!result.session || !result.user) {
-      console.log('[VALIDATE DEBUG] Session validation returned null/invalid');
       return result;
     }
 
@@ -83,8 +69,6 @@ export async function validateSession(
       // Use the session ID as a stable basis for CSRF token to avoid regeneration on every request
       const csrfToken = dbSession.csrf_token || crypto.createHash('sha256').update(result.session.id + 'csrf-salt').digest('hex');
       (result.session as any).csrfToken = csrfToken;
-
-      console.log('[VALIDATE DEBUG] Added PIM attributes - role:', result.user.role, 'elevated_until:', dbSession.elevated_until, 'assumed_role:', dbSession.assumed_role);
     }
 
     return result;
