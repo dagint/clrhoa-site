@@ -8,10 +8,10 @@
  */
 
 import type { APIRoute } from 'astro';
-import { getMemberByEmail, listAllMembers } from '../../lib/members-db';
-import { getEffectiveRole, isElevatedRole, VALID_ROLES } from '../../lib/auth';
-import { insertOwner, updateOwner, deleteOwners } from '../../lib/directory-db';
-import { setLoginWhitelistRole, removeFromLoginWhitelistUnlessAdmin } from '../../lib/auth';
+import { getMemberByEmail, listAllMembers } from '../../../lib/members-db';
+import { getEffectiveRole, isElevatedRole, VALID_ROLES } from '../../../lib/auth';
+import { insertOwner, updateOwner, deleteOwners } from '../../../lib/directory-db';
+import { setLoginWhitelistRole, removeFromLoginWhitelistUnlessAdmin } from '../../../lib/auth';
 
 export const prerender = false;
 
