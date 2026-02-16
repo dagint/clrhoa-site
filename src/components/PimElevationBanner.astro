@@ -7,9 +7,10 @@ interface Props {
   elevatedUntil: number;
   role?: string;
   elevatedRole?: string;
+  csrfToken?: string;
 }
 
-const { elevatedUntil, elevatedRole } = Astro.props;
+const { elevatedUntil, elevatedRole, csrfToken = '' } = Astro.props;
 
 // Format role label for display
 const roleLabel = elevatedRole
@@ -19,7 +20,7 @@ const roleLabel = elevatedRole
   : 'elevated access';
 ---
 
-<div id="pim-elevation-banner" class="bg-amber-100 border-b border-amber-300 px-4 py-2 flex flex-wrap items-center justify-between gap-2" role="status" aria-live="polite" data-elevated-until={String(elevatedUntil)}>
+<div id="pim-elevation-banner" class="bg-amber-100 border-b border-amber-300 px-4 py-2 flex flex-wrap items-center justify-between gap-2" role="status" aria-live="polite" data-elevated-until={String(elevatedUntil)} data-csrf-token={csrfToken}>
   <span class="text-amber-900 text-sm font-medium">
     <span id="pim-elevation-label">Elevated as {roleLabel}</span>
     <span id="pim-elevation-timer" class="ml-2 font-mono">—</span>
@@ -42,6 +43,7 @@ const roleLabel = elevatedRole
     if (!timerEl || !bannerEl) return;
 
     let elevatedUntil = parseInt(bannerEl.getAttribute('data-elevated-until') || '0', 10);
+    const csrfToken = bannerEl.getAttribute('data-csrf-token') || '';
     const EXTENSION_THRESHOLD_MS = 15 * 60 * 1000; // 15 minutes
 
     interface ExtendResponse {
@@ -90,7 +92,8 @@ const roleLabel = elevatedRole
       fetch('/api/pim/extend', {
         method: 'POST',
         credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ csrf_token: csrfToken })
       })
         .then(function (r) {
           return r.json().then(function (data) {
@@ -134,7 +137,12 @@ const roleLabel = elevatedRole
     form?.addEventListener('submit', function (e) {
       e.preventDefault();
       clearInterval(interval);
-      fetch('/api/pim/drop', { method: 'POST', credentials: 'same-origin' })
+      fetch('/api/pim/drop', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ csrf_token: csrfToken })
+      })
         .then(function (r) {
           if (r.ok) window.location.reload();
         })
