@@ -210,6 +210,70 @@ const csrfToken = session?.csrfToken ?? '';
       </form>
     </div>
 
+    <!-- CSV Bulk Upload -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-8">
+      <h2 class="text-xl font-heading font-semibold text-clr-green mb-4">Bulk Import (CSV)</h2>
+      <p class="text-sm text-gray-600 mb-4">
+        Upload a CSV file to add or update multiple members at once. Existing members (matched by email) will be updated.
+      </p>
+
+      <form id="upload-csv-form" class="space-y-4">
+        <input type="hidden" name="csrf_token" value={csrfToken} />
+
+        <div>
+          <label for="csv-file" class="block text-sm font-medium text-gray-700 mb-2">
+            CSV File *
+          </label>
+          <input
+            type="file"
+            id="csv-file"
+            name="file"
+            accept=".csv,text/csv"
+            required
+            class="block w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 focus:outline-none focus:ring-2 focus:ring-clr-green focus:border-clr-green p-2"
+          />
+          <p class="mt-1 text-xs text-gray-500">
+            Maximum 1MB, up to 1000 rows
+          </p>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <button
+            type="submit"
+            id="upload-csv-btn"
+            class="px-6 py-2.5 bg-clr-green text-white rounded-lg font-medium hover:brightness-110 transition-all"
+          >
+            ↑ Upload CSV
+          </button>
+          <a
+            href="/templates/members-import-template.csv"
+            download
+            class="px-6 py-2.5 bg-blue-500 text-white rounded-lg font-medium hover:brightness-110 transition-all"
+          >
+            📥 Download Template
+          </a>
+        </div>
+
+        <div class="bg-gray-50 rounded-lg p-4 text-sm">
+          <p class="font-semibold text-gray-700 mb-2">📋 CSV Format:</p>
+          <ul class="space-y-1 text-gray-600 list-disc list-inside">
+            <li><code>name</code> - Member name (required)</li>
+            <li><code>email</code> - Email address (required for account creation)</li>
+            <li><code>address</code> - Physical address (optional)</li>
+            <li><code>lot_number</code> or <code>lot</code> - Lot number (optional)</li>
+            <li><code>phone</code> - Phone number (optional)</li>
+            <li><code>role</code> - Account role: member, board, arb, admin (optional, defaults to member)</li>
+          </ul>
+          <p class="mt-3 text-gray-600">
+            💡 <strong>Tip:</strong> Download the template above to see the correct format. Existing members (matched by email) will be updated automatically.
+          </p>
+        </div>
+      </form>
+
+      <!-- CSV Upload Progress/Results -->
+      <div id="csv-upload-result" class="hidden mt-4 p-4 rounded-lg"></div>
+    </div>
+
     <!-- Members List -->
     <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
       <div class="flex items-center justify-between mb-4">
@@ -465,6 +529,89 @@ const csrfToken = session?.csrfToken ?? '';
       showMessage('Network error. Please try again.', true);
     }
   };
+
+  // CSV Upload Form
+  const uploadForm = document.getElementById('upload-csv-form');
+  const uploadBtn = document.getElementById('upload-csv-btn');
+  const csvResultEl = document.getElementById('csv-upload-result');
+
+  uploadForm?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const formData = new FormData(uploadForm);
+    const fileInput = document.getElementById('csv-file');
+    const file = fileInput?.files?.[0];
+
+    if (!file) {
+      showMessage('Please select a CSV file', true);
+      return;
+    }
+
+    // Disable button and show loading
+    uploadBtn.disabled = true;
+    uploadBtn.textContent = '⏳ Uploading...';
+    csvResultEl.classList.add('hidden');
+
+    try {
+      const response = await fetch('/api/members/upload-csv', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        // Show detailed results
+        let resultHtml = `<div class="bg-green-50 border border-green-200 rounded-lg p-4">`;
+        resultHtml += `<p class="font-semibold text-green-900 mb-2">✓ Upload Successful!</p>`;
+        resultHtml += `<ul class="text-sm text-green-800 space-y-1">`;
+        resultHtml += `<li>✓ <strong>${result.added || 0}</strong> new members added</li>`;
+        resultHtml += `<li>✓ <strong>${result.updated || 0}</strong> existing members updated</li>`;
+        if (result.skipped > 0) {
+          resultHtml += `<li>⊘ <strong>${result.skipped}</strong> rows skipped (no email/name)</li>`;
+        }
+        resultHtml += `</ul>`;
+
+        if (result.errors && result.errors.length > 0) {
+          resultHtml += `<div class="mt-3 pt-3 border-t border-green-300">`;
+          resultHtml += `<p class="font-semibold text-red-800 mb-1">Errors:</p>`;
+          resultHtml += `<ul class="text-xs text-red-700 space-y-1 max-h-32 overflow-y-auto">`;
+          result.errors.forEach(err => {
+            resultHtml += `<li>• ${err}</li>`;
+          });
+          resultHtml += `</ul></div>`;
+        }
+        resultHtml += `</div>`;
+
+        csvResultEl.innerHTML = resultHtml;
+        csvResultEl.classList.remove('hidden');
+
+        // Reset form and reload members
+        uploadForm.reset();
+        loadMembers();
+        showMessage(`CSV uploaded: ${result.added} added, ${result.updated} updated`);
+      } else {
+        csvResultEl.innerHTML = `<div class="bg-red-50 border border-red-200 rounded-lg p-4">
+          <p class="font-semibold text-red-900">✗ Upload Failed</p>
+          <p class="text-sm text-red-800 mt-1">${result.error || 'Unknown error'}</p>
+        </div>`;
+        csvResultEl.classList.remove('hidden');
+        showMessage(result.error || 'Failed to upload CSV', true);
+      }
+    } catch (error) {
+      console.error('[CSV-UPLOAD] Error:', error);
+      csvResultEl.innerHTML = `<div class="bg-red-50 border border-red-200 rounded-lg p-4">
+        <p class="font-semibold text-red-900">✗ Network Error</p>
+        <p class="text-sm text-red-800 mt-1">Failed to upload CSV. Please try again.</p>
+      </div>`;
+      csvResultEl.classList.remove('hidden');
+      showMessage('Network error. Please try again.', true);
+    } finally {
+      // Re-enable button
+      uploadBtn.disabled = false;
+      uploadBtn.textContent = '↑ Upload CSV';
+    }
+  });
 
   // Refresh button
   refreshBtn?.addEventListener('click', () => loadMembers());
