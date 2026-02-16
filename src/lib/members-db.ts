@@ -44,42 +44,44 @@ export async function listAllMembers(
   offset = 0
 ): Promise<UnifiedMember[]> {
   // Since D1 doesn't support FULL OUTER JOIN, we'll do UNION of LEFT JOINs
+  // Wrap in subquery to allow ORDER BY with UNION
   const query = `
-    SELECT
-      COALESCE(u.email, o.email) as email,
-      COALESCE(u.name, o.name) as name,
-      u.id as userId,
-      u.status as accountStatus,
-      u.role as role,
-      u.created_at as user_created_at,
-      o.id as ownerId,
-      o.address as address,
-      o.lot_number as lot_number,
-      o.phone as phone,
-      o.phones as phones,
-      o.created_at as owner_created_at
-    FROM users u
-    LEFT JOIN owners o ON u.email = o.email
+    SELECT * FROM (
+      SELECT
+        COALESCE(u.email, o.email) as email,
+        COALESCE(u.name, o.name) as name,
+        u.id as userId,
+        u.status as accountStatus,
+        u.role as role,
+        u.created_at as user_created_at,
+        o.id as ownerId,
+        o.address as address,
+        o.lot_number as lot_number,
+        o.phone as phone,
+        o.phones as phones,
+        o.created_at as owner_created_at
+      FROM users u
+      LEFT JOIN owners o ON u.email = o.email
 
-    UNION
+      UNION
 
-    SELECT
-      COALESCE(u.email, o.email) as email,
-      COALESCE(u.name, o.name) as name,
-      u.id as userId,
-      u.status as accountStatus,
-      u.role as role,
-      u.created_at as user_created_at,
-      o.id as ownerId,
-      o.address as address,
-      o.lot_number as lot_number,
-      o.phone as phone,
-      o.phones as phones,
-      o.created_at as owner_created_at
-    FROM owners o
-    LEFT JOIN users u ON o.email = u.email
-
-    ORDER BY name ASC
+      SELECT
+        COALESCE(u.email, o.email) as email,
+        COALESCE(u.name, o.name) as name,
+        u.id as userId,
+        u.status as accountStatus,
+        u.role as role,
+        u.created_at as user_created_at,
+        o.id as ownerId,
+        o.address as address,
+        o.lot_number as lot_number,
+        o.phone as phone,
+        o.phones as phones,
+        o.created_at as owner_created_at
+      FROM owners o
+      LEFT JOIN users u ON o.email = u.email
+    )
+    ORDER BY address ASC, name ASC
     LIMIT ? OFFSET ?
   `;
 
