@@ -274,6 +274,96 @@ const csrfToken = session?.csrfToken ?? '';
       <div id="csv-upload-result" class="hidden mt-4 p-4 rounded-lg"></div>
     </div>
 
+    <!-- Edit Member Modal -->
+    <div id="edit-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div class="bg-white rounded-2xl shadow-xl max-w-2xl w-full p-6">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-xl font-heading font-semibold text-clr-green">Edit Member</h3>
+          <button id="edit-modal-close" class="text-gray-400 hover:text-gray-600">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <form id="edit-member-form" class="space-y-4">
+          <input type="hidden" id="edit-email" name="email" />
+
+          <div>
+            <label for="edit-name" class="block text-sm font-medium text-gray-700 mb-1">Name</label>
+            <input
+              type="text"
+              id="edit-name"
+              name="name"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-clr-green focus:border-clr-green"
+            />
+          </div>
+
+          <div>
+            <label for="edit-role" class="block text-sm font-medium text-gray-700 mb-1">Role</label>
+            <select
+              id="edit-role"
+              name="role"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-clr-green focus:border-clr-green"
+            >
+              <option value="member">Member</option>
+              <option value="board">Board</option>
+              <option value="arb">ARB</option>
+              <option value="arb_board">ARB + Board</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+
+          <div class="grid md:grid-cols-2 gap-4">
+            <div>
+              <label for="edit-lot" class="block text-sm font-medium text-gray-700 mb-1">Lot Number</label>
+              <input
+                type="text"
+                id="edit-lot"
+                name="lot_number"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-clr-green focus:border-clr-green"
+              />
+            </div>
+            <div>
+              <label for="edit-phone" class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+              <input
+                type="tel"
+                id="edit-phone"
+                name="phone"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-clr-green focus:border-clr-green"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label for="edit-address" class="block text-sm font-medium text-gray-700 mb-1">Address</label>
+            <input
+              type="text"
+              id="edit-address"
+              name="address"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-clr-green focus:border-clr-green"
+            />
+          </div>
+
+          <div class="flex gap-3 pt-4">
+            <button
+              type="submit"
+              class="flex-1 py-2 bg-clr-green text-white rounded-lg hover:brightness-110 font-medium"
+            >
+              Save Changes
+            </button>
+            <button
+              type="button"
+              id="edit-modal-cancel"
+              class="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <!-- Members List -->
     <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
       <div class="flex items-center justify-between mb-4">
@@ -393,6 +483,7 @@ const csrfToken = session?.csrfToken ?? '';
       }
 
       const members = data.members || [];
+      currentMembers = members; // Store for edit function
 
       if (members.length === 0) {
         loadingEl?.classList.add('hidden');
@@ -428,12 +519,20 @@ const csrfToken = session?.csrfToken ?? '';
                 <td class="px-4 py-3 text-sm text-gray-600">${m.phone || '-'}</td>
                 <td class="px-4 py-3 text-sm text-gray-600">${m.address || '-'}</td>
                 <td class="px-4 py-3 text-sm">
-                  <button
-                    class="text-red-600 hover:text-red-800 font-medium"
-                    onclick="deleteMember('${m.email}')"
-                  >
-                    Delete
-                  </button>
+                  <div class="flex gap-3">
+                    <button
+                      class="text-clr-green hover:text-clr-green/80 font-medium"
+                      onclick="editMember('${m.email}')"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      class="text-red-600 hover:text-red-800 font-medium"
+                      onclick="deleteMember('${m.email}')"
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </td>
               </tr>
             `
@@ -499,6 +598,78 @@ const csrfToken = session?.csrfToken ?? '';
       if (submitBtn) {
         submitBtn.disabled = false;
         submitBtn.textContent = 'Add Member';
+      }
+    }
+  });
+
+  // Edit member function (global so onclick can call it)
+  let currentMembers = [];
+  window.editMember = function (email) {
+    const member = currentMembers.find((m) => m.email === email);
+    if (!member) return;
+
+    // Populate form
+    document.getElementById('edit-email').value = member.email;
+    document.getElementById('edit-name').value = member.name || '';
+    document.getElementById('edit-role').value = member.role || 'member';
+    document.getElementById('edit-lot').value = member.lot_number || '';
+    document.getElementById('edit-phone').value = member.phone || '';
+    document.getElementById('edit-address').value = member.address || '';
+
+    // Show modal
+    document.getElementById('edit-modal').classList.remove('hidden');
+  };
+
+  // Close edit modal
+  document.getElementById('edit-modal-close')?.addEventListener('click', () => {
+    document.getElementById('edit-modal').classList.add('hidden');
+  });
+  document.getElementById('edit-modal-cancel')?.addEventListener('click', () => {
+    document.getElementById('edit-modal').classList.add('hidden');
+  });
+
+  // Handle edit form submission
+  document.getElementById('edit-member-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    const data = {
+      email: formData.get('email'),
+      name: formData.get('name'),
+      role: formData.get('role'),
+      lot_number: formData.get('lot_number'),
+      phone: formData.get('phone'),
+      address: formData.get('address'),
+    };
+
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Saving...';
+    }
+
+    try {
+      const response = await fetch('/api/members', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        showMessage(result.message || 'Member updated successfully!');
+        document.getElementById('edit-modal').classList.add('hidden');
+        loadMembers();
+      } else {
+        showMessage(result.error || 'Failed to update member', true);
+      }
+    } catch (error) {
+      console.error('[MEMBERS] Edit error:', error);
+      showMessage('Network error. Please try again.', true);
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Save Changes';
       }
     }
   });
