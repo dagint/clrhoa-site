@@ -170,7 +170,7 @@ export async function sendResetEmail(
   });
 
   await resend.emails.send({
-    from: 'CLRHOA Portal <portal@clrhoa.com>',
+    from: 'CLRHOA Portal <noreply@portal.clrhoa.com>',
     to: userEmail,
     subject: 'Reset your CLRHOA password',
     html,

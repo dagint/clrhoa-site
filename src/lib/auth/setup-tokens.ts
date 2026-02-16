@@ -246,7 +246,7 @@ export async function sendSetupEmail(
   });
 
   await resend.emails.send({
-    from: 'CLRHOA Portal <portal@clrhoa.com>',
+    from: 'CLRHOA Portal <noreply@portal.clrhoa.com>',
     to: userEmail,
     subject: 'Set up your CLRHOA portal account',
     html,

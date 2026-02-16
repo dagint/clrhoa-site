@@ -314,7 +314,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
     // 12. Send confirmation email (optional but recommended)
     try {
       await resend?.emails?.send({
-        from: 'CLRHOA Portal <portal@clrhoa.com>',
+        from: 'CLRHOA Portal <noreply@portal.clrhoa.com>',
         to: resetTokenResult.email,
         subject: 'Your password has been changed',
         html: `

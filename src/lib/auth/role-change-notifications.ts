@@ -248,7 +248,7 @@ This is an automated notification. If you believe this change was made in error,
   `.trim();
 
   await resend.emails.send({
-    from: 'CLRHOA Portal <portal@clrhoa.com>',
+    from: 'CLRHOA Portal <noreply@portal.clrhoa.com>',
     to: userEmail,
     subject: `Your CLRHOA account role has been updated to ${newRoleInfo.title}`,
     html: htmlBody,
