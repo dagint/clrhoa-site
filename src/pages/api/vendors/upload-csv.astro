@@ -8,7 +8,7 @@
 export const prerender = false;
 
 import { verifyOrigin, getEffectiveRole, isElevatedRole } from '../../../lib/auth';
-import { insertVendor } from '../../../lib/vendors-db';
+import { insertVendor, insertVendorAuditLog } from '../../../lib/vendors-db';
 import { checkRateLimit, getRateLimitConfig } from '../../../lib/rate-limit';
 import { getSecurityMonitor } from '../../../lib/monitoring';
 
@@ -225,7 +225,7 @@ for (let i = startRow; i < lines.length; i++) {
   if (!name) continue;
 
   try {
-    await insertVendor(db, {
+    const vendorId = await insertVendor(db, {
       name,
       category,
       phone,
@@ -233,6 +233,14 @@ for (let i = startRow; i < lines.length; i++) {
       website: website || null,
       notes: notes || null,
       show_on_public: showOnPublic,
+    });
+    // Audit log for bulk CSV upload
+    await insertVendorAuditLog(db, {
+      vendor_id: vendorId,
+      vendor_name: name,
+      action: 'created_via_csv_upload',
+      done_by_email: user.email,
+      ip_address: clientIpAddress,
     });
     added += 1;
   } catch (e) {
