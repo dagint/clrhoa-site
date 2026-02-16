@@ -142,12 +142,32 @@ const ext = file.name.includes('.') ? file.name.split('.').pop()?.toLowerCase() 
 const safeExt = ['pdf', 'docx', 'doc'].includes(ext) ? ext : 'pdf';
 const fileKey = `public-docs/${slug}.${safeExt}`;
 
+console.log('[PUBLIC-DOC] Uploading to R2:', { fileKey, contentType: file.type, size: file.size });
 const buf = await file.arrayBuffer();
 await r2.put(fileKey, buf, {
   httpMetadata: { contentType: file.type },
 });
+console.log('[PUBLIC-DOC] R2 upload successful');
 
-await setPublicDocumentFile(db, slug, fileKey, file.type, user.email, effectiveRole);
+console.log('[PUBLIC-DOC] Updating database:', { slug, fileKey, contentType: file.type, email: user.email, role: effectiveRole });
+const dbResult = await db
+  .prepare(
+    `UPDATE public_documents SET file_key = ?, content_type = ?, updated_at = datetime('now'), updated_by_email = ?, updated_by_role = ? WHERE slug = ?`
+  )
+  .bind(fileKey, file.type, user.email, effectiveRole, slug)
+  .run();
+console.log('[PUBLIC-DOC] Database update result:', { success: dbResult.success, rowsAffected: dbResult.meta?.changes });
+
+if (!dbResult.success || dbResult.meta?.changes === 0) {
+  console.error('[PUBLIC-DOC] Database update failed or no rows affected');
+  return new Response(
+    JSON.stringify({
+      error: 'Database update failed',
+      debug: { success: dbResult.success, rowsAffected: dbResult.meta?.changes }
+    }),
+    { status: 500, headers: { 'Content-Type': 'application/json' } }
+  );
+}
 
 return new Response(
   JSON.stringify({
