@@ -65,20 +65,20 @@ export async function listOwners(db: D1Database, limit = LIST_OWNERS_MAX, offset
   const safeOffset = Math.max(0, offset);
   try {
     const { results } = await db
-      .prepare(`${OWNERS_SELECT_FULL_WITH_UPDATED} ORDER BY name ASC LIMIT ? OFFSET ?`)
+      .prepare(`${OWNERS_SELECT_FULL_WITH_UPDATED} ORDER BY CASE WHEN address IS NULL THEN 1 ELSE 0 END, address ASC, name ASC LIMIT ? OFFSET ?`)
       .bind(safeLimit, safeOffset)
       .all<Owner>();
     return results ?? [];
   } catch {
     try {
       const { results } = await db
-        .prepare(`${OWNERS_SELECT_FULL_WITH_PRIMARY} ORDER BY name ASC LIMIT ? OFFSET ?`)
+        .prepare(`${OWNERS_SELECT_FULL_WITH_PRIMARY} ORDER BY CASE WHEN address IS NULL THEN 1 ELSE 0 END, address ASC, name ASC LIMIT ? OFFSET ?`)
         .bind(safeLimit, safeOffset)
         .all<Owner>();
       return (results ?? []).map((o) => ({ ...o, updated_by: null, updated_at: null }));
     } catch {
       const { results } = await db
-        .prepare(`${OWNERS_SELECT_FULL} ORDER BY name ASC LIMIT ? OFFSET ?`)
+        .prepare(`${OWNERS_SELECT_FULL} ORDER BY CASE WHEN address IS NULL THEN 1 ELSE 0 END, address ASC, name ASC LIMIT ? OFFSET ?`)
         .bind(safeLimit, safeOffset)
         .all<Owner>();
       return (results ?? []).map((o) => ({ ...o, updated_by: null, updated_at: null }));
