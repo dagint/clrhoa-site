@@ -7,7 +7,7 @@
  */
 export const prerender = false;
 
-import { verifyCsrfToken, verifyOrigin, getEffectiveRole, isElevatedRole } from '../../../lib/auth';
+import { verifyOrigin, getEffectiveRole, isElevatedRole } from '../../../lib/auth';
 import { insertVendor } from '../../../lib/vendors-db';
 import { checkRateLimit, getRateLimitConfig } from '../../../lib/rate-limit';
 import { getSecurityMonitor } from '../../../lib/monitoring';
@@ -21,7 +21,7 @@ const session = Astro.locals.session;
 console.log('[VENDOR-CSV-UPLOAD] Auth check:', {
   hasUser: !!user,
   hasSession: !!session,
-  sessionRole: session?.role,
+  userRole: user?.role,
   sessionAssumedRole: (session as any)?.assumed_role,
   sessionAssumedUntil: (session as any)?.assumed_until,
 });
@@ -111,10 +111,10 @@ try {
   });
 }
 
-const csrf = (formData.get('csrf_token') ?? formData.get('csrfToken'))?.toString() ?? '';
 // CSRF token verification - session from middleware doesn't have csrfToken in the same format
 // Skipping for now as session is already validated by middleware
 // TODO: Implement proper CSRF token handling with Lucia sessions
+// const csrf = (formData.get('csrf_token') ?? formData.get('csrfToken'))?.toString() ?? '';
 // if (!verifyCsrfToken(session as any, csrf)) {
 //   return new Response(JSON.stringify({ error: 'Invalid security token.' }), {
 //     status: 403,
