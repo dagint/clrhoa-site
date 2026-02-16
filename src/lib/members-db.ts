@@ -81,7 +81,7 @@ export async function listAllMembers(
       FROM owners o
       LEFT JOIN users u ON o.email = u.email
     )
-    ORDER BY name ASC
+    ORDER BY address ASC, name ASC
     LIMIT ? OFFSET ?
   `;
 
