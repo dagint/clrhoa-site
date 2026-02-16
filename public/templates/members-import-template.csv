@@ -1,0 +1,4 @@
+name,email,address,lot_number,phone,role
+John Doe,john.doe@example.com,"123 Main St, Crystal Lake, FL 34101",42,555-1234,member
+Jane Smith,jane.smith@example.com,"456 Oak Ave, Crystal Lake, FL 34101",43,555-5678,member
+Board Member,board@example.com,"789 Pine Rd, Crystal Lake, FL 34101",44,555-9012,board
