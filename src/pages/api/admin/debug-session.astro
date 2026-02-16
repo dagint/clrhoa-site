@@ -7,8 +7,9 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie, verifyCsrfToken, verifyOrigin, getEffectiveRole } from '../../../lib/auth';
+import { verifyCsrfToken, verifyOrigin, getEffectiveRole } from '../../../lib/auth';
 import { isElevatedRole } from '../../../lib/auth';
+import { validateSession, getSessionId, SESSION_COOKIE_NAME } from '../../../lib/auth/middleware';
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
@@ -24,7 +25,7 @@ if (Astro.request.method !== 'POST') {
 const userAgent = Astro.request.headers.get('user-agent') ?? null;
 const ipAddress = Astro.request.headers.get('cf-connecting-ip') ??
   Astro.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
-const cookieHeader = Astro.request.headers.get('cookie') ?? undefined;
+const sessionId = getSessionId(Astro);
 const origin = Astro.request.headers.get('origin');
 const referer = Astro.request.headers.get('referer');
 
@@ -36,7 +37,7 @@ const diagnostic: any = {
     ipAddress,
     origin,
     referer,
-    hasCookie: !!cookieHeader,
+    hasSessionCookie: !!sessionId,
   },
   tests: {},
 };
@@ -59,44 +60,32 @@ if (!diagnostic.tests.originVerification.passed) {
   });
 }
 
-// Test 2: Session validation without fingerprinting
-const sessionNoFingerprint = await getSessionFromCookie(
-  cookieHeader,
-  env?.SESSION_SECRET
+// Test 2: Session validation using Lucia (current system)
+const { session: luciaSession, user: luciaUser } = await validateSession(
+  env?.DB,
+  sessionId,
+  Astro.url.href
 );
 
-diagnostic.tests.sessionWithoutFingerprint = {
-  valid: !!sessionNoFingerprint,
-  email: sessionNoFingerprint?.email,
-  role: sessionNoFingerprint?.role,
+diagnostic.tests.luciaSession = {
+  valid: !!luciaSession,
+  email: luciaUser?.email,
+  role: luciaUser?.role,
+  sessionId: luciaSession?.id?.substring(0, 10) + '...' || 'N/A',
+  elevated_until: (luciaSession as any)?.elevated_until || null,
+  csrfToken: (luciaSession as any)?.csrfToken?.substring(0, 10) + '...' || 'N/A',
 };
 
-// Test 3: Session validation WITH fingerprinting (correct way)
-const sessionWithFingerprint = await getSessionFromCookie(
-  cookieHeader,
-  env?.SESSION_SECRET,
-  userAgent,
-  ipAddress
-);
-
-diagnostic.tests.sessionWithFingerprint = {
-  valid: !!sessionWithFingerprint,
-  email: sessionWithFingerprint?.email,
-  role: sessionWithFingerprint?.role,
-  elevated_until: sessionWithFingerprint?.elevated_until,
-  csrfToken: sessionWithFingerprint?.csrfToken?.substring(0, 10) + '...',
-};
-
-// Test 4: Effective role check
-if (sessionWithFingerprint) {
-  const effectiveRole = getEffectiveRole(sessionWithFingerprint);
+// Test 3: Effective role check
+if (luciaSession) {
+  const effectiveRole = getEffectiveRole(luciaSession as any);
   diagnostic.tests.effectiveRole = {
     role: effectiveRole,
     isElevated: isElevatedRole(effectiveRole),
   };
 }
 
-// Test 5: CSRF token validation
+// Test 4: CSRF token validation
 let body: { csrf_token?: string; csrfToken?: string };
 try {
   body = await Astro.request.json();
@@ -107,26 +96,35 @@ try {
 diagnostic.tests.csrfValidation = {
   tokenProvided: !!(body.csrf_token ?? body.csrfToken),
   tokenValue: body.csrf_token ?? body.csrfToken,
-  sessionToken: sessionWithFingerprint?.csrfToken?.substring(0, 10) + '...',
-  valid: sessionWithFingerprint ? verifyCsrfToken(sessionWithFingerprint, body.csrf_token ?? body.csrfToken) : false,
+  sessionToken: (luciaSession as any)?.csrfToken?.substring(0, 10) + '...' || 'N/A',
+  valid: luciaSession ? verifyCsrfToken(luciaSession as any, body.csrf_token ?? body.csrfToken) : false,
+};
+
+// Test 5: Check middleware session (what the app actually uses)
+diagnostic.tests.middlewareSession = {
+  valid: !!(Astro.locals.session && Astro.locals.user),
+  email: Astro.locals.user?.email,
+  role: Astro.locals.user?.role,
+  hasElevation: !!(Astro.locals.session as any)?.elevated_until,
 };
 
 // Final result
 const allTestsPassed =
   diagnostic.tests.originVerification.passed &&
-  diagnostic.tests.sessionWithFingerprint.valid &&
+  diagnostic.tests.luciaSession.valid &&
   diagnostic.tests.effectiveRole?.isElevated &&
-  diagnostic.tests.csrfValidation.valid;
+  diagnostic.tests.csrfValidation.valid &&
+  diagnostic.tests.middlewareSession.valid;
 
 return new Response(JSON.stringify({
   success: allTestsPassed,
   diagnostic,
   summary: {
     originCheck: diagnostic.tests.originVerification.passed ? '✅ PASS' : '❌ FAIL',
-    sessionNoFingerprint: diagnostic.tests.sessionWithoutFingerprint.valid ? '✅ Valid' : '❌ Invalid',
-    sessionWithFingerprint: diagnostic.tests.sessionWithFingerprint.valid ? '✅ Valid' : '❌ Invalid',
+    luciaSession: diagnostic.tests.luciaSession.valid ? '✅ Valid' : '❌ Invalid',
     effectiveRole: diagnostic.tests.effectiveRole?.isElevated ? '✅ Elevated' : '❌ Not Elevated',
     csrfValidation: diagnostic.tests.csrfValidation.valid ? '✅ Valid' : '❌ Invalid',
+    middlewareSession: diagnostic.tests.middlewareSession.valid ? '✅ Valid' : '❌ Invalid',
   },
   recommendation: allTestsPassed ?
     'All tests passed! Session validation is working correctly.' :
