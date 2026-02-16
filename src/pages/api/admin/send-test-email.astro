@@ -6,9 +6,10 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie, verifyCsrfToken, verifyOrigin, getEffectiveRole } from '../../../lib/auth';
+import { verifyCsrfToken, verifyOrigin, getEffectiveRole } from '../../../lib/auth';
 import { isElevatedRole } from '../../../lib/auth';
 import { sendEmail } from '../../../lib/notifications';
+import { validateSession, getSessionId } from '../../../lib/auth/middleware';
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
@@ -26,22 +27,15 @@ if (!verifyOrigin(origin, referer, Astro.url.origin)) {
   return new Response(JSON.stringify({ error: 'Invalid origin.' }), { status: 403, headers: { 'Content-Type': 'application/json' } });
 }
 
-// Get user agent and IP for session fingerprinting
-const userAgent = Astro.request.headers.get('user-agent') ?? null;
-const ipAddress = Astro.request.headers.get('cf-connecting-ip') ??
-  Astro.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
+// Validate session using Lucia (D1-based)
+const sessionId = getSessionId(Astro);
+const { session, user } = await validateSession(env?.DB, sessionId, Astro.url.href);
 
-const session = await getSessionFromCookie(
-  Astro.request.headers.get('cookie') ?? undefined,
-  env?.SESSION_SECRET,
-  userAgent,
-  ipAddress
-);
-if (!session) {
+if (!session || !user) {
   return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
 }
 
-const role = getEffectiveRole(session);
+const role = getEffectiveRole(session as any);
 if (!isElevatedRole(role)) {
   return new Response(JSON.stringify({ error: 'Forbidden. Board or admin access required.' }), { status: 403, headers: { 'Content-Type': 'application/json' } });
 }
@@ -68,7 +62,7 @@ const TEST_EMAIL_WINDOW_SEC = 90;
 const kv = (env as { KV?: KVNamespace })?.KV;
 if (kv) {
   const minute = Math.floor(Date.now() / 60000);
-  const rateKey = `test-email:${session.email}:${minute}`;
+  const rateKey = `test-email:${user.email}:${minute}`;
   const current = await kv.get(rateKey);
   const count = current ? parseInt(current, 10) || 0 : 0;
   if (count >= TEST_EMAIL_LIMIT) {
@@ -98,7 +92,7 @@ console.log('[admin send-test-email]', {
   subject,
   ok: result.ok,
   error: result.error,
-  by: session.email,
+  by: user.email,
   role,
 });
 
