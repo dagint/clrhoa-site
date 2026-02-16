@@ -32,7 +32,7 @@ console.log('[DOCUMENTS-PAGE] Public overrides from DB:', publicOverrides.map(r 
 const overrideBySlug = Object.fromEntries(
   publicOverrides
     .filter((r) => r.file_key)
-    .map((r) => [r.slug, { slug: r.slug, file_key: r.file_key, content_type: r.content_type }])
+    .map((r) => [r.slug, { slug: r.slug, file_key: r.file_key, content_type: r.content_type, updated_at: r.updated_at }])
 );
 console.log('[DOCUMENTS-PAGE] Override map keys:', Object.keys(overrideBySlug));
 
@@ -94,7 +94,9 @@ const keyRules = [
             {docs.map((doc) => {
               const slug = doc.slug; // Use auto-generated slug from filename, not doc.data.slug
               const override = slug ? overrideBySlug[slug] : null;
-              const linkUrl = override?.file_key ? `/api/public-doc-file?slug=${encodeURIComponent(slug!)}` : doc.data.fileUrl;
+              // Add cache buster using updated_at timestamp to force new downloads when file is re-uploaded
+              const cacheBuster = override?.updated_at ? `&v=${encodeURIComponent(override.updated_at)}` : '';
+              const linkUrl = override?.file_key ? `/api/public-doc-file?slug=${encodeURIComponent(slug!)}${cacheBuster}` : doc.data.fileUrl;
               const isPdf = linkUrl.toLowerCase().includes('.pdf') || (override?.content_type?.toLowerCase().includes('pdf'));
               console.log('[DOCUMENTS-PAGE] Rendering doc:', { slug, hasOverride: !!override, linkUrl });
               return (
