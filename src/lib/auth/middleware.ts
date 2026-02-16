@@ -19,6 +19,7 @@ import type { APIContext } from 'astro';
 import { createLucia } from '../lucia';
 import type { Session, User } from 'lucia';
 import { getUserRole } from '../../types/auth';
+import crypto from 'node:crypto';
 
 export const SESSION_COOKIE_NAME = 'clrhoa_session';
 
@@ -70,12 +71,19 @@ export async function validateSession(
     // Manually fetch custom session attributes (Lucia D1 adapter doesn't include them)
     // This includes elevated_until, assumed_role, assumed_at, assumed_until for PIM
     // Also add the user's base role so getEffectiveRole() can access it
+    // Also add CSRF token for form submissions
     if (result.session && dbSession) {
       (result.session as any).role = result.user.role;
       (result.session as any).elevated_until = dbSession.elevated_until;
       (result.session as any).assumed_role = dbSession.assumed_role;
       (result.session as any).assumed_at = dbSession.assumed_at;
       (result.session as any).assumed_until = dbSession.assumed_until;
+
+      // Generate CSRF token if not present in DB session
+      // Use the session ID as a stable basis for CSRF token to avoid regeneration on every request
+      const csrfToken = dbSession.csrf_token || crypto.createHash('sha256').update(result.session.id + 'csrf-salt').digest('hex');
+      (result.session as any).csrfToken = csrfToken;
+
       console.log('[VALIDATE DEBUG] Added PIM attributes - role:', result.user.role, 'elevated_until:', dbSession.elevated_until, 'assumed_role:', dbSession.assumed_role);
     }
 
