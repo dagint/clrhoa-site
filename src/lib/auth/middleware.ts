@@ -18,7 +18,7 @@
 import type { APIContext } from 'astro';
 import { createLucia } from '../lucia';
 import type { Session, User } from 'lucia';
-import { getUserRole } from '../../types/auth';
+import { getUserRole, type ExtendedSession, type PIMAttributes } from '../../types/auth';
 import crypto from 'node:crypto';
 
 export const SESSION_COOKIE_NAME = 'clrhoa_session';
@@ -36,7 +36,7 @@ export async function validateSession(
   sessionId: string | null | undefined,
   url?: string
 ): Promise<{
-  session: Session | null;
+  session: ExtendedSession | null;
   user: User | null;
 }> {
   if (!sessionId) {
@@ -59,19 +59,22 @@ export async function validateSession(
     // Also add the user's base role so getEffectiveRole() can access it
     // Also add CSRF token for form submissions
     if (result.session && dbSession) {
-      (result.session as any).role = result.user.role;
-      (result.session as any).elevated_until = dbSession.elevated_until;
-      (result.session as any).assumed_role = dbSession.assumed_role;
-      (result.session as any).assumed_at = dbSession.assumed_at;
-      (result.session as any).assumed_until = dbSession.assumed_until;
+      const extendedSession = result.session as ExtendedSession;
+      extendedSession.role = result.user.role as any; // User role is set by Lucia
+      extendedSession.elevated_until = dbSession.elevated_until as number | null;
+      extendedSession.assumed_role = dbSession.assumed_role as string | null;
+      extendedSession.assumed_at = dbSession.assumed_at as number | null;
+      extendedSession.assumed_until = dbSession.assumed_until as number | null;
 
       // Generate CSRF token if not present in DB session
       // Use the session ID as a stable basis for CSRF token to avoid regeneration on every request
-      const csrfToken = dbSession.csrf_token || crypto.createHash('sha256').update(result.session.id + 'csrf-salt').digest('hex');
-      (result.session as any).csrfToken = csrfToken;
+      const csrfToken = dbSession.csrf_token as string || crypto.createHash('sha256').update(result.session.id + 'csrf-salt').digest('hex');
+      extendedSession.csrfToken = csrfToken;
+
+      return { session: extendedSession, user: result.user };
     }
 
-    return result;
+    return { session: null, user: null };
   } catch (error) {
     console.error('[VALIDATE DEBUG] Session validation error:', error);
     return { session: null, user: null };
