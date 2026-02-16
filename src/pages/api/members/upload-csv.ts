@@ -57,7 +57,7 @@ function parseCsvLine(line: string): string[] {
   return out;
 }
 
-export const POST: APIRoute = async ({ request, locals }) => {
+export const POST: APIRoute = async ({ request, locals, clientAddress }) => {
   const user = locals.user;
   const session = locals.session;
 
@@ -78,6 +78,9 @@ export const POST: APIRoute = async ({ request, locals }) => {
   }
 
   const db = locals.runtime?.env?.DB;
+
+  // Get client IP for audit logging
+  const clientIp = clientAddress || request.headers.get('cf-connecting-ip') || 'unknown';
   const kv = locals.runtime?.env?.CLOURHOA_USERS;
   if (!db) {
     return new Response(JSON.stringify({ error: 'Server configuration error' }), {
@@ -269,7 +272,12 @@ export const POST: APIRoute = async ({ request, locals }) => {
                 lot_number: lotNumber || existing.lot_number,
                 phone: phone || existing.phone,
               },
-              user.email
+              user.email,
+              {
+                ip_address: clientIp,
+                role: effectiveRole,
+                operation_type: 'csv_upload',
+              }
             );
             didUpdate = true;
           } else if (name || address || phone || lotNumber) {
@@ -283,7 +291,12 @@ export const POST: APIRoute = async ({ request, locals }) => {
                 lot_number: lotNumber,
                 phone,
               },
-              user.email
+              user.email,
+              {
+                ip_address: clientIp,
+                role: effectiveRole,
+                operation_type: 'csv_upload',
+              }
             );
             didUpdate = true;
           }
@@ -320,7 +333,12 @@ export const POST: APIRoute = async ({ request, locals }) => {
               lot_number: lotNumber,
               phone,
             },
-            user.email
+            user.email,
+            {
+              ip_address: clientIp,
+              role: effectiveRole,
+              operation_type: 'csv_upload',
+            }
           );
 
           // 2. Add to KV whitelist for account creation
@@ -341,7 +359,12 @@ export const POST: APIRoute = async ({ request, locals }) => {
             lot_number: lotNumber,
             phone,
           },
-          user.email
+          user.email,
+          {
+            ip_address: clientIp,
+            role: effectiveRole,
+            operation_type: 'csv_upload',
+          }
         );
         added += 1;
       }

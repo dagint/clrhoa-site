@@ -52,6 +52,9 @@ if (!db) {
   });
 }
 
+// Get client IP for audit logging
+const clientIpAddress = Astro.clientAddress || Astro.request.headers.get('cf-connecting-ip') || 'unknown';
+
 // GET: list owners (board, admin, arb)
 if (Astro.request.method === 'GET') {
   if (!canManageDirectory) {
@@ -118,7 +121,12 @@ if (Astro.request.method === 'POST') {
       phone: body.phone ?? null,
       email: emailRaw,
     },
-    user.email
+    user.email,
+    {
+      ip_address: clientIpAddress,
+      role: effectiveRole,
+      operation_type: 'manual',
+    }
   );
   await setLoginWhitelistRole(env?.CLOURHOA_USERS, emailRaw, roleToStore);
   return new Response(JSON.stringify({ success: true, id }), {
@@ -174,14 +182,24 @@ if (Astro.request.method === 'PUT') {
       });
     }
   }
-  const updated = await updateOwner(db, id, {
-    name: body.name,
-    address: body.address,
-    lot_number: lotNumber,
-    phone: body.phone,
-    email: body.email,
-    is_primary: body.is_primary === true ? 1 : body.is_primary === false ? 0 : undefined,
-  }, user.email);
+  const updated = await updateOwner(
+    db,
+    id,
+    {
+      name: body.name,
+      address: body.address,
+      lot_number: lotNumber,
+      phone: body.phone,
+      email: body.email,
+      is_primary: body.is_primary === true ? 1 : body.is_primary === false ? 0 : undefined,
+    },
+    user.email,
+    {
+      ip_address: clientIpAddress,
+      role: effectiveRole,
+      operation_type: 'manual',
+    }
+  );
   if (!updated) {
     return new Response(JSON.stringify({ error: 'Owner not found or update failed.' }), {
       status: 404,
@@ -248,7 +266,11 @@ if (Astro.request.method === 'DELETE') {
   }
   // Resolve emails before delete so we can revoke login (KV) for removed owners. Admins are left on KV.
   const ownersToDelete = await getOwnersByIds(db, trimmed);
-  const deleted = await deleteOwners(db, trimmed);
+  const deleted = await deleteOwners(db, trimmed, user.email, {
+    ip_address: clientIpAddress,
+    role: effectiveRole,
+    operation_type: 'manual',
+  });
   const kv = env?.CLOURHOA_USERS;
   for (const owner of ownersToDelete) {
     const email = owner.email?.trim();
