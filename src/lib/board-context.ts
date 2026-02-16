@@ -81,6 +81,7 @@ export async function getAdminContext(astro: RoleContextAstro): Promise<GetRoleC
     exp: Math.floor(luciaSession.expiresAt.getTime() / 1000),
     sessionId: luciaSession.id,
     elevated_until: (luciaSession as any).elevated_until,
+    csrfToken: (luciaSession as any).csrfToken,
   };
 
   const effectiveRole = getEffectiveRole(session);
@@ -136,6 +137,7 @@ export async function getBoardContext(astro: RoleContextAstro): Promise<GetRoleC
     exp: Math.floor(luciaSession.expiresAt.getTime() / 1000),
     sessionId: luciaSession.id,
     elevated_until: (luciaSession as any).elevated_until,
+    csrfToken: (luciaSession as any).csrfToken,
   };
 
   const effectiveRole = getEffectiveRole(session);
@@ -191,6 +193,7 @@ export async function getArbContext(astro: RoleContextAstro): Promise<GetRoleCon
     exp: Math.floor(luciaSession.expiresAt.getTime() / 1000),
     sessionId: luciaSession.id,
     elevated_until: (luciaSession as any).elevated_until,
+    csrfToken: (luciaSession as any).csrfToken,
   };
 
   const effectiveRole = getEffectiveRole(session);
