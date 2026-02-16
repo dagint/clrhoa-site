@@ -6,7 +6,9 @@ import { getCollection } from 'astro:content';
 import { listPublicDocuments } from '../lib/public-documents-db';
 
 const allDocuments = await getCollection('documents');
+console.log('[DOCUMENTS-PAGE] All documents:', allDocuments.map(d => ({ slug: d.data.slug, title: d.data.title, category: d.data.category, published: d.data.published })));
 const publishedDocuments = allDocuments.filter((item) => item.data.published);
+console.log('[DOCUMENTS-PAGE] Published:', publishedDocuments.map(d => d.data.slug));
 
 const documentsByCategory = publishedDocuments.reduce((acc, doc) => {
   const category = doc.data.category;
@@ -16,6 +18,7 @@ const documentsByCategory = publishedDocuments.reduce((acc, doc) => {
   acc[category].push(doc);
   return acc;
 }, {} as Record<string, typeof publishedDocuments>);
+console.log('[DOCUMENTS-PAGE] By category:', Object.fromEntries(Object.entries(documentsByCategory).map(([cat, docs]) => [cat, docs.map(d => d.data.slug)])));
 
 const categories = ['Governing Documents', 'Policies', 'Forms', 'Other'] as const;
 
