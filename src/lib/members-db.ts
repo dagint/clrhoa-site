@@ -53,13 +53,12 @@ export async function listAllMembers(
         u.id as userId,
         u.status as accountStatus,
         u.role as role,
-        u.created_at as user_created_at,
         o.id as ownerId,
         o.address as address,
         o.lot_number as lot_number,
         o.phone as phone,
         o.phones as phones,
-        o.created_at as owner_created_at
+        o.created_at as created_at
       FROM users u
       LEFT JOIN owners o ON u.email = o.email
 
@@ -71,13 +70,12 @@ export async function listAllMembers(
         u.id as userId,
         u.status as accountStatus,
         u.role as role,
-        u.created_at as user_created_at,
         o.id as ownerId,
         o.address as address,
         o.lot_number as lot_number,
         o.phone as phone,
         o.phones as phones,
-        o.created_at as owner_created_at
+        o.created_at as created_at
       FROM owners o
       LEFT JOIN users u ON o.email = u.email
     )
@@ -95,13 +93,12 @@ export async function listAllMembers(
       userId: string | null;
       accountStatus: string | null;
       role: string | null;
-      user_created_at: string | null;
       ownerId: string | null;
       address: string | null;
       lot_number: string | null;
       phone: string | null;
       phones: string | null;
-      owner_created_at: string | null;
+      created_at: string | null;
     }>();
 
     if (!result.success) {
@@ -122,8 +119,8 @@ export async function listAllMembers(
       lot_number: row.lot_number,
       phone: row.phone,
       phones: row.phones,
-      created_at: row.user_created_at || row.owner_created_at,
-      updated_at: null, // TODO: Add updated_at columns to tables if needed
+      created_at: row.created_at,
+      updated_at: null,
     }));
   } catch (error) {
     console.error('[MEMBERS-DB] listAllMembers error:', error);
