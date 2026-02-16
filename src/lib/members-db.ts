@@ -139,7 +139,7 @@ export async function getMemberByEmail(
 ): Promise<UnifiedMember | null> {
   const normalizedEmail = email.toLowerCase().trim();
 
-  const userQuery = `SELECT id, email, name, role, status, created_at FROM users WHERE email = ?`;
+  const userQuery = `SELECT id, email, name, role, status, created FROM users WHERE email = ?`;
   const ownerQuery = `SELECT id, email, name, address, lot_number, phone, phones, created_at FROM owners WHERE email = ?`;
 
   const [userResult, ownerResult] = await Promise.all([
@@ -149,7 +149,7 @@ export async function getMemberByEmail(
       name: string | null;
       role: string;
       status: string;
-      created_at: string;
+      created: string;
     }>(),
     db.prepare(ownerQuery).bind(normalizedEmail).first<{
       id: string;
@@ -181,7 +181,7 @@ export async function getMemberByEmail(
     lot_number: ownerResult?.lot_number || null,
     phone: ownerResult?.phone || null,
     phones: ownerResult?.phones || null,
-    created_at: userResult?.created_at || ownerResult?.created_at || null,
+    created_at: userResult?.created || ownerResult?.created_at || null,
     updated_at: null,
   };
 }
