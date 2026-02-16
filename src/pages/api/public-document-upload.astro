@@ -21,8 +21,20 @@ const env = runtime?.env;
 const user = Astro.locals.user;
 const session = Astro.locals.session;
 
+// Debug logging
+console.log('[PUBLIC-DOC-UPLOAD] user:', !!user, 'session:', !!session);
+console.log('[PUBLIC-DOC-UPLOAD] Astro.locals keys:', Object.keys(Astro.locals));
+
 if (!session || !user) {
-  return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+  console.log('[PUBLIC-DOC-UPLOAD] Returning 401 - missing session or user');
+  return new Response(JSON.stringify({
+    error: 'Unauthorized',
+    debug: {
+      hasSession: !!session,
+      hasUser: !!user,
+      localsKeys: Object.keys(Astro.locals)
+    }
+  }), {
     status: 401,
     headers: { 'Content-Type': 'application/json' },
   });
