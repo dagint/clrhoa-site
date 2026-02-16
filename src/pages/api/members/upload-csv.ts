@@ -131,12 +131,21 @@ export const POST: APIRoute = async ({ request, locals }) => {
 
   // 4. CSRF verification
   const csrf = (formData.get('csrf_token') ?? formData.get('csrfToken'))?.toString() ?? '';
+  console.log('[CSV-UPLOAD] CSRF Debug:', {
+    csrfToken: csrf?.substring(0, 20) + '...',
+    hasSession: !!session,
+    sessionKeys: session ? Object.keys(session) : [],
+  });
+
   if (!verifyCsrfToken(session as any, csrf)) {
+    console.log('[CSV-UPLOAD] CSRF verification failed');
     return new Response(JSON.stringify({ error: 'Invalid security token.' }), {
       status: 403,
       headers: { 'Content-Type': 'application/json' },
     });
   }
+
+  console.log('[CSV-UPLOAD] CSRF verification passed');
 
   // 5. Get CSV file
   const file = formData.get('file') ?? formData.get('csv');
