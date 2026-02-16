@@ -5,29 +5,43 @@
  * Tests session validation to diagnose authentication issues.
  * Remove this page after debugging is complete.
  */
+export const prerender = false;
+
+import PortalLayout from '../../../layouts/PortalLayout.astro';
 import PortalPage from '../../../components/PortalPage.astro';
-import { getEffectiveRole } from '../../../lib/auth';
-import type { ExtendedSession } from '../../../types/auth';
+import AdminNav from '../../../components/AdminNav.astro';
+import { getAdminContext } from '../../../lib/board-context';
+import { getPortalBadgeCounts } from '../../../lib/portal-badge-counts';
 
-const user = Astro.locals.user;
-const session = Astro.locals.session;
+const ctx = await getAdminContext(Astro);
+if ('redirect' in ctx) return Astro.redirect(ctx.redirect);
+const { env, session, effectiveRole } = ctx;
 
-// Admin role check
-const effectiveRole = getEffectiveRole(session as ExtendedSession | null);
-if (effectiveRole.toLowerCase() !== 'admin') {
-  return Astro.redirect('/portal/dashboard');
-}
+const { email, role, name } = session;
+const db = env?.DB;
+const badges = await getPortalBadgeCounts(db, email, role, name);
 
 // Get CSRF token from session
-const csrfToken = (session as any)?.csrfToken || '';
+const csrfToken = session?.csrfToken ?? '';
 ---
 
-<PortalPage
-  currentPath="/portal/admin/debug-session"
-  pageTitle="Debug Session"
-  userEmail={user?.email || ''}
-  effectiveRole={effectiveRole}
->
+<PortalLayout title="Debug Session | Admin | Member Portal | Crooked Lake Reserve HOA">
+  <PortalPage
+    currentPath="/portal/admin/debug-session"
+    pageTitle="Debug Session"
+    userName={badges.displayName ?? undefined}
+    userEmail={email}
+    effectiveRole={effectiveRole}
+    draftCount={badges.draftCount}
+    role={effectiveRole}
+    staffRole={role ?? ''}
+    arbInReviewCount={badges.arbInReviewCount}
+    vendorPendingCount={badges.vendorPendingCount}
+    maintenanceOpenCount={badges.maintenanceOpenCount}
+    meetingsRsvpCount={badges.meetingsRsvpCount}
+    feedbackDueCount={badges.feedbackDueCount}
+  >
+    <AdminNav currentPath="/portal/admin/debug-session" />
   <div class="max-w-4xl mx-auto">
     <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6">
       <div class="flex">
@@ -51,11 +65,11 @@ const csrfToken = (session as any)?.csrfToken || '';
       <dl class="grid grid-cols-1 gap-4">
         <div>
           <dt class="text-sm font-medium text-gray-500">Email</dt>
-          <dd class="mt-1 text-sm text-gray-900">{user?.email || 'Not available'}</dd>
+          <dd class="mt-1 text-sm text-gray-900">{email || 'Not available'}</dd>
         </div>
         <div>
           <dt class="text-sm font-medium text-gray-500">Role</dt>
-          <dd class="mt-1 text-sm text-gray-900">{user?.role || 'Not available'}</dd>
+          <dd class="mt-1 text-sm text-gray-900">{role || 'Not available'}</dd>
         </div>
         <div>
           <dt class="text-sm font-medium text-gray-500">CSRF Token (first 20 chars)</dt>
@@ -170,4 +184,5 @@ const csrfToken = (session as any)?.csrfToken || '';
       }
     });
   </script>
-</PortalPage>
+  </PortalPage>
+</PortalLayout>
