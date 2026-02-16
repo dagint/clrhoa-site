@@ -195,7 +195,7 @@
       "board": "write",
       "admin": "none"
     },
-    "/board/directory": {
+    "/board/members": {
       "member": "none",
       "arb": "none",
       "board": "write",

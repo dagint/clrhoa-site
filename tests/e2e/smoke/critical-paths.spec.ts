@@ -40,9 +40,9 @@ test.describe('Smoke Tests - Critical Paths', () => {
     await loginAs(context, 'board', { elevated: true });
     const page = await context.newPage();
 
-    // Can access board directory
-    await page.goto('/board/directory');
-    await expect(page).toHaveURL(/\/board\/directory/);
+    // Can access board members page
+    await page.goto('/board/members');
+    await expect(page).toHaveURL(/\/board\/members/);
 
     await context.close();
   });

@@ -20,7 +20,7 @@ export interface RouteAccessConfig {
  */
 export const DEFAULT_ROUTE_ACCESS: RouteAccessConfig = {
   auditLogsPaths: ['/board/audit-logs'],
-  boardOnlyPaths: ['/board/directory', '/board/assessments'],
+  boardOnlyPaths: ['/board/members', '/board/assessments'],
   arbAllowedPaths: [
     '/board/vendors',
     '/board/meetings',
@@ -38,7 +38,7 @@ export const DEFAULT_ROUTE_ACCESS: RouteAccessConfig = {
     '/board/backups',
     '/board/vendors',
     '/board/maintenance',
-    '/board/directory',
+    '/board/members',
     '/board/contacts',
     '/board/news',
     '/board/member-documents',
@@ -65,7 +65,7 @@ function matchesPath(pathname: string, patterns: string[]): boolean {
  *
  * @example
  * hasRouteAccess('admin', '/board/audit-logs'); // true
- * hasRouteAccess('arb', '/board/directory'); // false
+ * hasRouteAccess('arb', '/board/members'); // false
  * hasRouteAccess('board', '/board/vendors'); // true
  */
 export function hasRouteAccess(

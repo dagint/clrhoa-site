@@ -29,7 +29,7 @@ test.describe('Menu Visibility', () => {
 
       // Should NOT see board items
       await expect(page.locator('a[href="/portal/board"]')).not.toBeVisible();
-      await expect(page.locator('a[href="/board/directory"]')).not.toBeVisible();
+      await expect(page.locator('a[href="/board/members"]')).not.toBeVisible();
 
       // Should NOT see ARB items
       await expect(page.locator('a[href="/portal/arb"]')).not.toBeVisible();
@@ -49,7 +49,7 @@ test.describe('Menu Visibility', () => {
 
       // Should see board items
       await expect(page.locator('a[href="/portal/board"]')).toBeVisible();
-      await expect(page.locator('a[href="/board/directory"]')).toBeVisible();
+      await expect(page.locator('a[href="/board/members"]')).toBeVisible();
       await expect(page.locator('a[href="/board/assessments"]')).toBeVisible();
 
       // Should see member items (board has member access)
@@ -110,7 +110,7 @@ test.describe('Menu Visibility', () => {
 
       // Should see board items
       await expect(page.locator('a[href="/portal/board"]')).toBeVisible();
-      await expect(page.locator('a[href="/board/directory"]')).toBeVisible();
+      await expect(page.locator('a[href="/board/members"]')).toBeVisible();
 
       // Should see ARB items
       await expect(page.locator('a[href="/portal/arb"]')).toBeVisible();
@@ -160,7 +160,7 @@ test.describe('Menu Visibility', () => {
 
       // Should see board items now
       await expect(page.locator('a[href="/portal/board"]')).toBeVisible();
-      await expect(page.locator('a[href="/board/directory"]')).toBeVisible();
+      await expect(page.locator('a[href="/board/members"]')).toBeVisible();
       await expect(page.locator('a[href="/board/assessments"]')).toBeVisible();
 
       // Should see "Acting as Board" indicator

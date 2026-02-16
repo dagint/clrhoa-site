@@ -13,7 +13,7 @@ import type { MenuItem, MenuSection } from './memberMenu';
 export const boardPrimaryLinks: MenuItem[] = [
   { label: 'Board Home', href: '/portal/board', description: 'Board dashboard' },
   { label: 'ARB Dashboard', href: '/portal/arb-dashboard', description: 'Review ARB requests' },
-  { label: 'Directory', href: '/board/directory', description: 'Manage member directory' },
+  { label: 'Members', href: '/board/members', description: 'Manage members & directory' },
   { label: 'Dues', href: '/board/assessments', description: 'Payment tracking' },
 ];
 
@@ -60,7 +60,7 @@ export const boardSecondaryLinks: MenuSection[] = [
 export const boardQuickActions: MenuItem[] = [
   { label: 'Review ARB Requests', href: '/portal/arb-dashboard' },
   { label: 'Record Payment', href: '/board/assessments' },
-  { label: 'Manage Directory', href: '/board/directory' },
+  { label: 'Manage Members', href: '/board/members' },
 ];
 
 /**
