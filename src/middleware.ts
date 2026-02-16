@@ -48,6 +48,7 @@ const ELEVATED_API_PREFIXES = [
   '/api/arb-deadline',
   '/api/arb-export',
   '/api/vendors',
+  '/api/directory-export',
 ];
 
 /** Suspicious path patterns commonly used in credential scanning attacks. Block these early. */
