@@ -132,13 +132,17 @@ export const POST: APIRoute = async ({ request, locals }) => {
   // 4. CSRF verification
   const csrf = (formData.get('csrf_token') ?? formData.get('csrfToken'))?.toString() ?? '';
   console.log('[CSV-UPLOAD] CSRF Debug:', {
-    csrfToken: csrf?.substring(0, 20) + '...',
+    formToken: csrf?.substring(0, 20) + '...' || '(empty)',
+    formTokenLength: csrf?.length || 0,
+    sessionToken: (session as any)?.csrfToken?.substring(0, 20) + '...' || '(empty)',
+    sessionTokenLength: (session as any)?.csrfToken?.length || 0,
+    tokensMatch: csrf === (session as any)?.csrfToken,
     hasSession: !!session,
     sessionKeys: session ? Object.keys(session) : [],
   });
 
   if (!verifyCsrfToken(session as any, csrf)) {
-    console.log('[CSV-UPLOAD] CSRF verification failed');
+    console.log('[CSV-UPLOAD] CSRF verification failed - tokens do not match');
     return new Response(JSON.stringify({ error: 'Invalid security token.' }), {
       status: 403,
       headers: { 'Content-Type': 'application/json' },
