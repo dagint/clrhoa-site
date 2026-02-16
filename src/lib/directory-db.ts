@@ -536,11 +536,15 @@ export async function insertDirectoryExportLog(
 export async function insertOwner(
   db: D1Database,
   data: { name: string | null; address: string | null; lot_number?: string | null; phone: string | null; email: string | null; phones?: string | null },
-  createdByEmail?: string | null
+  createdByEmail?: string | null,
+  auditContext?: { ip_address?: string; role?: string; operation_type?: string }
 ): Promise<string> {
   const id = generateId();
   const creator = createdByEmail?.trim()?.toLowerCase() ?? null;
   const lotNumber = data.lot_number?.trim() || null;
+  const normalizedEmail = data.email?.trim()?.toLowerCase() ?? null;
+  const normalizedName = data.name?.trim() ?? null;
+
   if (creator) {
     try {
       await db
@@ -549,16 +553,15 @@ export async function insertOwner(
         )
         .bind(
           id,
-          data.name?.trim() ?? null,
+          normalizedName,
           data.address?.trim() ?? null,
           lotNumber,
           data.phone?.trim() ?? null,
-          data.email?.trim()?.toLowerCase() ?? null,
+          normalizedEmail,
           data.phones ?? null,
           creator
         )
         .run();
-      return id;
     } catch {
       /* lot_number column may not exist */
       await db
@@ -567,59 +570,74 @@ export async function insertOwner(
         )
         .bind(
           id,
-          data.name?.trim() ?? null,
+          normalizedName,
           data.address?.trim() ?? null,
           data.phone?.trim() ?? null,
-          data.email?.trim()?.toLowerCase() ?? null,
+          normalizedEmail,
           data.phones ?? null,
           creator
         )
         .run();
-      return id;
+    }
+  } else {
+    try {
+      await db
+        .prepare(
+          `INSERT INTO owners (id, name, address, lot_number, phone, email, phones) VALUES (?, ?, ?, ?, ?, ?, ?)`
+        )
+        .bind(
+          id,
+          normalizedName,
+          data.address?.trim() ?? null,
+          lotNumber,
+          data.phone?.trim() ?? null,
+          normalizedEmail,
+          data.phones ?? null
+        )
+        .run();
+    } catch {
+      await db
+        .prepare(
+          `INSERT INTO owners (id, name, address, phone, email, phones) VALUES (?, ?, ?, ?, ?, ?)`
+        )
+        .bind(
+          id,
+          normalizedName,
+          data.address?.trim() ?? null,
+          data.phone?.trim() ?? null,
+          normalizedEmail,
+          data.phones ?? null
+        )
+        .run();
     }
   }
-  try {
-    await db
-      .prepare(
-        `INSERT INTO owners (id, name, address, lot_number, phone, email, phones) VALUES (?, ?, ?, ?, ?, ?, ?)`
-      )
-      .bind(
-        id,
-        data.name?.trim() ?? null,
-        data.address?.trim() ?? null,
-        lotNumber,
-        data.phone?.trim() ?? null,
-        data.email?.trim()?.toLowerCase() ?? null,
-        data.phones ?? null
-      )
-      .run();
-    return id;
-  } catch {
-    await db
-      .prepare(
-        `INSERT INTO owners (id, name, address, phone, email, phones) VALUES (?, ?, ?, ?, ?, ?)`
-      )
-      .bind(
-        id,
-        data.name?.trim() ?? null,
-        data.address?.trim() ?? null,
-        data.phone?.trim() ?? null,
-        data.email?.trim()?.toLowerCase() ?? null,
-        data.phones ?? null
-      )
-      .run();
-    return id;
-  }
+
+  // Audit log
+  await insertOwnerAuditLog(db, {
+    owner_id: id,
+    owner_name: normalizedName,
+    owner_email: normalizedEmail,
+    action: auditContext?.operation_type === 'csv_upload' ? 'created_via_csv_upload' : 'created',
+    changed_by_email: creator,
+    changed_by_role: auditContext?.role ?? null,
+    ip_address: auditContext?.ip_address ?? null,
+    new_values: JSON.stringify(data),
+    operation_type: auditContext?.operation_type ?? 'manual',
+  });
+
+  return id;
 }
 
 export async function updateOwner(
   db: D1Database,
   id: string,
   data: { name?: string | null; address?: string | null; lot_number?: string | null; phone?: string | null; email?: string | null; phones?: string | null; is_primary?: number | null },
-  updatedByEmail?: string | null
+  updatedByEmail?: string | null,
+  auditContext?: { ip_address?: string; role?: string; operation_type?: string }
 ): Promise<boolean> {
   const existing = await getOwnerById(db, id);
   if (!existing) return false;
+
   const name = data.name !== undefined ? (data.name?.trim() ?? null) : existing.name;
   const address = data.address !== undefined ? (data.address?.trim() ?? null) : existing.address;
   const lotNumber = data.lot_number !== undefined ? (data.lot_number?.trim() || null) : existing.lot_number ?? null;
@@ -628,52 +646,155 @@ export async function updateOwner(
   const phones = data.phones !== undefined ? data.phones : existing.phones;
   const isPrimary = data.is_primary !== undefined ? (data.is_primary ? 1 : 0) : (existing.is_primary ?? 1);
   const updatedBy = updatedByEmail?.trim()?.toLowerCase() ?? null;
+
+  // Track changed fields for audit
+  const changedFields: string[] = [];
+  const oldValues: Record<string, any> = {};
+  const newValues: Record<string, any> = {};
+
+  if (data.name !== undefined && name !== existing.name) {
+    changedFields.push('name');
+    oldValues.name = existing.name;
+    newValues.name = name;
+  }
+  if (data.address !== undefined && address !== existing.address) {
+    changedFields.push('address');
+    oldValues.address = existing.address;
+    newValues.address = address;
+  }
+  if (data.lot_number !== undefined && lotNumber !== existing.lot_number) {
+    changedFields.push('lot_number');
+    oldValues.lot_number = existing.lot_number;
+    newValues.lot_number = lotNumber;
+  }
+  if (data.phone !== undefined && phone !== existing.phone) {
+    changedFields.push('phone');
+    oldValues.phone = existing.phone;
+    newValues.phone = phone;
+  }
+  if (data.email !== undefined && email !== existing.email) {
+    changedFields.push('email');
+    oldValues.email = existing.email;
+    newValues.email = email;
+  }
+  if (data.phones !== undefined && phones !== existing.phones) {
+    changedFields.push('phones');
+    oldValues.phones = existing.phones;
+    newValues.phones = phones;
+  }
+  if (data.is_primary !== undefined && isPrimary !== (existing.is_primary ?? 1)) {
+    changedFields.push('is_primary');
+    oldValues.is_primary = existing.is_primary;
+    newValues.is_primary = isPrimary;
+  }
+
+  let updated = false;
   if (updatedBy) {
     try {
       const result = await db
         .prepare(`UPDATE owners SET name = ?, address = ?, lot_number = ?, phone = ?, email = ?, phones = ?, is_primary = ?, updated_by = ?, updated_at = datetime('now') WHERE id = ?`)
         .bind(name, address, lotNumber, phone, email, phones ?? null, isPrimary, updatedBy, id)
         .run();
-      if ((result.meta.changes ?? 0) > 0) return true;
+      if ((result.meta.changes ?? 0) > 0) updated = true;
     } catch {
       try {
         const result = await db
           .prepare(`UPDATE owners SET name = ?, address = ?, phone = ?, email = ?, phones = ?, is_primary = ?, updated_by = ?, updated_at = datetime('now') WHERE id = ?`)
           .bind(name, address, phone, email, phones ?? null, isPrimary, updatedBy, id)
           .run();
-        if ((result.meta.changes ?? 0) > 0) return true;
+        if ((result.meta.changes ?? 0) > 0) updated = true;
       } catch {
         /* updated_by column may not exist */
       }
     }
   }
-  try {
-    const result = await db
-      .prepare(`UPDATE owners SET name = ?, address = ?, lot_number = ?, phone = ?, email = ?, phones = ?, is_primary = ? WHERE id = ?`)
-      .bind(name, address, lotNumber, phone, email, phones ?? null, isPrimary, id)
-      .run();
-    return (result.meta.changes ?? 0) > 0;
-  } catch {
-    const result = await db
-      .prepare(`UPDATE owners SET name = ?, address = ?, phone = ?, email = ?, phones = ?, is_primary = ? WHERE id = ?`)
-      .bind(name, address, phone, email, phones ?? null, isPrimary, id)
-      .run();
-    return (result.meta.changes ?? 0) > 0;
+
+  if (!updated) {
+    try {
+      const result = await db
+        .prepare(`UPDATE owners SET name = ?, address = ?, lot_number = ?, phone = ?, email = ?, phones = ?, is_primary = ? WHERE id = ?`)
+        .bind(name, address, lotNumber, phone, email, phones ?? null, isPrimary, id)
+        .run();
+      updated = (result.meta.changes ?? 0) > 0;
+    } catch {
+      const result = await db
+        .prepare(`UPDATE owners SET name = ?, address = ?, phone = ?, email = ?, phones = ?, is_primary = ? WHERE id = ?`)
+        .bind(name, address, phone, email, phones ?? null, isPrimary, id)
+        .run();
+      updated = (result.meta.changes ?? 0) > 0;
+    }
   }
+
+  // Audit log if update was successful and fields changed
+  if (updated && changedFields.length > 0) {
+    await insertOwnerAuditLog(db, {
+      owner_id: id,
+      owner_name: name,
+      owner_email: email,
+      action: auditContext?.operation_type === 'csv_upload' ? 'updated_via_csv_upload' : 'updated',
+      changed_by_email: updatedBy,
+      changed_by_role: auditContext?.role ?? null,
+      ip_address: auditContext?.ip_address ?? null,
+      old_values: JSON.stringify(oldValues),
+      new_values: JSON.stringify(newValues),
+      fields_changed: changedFields.join(', '),
+      operation_type: auditContext?.operation_type ?? 'manual',
+    });
+  }
+
+  return updated;
 }
 
-export async function deleteOwner(db: D1Database, id: string): Promise<boolean> {
+export async function deleteOwner(
+  db: D1Database,
+  id: string,
+  deletedByEmail?: string | null,
+  auditContext?: { ip_address?: string; role?: string; operation_type?: string }
+): Promise<boolean> {
+  // Fetch owner data before deletion for audit log
+  const existing = await getOwnerById(db, id);
+  if (!existing) return false;
+
   const result = await db.prepare('DELETE FROM owners WHERE id = ?').bind(id).run();
-  return (result.meta.changes ?? 0) > 0;
+  const deleted = (result.meta.changes ?? 0) > 0;
+
+  // Audit log
+  if (deleted) {
+    await insertOwnerAuditLog(db, {
+      owner_id: id,
+      owner_name: existing.name,
+      owner_email: existing.email,
+      action: 'deleted',
+      changed_by_email: deletedByEmail?.trim()?.toLowerCase() ?? null,
+      changed_by_role: auditContext?.role ?? null,
+      ip_address: auditContext?.ip_address ?? null,
+      old_values: JSON.stringify({
+        name: existing.name,
+        address: existing.address,
+        lot_number: existing.lot_number,
+        phone: existing.phone,
+        email: existing.email,
+        phones: existing.phones,
+      }),
+      operation_type: auditContext?.operation_type ?? 'manual',
+    });
+  }
+
+  return deleted;
 }
 
 /** Delete multiple owners by id. Returns number of rows deleted. */
-export async function deleteOwners(db: D1Database, ids: string[]): Promise<number> {
+export async function deleteOwners(
+  db: D1Database,
+  ids: string[],
+  deletedByEmail?: string | null,
+  auditContext?: { ip_address?: string; role?: string; operation_type?: string }
+): Promise<number> {
   const unique = [...new Set(ids)].filter((id) => id?.trim());
   if (unique.length === 0) return 0;
   let deleted = 0;
   for (const id of unique) {
-    const ok = await deleteOwner(db, id);
+    const ok = await deleteOwner(db, id, deletedByEmail, auditContext);
     if (ok) deleted += 1;
   }
   return deleted;
@@ -751,4 +872,140 @@ export async function upsertOwnerByEmail(
       .run();
   }
   return { id, created: true };
+}
+
+// ============================================================================
+// OWNER AUDIT LOGGING
+// ============================================================================
+
+export interface OwnerAuditLogEntry {
+  owner_id: string;
+  owner_name?: string | null;
+  owner_email?: string | null;
+  action: string;
+  changed_by_email?: string | null;
+  changed_by_role?: string | null;
+  ip_address?: string | null;
+  old_values?: string | null;  // JSON
+  new_values?: string | null;  // JSON
+  fields_changed?: string | null;
+  operation_type?: string | null;
+  correlation_id?: string | null;
+}
+
+export interface OwnerAuditLogRow {
+  id: number;
+  owner_id: string;
+  owner_name: string | null;
+  owner_email: string | null;
+  action: string;
+  changed_by_email: string | null;
+  changed_by_role: string | null;
+  ip_address: string | null;
+  old_values: string | null;
+  new_values: string | null;
+  fields_changed: string | null;
+  operation_type: string | null;
+  correlation_id: string | null;
+  created: string;
+}
+
+/**
+ * Insert owner audit log entry
+ * Tracks all owner/directory CRUD operations for HOA compliance
+ */
+export async function insertOwnerAuditLog(
+  db: D1Database,
+  params: OwnerAuditLogEntry
+): Promise<void> {
+  try {
+    await db
+      .prepare(
+        `INSERT INTO owner_audit_log (
+          owner_id, owner_name, owner_email, action,
+          changed_by_email, changed_by_role, ip_address,
+          old_values, new_values, fields_changed,
+          operation_type, correlation_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .bind(
+        params.owner_id,
+        params.owner_name?.trim() ?? null,
+        params.owner_email?.trim()?.toLowerCase() ?? null,
+        params.action,
+        params.changed_by_email?.trim()?.toLowerCase() ?? null,
+        params.changed_by_role?.trim() ?? null,
+        params.ip_address?.trim() ?? null,
+        params.old_values ?? null,
+        params.new_values ?? null,
+        params.fields_changed ?? null,
+        params.operation_type ?? null,
+        params.correlation_id ?? null
+      )
+      .run();
+  } catch (error) {
+    // Table may not exist yet (migration not run)
+    console.error('[DIRECTORY-DB] Failed to insert owner audit log:', error);
+  }
+}
+
+/**
+ * List owner audit log entries
+ * For HOA compliance reporting and security audit
+ */
+export async function listOwnerAuditLog(
+  db: D1Database,
+  limit: number,
+  offset = 0
+): Promise<OwnerAuditLogRow[]> {
+  const safeLimit = Math.max(1, Math.min(limit, 500));
+  const safeOffset = Math.max(0, offset);
+  try {
+    const { results } = await db
+      .prepare(
+        `SELECT
+          id, owner_id, owner_name, owner_email, action,
+          changed_by_email, changed_by_role, ip_address,
+          old_values, new_values, fields_changed,
+          operation_type, correlation_id, created
+         FROM owner_audit_log
+         ORDER BY created DESC
+         LIMIT ? OFFSET ?`
+      )
+      .bind(safeLimit, safeOffset)
+      .all<OwnerAuditLogRow>();
+    return results ?? [];
+  } catch {
+    // Table may not exist yet
+    return [];
+  }
+}
+
+/**
+ * Get audit log for specific owner
+ */
+export async function getOwnerAuditHistory(
+  db: D1Database,
+  ownerId: string,
+  limit = 50
+): Promise<OwnerAuditLogRow[]> {
+  try {
+    const { results } = await db
+      .prepare(
+        `SELECT
+          id, owner_id, owner_name, owner_email, action,
+          changed_by_email, changed_by_role, ip_address,
+          old_values, new_values, fields_changed,
+          operation_type, correlation_id, created
+         FROM owner_audit_log
+         WHERE owner_id = ?
+         ORDER BY created DESC
+         LIMIT ?`
+      )
+      .bind(ownerId, limit)
+      .all<OwnerAuditLogRow>();
+    return results ?? [];
+  } catch {
+    return [];
+  }
 }

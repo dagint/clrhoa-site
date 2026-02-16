@@ -57,7 +57,7 @@ if (!db) {
   });
 }
 
-const clientIpAddress = Astro.clientAddress || Astro.request.headers.get('cf-connecting-ip') || ipAddress;
+const clientIpAddress = Astro.clientAddress || Astro.request.headers.get('cf-connecting-ip') || ipAddress || 'unknown';
 const rateLimitKv = env?.KV;
 const endpoint = '/api/owners/upload-csv';
 const rateLimitConfig = getRateLimitConfig(endpoint);
@@ -215,15 +215,43 @@ for (let i = startRow; i < lines.length; i++) {
     if (email) {
       const existing = await getOwnerByEmail(db, email);
       if (existing) {
-        const ok = await updateOwner(db, existing.id, { name, address, lot_number: lotNumber, phone, email }, session.email);
+        const ok = await updateOwner(
+          db,
+          existing.id,
+          { name, address, lot_number: lotNumber, phone, email },
+          session.email,
+          {
+            ip_address: clientIpAddress,
+            role: effectiveRole,
+            operation_type: 'csv_upload',
+          }
+        );
         if (ok) updated += 1;
       } else {
-        await insertOwner(db, { name, address, lot_number: lotNumber, phone, email });
+        await insertOwner(
+          db,
+          { name, address, lot_number: lotNumber, phone, email },
+          session.email,
+          {
+            ip_address: clientIpAddress,
+            role: effectiveRole,
+            operation_type: 'csv_upload',
+          }
+        );
         added += 1;
         await addToLoginWhitelistIfMissing(env?.CLOURHOA_USERS, email);
       }
     } else {
-      await insertOwner(db, { name, address, lot_number: lotNumber, phone, email: null });
+      await insertOwner(
+        db,
+        { name, address, lot_number: lotNumber, phone, email: null },
+        session.email,
+        {
+          ip_address: clientIpAddress,
+          role: effectiveRole,
+          operation_type: 'csv_upload',
+        }
+      );
       added += 1;
     }
   } catch (e) {
