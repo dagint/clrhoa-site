@@ -33,7 +33,6 @@ import { logSecurityEvent } from '../../../lib/audit-log';
 import { generateResetToken, sendResetEmail } from '../../../lib/auth/reset-tokens';
 import { getResendClient } from '../../../lib/resend-client';
 import crypto from 'node:crypto';
-import type { ResendClient } from '../../../types/resend';
 
 /**
  * Simple email validation regex.
@@ -106,8 +105,8 @@ export const POST: APIRoute = async ({ request, locals }) => {
       );
     }
 
-    // 3. Look up user by email
-    const user = await db
+    // 3. Look up user by email in users table
+    let user = await db
       .prepare(
         `SELECT email, name, status
          FROM users
@@ -133,18 +132,86 @@ export const POST: APIRoute = async ({ request, locals }) => {
       }
     );
 
-    // If user doesn't exist, log and return generic success
+    // 3b. If user doesn't exist in users table, check directory (owners table)
     if (!user) {
-      await logSecurityEvent(db, {
-        eventType: 'forgot_password_unknown_email',
-        severity: 'info',
-        details: {
-          email: normalizedEmail,
-          ip_address: ipAddress,
-        },
-      });
+      const directoryEntry = await db
+        .prepare(
+          `SELECT email, name
+           FROM owners
+           WHERE email = ?`
+        )
+        .bind(normalizedEmail)
+        .first<{
+          email: string;
+          name: string | null;
+        }>();
 
-      return genericSuccessResponse;
+      // If found in directory but not in users table, auto-create user account
+      if (directoryEntry) {
+        try {
+          // Get their role from KV whitelist (or default to member)
+          let role = 'member';
+          if (kv) {
+            const kvRole = await kv.get(normalizedEmail);
+            if (kvRole && ['member', 'board', 'arb', 'arb_board', 'admin'].includes(kvRole)) {
+              role = kvRole;
+            }
+          }
+
+          // Create user account with pending_setup status
+          const userId = crypto.randomBytes(16).toString('hex');
+          await db
+            .prepare(
+              `INSERT INTO users (id, email, name, role, status, created_at)
+               VALUES (?, ?, ?, ?, ?, datetime('now'))`
+            )
+            .bind(userId, normalizedEmail, directoryEntry.name, role, 'pending_setup')
+            .run();
+
+          await logSecurityEvent(db, {
+            eventType: 'forgot_password_auto_created_account',
+            severity: 'info',
+            userId: normalizedEmail,
+            details: {
+              from_directory: true,
+              role,
+              ip_address: ipAddress,
+            },
+          });
+
+          // Re-fetch the newly created user
+          user = {
+            email: normalizedEmail,
+            name: directoryEntry.name,
+            status: 'pending_setup',
+          };
+        } catch (error) {
+          console.error('[FORGOT-PASSWORD] Failed to auto-create user:', error);
+          await logSecurityEvent(db, {
+            eventType: 'forgot_password_auto_create_failed',
+            severity: 'critical',
+            details: {
+              email: normalizedEmail,
+              error: error instanceof Error ? error.message : 'Unknown',
+              ip_address: ipAddress,
+            },
+          });
+          // Return generic success even on error
+          return genericSuccessResponse;
+        }
+      } else {
+        // Not in users table OR directory table
+        await logSecurityEvent(db, {
+          eventType: 'forgot_password_unknown_email',
+          severity: 'info',
+          details: {
+            email: normalizedEmail,
+            ip_address: ipAddress,
+          },
+        });
+
+        return genericSuccessResponse;
+      }
     }
 
     // 4. Check if user account is active

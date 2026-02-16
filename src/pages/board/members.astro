@@ -1,0 +1,474 @@
+---
+/**
+ * Unified Members Management
+ *
+ * Replaces both /portal/admin/users and /board/directory
+ * Manages authentication accounts AND directory entries in one place
+ */
+export const prerender = false;
+
+import { getAdminContext } from '../../lib/board-context';
+import { getPortalBadgeCounts } from '../../lib/portal-badge-counts';
+import { getMemberStats } from '../../lib/members-db';
+import { sanitizeForScriptInjection } from '../../lib/sanitize';
+import PortalLayout from '../../layouts/PortalLayout.astro';
+import PortalPage from '../../components/PortalPage.astro';
+import AdminNav from '../../components/AdminNav.astro';
+
+const ctx = await getAdminContext(Astro);
+if ('redirect' in ctx) return Astro.redirect(ctx.redirect);
+const { env, session, effectiveRole } = ctx;
+
+const { email, role, name } = session;
+const db = env?.DB;
+const badges = await getPortalBadgeCounts(db, email, role, name);
+
+// Get member statistics
+const stats = db ? await getMemberStats(db) : {
+  total: 0,
+  withAccounts: 0,
+  inDirectory: 0,
+  activeAccounts: 0,
+  pendingAccounts: 0,
+  accountOnlyCount: 0,
+  directoryOnlyCount: 0,
+};
+
+const csrfToken = session?.csrfToken ?? '';
+---
+
+<PortalLayout title="Members | Board | Crooked Lake Reserve HOA">
+  <PortalPage
+    currentPath="/board/members"
+    pageTitle="Members"
+    userName={badges.displayName ?? undefined}
+    userEmail={email}
+    effectiveRole={effectiveRole}
+    draftCount={badges.draftCount}
+    role={effectiveRole}
+    staffRole={role ?? ''}
+    arbInReviewCount={badges.arbInReviewCount}
+    vendorPendingCount={badges.vendorPendingCount}
+    maintenanceOpenCount={badges.maintenanceOpenCount}
+    meetingsRsvpCount={badges.meetingsRsvpCount}
+    feedbackDueCount={badges.feedbackDueCount}
+  >
+    <AdminNav currentPath="/board/members" />
+
+    <!-- Header -->
+    <div class="mb-6">
+      <h1 class="text-3xl font-heading font-bold text-clr-green mb-2">Members</h1>
+      <p class="text-gray-600">
+        Unified view of all members - authentication accounts and directory entries in one place.
+      </p>
+    </div>
+
+    <!-- Message area -->
+    <div id="members-message" class="hidden mb-4 p-4 rounded-xl border" role="status" aria-live="polite" aria-atomic="true"></div>
+
+    <!-- Stats Dashboard -->
+    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-8">
+      <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+        <div class="text-2xl font-bold text-clr-green">{stats.total}</div>
+        <div class="text-sm text-gray-600">Total Members</div>
+      </div>
+      <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+        <div class="text-2xl font-bold text-green-600">{stats.activeAccounts}</div>
+        <div class="text-sm text-gray-600">Active Accounts</div>
+      </div>
+      <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+        <div class="text-2xl font-bold text-amber-600">{stats.pendingAccounts}</div>
+        <div class="text-sm text-gray-600">Pending Setup</div>
+      </div>
+      <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+        <div class="text-2xl font-bold text-blue-600">{stats.inDirectory}</div>
+        <div class="text-sm text-gray-600">In Directory</div>
+      </div>
+      <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+        <div class="text-2xl font-bold text-purple-600">{stats.withAccounts + stats.inDirectory - stats.total}</div>
+        <div class="text-sm text-gray-600">Complete Records</div>
+      </div>
+      <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+        <div class="text-2xl font-bold text-gray-600">{stats.accountOnlyCount}</div>
+        <div class="text-sm text-gray-600">Account Only</div>
+      </div>
+      <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+        <div class="text-2xl font-bold text-gray-600">{stats.directoryOnlyCount}</div>
+        <div class="text-sm text-gray-600">Directory Only</div>
+      </div>
+    </div>
+
+    <!-- Add Member Form -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-8">
+      <h2 class="text-xl font-heading font-semibold text-clr-green mb-4">Add New Member</h2>
+      <form id="add-member-form" class="space-y-4">
+        <input type="hidden" name="csrf_token" value={csrfToken} />
+
+        <div class="grid md:grid-cols-2 gap-4">
+          <div>
+            <label for="add-email" class="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+            <input
+              type="email"
+              id="add-email"
+              name="email"
+              required
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-clr-green focus:border-clr-green"
+              placeholder="member@example.com"
+            />
+          </div>
+          <div>
+            <label for="add-name" class="block text-sm font-medium text-gray-700 mb-1">Name *</label>
+            <input
+              type="text"
+              id="add-name"
+              name="name"
+              required
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-clr-green focus:border-clr-green"
+              placeholder="John Doe"
+            />
+          </div>
+        </div>
+
+        <div class="grid md:grid-cols-3 gap-4">
+          <div>
+            <label for="add-role" class="block text-sm font-medium text-gray-700 mb-1">Role</label>
+            <select
+              id="add-role"
+              name="role"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-clr-green focus:border-clr-green"
+            >
+              <option value="member">Member</option>
+              <option value="board">Board</option>
+              <option value="arb">ARB</option>
+              <option value="arb_board">ARB + Board</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+          <div>
+            <label for="add-lot" class="block text-sm font-medium text-gray-700 mb-1">Lot Number</label>
+            <input
+              type="text"
+              id="add-lot"
+              name="lot_number"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-clr-green focus:border-clr-green"
+              placeholder="1-25"
+            />
+          </div>
+          <div>
+            <label for="add-phone" class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+            <input
+              type="tel"
+              id="add-phone"
+              name="phone"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-clr-green focus:border-clr-green"
+              placeholder="(555) 123-4567"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label for="add-address" class="block text-sm font-medium text-gray-700 mb-1">Address</label>
+          <input
+            type="text"
+            id="add-address"
+            name="address"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-clr-green focus:border-clr-green"
+            placeholder="123 Lake Shore Dr, Frostproof FL 33843"
+          />
+        </div>
+
+        <div class="flex items-center gap-4 text-sm">
+          <label class="flex items-center gap-2">
+            <input type="checkbox" name="createAccount" checked class="rounded border-gray-300 text-clr-green focus:ring-clr-green" />
+            <span>Create login account (they can use "Forgot Password" to set password)</span>
+          </label>
+          <label class="flex items-center gap-2">
+            <input type="checkbox" name="addToDirectory" checked class="rounded border-gray-300 text-clr-green focus:ring-clr-green" />
+            <span>Add to member directory</span>
+          </label>
+        </div>
+
+        <div class="flex gap-3">
+          <button
+            type="submit"
+            class="px-6 py-2.5 bg-clr-green text-white rounded-lg font-medium hover:brightness-110 transition-all"
+          >
+            Add Member
+          </button>
+          <button
+            type="reset"
+            class="px-6 py-2.5 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 transition-all"
+          >
+            Clear
+          </button>
+        </div>
+
+        <p class="text-sm text-gray-500">
+          💡 <strong>Self-service tip:</strong> Just add to directory (uncheck "Create account").
+          Member can then use "Forgot Password" to create their own account when ready.
+        </p>
+      </form>
+    </div>
+
+    <!-- Members List -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-xl font-heading font-semibold text-clr-green">All Members</h2>
+        <div class="flex gap-2">
+          <button
+            id="refresh-btn"
+            class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium"
+          >
+            🔄 Refresh
+          </button>
+          <a
+            href="/api/directory-export"
+            class="px-4 py-2 bg-clr-green text-white rounded-lg hover:brightness-110 text-sm font-medium"
+            download
+          >
+            ↓ Export CSV
+          </a>
+        </div>
+      </div>
+
+      <!-- Loading State -->
+      <div id="members-loading" class="text-center py-8">
+        <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-clr-green border-t-transparent"></div>
+        <p class="mt-2 text-gray-600">Loading members...</p>
+      </div>
+
+      <!-- Members Table Container -->
+      <div id="members-container" class="hidden overflow-x-auto">
+        <!-- Table will be inserted here by JavaScript -->
+      </div>
+
+      <!-- Empty State -->
+      <div id="members-empty" class="hidden text-center py-8">
+        <p class="text-gray-500">No members found. Add your first member above!</p>
+      </div>
+    </div>
+
+    <!-- Info Box -->
+    <div class="mt-8 p-6 rounded-xl bg-blue-50 border border-blue-200">
+      <h3 class="font-semibold text-blue-900 mb-2">📘 About This Page</h3>
+      <p class="text-sm text-blue-800 mb-3">
+        This unified members page combines authentication accounts (<code>/portal/admin/users</code>)
+        and directory entries (<code>/board/directory</code>) into a single view.
+      </p>
+      <ul class="text-sm text-blue-800 space-y-1 list-disc list-inside">
+        <li><strong>Complete Records:</strong> Members with both account + directory entry</li>
+        <li><strong>Account Only:</strong> Can log in but not in member directory (admins, service providers)</li>
+        <li><strong>Directory Only:</strong> In directory but haven't set up portal access yet</li>
+        <li><strong>Self-Service:</strong> Members can use "Forgot Password" to create accounts themselves</li>
+      </ul>
+    </div>
+  </PortalPage>
+</PortalLayout>
+
+<script is:inline define:vars={{ csrfToken: sanitizeForScriptInjection(csrfToken) }}>
+  const msgEl = document.getElementById('members-message');
+  const loadingEl = document.getElementById('members-loading');
+  const containerEl = document.getElementById('members-container');
+  const emptyEl = document.getElementById('members-empty');
+  const addForm = document.getElementById('add-member-form');
+  const refreshBtn = document.getElementById('refresh-btn');
+
+  function showMessage(text, isError = false) {
+    if (!msgEl) return;
+    msgEl.textContent = text;
+    msgEl.className = `mb-4 p-4 rounded-xl border ${
+      isError
+        ? 'bg-red-50 border-red-200 text-red-800'
+        : 'bg-green-50 border-green-200 text-green-800'
+    }`;
+    msgEl.classList.remove('hidden');
+    setTimeout(() => msgEl.classList.add('hidden'), 5000);
+  }
+
+  function getStatusBadge(member) {
+    if (member.hasAccount && member.inDirectory) {
+      return `<span class="px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-800">✓ Complete</span>`;
+    } else if (member.hasAccount) {
+      if (member.accountStatus === 'active') {
+        return `<span class="px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800">Account Only</span>`;
+      } else if (member.accountStatus === 'pending_setup') {
+        return `<span class="px-2 py-1 rounded text-xs font-medium bg-amber-100 text-amber-800">Pending Setup</span>`;
+      } else {
+        return `<span class="px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-800">Suspended</span>`;
+      }
+    } else if (member.inDirectory) {
+      return `<span class="px-2 py-1 rounded text-xs font-medium bg-purple-100 text-purple-800">Directory Only</span>`;
+    }
+    return `<span class="px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-800">Unknown</span>`;
+  }
+
+  function getRoleBadge(role) {
+    if (!role) return '-';
+    const colors = {
+      admin: 'bg-red-100 text-red-800',
+      board: 'bg-blue-100 text-blue-800',
+      arb: 'bg-green-100 text-green-800',
+      arb_board: 'bg-purple-100 text-purple-800',
+      member: 'bg-gray-100 text-gray-800',
+    };
+    const color = colors[role] || 'bg-gray-100 text-gray-800';
+    return `<span class="px-2 py-1 rounded text-xs font-medium ${color}">${role}</span>`;
+  }
+
+  async function loadMembers() {
+    loadingEl?.classList.remove('hidden');
+    containerEl?.classList.add('hidden');
+    emptyEl?.classList.add('hidden');
+
+    try {
+      const response = await fetch('/api/members');
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to load members');
+      }
+
+      const members = data.members || [];
+
+      if (members.length === 0) {
+        loadingEl?.classList.add('hidden');
+        emptyEl?.classList.remove('hidden');
+        return;
+      }
+
+      // Build table
+      const table = `
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lot #</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Address</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="bg-white divide-y divide-gray-200">
+            ${members
+              .map(
+                (m) => `
+              <tr class="hover:bg-gray-50">
+                <td class="px-4 py-3 text-sm text-gray-900">${m.email}</td>
+                <td class="px-4 py-3 text-sm text-gray-900">${m.name || '-'}</td>
+                <td class="px-4 py-3 text-sm">${getStatusBadge(m)}</td>
+                <td class="px-4 py-3 text-sm">${getRoleBadge(m.role)}</td>
+                <td class="px-4 py-3 text-sm text-gray-600">${m.lot_number || '-'}</td>
+                <td class="px-4 py-3 text-sm text-gray-600">${m.phone || '-'}</td>
+                <td class="px-4 py-3 text-sm text-gray-600">${m.address || '-'}</td>
+                <td class="px-4 py-3 text-sm">
+                  <button
+                    class="text-red-600 hover:text-red-800 font-medium"
+                    onclick="deleteMember('${m.email}')"
+                  >
+                    Delete
+                  </button>
+                </td>
+              </tr>
+            `
+              )
+              .join('')}
+          </tbody>
+        </table>
+      `;
+
+      if (containerEl) {
+        containerEl.innerHTML = table;
+        containerEl.classList.remove('hidden');
+      }
+      loadingEl?.classList.add('hidden');
+    } catch (error) {
+      console.error('[MEMBERS] Load error:', error);
+      loadingEl?.classList.add('hidden');
+      showMessage(error.message || 'Failed to load members', true);
+    }
+  }
+
+  // Add member form handler
+  addForm?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    const data = {
+      email: formData.get('email'),
+      name: formData.get('name'),
+      role: formData.get('role'),
+      lot_number: formData.get('lot_number'),
+      phone: formData.get('phone'),
+      address: formData.get('address'),
+      createAccount: formData.get('createAccount') === 'on',
+      addToDirectory: formData.get('addToDirectory') === 'on',
+    };
+
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Adding...';
+    }
+
+    try {
+      const response = await fetch('/api/members', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        showMessage(result.message || 'Member added successfully!');
+        addForm.reset();
+        loadMembers();
+      } else {
+        showMessage(result.error || 'Failed to add member', true);
+      }
+    } catch (error) {
+      console.error('[MEMBERS] Add error:', error);
+      showMessage('Network error. Please try again.', true);
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Add Member';
+      }
+    }
+  });
+
+  // Delete member function (global so onclick can call it)
+  window.deleteMember = async function (email) {
+    if (!confirm(`Delete member ${email}? This will remove them from both the directory and authentication system.`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/members', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        showMessage(result.message || 'Member deleted successfully!');
+        loadMembers();
+      } else {
+        showMessage(result.error || 'Failed to delete member', true);
+      }
+    } catch (error) {
+      console.error('[MEMBERS] Delete error:', error);
+      showMessage('Network error. Please try again.', true);
+    }
+  };
+
+  // Refresh button
+  refreshBtn?.addEventListener('click', () => loadMembers());
+
+  // Load members on page load
+  loadMembers();
+</script>
