@@ -225,6 +225,7 @@
   },
   "overrides": {
     "undici": ">=7.18.2",
+    "lodash": "4.17.23",
     "@astrojs/cloudflare": {
       "wrangler": "4.59.1"
     }
