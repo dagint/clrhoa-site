@@ -52,8 +52,8 @@ export async function isEmailWhitelisted(
 export const ELEVATED_ROLES = new Set<string>(['arb', 'board', 'arb_board', 'admin']);
 export const VALID_ROLES = new Set<string>(['member', 'arb', 'board', 'arb_board', 'admin']);
 
-/** PIM: 2-hour window for JIT elevated access. */
-export const PIM_ELEVATION_TTL_MS = 2 * 60 * 60 * 1000;
+/** PIM: 1-hour window for JIT elevated access. */
+export const PIM_ELEVATION_TTL_MS = 60 * 60 * 1000;
 
 export function isElevatedRole(role: string): boolean {
   return ELEVATED_ROLES.has(role.toLowerCase());
@@ -490,8 +490,8 @@ export async function createSessionWithElevation(
 export const ASSUMED_ROLES = ['board', 'arb'] as const;
 export type AdminAssumedRole = (typeof ASSUMED_ROLES)[number];
 
-/** TTL for assumed role (2 hours). After this, user falls back to admin/arb_board until they assume again or drop. */
-export const ASSUMED_ROLE_TTL_MS = 2 * 60 * 60 * 1000;
+/** TTL for assumed role (1 hour). After this, user falls back to admin/arb_board until they assume again or drop. */
+export const ASSUMED_ROLE_TTL_MS = 60 * 60 * 1000;
 
 /**
  * Re-issue session cookie with assumed_role set or cleared (admin or arb_board only). Caller must set the cookie on response and log the action.

@@ -68,6 +68,87 @@ const returnLabel = returnParam && returnParam.startsWith('/board') ? 'Board' : 
 
         <!-- Elevation Request Form -->
         <form id="pim-elevate-form" class="space-y-4">
+          {/* Role selection for users with multiple roles */}
+          {(whitelistRole === 'admin' || whitelistRole === 'arb_board') && (
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-3">
+                Select role to elevate to <span class="text-red-600">*</span>
+              </label>
+              <div class="space-y-2">
+                {whitelistRole === 'admin' && (
+                  <>
+                    <label class="flex items-center p-3 border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="targetRole"
+                        value="admin"
+                        required
+                        class="w-4 h-4 text-clr-green focus:ring-clr-green border-gray-300"
+                      />
+                      <span class="ml-3 text-sm">
+                        <strong class="text-gray-900">Admin</strong>
+                        <span class="block text-gray-600 text-xs mt-0.5">Site administration, user management, and settings</span>
+                      </span>
+                    </label>
+                    <label class="flex items-center p-3 border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="targetRole"
+                        value="board"
+                        class="w-4 h-4 text-clr-green focus:ring-clr-green border-gray-300"
+                      />
+                      <span class="ml-3 text-sm">
+                        <strong class="text-gray-900">Board</strong>
+                        <span class="block text-gray-600 text-xs mt-0.5">Board operations, directory, meetings, dues</span>
+                      </span>
+                    </label>
+                    <label class="flex items-center p-3 border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="targetRole"
+                        value="arb"
+                        class="w-4 h-4 text-clr-green focus:ring-clr-green border-gray-300"
+                      />
+                      <span class="ml-3 text-sm">
+                        <strong class="text-gray-900">ARB</strong>
+                        <span class="block text-gray-600 text-xs mt-0.5">Architectural Review Board operations</span>
+                      </span>
+                    </label>
+                  </>
+                )}
+                {whitelistRole === 'arb_board' && (
+                  <>
+                    <label class="flex items-center p-3 border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="targetRole"
+                        value="board"
+                        required
+                        class="w-4 h-4 text-clr-green focus:ring-clr-green border-gray-300"
+                      />
+                      <span class="ml-3 text-sm">
+                        <strong class="text-gray-900">Board</strong>
+                        <span class="block text-gray-600 text-xs mt-0.5">Board operations, directory, meetings, dues</span>
+                      </span>
+                    </label>
+                    <label class="flex items-center p-3 border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="targetRole"
+                        value="arb"
+                        class="w-4 h-4 text-clr-green focus:ring-clr-green border-gray-300"
+                      />
+                      <span class="ml-3 text-sm">
+                        <strong class="text-gray-900">ARB</strong>
+                        <span class="block text-gray-600 text-xs mt-0.5">Architectural Review Board operations</span>
+                      </span>
+                    </label>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+
           <div>
             <label for="password" class="block text-sm font-medium text-gray-700 mb-2">
               Confirm your password <span class="text-red-600">*</span>
@@ -140,15 +221,24 @@ const returnLabel = returnParam && returnParam.startsWith('/board') ? 'Board' : 
           return;
         }
 
+        // Get selected target role (if applicable)
+        var targetRoleInput = document.querySelector('input[name="targetRole"]:checked');
+        var targetRole = targetRoleInput ? targetRoleInput.value : null;
+
         var b = /** @type {HTMLButtonElement} */ (btn);
         b.disabled = true;
         b.textContent = 'Requesting access...';
+
+        var requestBody = { password: password };
+        if (targetRole) {
+          requestBody.targetRole = targetRole;
+        }
 
         fetch('/api/pim/elevate', {
           method: 'POST',
           credentials: 'same-origin',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ password: password })
+          body: JSON.stringify(requestBody)
         })
           .then(function (r) {
             return r.json().then(function (data) {

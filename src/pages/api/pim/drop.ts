@@ -46,16 +46,25 @@ export async function POST(context: APIContext): Promise<Response> {
   }
 
   try {
-    // Clear elevation from session
+    // Get current assumed_role before clearing (for logging)
+    const dbSession = await env.DB
+      .prepare('SELECT assumed_role FROM sessions WHERE id = ?')
+      .bind(session.id)
+      .first<{ assumed_role: string | null }>();
+
+    const assumedRole = dbSession?.assumed_role;
+
+    // Clear elevation and assumed role from session
     await env.DB
-      .prepare('UPDATE sessions SET elevated_until = NULL WHERE id = ?')
+      .prepare('UPDATE sessions SET elevated_until = NULL, assumed_role = NULL, assumed_at = NULL, assumed_until = NULL WHERE id = ?')
       .bind(session.id)
       .run();
 
-    // Log the drop action
+    // Log the drop action with the specific role that was dropped
+    const loggedRole = assumedRole || userRole;
     await insertPimElevationLog(env.DB, {
       email: user.email,
-      role: userRole,
+      role: loggedRole,
       action: 'drop',
       expires_at: null,
     });

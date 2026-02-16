@@ -16,6 +16,17 @@ export interface DatabaseUserAttributes {
   status: string;
 }
 
+export interface DatabaseSessionAttributes {
+  elevated_until?: number | null;
+  assumed_role?: string | null;
+  assumed_at?: number | null;
+  assumed_until?: number | null;
+  fingerprint?: string | null;
+  ip_address?: string | null;
+  user_agent?: string | null;
+  created_at?: number | null;
+}
+
 /**
  * Determine if we're running in production based on environment.
  * Checks common environment indicators.
@@ -95,5 +106,6 @@ declare module 'lucia' {
   interface Register {
     Lucia: ReturnType<typeof createLucia>;
     DatabaseUserAttributes: DatabaseUserAttributes;
+    DatabaseSessionAttributes: DatabaseSessionAttributes;
   }
 }

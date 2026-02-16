@@ -51,11 +51,11 @@ export async function POST(context: APIContext): Promise<Response> {
   }
 
   try {
-    // Get current elevation status
+    // Get current elevation status including assumed_role
     const dbSession = await env.DB
-      .prepare('SELECT elevated_until FROM sessions WHERE id = ?')
+      .prepare('SELECT elevated_until, assumed_role, assumed_until FROM sessions WHERE id = ?')
       .bind(session.id)
-      .first<{ elevated_until: number | null }>();
+      .first<{ elevated_until: number | null; assumed_role: string | null; assumed_until: number | null }>();
 
     if (!dbSession || !dbSession.elevated_until) {
       return new Response(JSON.stringify({
@@ -99,16 +99,25 @@ export async function POST(context: APIContext): Promise<Response> {
     const newExpiration = currentExpiration + EXTENSION_DURATION_MS;
 
     // Update session with new expiration
-    await env.DB
-      .prepare('UPDATE sessions SET elevated_until = ? WHERE id = ?')
-      .bind(newExpiration, session.id)
-      .run();
+    // Also extend assumed_until if user has an assumed role
+    if (dbSession.assumed_role && dbSession.assumed_until) {
+      await env.DB
+        .prepare('UPDATE sessions SET elevated_until = ?, assumed_until = ? WHERE id = ?')
+        .bind(newExpiration, newExpiration, session.id)
+        .run();
+    } else {
+      await env.DB
+        .prepare('UPDATE sessions SET elevated_until = ? WHERE id = ?')
+        .bind(newExpiration, session.id)
+        .run();
+    }
 
-    // Log the extension
+    // Log the extension with the specific role (use assumed_role if present)
     const expiresAtIso = new Date(newExpiration).toISOString();
+    const loggedRole = dbSession.assumed_role || userRole;
     await insertPimElevationLog(env.DB, {
       email: user.email,
-      role: userRole,
+      role: loggedRole,
       action: 'elevate', // Using 'elevate' to represent extension
       expires_at: expiresAtIso,
     });

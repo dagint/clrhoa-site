@@ -50,7 +50,7 @@ export async function POST(context: APIContext): Promise<Response> {
   }
 
   // Parse request body
-  let body: { password?: string };
+  let body: { password?: string; targetRole?: string };
   try {
     body = await context.request.json();
   } catch {
@@ -63,7 +63,7 @@ export async function POST(context: APIContext): Promise<Response> {
     });
   }
 
-  const { password } = body;
+  const { password, targetRole } = body;
 
   // Require password for re-authentication
   if (!password || typeof password !== 'string') {
@@ -106,20 +106,66 @@ export async function POST(context: APIContext): Promise<Response> {
       });
     }
 
+    // Validate and determine target role for elevation
+    let effectiveTargetRole: string | null = null;
+
+    if (userRole === 'admin') {
+      // Admin can elevate to admin, board, or arb
+      const validTargets = ['admin', 'board', 'arb'];
+      if (targetRole && validTargets.includes(targetRole.toLowerCase())) {
+        effectiveTargetRole = targetRole.toLowerCase();
+      } else {
+        return new Response(JSON.stringify({
+          error: 'Admin must specify target role: admin, board, or arb',
+          success: false
+        }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+    } else if (userRole === 'arb_board') {
+      // ARB+Board can elevate to board or arb (one at a time)
+      const validTargets = ['board', 'arb'];
+      if (targetRole && validTargets.includes(targetRole.toLowerCase())) {
+        effectiveTargetRole = targetRole.toLowerCase();
+      } else {
+        return new Response(JSON.stringify({
+          error: 'Board+ARB must specify target role: board or arb',
+          success: false
+        }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+    }
+    // For single-role users (board, arb), no target role needed - they elevate to their only role
+
     // Password valid - grant elevation
     const elevatedUntil = Date.now() + ELEVATION_DURATION_MS;
 
-    // Update session with elevation
-    await env.DB
-      .prepare('UPDATE sessions SET elevated_until = ? WHERE id = ?')
-      .bind(elevatedUntil, session.id)
-      .run();
+    // Determine assumed_role for database and session
+    // Admin and arb_board need assumed_role set; single-role users don't
+    const assumedRole = (userRole === 'admin' || userRole === 'arb_board') ? effectiveTargetRole : null;
 
-    // Log successful elevation
+    // Update session with elevation and assumed_role if applicable
+    if (assumedRole) {
+      await env.DB
+        .prepare('UPDATE sessions SET elevated_until = ?, assumed_role = ?, assumed_at = ?, assumed_until = ? WHERE id = ?')
+        .bind(elevatedUntil, assumedRole, elevatedUntil, elevatedUntil, session.id)
+        .run();
+    } else {
+      await env.DB
+        .prepare('UPDATE sessions SET elevated_until = ? WHERE id = ?')
+        .bind(elevatedUntil, session.id)
+        .run();
+    }
+
+    // Log successful elevation with the specific role that was elevated to
     const expiresAtIso = new Date(elevatedUntil).toISOString();
+    const loggedRole = effectiveTargetRole || userRole;
     await insertPimElevationLog(env.DB, {
       email: user.email,
-      role: userRole,
+      role: loggedRole,
       action: 'elevate',
       expires_at: expiresAtIso,
     });
@@ -128,6 +174,7 @@ export async function POST(context: APIContext): Promise<Response> {
       success: true,
       elevated_until: elevatedUntil,
       expires_in_minutes: 60,
+      elevated_role: loggedRole,
     }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },

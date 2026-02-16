@@ -68,10 +68,13 @@ export async function validateSession(
     }
 
     // Manually fetch custom session attributes (Lucia D1 adapter doesn't include them)
-    // This includes elevated_until for PIM (Privileged Identity Management)
+    // This includes elevated_until, assumed_role, assumed_at, assumed_until for PIM
     if (result.session && dbSession) {
       (result.session as any).elevated_until = dbSession.elevated_until;
-      console.log('[VALIDATE DEBUG] Added elevated_until to session:', dbSession.elevated_until);
+      (result.session as any).assumed_role = dbSession.assumed_role;
+      (result.session as any).assumed_at = dbSession.assumed_at;
+      (result.session as any).assumed_until = dbSession.assumed_until;
+      console.log('[VALIDATE DEBUG] Added PIM attributes - elevated_until:', dbSession.elevated_until, 'assumed_role:', dbSession.assumed_role);
     }
 
     return result;

@@ -90,6 +90,10 @@ const hasNewNotices = recentVendorsCount > 0 || recentOwnersCount > 0;
 const arbBadgeCount = isStaffRole ? arbCounts.pending : draftCount;
 const showPimBanner = isStaffRole && typeof session.elevated_until === 'number' && session.elevated_until > Date.now();
 
+// Determine the elevated role to display
+// If assumed_role is set (for admin/arb_board), use that; otherwise use effectiveRole
+const elevatedRole = (session as any)?.assumed_role || effectiveRole;
+
 // Dismissals: "Mark as read" hides a notice for 7 days
 const dismissedSet = db ? await getDismissedKeys(db, email) : new Set<string>();
 const showStaffOutstanding = hasStaffWhitelistRole && (arbCounts.in_review > 0 || arbCounts.pending > 0 || pendingVendorCount > 0) && !dismissedSet.has('staff_outstanding');
@@ -127,7 +131,7 @@ const showActionNeededBanner = showActionFeedback || showActionMaintenance || sh
           <!-- PIM Elevation Banner -->
           {showPimBanner && (
             <div class="mb-6">
-              <PimElevationBanner elevatedUntil={session.elevated_until!} role={effectiveRole} />
+              <PimElevationBanner elevatedUntil={session.elevated_until!} role={effectiveRole} elevatedRole={elevatedRole} />
             </div>
           )}
 
@@ -149,7 +153,7 @@ const showActionNeededBanner = showActionFeedback || showActionMaintenance || sh
                     {canRequestElevation ? (
                       <>
                         <p class="text-sm text-amber-800 mb-3">
-                          You're viewing the portal as a regular member. Click "Request elevated access" in the sidebar to use board or ARB tools for 2 hours.
+                          You're viewing the portal as a regular member. Click "Request elevated access" in the sidebar to use board or ARB tools for 1 hour.
                         </p>
                         <button type="button" id="pim-elevate-btn" class="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg font-medium text-sm transition-colors">
                           Request elevated access
