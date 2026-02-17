@@ -61,10 +61,10 @@ const allNavItems = [
   { label: 'Library', href: '/portal/library', icon: 'book', badge: 0 },
 ];
 
-// Hide Library link if no content available (unless user is staff)
+// Hide Library link if no content available
 const mainNavItems = allNavItems.filter(item => {
   if (item.label === 'Library') {
-    return libraryItemCount > 0 || isStaff;
+    return libraryItemCount > 0;
   }
   return true;
 });
