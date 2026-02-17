@@ -232,7 +232,7 @@ function getCategoryLabel(category: string): string {
       <div class="space-y-3">
         {upcomingMeetings.map((status) => {
           const meetingDate = status.meeting.datetime ? new Date(status.meeting.datetime) : null;
-          const isMember = status.meeting.meeting_type?.toLowerCase() === 'member';
+          const isMember = false; // meeting_type column doesn't exist yet
           return (
             <div class={`p-4 rounded-xl border ${status.overallCompliant ? 'border-green-200 bg-green-50' : 'border-amber-200 bg-amber-50'}`}>
               <div class="flex items-start justify-between gap-4 flex-wrap">
@@ -240,7 +240,7 @@ function getCategoryLabel(category: string): string {
                   <div class="flex items-center gap-2 mb-1">
                     <span class="font-medium text-gray-900">{status.meeting.title || 'Untitled Meeting'}</span>
                     <span class="px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700 capitalize">
-                      {status.meeting.meeting_type || 'Board'}
+                      Board
                     </span>
                     {status.overallCompliant ? (
                       <span class="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
