@@ -574,25 +574,15 @@ export function verifyOrigin(
   referer: string | null,
   expectedOrigin: string
 ): boolean {
-  if (!origin && !referer) {
-    console.log('[verifyOrigin] No origin or referer provided');
-    return false;
-  }
+  if (!origin && !referer) return false;
 
   // Check Origin header first (more reliable)
   if (origin) {
     try {
       const originUrl = new URL(origin);
       const expectedUrl = new URL(expectedOrigin);
-      const match = originUrl.origin === expectedUrl.origin;
-      console.log('[verifyOrigin] Comparing origins:', {
-        origin: originUrl.origin,
-        expected: expectedUrl.origin,
-        match,
-      });
-      return match;
-    } catch (err) {
-      console.error('[verifyOrigin] Error parsing origin:', err);
+      return originUrl.origin === expectedUrl.origin;
+    } catch {
       return false;
     }
   }
@@ -602,15 +592,8 @@ export function verifyOrigin(
     try {
       const refererUrl = new URL(referer);
       const expectedUrl = new URL(expectedOrigin);
-      const match = refererUrl.origin === expectedUrl.origin;
-      console.log('[verifyOrigin] Comparing referer:', {
-        referer: refererUrl.origin,
-        expected: expectedUrl.origin,
-        match,
-      });
-      return match;
-    } catch (err) {
-      console.error('[verifyOrigin] Error parsing referer:', err);
+      return refererUrl.origin === expectedUrl.origin;
+    } catch {
       return false;
     }
   }
