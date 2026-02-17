@@ -28,6 +28,7 @@ export interface UnifiedMember {
   lot_number: string | null;
   phone: string | null;
   phones: string | null;
+  board_title: string | null;
 
   // Metadata
   created_at: string | null;
@@ -58,6 +59,7 @@ export async function listAllMembers(
         o.lot_number as lot_number,
         o.phone as phone,
         o.phones as phones,
+        o.board_title as board_title,
         o.created_at as created_at
       FROM users u
       LEFT JOIN owners o ON u.email = o.email
@@ -75,6 +77,7 @@ export async function listAllMembers(
         o.lot_number as lot_number,
         o.phone as phone,
         o.phones as phones,
+        o.board_title as board_title,
         o.created_at as created_at
       FROM owners o
       LEFT JOIN users u ON o.email = u.email
@@ -98,6 +101,7 @@ export async function listAllMembers(
       lot_number: string | null;
       phone: string | null;
       phones: string | null;
+      board_title: string | null;
       created_at: string | null;
     }>();
 
@@ -119,6 +123,7 @@ export async function listAllMembers(
       lot_number: row.lot_number,
       phone: row.phone,
       phones: row.phones,
+      board_title: row.board_title,
       created_at: row.created_at,
       updated_at: null,
     }));
@@ -140,7 +145,7 @@ export async function getMemberByEmail(
   const normalizedEmail = email.toLowerCase().trim();
 
   const userQuery = `SELECT id, email, name, role, status, created FROM users WHERE email = ?`;
-  const ownerQuery = `SELECT id, email, name, address, lot_number, phone, phones, created_at FROM owners WHERE email = ?`;
+  const ownerQuery = `SELECT id, email, name, address, lot_number, phone, phones, board_title, created_at FROM owners WHERE email = ?`;
 
   const [userResult, ownerResult] = await Promise.all([
     db.prepare(userQuery).bind(normalizedEmail).first<{
@@ -159,6 +164,7 @@ export async function getMemberByEmail(
       lot_number: string | null;
       phone: string | null;
       phones: string | null;
+      board_title: string | null;
       created_at: string;
     }>()
   ]);
@@ -181,6 +187,7 @@ export async function getMemberByEmail(
     lot_number: ownerResult?.lot_number || null,
     phone: ownerResult?.phone || null,
     phones: ownerResult?.phones || null,
+    board_title: ownerResult?.board_title || null,
     created_at: userResult?.created || ownerResult?.created_at || null,
     updated_at: null,
   };

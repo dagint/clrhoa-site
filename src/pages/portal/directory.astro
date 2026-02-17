@@ -87,6 +87,20 @@ function roleLabel(role: string): string {
   return role === 'arb' ? 'ARB' : role === 'board' ? 'Board' : role === 'arb_board' ? 'ARB + Board' : role === 'admin' ? 'Admin' : role;
 }
 
+function getBoardTitleBadgeClass(title: string | null): string {
+  if (!title) return '';
+  const titleColors: Record<string, string> = {
+    'President': 'bg-amber-100 text-amber-900',
+    'Vice President': 'bg-amber-100 text-amber-800',
+    'Secretary': 'bg-blue-100 text-blue-900',
+    'Treasurer': 'bg-green-100 text-green-900',
+    'Member at Large': 'bg-purple-100 text-purple-900',
+    'ARB Chair': 'bg-orange-100 text-orange-900',
+    'ARB Member': 'bg-orange-50 text-orange-800',
+  };
+  return titleColors[title] || 'bg-gray-100 text-gray-800';
+}
+
 const viewerElevated = isElevatedRole(effectiveRole);
 function canRevealContact(owner: { share_contact_with_members?: number | null }): boolean {
   return owner.share_contact_with_members !== 0 || viewerElevated;
@@ -156,6 +170,7 @@ function canRevealContact(owner: { share_contact_with_members?: number | null })
               <tr>
                 <th scope="col" class="px-6 py-4 text-left text-sm font-semibold text-gray-700 uppercase tracking-wider">Name</th>
                 <th scope="col" class="px-6 py-4 text-left text-sm font-semibold text-gray-700 uppercase tracking-wider">Role</th>
+                <th scope="col" class="px-6 py-4 text-left text-sm font-semibold text-gray-700 uppercase tracking-wider">Title</th>
                 <th scope="col" class="px-6 py-4 text-left text-sm font-semibold text-gray-700 uppercase tracking-wider">Address</th>
                 <th scope="col" class="px-6 py-4 text-left text-sm font-semibold text-gray-700 uppercase tracking-wider">Phone</th>
                 <th scope="col" class="px-6 py-4 text-left text-sm font-semibold text-gray-700 uppercase tracking-wider">Email</th>
@@ -172,6 +187,15 @@ function canRevealContact(owner: { share_contact_with_members?: number | null })
                     {ownerRole ? (
                       <span class="inline-block px-3 py-1 text-sm font-semibold rounded-lg bg-clr-green/15 text-clr-green">
                         {roleLabel(ownerRole)}
+                      </span>
+                    ) : (
+                      <span class="text-gray-400">-</span>
+                    )}
+                  </td>
+                  <td class="px-6 py-4">
+                    {owner.board_title ? (
+                      <span class={`inline-block px-2 py-1 rounded text-xs font-medium ${getBoardTitleBadgeClass(owner.board_title)}`}>
+                        {owner.board_title}
                       </span>
                     ) : (
                       <span class="text-gray-400">-</span>

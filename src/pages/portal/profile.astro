@@ -29,6 +29,20 @@ const requiredParam = Astro.url.searchParams.get('required') === '1';
 const startInEditMode = !profileComplete || requiredParam;
 
 const allHouseholdMembers = db ? await listAllHouseholdMembers(db, email) : [];
+
+function getBoardTitleBadgeClass(title: string | null): string {
+  if (!title) return '';
+  const titleColors: Record<string, string> = {
+    'President': 'bg-amber-100 text-amber-900',
+    'Vice President': 'bg-amber-100 text-amber-800',
+    'Secretary': 'bg-blue-100 text-blue-900',
+    'Treasurer': 'bg-green-100 text-green-900',
+    'Member at Large': 'bg-purple-100 text-purple-900',
+    'ARB Chair': 'bg-orange-100 text-orange-900',
+    'ARB Member': 'bg-orange-50 text-orange-800',
+  };
+  return titleColors[title] || 'bg-gray-100 text-gray-800';
+}
 ---
 
 <PortalLayout title="Profile | Member Portal | Crooked Lake Reserve HOA">
@@ -84,6 +98,16 @@ const allHouseholdMembers = db ? await listAllHouseholdMembers(db, email) : [];
               <dt class="text-base font-semibold text-gray-600">Name</dt>
               <dd id="profile-view-name" class="mt-1 text-gray-900 text-lg">{owner?.name?.trim() || 'Not set'}</dd>
             </div>
+            {owner?.board_title && (
+              <div>
+                <dt class="text-base font-semibold text-gray-600">Board/ARB Title</dt>
+                <dd class="mt-1">
+                  <span class={`inline-block px-3 py-1.5 rounded text-base font-semibold ${getBoardTitleBadgeClass(owner.board_title)}`}>
+                    {owner.board_title}
+                  </span>
+                </dd>
+              </div>
+            )}
             <div>
               <dt class="text-base font-semibold text-gray-600">Property address</dt>
               <dd id="profile-view-address" class="mt-1 text-gray-900 text-lg">{owner?.address?.trim() || 'Not set'}</dd>

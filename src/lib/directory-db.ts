@@ -19,6 +19,8 @@ export interface Owner {
   share_contact_with_members?: number | null;
   /** 1 = primary contact for this property (one per address for dues/assessments). Default 1. */
   is_primary?: number | null;
+  /** Board or ARB leadership title (President, Vice President, Secretary, Treasurer, Member at Large, ARB Chair, ARB Member). */
+  board_title?: string | null;
   /** Set when board updates owner (audit). */
   updated_by?: string | null;
   updated_at?: string | null;
@@ -634,7 +636,7 @@ export async function insertOwner(
 export async function updateOwner(
   db: D1Database,
   id: string,
-  data: { name?: string | null; address?: string | null; lot_number?: string | null; phone?: string | null; email?: string | null; phones?: string | null; is_primary?: number | null },
+  data: { name?: string | null; address?: string | null; lot_number?: string | null; phone?: string | null; email?: string | null; phones?: string | null; is_primary?: number | null; board_title?: string | null },
   updatedByEmail?: string | null,
   auditContext?: { ip_address?: string; role?: string; operation_type?: string }
 ): Promise<boolean> {
@@ -648,6 +650,7 @@ export async function updateOwner(
   const email = data.email !== undefined ? (data.email?.trim()?.toLowerCase() ?? null) : existing.email;
   const phones = data.phones !== undefined ? data.phones : existing.phones;
   const isPrimary = data.is_primary !== undefined ? (data.is_primary ? 1 : 0) : (existing.is_primary ?? 1);
+  const boardTitle = data.board_title !== undefined ? (data.board_title?.trim() || null) : existing.board_title ?? null;
   const updatedBy = updatedByEmail?.trim()?.toLowerCase() ?? null;
 
   // Track changed fields for audit
@@ -690,24 +693,37 @@ export async function updateOwner(
     oldValues.is_primary = existing.is_primary;
     newValues.is_primary = isPrimary;
   }
+  if (data.board_title !== undefined && boardTitle !== (existing.board_title ?? null)) {
+    changedFields.push('board_title');
+    oldValues.board_title = existing.board_title;
+    newValues.board_title = boardTitle;
+  }
 
   let updated = false;
   if (updatedBy) {
     try {
       const result = await db
-        .prepare(`UPDATE owners SET name = ?, address = ?, lot_number = ?, phone = ?, email = ?, phones = ?, is_primary = ?, updated_by = ?, updated_at = datetime('now') WHERE id = ?`)
-        .bind(name, address, lotNumber, phone, email, phones ?? null, isPrimary, updatedBy, id)
+        .prepare(`UPDATE owners SET name = ?, address = ?, lot_number = ?, phone = ?, email = ?, phones = ?, is_primary = ?, board_title = ?, updated_by = ?, updated_at = datetime('now') WHERE id = ?`)
+        .bind(name, address, lotNumber, phone, email, phones ?? null, isPrimary, boardTitle, updatedBy, id)
         .run();
       if ((result.meta.changes ?? 0) > 0) updated = true;
     } catch {
       try {
         const result = await db
-          .prepare(`UPDATE owners SET name = ?, address = ?, phone = ?, email = ?, phones = ?, is_primary = ?, updated_by = ?, updated_at = datetime('now') WHERE id = ?`)
-          .bind(name, address, phone, email, phones ?? null, isPrimary, updatedBy, id)
+          .prepare(`UPDATE owners SET name = ?, address = ?, lot_number = ?, phone = ?, email = ?, phones = ?, is_primary = ?, updated_by = ?, updated_at = datetime('now') WHERE id = ?`)
+          .bind(name, address, lotNumber, phone, email, phones ?? null, isPrimary, updatedBy, id)
           .run();
         if ((result.meta.changes ?? 0) > 0) updated = true;
       } catch {
-        /* updated_by column may not exist */
+        try {
+          const result = await db
+            .prepare(`UPDATE owners SET name = ?, address = ?, phone = ?, email = ?, phones = ?, is_primary = ?, updated_by = ?, updated_at = datetime('now') WHERE id = ?`)
+            .bind(name, address, phone, email, phones ?? null, isPrimary, updatedBy, id)
+            .run();
+          if ((result.meta.changes ?? 0) > 0) updated = true;
+        } catch {
+          /* updated_by column may not exist */
+        }
       }
     }
   }
@@ -715,16 +731,24 @@ export async function updateOwner(
   if (!updated) {
     try {
       const result = await db
-        .prepare(`UPDATE owners SET name = ?, address = ?, lot_number = ?, phone = ?, email = ?, phones = ?, is_primary = ? WHERE id = ?`)
-        .bind(name, address, lotNumber, phone, email, phones ?? null, isPrimary, id)
+        .prepare(`UPDATE owners SET name = ?, address = ?, lot_number = ?, phone = ?, email = ?, phones = ?, is_primary = ?, board_title = ? WHERE id = ?`)
+        .bind(name, address, lotNumber, phone, email, phones ?? null, isPrimary, boardTitle, id)
         .run();
       updated = (result.meta.changes ?? 0) > 0;
     } catch {
-      const result = await db
-        .prepare(`UPDATE owners SET name = ?, address = ?, phone = ?, email = ?, phones = ?, is_primary = ? WHERE id = ?`)
-        .bind(name, address, phone, email, phones ?? null, isPrimary, id)
-        .run();
-      updated = (result.meta.changes ?? 0) > 0;
+      try {
+        const result = await db
+          .prepare(`UPDATE owners SET name = ?, address = ?, lot_number = ?, phone = ?, email = ?, phones = ?, is_primary = ? WHERE id = ?`)
+          .bind(name, address, lotNumber, phone, email, phones ?? null, isPrimary, id)
+          .run();
+        updated = (result.meta.changes ?? 0) > 0;
+      } catch {
+        const result = await db
+          .prepare(`UPDATE owners SET name = ?, address = ?, phone = ?, email = ?, phones = ?, is_primary = ? WHERE id = ?`)
+          .bind(name, address, phone, email, phones ?? null, isPrimary, id)
+          .run();
+        updated = (result.meta.changes ?? 0) > 0;
+      }
     }
   }
 
