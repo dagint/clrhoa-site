@@ -5,6 +5,7 @@
  * Collapsible on mobile.
  */
 import { getPortalElevatedLink } from '../config/navigation';
+import { getMenuItems } from '../lib/menu-db';
 
 interface Props {
   currentPath: string;
@@ -38,6 +39,19 @@ const isElevated = role === 'board' || role === 'admin' || role === 'arb' || rol
 const isStaffFromWhitelist = !!elevatedLink;
 const isStaff = isElevated || isStaffFromWhitelist;
 
+// Load menu items from database (with fallback to defaults)
+const db = Astro.locals.runtime?.env?.DB;
+const dbMenuItems = db ? await getMenuItems(db) : [];
+
+// Map badge keys to actual values
+const badgeValues: Record<string, number> = {
+  nonFinalCount,
+  maintenanceOpenCount,
+  meetingsRsvpCount,
+  feedbackDueCount,
+  libraryItemCount,
+};
+
 function isCurrent(href: string) {
   if (href === '/portal/dashboard') return currentPath === '/portal/dashboard';
   if (href === '/portal/board') return currentPath === '/portal/board' || currentPath.startsWith('/board/');
@@ -47,19 +61,15 @@ function isCurrent(href: string) {
   return currentPath.startsWith(href);
 }
 
-// Navigation items with icons
-const allNavItems = [
-  { label: 'Dashboard', href: '/portal/dashboard', icon: 'home', badge: 0 },
-  { label: 'ARB Requests', href: '/portal/requests', icon: 'clipboard', badge: nonFinalCount },
-  { label: 'Maintenance', href: '/portal/maintenance', icon: 'wrench', badge: maintenanceOpenCount },
-  { label: 'Meetings', href: '/portal/meetings', icon: 'calendar', badge: meetingsRsvpCount },
-  { label: 'Directory', href: '/portal/directory', icon: 'users', badge: 0 },
-  { label: 'Vendors', href: '/portal/vendors', icon: 'briefcase', badge: 0 },
-  { label: 'Documents', href: '/portal/documents', icon: 'folder', badge: 0 },
-  { label: 'Dues', href: '/portal/assessments', icon: 'dollar', badge: 0 },
-  { label: 'Feedback', href: '/portal/feedback', icon: 'message', badge: feedbackDueCount },
-  { label: 'Library', href: '/portal/library', icon: 'book', badge: 0 },
-];
+// Convert database menu items to nav items format
+const allNavItems = dbMenuItems
+  .filter(item => item.visible === 1) // Only show visible items
+  .map(item => ({
+    label: item.label,
+    href: item.href,
+    icon: item.icon,
+    badge: item.badge_key ? (badgeValues[item.badge_key] || 0) : 0,
+  }));
 
 // Hide Library link if no content available
 const mainNavItems = allNavItems.filter(item => {

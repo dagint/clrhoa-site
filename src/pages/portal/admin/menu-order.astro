@@ -1,0 +1,298 @@
+---
+/**
+ * Admin: Menu Order Management
+ *
+ * Admin-only page for reordering portal sidebar menu items.
+ * Changes are persisted to database and apply immediately.
+ */
+export const prerender = false;
+
+import PortalLayout from '../../../layouts/PortalLayout.astro';
+import PortalPage from '../../../components/PortalPage.astro';
+import AdminNav from '../../../components/AdminNav.astro';
+import { getAdminContext } from '../../../lib/board-context';
+import { getPortalBadgeCounts } from '../../../lib/portal-badge-counts';
+import { getMenuItems } from '../../../lib/menu-db';
+
+const ctx = await getAdminContext(Astro);
+if ('redirect' in ctx) return Astro.redirect(ctx.redirect);
+const { env, session, effectiveRole } = ctx;
+
+const { email, role, name } = session;
+const db = env?.DB;
+const badges = await getPortalBadgeCounts(db, email, role, name);
+
+// Load current menu items
+const menuItems = db ? await getMenuItems(db) : [];
+---
+
+<PortalLayout title="Menu Order | Admin | Member Portal | Crooked Lake Reserve HOA">
+  <PortalPage
+    currentPath="/portal/admin/menu-order"
+    pageTitle="Menu Order"
+    userName={badges.displayName ?? undefined}
+    userEmail={email}
+    effectiveRole={effectiveRole}
+    draftCount={badges.draftCount}
+    role={effectiveRole}
+    staffRole={role ?? ''}
+    arbInReviewCount={badges.arbInReviewCount}
+    vendorPendingCount={badges.vendorPendingCount}
+    maintenanceOpenCount={badges.maintenanceOpenCount}
+    meetingsRsvpCount={badges.meetingsRsvpCount}
+    feedbackDueCount={badges.feedbackDueCount}
+    libraryItemCount={badges.libraryItemCount}
+  >
+    <AdminNav currentPath="/portal/admin/menu-order" />
+
+    <!-- Page Header -->
+    <div class="mb-6 bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+      <h1 class="text-2xl font-heading font-bold text-clr-green mb-2">Menu Order Management</h1>
+      <p class="text-gray-600">Customize the order of portal sidebar menu items. Changes apply immediately for all users.</p>
+    </div>
+
+    <!-- Info Banner -->
+    <div class="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-4">
+      <div class="flex items-start gap-3">
+        <svg class="w-5 h-5 text-blue-600 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <div class="flex-1">
+          <h3 class="text-sm font-semibold text-blue-900 mb-1">How to use</h3>
+          <div class="text-sm text-blue-800 space-y-1">
+            <p>• Use ↑↓ arrows to reorder menu items</p>
+            <p>• Click "Save Order" to apply changes</p>
+            <p>• Click "Reset to Default" to restore original order</p>
+            <p>• Changes take effect immediately for all portal users</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Messages -->
+    <div id="message" class="hidden mb-6 p-4 rounded-lg border" role="alert"></div>
+
+    <!-- Menu Items List -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+      <h2 class="text-xl font-heading font-semibold text-gray-900 mb-4">Menu Items</h2>
+
+      <div id="menu-items-container" class="space-y-2">
+        {menuItems.map((item) => (
+          <div
+            class="menu-item flex items-center gap-3 p-4 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors"
+            data-id={item.id}
+            data-position={item.position}
+          >
+            <!-- Drag Handle / Icon -->
+            <div class="flex-shrink-0 text-gray-400">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16" />
+              </svg>
+            </div>
+
+            <!-- Position Number -->
+            <div class="flex-shrink-0 w-8 text-center">
+              <span class="position-number text-sm font-semibold text-gray-600">{item.position}</span>
+            </div>
+
+            <!-- Menu Item Info -->
+            <div class="flex-1">
+              <div class="font-semibold text-gray-900">{item.label}</div>
+              <div class="text-sm text-gray-500">{item.href}</div>
+            </div>
+
+            <!-- Move Buttons -->
+            <div class="flex gap-1">
+              <button
+                type="button"
+                class="move-up p-2 text-gray-600 hover:text-clr-green hover:bg-gray-200 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                title="Move up"
+              >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                class="move-down p-2 text-gray-600 hover:text-clr-green hover:bg-gray-200 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                title="Move down"
+              >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="mt-6 flex gap-3 pt-6 border-t border-gray-200">
+        <button
+          type="button"
+          id="save-order-btn"
+          class="px-6 py-3 bg-clr-green text-white rounded-xl font-semibold hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          Save Order
+        </button>
+        <button
+          type="button"
+          id="reset-btn"
+          class="px-6 py-3 bg-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-300 transition-all"
+        >
+          Reset to Default
+        </button>
+      </div>
+    </div>
+
+  </PortalPage>
+</PortalLayout>
+
+<script is:inline define:vars={{ csrfToken: session.csrfToken ?? '' }}>
+  (function() {
+    const container = document.getElementById('menu-items-container');
+    const saveBtn = document.getElementById('save-order-btn');
+    const resetBtn = document.getElementById('reset-btn');
+    const messageEl = document.getElementById('message');
+
+    let isDirty = false;
+
+    function showMessage(text, isError) {
+      if (!messageEl) return;
+      messageEl.textContent = text;
+      messageEl.classList.remove('hidden', 'bg-green-50', 'border-green-200', 'text-green-800', 'bg-red-50', 'border-red-200', 'text-red-800');
+      if (isError) {
+        messageEl.classList.add('bg-red-50', 'border-red-200', 'text-red-800');
+      } else {
+        messageEl.classList.add('bg-green-50', 'border-green-200', 'text-green-800');
+      }
+      setTimeout(() => messageEl.classList.add('hidden'), 5000);
+    }
+
+    function updatePositionNumbers() {
+      const items = Array.from(container.querySelectorAll('.menu-item'));
+      items.forEach((item, index) => {
+        const positionNum = index + 1;
+        item.dataset.position = positionNum.toString();
+        item.querySelector('.position-number').textContent = positionNum.toString();
+      });
+      updateButtonStates();
+    }
+
+    function updateButtonStates() {
+      const items = Array.from(container.querySelectorAll('.menu-item'));
+      items.forEach((item, index) => {
+        const upBtn = item.querySelector('.move-up');
+        const downBtn = item.querySelector('.move-down');
+        upBtn.disabled = index === 0;
+        downBtn.disabled = index === items.length - 1;
+      });
+    }
+
+    function moveItem(item, direction) {
+      const sibling = direction === 'up' ? item.previousElementSibling : item.nextElementSibling;
+      if (!sibling) return;
+
+      if (direction === 'up') {
+        container.insertBefore(item, sibling);
+      } else {
+        container.insertBefore(sibling, item);
+      }
+
+      updatePositionNumbers();
+      isDirty = true;
+    }
+
+    // Move button handlers
+    container.addEventListener('click', function(e) {
+      const moveUpBtn = e.target.closest('.move-up');
+      const moveDownBtn = e.target.closest('.move-down');
+
+      if (moveUpBtn) {
+        const item = moveUpBtn.closest('.menu-item');
+        moveItem(item, 'up');
+      } else if (moveDownBtn) {
+        const item = moveDownBtn.closest('.menu-item');
+        moveItem(item, 'down');
+      }
+    });
+
+    // Save order
+    saveBtn.addEventListener('click', async function() {
+      if (!isDirty) {
+        showMessage('No changes to save', false);
+        return;
+      }
+
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Saving...';
+
+      const items = Array.from(container.querySelectorAll('.menu-item')).map((item, index) => ({
+        id: item.dataset.id,
+        position: index + 1
+      }));
+
+      try {
+        const res = await fetch('/api/admin/menu-order', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'update',
+            items: items,
+            csrf_token: csrfToken,
+          }),
+        });
+
+        const data = await res.json();
+        if (data.success) {
+          showMessage('Menu order saved successfully!', false);
+          isDirty = false;
+        } else {
+          showMessage(data.error || 'Failed to save menu order', true);
+        }
+      } catch (error) {
+        showMessage('Network error. Please try again.', true);
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Save Order';
+      }
+    });
+
+    // Reset to defaults
+    resetBtn.addEventListener('click', async function() {
+      if (!confirm('Reset menu to default order? This will undo any custom ordering.')) {
+        return;
+      }
+
+      resetBtn.disabled = true;
+      resetBtn.textContent = 'Resetting...';
+
+      try {
+        const res = await fetch('/api/admin/menu-order', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'reset',
+            csrf_token: csrfToken,
+          }),
+        });
+
+        const data = await res.json();
+        if (data.success) {
+          showMessage('Menu reset to defaults. Reloading...', false);
+          setTimeout(() => window.location.reload(), 1000);
+        } else {
+          showMessage(data.error || 'Failed to reset menu', true);
+        }
+      } catch (error) {
+        showMessage('Network error. Please try again.', true);
+      } finally {
+        resetBtn.disabled = false;
+        resetBtn.textContent = 'Reset to Default';
+      }
+    });
+
+    // Initial setup
+    updatePositionNumbers();
+  })();
+</script>
