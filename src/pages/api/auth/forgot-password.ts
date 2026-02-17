@@ -77,6 +77,9 @@ export const POST: APIRoute = async ({ request, locals }) => {
 
     const normalizedEmail = email.toLowerCase().trim();
 
+    // Extract site URL once for use in all email functions
+    const siteUrl = new URL(request.url).origin;
+
     // 2. Rate limiting - 3 requests per hour per email
     const rateLimitResult = await checkRateLimit(
       kv,
@@ -223,7 +226,6 @@ export const POST: APIRoute = async ({ request, locals }) => {
 
       if (resend) {
         try {
-          const siteUrl = new URL(request.url).origin;
           await sendSetupEmail(resend, user.email, token, user.name || undefined, siteUrl);
 
           await logSecurityEvent(db, {
@@ -284,7 +286,8 @@ export const POST: APIRoute = async ({ request, locals }) => {
           resend,
           user.email,
           token,
-          user.name || undefined
+          user.name || undefined,
+          siteUrl
         );
 
         // Log successful reset request
