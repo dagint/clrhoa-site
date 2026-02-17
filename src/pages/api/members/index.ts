@@ -335,7 +335,7 @@ export const DELETE: APIRoute = async ({ request, locals, clientAddress }) => {
   // Get client IP for audit logging
   const clientIp = clientAddress || request.headers.get('cf-connecting-ip') || 'unknown';
 
-  let body: { email: string };
+  let body: { email?: string | null; ownerId?: string | null; userId?: string | null };
   try {
     body = await request.json();
   } catch {
@@ -345,16 +345,50 @@ export const DELETE: APIRoute = async ({ request, locals, clientAddress }) => {
     });
   }
 
-  const email = body.email?.trim()?.toLowerCase();
-  if (!email) {
-    return new Response(JSON.stringify({ error: 'Email is required' }), {
+  const email = body.email?.trim()?.toLowerCase() || null;
+  const ownerId = body.ownerId?.trim() || null;
+  const userId = body.userId?.trim() || null;
+
+  // Need at least one identifier
+  if (!email && !ownerId && !userId) {
+    return new Response(JSON.stringify({ error: 'Email, ownerId, or userId is required' }), {
       status: 400,
       headers: { 'Content-Type': 'application/json' },
     });
   }
 
   try {
-    const member = await getMemberByEmail(db, email);
+    // Try to find member by email first, then fallback to IDs
+    let member = email ? await getMemberByEmail(db, email) : null;
+
+    // If not found by email but we have ownerId, query owners table directly
+    if (!member && ownerId) {
+      const owner = await db.prepare('SELECT id, email, name FROM owners WHERE id = ?').bind(ownerId).first<{
+        id: string;
+        email: string | null;
+        name: string | null;
+      }>();
+      if (owner) {
+        member = {
+          email: owner.email || '',
+          name: owner.name,
+          hasAccount: false,
+          accountStatus: null,
+          role: null,
+          userId: null,
+          inDirectory: true,
+          ownerId: owner.id,
+          address: null,
+          lot_number: null,
+          phone: null,
+          phones: null,
+          board_title: null,
+          created_at: null,
+          updated_at: null,
+        };
+      }
+    }
+
     if (!member) {
       return new Response(JSON.stringify({ error: 'Member not found' }), {
         status: 404,
@@ -376,9 +410,9 @@ export const DELETE: APIRoute = async ({ request, locals, clientAddress }) => {
       await db.prepare('DELETE FROM users WHERE id = ?').bind(member.userId).run();
     }
 
-    // Remove from KV whitelist
-    if (kv) {
-      await removeFromLoginWhitelistUnlessAdmin(kv, email);
+    // Remove from KV whitelist (only if we have an email)
+    if (kv && member.email) {
+      await removeFromLoginWhitelistUnlessAdmin(kv, member.email);
     }
 
     return new Response(
