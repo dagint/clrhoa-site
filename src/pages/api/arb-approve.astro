@@ -5,7 +5,7 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie, verifyCsrfToken, verifyOrigin, getEffectiveRole, canApproveArb, isAdminActingAs } from '../../lib/auth';
+import { verifyCsrfToken, verifyOrigin, getEffectiveRole, canApproveArb, isAdminActingAs } from '../../lib/auth';
 import { insertAdminAssumedRoleAudit } from '../../lib/admin-assumed-role-db';
 import { checkRateLimit, getRateLimitConfig } from '../../lib/rate-limit';
 import { getSecurityMonitor } from '../../lib/monitoring';
@@ -15,12 +15,10 @@ import { createLogger } from '../../lib/logging';
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
-const session = await getSessionFromCookie(
-  Astro.request.headers.get('cookie') ?? undefined,
-  env?.SESSION_SECRET
-);
+const user = Astro.locals.user;
+const session = Astro.locals.session;
 
-if (!session) {
+if (!session || !user) {
   return new Response(JSON.stringify({ error: 'Unauthorized' }), {
     status: 401,
     headers: { 'Content-Type': 'application/json' },
@@ -103,7 +101,7 @@ if (secret && (body.action === 'approve' || body.action === 'reject')) {
       300 // 5 minutes
     );
     if (!isValid) {
-      securityMonitor.trackUnauthorizedAccess('/api/arb-approve', session.email, ipAddress, 'Invalid request signature');
+      securityMonitor.trackUnauthorizedAccess('/api/arb-approve', user.email, ipAddress, 'Invalid request signature');
       logger.warn('Invalid request signature for approve/reject', { requestId: body.requestId, action: body.action });
       return new Response(
         JSON.stringify({ error: 'Invalid request signature or request expired. Please try again.' }),
@@ -163,7 +161,7 @@ if (action === 'request_revision' || action === 'request revision') {
     );
   }
   const clientIp = Astro.clientAddress || Astro.request.headers.get('cf-connecting-ip') || null;
-  const updated = await setArbRequestPendingForRevision(db, requestId, revisionNotes, session.email, effectiveRole, clientIp);
+  const updated = await setArbRequestPendingForRevision(db, requestId, revisionNotes, user.email, effectiveRole, clientIp);
   if (!updated) {
     return new Response(JSON.stringify({ error: 'Update failed.' }), {
       status: 500,
@@ -202,9 +200,9 @@ if (request.status !== 'in_review') {
 }
 
 const status = action === 'approve' ? 'approved' : 'rejected';
-const esignRecord = `${status.toUpperCase()} | ${arbEsign} | ${session.email} | ${new Date().toISOString()}`;
+const esignRecord = `${status.toUpperCase()} | ${arbEsign} | ${user.email} | ${new Date().toISOString()}`;
 const clientIp = Astro.clientAddress || Astro.request.headers.get('cf-connecting-ip') || null;
-const updated = await updateArbRequestStatus(db, requestId, status, esignRecord, session.email, effectiveRole, clientIp);
+const updated = await updateArbRequestStatus(db, requestId, status, esignRecord, user.email, effectiveRole, clientIp);
 
 if (!updated) {
   return new Response(JSON.stringify({ error: 'Update failed.' }), {
@@ -217,10 +215,10 @@ if (isAdminActingAs(session) && session.assumed_role) {
   try {
     const actorRole = session.role?.toLowerCase() === 'arb_board' ? 'arb_board' : 'admin';
     await insertAdminAssumedRoleAudit(db, {
-      admin_email: session.email,
+      admin_email: user.email,
       actor_role: actorRole,
       action: 'action',
-      role_assumed: session.assumed_role,
+      role_assumed: session.assumed_role as 'arb' | 'board' | null,
       action_detail: `arb_approve request_id=${requestId} action=${action} status=${status}`,
       ip_address: Astro.request.headers.get('cf-connecting-ip') ?? Astro.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null,
     });

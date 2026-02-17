@@ -5,7 +5,7 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie, verifyCsrfToken, verifyOrigin } from '../../lib/auth';
+import { verifyCsrfToken, verifyOrigin } from '../../lib/auth';
 import { listArbRequestsByHousehold, listArbFilesByRequest } from '../../lib/arb-db';
 import { getSecurityMonitor } from '../../lib/monitoring';
 import { createLogger } from '../../lib/logging';
@@ -13,12 +13,10 @@ import { getCorrelationId } from '../../lib/api-helpers';
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
-const session = await getSessionFromCookie(
-  Astro.request.headers.get('cookie') ?? undefined,
-  env?.SESSION_SECRET
-);
+const user = Astro.locals.user;
+const session = Astro.locals.session;
 
-if (!session) {
+if (!session || !user) {
   return new Response(JSON.stringify({ error: 'Unauthorized' }), {
     status: 401,
     headers: { 'Content-Type': 'application/json' },
@@ -26,7 +24,7 @@ if (!session) {
 }
 
 const correlationId = getCorrelationId(Astro) || 'unknown';
-const logger = createLogger({ endpoint: '/api/arb-export-data', email: session.email, correlationId });
+const logger = createLogger({ endpoint: '/api/arb-export-data', email: user.email, correlationId });
 const securityMonitor = getSecurityMonitor();
 
 // CSRF protection: verify origin
@@ -63,12 +61,12 @@ if (!db) {
 
 try {
   // Get all user's requests
-  const requests = await listArbRequestsByHousehold(db, session.email);
+  const requests = await listArbRequestsByHousehold(db, user.email);
 
   // Get files for each request
   const exportData = {
     exportedAt: new Date().toISOString(),
-    userEmail: session.email,
+    userEmail: user.email,
     requestCount: requests.length,
     requests: await Promise.all(
       requests.map(async (req) => {

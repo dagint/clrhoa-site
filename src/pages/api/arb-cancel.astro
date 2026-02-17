@@ -6,7 +6,7 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie, verifyCsrfToken, verifyOrigin } from '../../lib/auth';
+import { verifyCsrfToken, verifyOrigin } from '../../lib/auth';
 import { requireArbRequestOwner } from '../../lib/access-control';
 import { createLogger, maskRequestId } from '../../lib/logging';
 import { checkRateLimit, getRateLimitConfig } from '../../lib/rate-limit';
@@ -16,17 +16,12 @@ import { listArbFilesByRequest, deleteAllArbFilesByRequest, cancelArbRequest } f
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
 const logger = createLogger({ endpoint: 'arb-cancel' });
-const userAgent = Astro.request.headers.get('user-agent') ?? null;
-const ipAddress = Astro.request.headers.get('cf-connecting-ip') ?? 
+const user = Astro.locals.user;
+const session = Astro.locals.session;
+const ipAddress = Astro.request.headers.get('cf-connecting-ip') ??
                   Astro.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
-let session = await getSessionFromCookie(
-  Astro.request.headers.get('cookie') ?? undefined,
-  env?.SESSION_SECRET,
-  userAgent,
-  ipAddress
-);
 
-if (!session) {
+if (!session || !user) {
   return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
 }
 
@@ -71,7 +66,7 @@ if (!requestId) {
   return new Response(JSON.stringify({ error: 'requestId is required.' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
 }
 
-const ownerCheck = await requireArbRequestOwner(db, requestId, session, { requirePending: true });
+const ownerCheck = await requireArbRequestOwner(db, requestId, user, { requirePending: true });
 if ('response' in ownerCheck) return ownerCheck.response;
 const req = ownerCheck.request;
 
@@ -81,12 +76,12 @@ const req = ownerCheck.request;
 
 // Step 1: Update status to cancelled first (most critical operation)
 const clientIp = Astro.clientAddress || Astro.request.headers.get('cf-connecting-ip') || null;
-const updated = await cancelArbRequest(db, requestId, session.email, clientIp);
+const updated = await cancelArbRequest(db, requestId, user.email, clientIp);
 if (!updated) {
-  logger.error('Failed to cancel request - status update failed', { requestId, email: session.email });
-  return new Response(JSON.stringify({ error: 'Could not cancel request. Please try again.' }), { 
-    status: 500, 
-    headers: { 'Content-Type': 'application/json' } 
+  logger.error('Failed to cancel request - status update failed', { requestId, email: user.email });
+  return new Response(JSON.stringify({ error: 'Could not cancel request. Please try again.' }), {
+    status: 500,
+    headers: { 'Content-Type': 'application/json' }
   });
 }
 
@@ -128,8 +123,8 @@ try {
 
 // Log results
 if (deletedFileKeys.length > 0) {
-  logger.info('File deletion completed', { 
-    requestId: maskRequestId(requestId), 
+  logger.info('File deletion completed', {
+    requestId: maskRequestId(requestId),
     filesDeleted: deletedFileKeys.length,
     r2Errors: r2DeleteErrors
   });

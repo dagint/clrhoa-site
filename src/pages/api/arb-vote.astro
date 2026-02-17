@@ -21,7 +21,6 @@
 export const prerender = false;
 
 import {
-  getSessionFromCookie,
   verifyCsrfToken,
   verifyOrigin,
   getEffectiveRole,
@@ -42,12 +41,10 @@ const runtime = Astro.locals.runtime;
 const env = runtime?.env;
 
 // Auth check
-const session = await getSessionFromCookie(
-  Astro.request.headers.get('cookie') ?? undefined,
-  env?.SESSION_SECRET
-);
+const user = Astro.locals.user;
+const session = Astro.locals.session;
 
-if (!session) {
+if (!session || !user) {
   return new Response(JSON.stringify({ error: 'Unauthorized' }), {
     status: 401,
     headers: { 'Content-Type': 'application/json' },
@@ -210,7 +207,7 @@ const eligibility = await isEligibleToVote(
   db,
   kv,
   requestId,
-  session.email,
+  user.email,
   stage,
   cycle
 );
@@ -218,7 +215,7 @@ const eligibility = await isEligibleToVote(
 if (!eligibility.eligible) {
   securityMonitor.trackUnauthorizedAccess(
     '/api/arb-vote',
-    session.email,
+    user.email,
     ipAddress,
     `Ineligible to vote: ${eligibility.reason}`
   );
@@ -235,7 +232,7 @@ try {
   const voteRecord = await castVote(
     db,
     requestId,
-    session.email,
+    user.email,
     stage,
     vote,
     comment,
@@ -244,7 +241,7 @@ try {
 
   logger.info('Vote cast', {
     requestId,
-    voter: session.email,
+    voter: user.email,
     stage,
     vote,
     cycle,
@@ -291,7 +288,7 @@ try {
           {
             vote_resolution: resolution,
             final_vote: vote,
-            final_voter: session.email,
+            final_voter: user.email,
           }
         );
 
@@ -371,7 +368,7 @@ try {
   logger.error('Failed to cast vote', {
     error,
     requestId,
-    voter: session.email,
+    voter: user.email,
   });
   return new Response(
     JSON.stringify({ error: 'Failed to cast vote. Please try again.' }),

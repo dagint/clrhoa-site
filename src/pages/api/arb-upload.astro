@@ -6,7 +6,7 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie, verifyCsrfToken, verifyOrigin, updateSessionActivity, SESSION_COOKIE_NAME } from '../../lib/auth';
+import { verifyCsrfToken, verifyOrigin } from '../../lib/auth';
 import { createLogger, maskEmail, maskRequestId } from '../../lib/logging';
 import { getCorrelationId } from '../../lib/api-helpers';
 import { getSecurityMonitor } from '../../lib/monitoring';
@@ -44,17 +44,13 @@ function isAllowedType(t: string): boolean {
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
+const user = Astro.locals.user;
+const session = Astro.locals.session;
 const userAgent = Astro.request.headers.get('user-agent') ?? null;
 const ipAddress = Astro.request.headers.get('cf-connecting-ip') ??
                   Astro.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
-let session = await getSessionFromCookie(
-  Astro.request.headers.get('cookie') ?? undefined,
-  env?.SESSION_SECRET,
-  userAgent,
-  ipAddress
-);
 
-if (!session) {
+if (!session || !user) {
   return new Response(JSON.stringify({ error: 'Unauthorized' }), {
     status: 401,
     headers: { 'Content-Type': 'application/json' },
@@ -65,7 +61,7 @@ if (!session) {
 const correlationId = getCorrelationId(Astro) || 'unknown';
 let logger = createLogger({
   endpoint: '/api/arb-upload',
-  email: session.email,
+  email: user.email,
   correlationId
 });
 
@@ -90,11 +86,11 @@ const MAX_SUBMISSIONS_PER_DAY = 5;
 const kv = env?.KV;
 if (kv) {
   const today = new Date().toISOString().split('T')[0];
-  const rateLimitKey = `arb_submit:${session.email}:${today}`;
+  const rateLimitKey = `arb_submit:${user.email}:${today}`;
   const count = await kv.get(rateLimitKey, { type: 'text' });
   const currentCount = parseInt(count ?? '0', 10);
   if (currentCount >= MAX_SUBMISSIONS_PER_DAY) {
-    securityMonitor.trackRateLimit('/api/arb-upload', session.email, clientIpAddress);
+    securityMonitor.trackRateLimit('/api/arb-upload', user.email, clientIpAddress);
     return new Response(
       JSON.stringify({
         error: `Rate limit exceeded. Maximum ${MAX_SUBMISSIONS_PER_DAY} submissions per day. Please try again tomorrow.`,
@@ -162,33 +158,12 @@ try {
   // CSRF token verification (from hidden form field)
   const csrfToken = formData.get('csrf_token') as string | null;
 
-  // If session doesn't have CSRF token, try to update it (might be an old session)
-  if (!session.csrfToken && env?.SESSION_SECRET) {
-    const updatedCookieValue = await updateSessionActivity(
-      Astro.request.headers.get('cookie') ?? undefined,
-      env.SESSION_SECRET,
-      userAgent,
-      ipAddress
-    );
-    if (updatedCookieValue) {
-      let updatedSession = await getSessionFromCookie(
-        `${SESSION_COOKIE_NAME}=${updatedCookieValue}`,
-        env.SESSION_SECRET,
-        userAgent,
-        ipAddress
-      );
-      if (updatedSession?.csrfToken) {
-        session = updatedSession;
-      }
-    }
-  }
-
   const csrfValid = verifyCsrfToken(session, csrfToken);
   if (!csrfValid) {
     logger.warn('CSRF token validation failed', {
       hasSessionToken: !!session.csrfToken,
       hasRequestToken: !!csrfToken,
-      sessionEmail: session.email
+      sessionEmail: user.email
     });
     securityMonitor.trackCsrfFailure('/api/arb-upload', clientIpAddress);
     return new Response(
@@ -425,7 +400,7 @@ try {
     .prepare(
       `SELECT id, description, created FROM arb_requests WHERE owner_email = ? AND created > ? ORDER BY created DESC LIMIT 10`
     )
-    .bind(session.email.toLowerCase(), thirtyDaysAgo.toISOString())
+    .bind(user.email.toLowerCase(), thirtyDaysAgo.toISOString())
     .all<{ id: string; description: string; created: string }>();
 
   // Simple similarity check: if description is very similar (80%+ match) or exact duplicate
@@ -490,8 +465,8 @@ if (isSubmit && esigTypedName && esigConsent && esigIntent) {
     signatureId = await createElectronicSignature(db, {
       documentType: esigDocumentType || 'arb_request',
       documentId: requestId,
-      signerEmail: esigSignerEmail || session.email,
-      signerName: applicantName || session.email,
+      signerEmail: esigSignerEmail || user.email,
+      signerName: applicantName || user.email,
       signatureData,
       ipAddress: clientIp ?? undefined,
       userAgent: userAgent ?? undefined,
@@ -512,7 +487,7 @@ if (isSubmit && esigTypedName && esigConsent && esigIntent) {
 }
 
 try {
-  await insertArbRequest(db, requestId, session.email, description, {
+  await insertArbRequest(db, requestId, user.email, description, {
     applicantName,
     phone,
     propertyAddress,
@@ -523,7 +498,7 @@ try {
 
   // If submitting for review, update status from 'pending' to 'in_review'
   if (isSubmit) {
-    const submitted = await setArbRequestInReview(db, requestId, session.email, clientIp);
+    const submitted = await setArbRequestInReview(db, requestId, user.email, clientIp);
     if (!submitted) {
       logger.warn('Failed to update status to in_review', { requestId });
       // Don't fail the request - it's saved as pending, user can resubmit later
@@ -535,7 +510,7 @@ try {
       await trackArbEvent(db, {
         eventType: 'submitted',
         requestId,
-        ownerEmail: session.email,
+        ownerEmail: user.email,
         hasSignature: !!signatureId,
         signatureId: signatureId || undefined,
         fileCount: fileGroups.length,
@@ -548,7 +523,7 @@ try {
   // Increment rate limit counter only for submissions (not drafts)
   if (isSubmit && kv) {
     const today = new Date().toISOString().split('T')[0];
-    const rateLimitKey = `arb_submit:${session.email}:${today}`;
+    const rateLimitKey = `arb_submit:${user.email}:${today}`;
     const count = await kv.get(rateLimitKey, { type: 'text' });
     const currentCount = parseInt(count ?? '0', 10);
     await kv.put(rateLimitKey, String(currentCount + 1), { expirationTtl: 86400 }); // 24 hours
@@ -668,7 +643,7 @@ if (isSubmit && env) {
     try {
       const sig = await import('../../lib/esignature-db').then(m => m.getElectronicSignature(db, signatureId));
       if (sig) {
-        await sendSignatureSubmittedEmail(env, session.email, {
+        await sendSignatureSubmittedEmail(env, user.email, {
           requestId,
           signatureId,
           signerName: esigTypedName,
@@ -690,8 +665,8 @@ if (isSubmit && env) {
       if (sig) {
         await sendArbNewSignedRequestEmail(env, {
           requestId,
-          ownerEmail: session.email,
-          ownerName: applicantName || session.email,
+          ownerEmail: user.email,
+          ownerName: applicantName || user.email,
           propertyAddress: propertyAddress || 'Not specified',
           signatureId,
           signedAt: sig.signed_at,

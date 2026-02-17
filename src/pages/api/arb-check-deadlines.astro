@@ -20,7 +20,7 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie, getEffectiveRole } from '../../lib/auth';
+import { getEffectiveRole } from '../../lib/auth';
 import { createLogger } from '../../lib/logging';
 import {
   checkAndApplyDeadlines,
@@ -31,12 +31,10 @@ const runtime = Astro.locals.runtime;
 const env = runtime?.env;
 
 // Auth check - only ARC, Board, or Admin can check deadlines
-const session = await getSessionFromCookie(
-  Astro.request.headers.get('cookie') ?? undefined,
-  env?.SESSION_SECRET
-);
+const user = Astro.locals.user;
+const session = Astro.locals.session;
 
-if (!session) {
+if (!session || !user) {
   return new Response(JSON.stringify({ error: 'Unauthorized' }), {
     status: 401,
     headers: { 'Content-Type': 'application/json' },
@@ -91,7 +89,7 @@ try {
     auto_approved_ids: autoApprovedIds,
     approaching_7_days_count: approaching7Days.length,
     approaching_3_days_count: approaching3Days.length,
-    checked_by: session.email,
+    checked_by: user.email,
   });
 
   return new Response(
@@ -109,7 +107,7 @@ try {
     { status: 200, headers: { 'Content-Type': 'application/json' } }
   );
 } catch (error) {
-  logger.error('Failed to check deadlines', { error, checked_by: session.email });
+  logger.error('Failed to check deadlines', { error, checked_by: user.email });
   return new Response(
     JSON.stringify({
       error: 'Failed to check deadlines. Please try again.',

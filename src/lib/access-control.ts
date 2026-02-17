@@ -10,6 +10,7 @@ import type { ArbRequest } from './arb-db';
 import { getArbRequest } from './arb-db';
 import { listEmailsAtSameAddress } from './directory-db.js';
 import { jsonResponse } from './api-helpers';
+import type { User } from 'lucia';
 
 /** True if the session user is the request owner or in the same household (same address). */
 async function isOwnerOrHousehold(
@@ -28,13 +29,15 @@ async function isOwnerOrHousehold(
 export async function requireArbRequestAccess(
   db: D1Database,
   requestId: string,
-  session: SessionPayload
+  sessionOrUser: SessionPayload | User
 ): Promise<{ request: ArbRequest } | { response: Response }> {
   const request = await getArbRequest(db, requestId);
   if (!request)
     return { response: jsonResponse({ error: 'Request not found' }, 404) };
-  const isOwnerOrInHousehold = await isOwnerOrHousehold(db, request.owner_email, session.email);
-  const isElevated = isElevatedRole(session.role);
+  const userEmail = 'email' in sessionOrUser ? sessionOrUser.email : '';
+  const userRole = 'role' in sessionOrUser ? sessionOrUser.role : '';
+  const isOwnerOrInHousehold = await isOwnerOrHousehold(db, request.owner_email, userEmail);
+  const isElevated = isElevatedRole(userRole);
   if (!isOwnerOrInHousehold && !isElevated)
     return { response: jsonResponse({ error: 'Forbidden' }, 403) };
   return { request };
@@ -47,13 +50,14 @@ export async function requireArbRequestAccess(
 export async function requireArbRequestOwner(
   db: D1Database,
   requestId: string,
-  session: SessionPayload,
+  sessionOrUser: SessionPayload | User,
   options?: { requirePending?: boolean }
 ): Promise<{ request: ArbRequest } | { response: Response }> {
   const request = await getArbRequest(db, requestId);
   if (!request)
     return { response: jsonResponse({ error: 'Request not found' }, 404) };
-  const isOwnerOrInHousehold = await isOwnerOrHousehold(db, request.owner_email, session.email);
+  const userEmail = 'email' in sessionOrUser ? sessionOrUser.email : '';
+  const isOwnerOrInHousehold = await isOwnerOrHousehold(db, request.owner_email, userEmail);
   if (!isOwnerOrInHousehold)
     return { response: jsonResponse({ error: 'You do not have access to this request.' }, 403) };
   if (options?.requirePending && request.status !== 'pending')

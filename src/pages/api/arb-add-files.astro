@@ -5,7 +5,7 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie, verifyCsrfToken, verifyOrigin } from '../../lib/auth';
+import { verifyCsrfToken, verifyOrigin } from '../../lib/auth';
 import { requireArbRequestOwner } from '../../lib/access-control';
 import { checkRateLimit, getRateLimitConfig } from '../../lib/rate-limit';
 import { getSecurityMonitor } from '../../lib/monitoring';
@@ -26,7 +26,7 @@ function isAllowedType(t: string): boolean {
 async function validateFileMimeType(file: File | Blob): Promise<boolean> {
   const buffer = await file.arrayBuffer();
   const bytes = new Uint8Array(buffer);
-  
+
   // JPEG: FF D8 FF
   if (bytes[0] === 0xFF && bytes[1] === 0xD8 && bytes[2] === 0xFF) {
     return file.type === 'image/jpeg' || file.type === 'image/jpg';
@@ -41,7 +41,7 @@ async function validateFileMimeType(file: File | Blob): Promise<boolean> {
   }
   // WebP: RIFF...WEBP
   if (bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46) {
-    if (bytes.length >= 12 && 
+    if (bytes.length >= 12 &&
         bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50) {
       return file.type === 'image/webp';
     }
@@ -51,25 +51,23 @@ async function validateFileMimeType(file: File | Blob): Promise<boolean> {
     return file.type === 'application/pdf';
   }
   // HEIC: ftyp...heic
-  if (bytes.length >= 12 && 
+  if (bytes.length >= 12 &&
       bytes[4] === 0x66 && bytes[5] === 0x74 && bytes[6] === 0x79 && bytes[7] === 0x70) {
     const brand = String.fromCharCode(bytes[8], bytes[9], bytes[10], bytes[11]);
     if (brand === 'heic' || brand === 'mif1' || brand === 'msf1') {
       return file.type === 'image/heic' || file.type === 'image/heif';
     }
   }
-  
+
   return isAllowedType(file.type) || file.type === 'application/pdf';
 }
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
-const session = await getSessionFromCookie(
-  Astro.request.headers.get('cookie') ?? undefined,
-  env?.SESSION_SECRET
-);
+const user = Astro.locals.user;
+const session = Astro.locals.session;
 
-if (!session) {
+if (!session || !user) {
   return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
 }
 
@@ -104,7 +102,7 @@ try {
   // Race between formData parsing and timeout
   const formDataPromise = Astro.request.formData();
   formData = await Promise.race([formDataPromise, timeoutPromise]);
-  
+
   // Check request size
   const contentLength = Astro.request.headers.get('content-length');
   if (contentLength) {
@@ -145,7 +143,7 @@ if (!requestId) {
   return new Response(JSON.stringify({ error: 'request_id is required.' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
 }
 
-const ownerCheck = await requireArbRequestOwner(db, requestId, session, { requirePending: true });
+const ownerCheck = await requireArbRequestOwner(db, requestId, user, { requirePending: true });
 if ('response' in ownerCheck) return ownerCheck.response;
 
 const existingFiles = await listArbFilesByRequest(db, requestId);
@@ -195,7 +193,7 @@ for (const f of fileGroups) {
   if (f.size > MAX_FILE_BYTES) {
     return new Response(JSON.stringify({ error: `File "${f.name}" exceeds 5MB.` }), { status: 400, headers: { 'Content-Type': 'application/json' } });
   }
-  
+
   // Server-side MIME type validation
   const isValidMime = await validateFileMimeType(f.original);
   if (!isValidMime) {
@@ -206,7 +204,7 @@ for (const f of fileGroups) {
       { status: 400, headers: { 'Content-Type': 'application/json' } }
     );
   }
-  
+
   // Also validate review and archive versions if present
   if (f.review) {
     const isValidReview = await validateFileMimeType(f.review);
@@ -230,7 +228,7 @@ for (const f of fileGroups) {
       );
     }
   }
-  
+
   newTotal += f.size;
 }
 if (existingTotal + newTotal > MAX_TOTAL_BYTES) {

@@ -5,7 +5,7 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie, verifyCsrfToken, verifyOrigin } from '../../lib/auth';
+import { verifyCsrfToken, verifyOrigin } from '../../lib/auth';
 import { createLogger, maskRequestId } from '../../lib/logging';
 import { checkRateLimit, getRateLimitConfig } from '../../lib/rate-limit';
 import { getSecurityMonitor } from '../../lib/monitoring';
@@ -15,17 +15,10 @@ import { requireArbRequestOwner } from '../../lib/access-control';
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
 const logger = createLogger({ endpoint: 'arb-update' });
-const userAgent = Astro.request.headers.get('user-agent') ?? null;
-const ipAddress = Astro.request.headers.get('cf-connecting-ip') ?? 
-                  Astro.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
-const session = await getSessionFromCookie(
-  Astro.request.headers.get('cookie') ?? undefined,
-  env?.SESSION_SECRET,
-  userAgent,
-  ipAddress
-);
+const user = Astro.locals.user;
+const session = Astro.locals.session;
 
-if (!session) {
+if (!session || !user) {
   return new Response(JSON.stringify({ error: 'Unauthorized' }), {
     status: 401,
     headers: { 'Content-Type': 'application/json' },
@@ -60,7 +53,7 @@ if (!db) {
 
 try {
   const formData = await Astro.request.formData();
-  
+
   // CSRF token verification
   const csrfToken = formData.get('csrf_token') as string | null;
   if (!verifyCsrfToken(session, csrfToken)) {
@@ -69,7 +62,7 @@ try {
       { status: 403, headers: { 'Content-Type': 'application/json' } }
     );
   }
-  
+
   const requestId = (formData.get('request_id') as string)?.trim();
   if (!requestId) {
     return new Response(JSON.stringify({ error: 'Request ID is required.' }), {
@@ -78,7 +71,7 @@ try {
     });
   }
 
-  const ownerCheck = await requireArbRequestOwner(db, requestId, session, { requirePending: true });
+  const ownerCheck = await requireArbRequestOwner(db, requestId, user, { requirePending: true });
   if ('response' in ownerCheck) return ownerCheck.response;
   const { request } = ownerCheck;
 
