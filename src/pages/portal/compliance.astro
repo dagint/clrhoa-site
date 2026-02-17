@@ -36,7 +36,7 @@ const publicDocToRequirement: Record<string, string> = {
   'covenants': 'HOA-03',
 };
 
-// Enhance compliance statuses with public doc references
+// Enhance compliance statuses with public doc references and recalculate status
 const enhancedStatuses = complianceData.statuses.map((status) => {
   if (!status.document) {
     // Check if there's a public doc that satisfies this requirement
@@ -44,14 +44,24 @@ const enhancedStatuses = complianceData.statuses.map((status) => {
       slug => publicDocToRequirement[slug] === status.requirement.id
     );
     if (publicSlug && publicDocsBySlug[publicSlug]?.file_key) {
+      // If we have a public doc, mark this requirement as COMPLIANT
       return {
         ...status,
+        status: 'COMPLIANT' as const,
         publicDoc: publicDocsBySlug[publicSlug],
+        lastUpdated: publicDocsBySlug[publicSlug].updated_at,
       };
     }
   }
   return { ...status, publicDoc: undefined };
 });
+
+// Recalculate compliance score based on enhanced statuses
+const compliantCount = enhancedStatuses.filter((s) => s.status === 'COMPLIANT').length;
+const partialCount = enhancedStatuses.filter((s) => s.status === 'PARTIAL').length;
+const missingCount = enhancedStatuses.filter((s) => s.status === 'MISSING').length;
+const totalCount = enhancedStatuses.length;
+const complianceScore = totalCount > 0 ? Math.round((compliantCount / totalCount) * 100) : 0;
 
 // Group by category
 const categories = [
@@ -134,9 +144,9 @@ function getDocumentYear(doc: any): number {
           <div>
             <div class="text-base text-gray-700 mb-1">Overall Compliance</div>
             <div class="flex items-baseline gap-2">
-              <div class="text-5xl font-bold text-clr-green">{complianceData.score}%</div>
+              <div class="text-5xl font-bold text-clr-green">{complianceScore}%</div>
               <div class="text-base text-gray-600">
-                {complianceData.compliantCount} of {complianceData.totalCount} requirements met
+                {compliantCount} of {totalCount} requirements met
               </div>
             </div>
           </div>
@@ -145,7 +155,7 @@ function getDocumentYear(doc: any): number {
             <div class="h-3 bg-white rounded-full overflow-hidden border border-gray-200">
               <div
                 class="h-full bg-clr-green transition-all duration-500"
-                style={`width: ${complianceData.score}%`}
+                style={`width: ${complianceScore}%`}
               ></div>
             </div>
           </div>
@@ -154,15 +164,15 @@ function getDocumentYear(doc: any): number {
         <!-- Status Summary Cards -->
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-6">
           <div class="p-4 rounded-xl bg-green-50 border border-green-200">
-            <div class="text-2xl font-bold text-green-800 mb-1">{complianceData.compliantCount}</div>
+            <div class="text-2xl font-bold text-green-800 mb-1">{compliantCount}</div>
             <div class="text-sm font-medium text-green-700">✅ Posted & Current</div>
           </div>
           <div class="p-4 rounded-xl bg-amber-50 border border-amber-200">
-            <div class="text-2xl font-bold text-amber-800 mb-1">{complianceData.partialCount}</div>
+            <div class="text-2xl font-bold text-amber-800 mb-1">{partialCount}</div>
             <div class="text-sm font-medium text-amber-700">⚠️ Needs Update</div>
           </div>
           <div class="p-4 rounded-xl bg-red-50 border border-red-200">
-            <div class="text-2xl font-bold text-red-800 mb-1">{complianceData.missingCount}</div>
+            <div class="text-2xl font-bold text-red-800 mb-1">{missingCount}</div>
             <div class="text-sm font-medium text-red-700">❌ Not Posted</div>
           </div>
         </div>
@@ -175,7 +185,7 @@ function getDocumentYear(doc: any): number {
           The score is calculated as: <strong>(Posted Documents ÷ Total Requirements) × 100</strong>
         </p>
         <p class="text-sm text-blue-700 mt-2">
-          Current calculation: {complianceData.compliantCount} compliant requirements ÷ {complianceData.totalCount} total requirements = {complianceData.score}%
+          Current calculation: {compliantCount} compliant requirements ÷ {totalCount} total requirements = {complianceScore}%
         </p>
       </div>
 
