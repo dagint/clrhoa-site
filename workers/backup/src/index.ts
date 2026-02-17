@@ -39,6 +39,18 @@ interface R2BackupState {
   totalBytes: number;
 }
 
+interface DeletedFileRecord {
+  deleted_at: string; // ISO date
+  size: number;
+  etag: string;
+  original_path: string;
+  backup_location: string; // Path in Drive: deleted-files/{date}/{original_path}
+}
+
+interface DeletedFilesManifest {
+  files: Record<string, DeletedFileRecord>; // Key is original R2 path
+}
+
 export default {
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
     const date = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
@@ -424,7 +436,7 @@ async function maybeUploadToGoogleDrive(env: Env, date: string, skipScheduleChec
   if (row.include_r2_files) {
     const result = await uploadR2FilesToDrive(env, accessToken, folderId, date);
     console.log(
-      `R2 file backup complete: ${result.uploaded} uploaded, ${result.skipped} skipped, ${Math.round(result.totalBytes / 1024 / 1024)}MB transferred`
+      `R2 file backup complete: ${result.uploaded} uploaded, ${result.skipped} skipped, ${result.deleted} deleted (archived), ${Math.round(result.totalBytes / 1024 / 1024)}MB transferred`
     );
   }
 
@@ -738,21 +750,346 @@ async function saveR2BackupState(
 }
 
 /**
+ * Detect files that were deleted from R2 since last backup.
+ * Returns list of files that existed in lastState but no longer exist in currentFiles.
+ */
+function detectDeletedFiles(
+  currentFiles: R2FileMetadata[],
+  lastState: R2BackupState | null
+): Array<{ key: string; etag: string; size: number; uploaded: string }> {
+  if (!lastState) return []; // First backup - no deletions to detect
+
+  const currentKeys = new Set(currentFiles.map((f) => f.key));
+  const deletedFiles: Array<{ key: string; etag: string; size: number; uploaded: string }> = [];
+
+  for (const [key, fileInfo] of Object.entries(lastState.files)) {
+    if (!currentKeys.has(key)) {
+      deletedFiles.push({
+        key,
+        etag: fileInfo.etag,
+        size: fileInfo.size,
+        uploaded: fileInfo.uploaded,
+      });
+    }
+  }
+
+  return deletedFiles;
+}
+
+/**
+ * Get the deleted files manifest from Google Drive.
+ */
+async function getDeletedFilesManifest(
+  accessToken: string,
+  folderId: string
+): Promise<DeletedFilesManifest> {
+  try {
+    const q = `'${folderId}' in parents and name = 'deleted-files-manifest.json'`;
+    const url = new URL("https://www.googleapis.com/drive/v3/files");
+    url.searchParams.set("q", q);
+    url.searchParams.set("fields", "files(id)");
+
+    const listRes = await fetch(url.toString(), {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    if (!listRes.ok) {
+      return { files: {} };
+    }
+
+    const listData = (await listRes.json()) as { files?: { id: string }[] };
+    if (!listData.files || listData.files.length === 0) {
+      return { files: {} };
+    }
+
+    const fileId = listData.files[0]!.id;
+    const downloadRes = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+
+    if (!downloadRes.ok) {
+      return { files: {} };
+    }
+
+    return (await downloadRes.json()) as DeletedFilesManifest;
+  } catch (e) {
+    console.warn("Error getting deleted files manifest:", e);
+    return { files: {} };
+  }
+}
+
+/**
+ * Save the deleted files manifest to Google Drive.
+ */
+async function saveDeletedFilesManifest(
+  env: Env,
+  accessToken: string,
+  folderId: string,
+  manifest: DeletedFilesManifest
+): Promise<void> {
+  try {
+    const q = `'${folderId}' in parents and name = 'deleted-files-manifest.json'`;
+    const url = new URL("https://www.googleapis.com/drive/v3/files");
+    url.searchParams.set("q", q);
+    url.searchParams.set("fields", "files(id)");
+
+    const listRes = await fetch(url.toString(), {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    const listData = (await listRes.json()) as { files?: { id: string }[] };
+    const existingFileId = listData.files && listData.files.length > 0 ? listData.files[0]!.id : null;
+
+    const manifestJson = JSON.stringify(manifest, null, 2);
+
+    if (existingFileId) {
+      // Update existing file
+      await fetch(
+        `https://www.googleapis.com/upload/drive/v3/files/${existingFileId}?uploadType=media`,
+        {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+          body: manifestJson,
+        }
+      );
+    } else {
+      // Create new file
+      await uploadToDrive(
+        env,
+        accessToken,
+        folderId,
+        "deleted-files-manifest.json",
+        new ReadableStream({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode(manifestJson));
+            controller.close();
+          },
+        }),
+        "application/json"
+      );
+    }
+  } catch (e) {
+    console.warn("Error saving deleted files manifest:", e);
+  }
+}
+
+/**
+ * Upload deleted files to Google Drive in deleted-files/{date}/ folder structure.
+ * Preserves original path structure within the dated folder.
+ */
+async function uploadDeletedFilesToDrive(
+  env: Env,
+  accessToken: string,
+  folderId: string,
+  deletedFiles: Array<{ key: string; etag: string; size: number; uploaded: string }>,
+  date: string
+): Promise<number> {
+  if (deletedFiles.length === 0) return 0;
+
+  console.log(`Found ${deletedFiles.length} deleted file(s) to archive`);
+
+  // Get current manifest
+  const manifest = await getDeletedFilesManifest(accessToken, folderId);
+
+  // Create deleted-files folder if needed
+  const deletedFilesFolderId = await getOrCreateDriveFolder(accessToken, folderId, "deleted-files");
+
+  // Create date folder (e.g., "2026-02-17")
+  const dateFolderId = await getOrCreateDriveFolder(accessToken, deletedFilesFolderId, date);
+
+  let uploaded = 0;
+
+  for (const file of deletedFiles) {
+    try {
+      // Try to get the file from R2 backup (it might still exist in a previous backup)
+      // If not in current R2, we can't recover it, so skip
+      const r2Obj = await env.BACKUP_R2.get(file.key);
+      if (!r2Obj) {
+        console.warn(`Deleted file ${file.key} not found in R2, cannot archive`);
+        continue;
+      }
+
+      // Determine folder structure
+      const pathParts = file.key.split("/");
+      const fileName = pathParts[pathParts.length - 1]!;
+      const folders = pathParts.slice(0, -1);
+
+      // Create nested folders preserving original path
+      let currentFolderId = dateFolderId;
+      for (const folder of folders) {
+        currentFolderId = await getOrCreateDriveFolder(accessToken, currentFolderId, folder);
+      }
+
+      // Upload deleted file
+      await uploadToDrive(
+        env,
+        accessToken,
+        currentFolderId,
+        fileName,
+        r2Obj.body,
+        r2Obj.httpMetadata?.contentType || "application/octet-stream"
+      );
+
+      // Add to manifest
+      const backupLocation = `deleted-files/${date}/${file.key}`;
+      manifest.files[file.key] = {
+        deleted_at: date,
+        size: file.size,
+        etag: file.etag,
+        original_path: file.key,
+        backup_location: backupLocation,
+      };
+
+      uploaded++;
+    } catch (e) {
+      console.error(`Failed to archive deleted file ${file.key}:`, e);
+    }
+  }
+
+  // Save updated manifest
+  await saveDeletedFilesManifest(env, accessToken, folderId, manifest);
+
+  console.log(`Archived ${uploaded} deleted file(s) to deleted-files/${date}/`);
+  return uploaded;
+}
+
+/**
+ * Clean up deleted files older than 90 days from Google Drive.
+ * Removes both the files and their manifest entries.
+ */
+async function cleanupOldDeletedFiles(
+  accessToken: string,
+  folderId: string
+): Promise<void> {
+  try {
+    const manifest = await getDeletedFilesManifest(accessToken, folderId);
+    const now = new Date();
+    const cutoffDate = new Date(now);
+    cutoffDate.setDate(cutoffDate.getDate() - 90);
+    const cutoffStr = cutoffDate.toISOString().slice(0, 10); // YYYY-MM-DD
+
+    const toDelete: string[] = [];
+    const dateFoldersToCleanup = new Set<string>();
+
+    // Find files older than 90 days
+    for (const [path, record] of Object.entries(manifest.files)) {
+      if (record.deleted_at < cutoffStr) {
+        toDelete.push(path);
+        dateFoldersToCleanup.add(record.deleted_at);
+      }
+    }
+
+    if (toDelete.length === 0) {
+      return; // Nothing to clean up
+    }
+
+    console.log(`Cleaning up ${toDelete.length} deleted file(s) older than 90 days`);
+
+    // Delete date folders from Drive
+    const deletedFilesFolderId = await getOrCreateDriveFolder(accessToken, folderId, "deleted-files");
+
+    for (const dateStr of dateFoldersToCleanup) {
+      // Find the date folder
+      const q = `'${deletedFilesFolderId}' in parents and name = '${dateStr}' and mimeType = 'application/vnd.google-apps.folder'`;
+      const url = new URL("https://www.googleapis.com/drive/v3/files");
+      url.searchParams.set("q", q);
+      url.searchParams.set("fields", "files(id)");
+
+      const listRes = await fetch(url.toString(), {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+
+      if (listRes.ok) {
+        const listData = (await listRes.json()) as { files?: { id: string }[] };
+        if (listData.files && listData.files.length > 0) {
+          const dateFolderId = listData.files[0]!.id;
+
+          // Delete the entire date folder (this deletes all files within it)
+          const delRes = await fetch(`https://www.googleapis.com/drive/v3/files/${dateFolderId}`, {
+            method: "DELETE",
+            headers: { Authorization: `Bearer ${accessToken}` },
+          });
+
+          if (!delRes.ok && delRes.status !== 404) {
+            console.warn(`Failed to delete date folder ${dateStr}: ${delRes.status}`);
+          } else {
+            console.log(`Deleted folder deleted-files/${dateStr}/`);
+          }
+        }
+      }
+    }
+
+    // Remove from manifest
+    for (const path of toDelete) {
+      delete manifest.files[path];
+    }
+
+    // Save updated manifest
+    const manifestJson = JSON.stringify(manifest, null, 2);
+    const q = `'${folderId}' in parents and name = 'deleted-files-manifest.json'`;
+    const url = new URL("https://www.googleapis.com/drive/v3/files");
+    url.searchParams.set("q", q);
+    url.searchParams.set("fields", "files(id)");
+
+    const listRes = await fetch(url.toString(), {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    if (listRes.ok) {
+      const listData = (await listRes.json()) as { files?: { id: string }[] };
+      if (listData.files && listData.files.length > 0) {
+        const manifestFileId = listData.files[0]!.id;
+        await fetch(
+          `https://www.googleapis.com/upload/drive/v3/files/${manifestFileId}?uploadType=media`,
+          {
+            method: "PATCH",
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              "Content-Type": "application/json",
+            },
+            body: manifestJson,
+          }
+        );
+      }
+    }
+
+    console.log(`Cleanup complete: removed ${toDelete.length} file record(s) from manifest`);
+  } catch (e) {
+    console.warn("Error during deleted files cleanup:", e);
+  }
+}
+
+/**
  * Upload R2 files to Google Drive incrementally.
  * Only uploads files that are new or changed since last backup (based on etag).
  * Creates a nested folder structure in Drive mirroring the R2 structure.
+ * Also detects and archives deleted files with 90-day retention.
  */
 async function uploadR2FilesToDrive(
   env: Env,
   accessToken: string,
   folderId: string,
   date: string
-): Promise<{ uploaded: number; skipped: number; totalBytes: number }> {
+): Promise<{ uploaded: number; skipped: number; deleted: number; totalBytes: number }> {
   // Get current R2 files
   const currentFiles = await listAllR2Files(env);
 
   // Get last backup state
   const lastState = await getR2BackupState(env, accessToken, folderId);
+
+  // Detect and archive deleted files (files that existed in last backup but not in current R2)
+  const deletedFiles = detectDeletedFiles(currentFiles, lastState);
+  let deletedCount = 0;
+  if (deletedFiles.length > 0) {
+    deletedCount = await uploadDeletedFilesToDrive(env, accessToken, folderId, deletedFiles, date);
+  }
+
+  // Clean up deleted files older than 90 days
+  await cleanupOldDeletedFiles(accessToken, folderId);
 
   // Determine which files are new or changed
   const filesToUpload = currentFiles.filter((file) => {
@@ -833,6 +1170,7 @@ async function uploadR2FilesToDrive(
   return {
     uploaded,
     skipped: currentFiles.length - filesToUpload.length,
+    deleted: deletedCount,
     totalBytes,
   };
 }
