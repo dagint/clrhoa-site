@@ -5,7 +5,7 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie, isElevatedRole, getEffectiveRole } from '../../lib/auth';
+import { isElevatedRole, getEffectiveRole } from '../../lib/auth';
 import { getOwnerByEmail, validateLotNumber } from '../../lib/directory-db';
 import { insertSmsFeatureRequest, getSmsFeatureRequestCounts, listSmsFeatureRequests } from '../../lib/sms-feature-request-db';
 
@@ -14,11 +14,9 @@ const env = runtime?.env;
 const db = env?.DB;
 
 if (Astro.request.method === 'POST') {
-  const session = await getSessionFromCookie(
-    Astro.request.headers.get('cookie') ?? undefined,
-    env?.SESSION_SECRET
-  );
-  if (!session) {
+  const user = Astro.locals.user;
+  const session = Astro.locals.session;
+  if (!session || !user) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
       status: 401,
       headers: { 'Content-Type': 'application/json' },
@@ -31,7 +29,7 @@ if (Astro.request.method === 'POST') {
     });
   }
 
-  const owner = await getOwnerByEmail(db, session.email);
+  const owner = await getOwnerByEmail(db, user.email);
   const lotNumber = owner?.lot_number?.trim() ?? null;
   if (!lotNumber || !validateLotNumber(lotNumber)) {
     return new Response(
@@ -63,10 +61,8 @@ if (Astro.request.method === 'POST') {
 }
 
 if (Astro.request.method === 'GET') {
-  const session = await getSessionFromCookie(
-    Astro.request.headers.get('cookie') ?? undefined,
-    env?.SESSION_SECRET
-  );
+  const user = Astro.locals.user;
+  const session = Astro.locals.session;
   if (!session || !isElevatedRole(getEffectiveRole(session))) {
     return new Response(JSON.stringify({ error: 'Forbidden' }), {
       status: 403,

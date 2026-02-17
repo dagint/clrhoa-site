@@ -5,7 +5,6 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie } from '../../../lib/auth';
 import { getNewsItemById, getNewsItemImageKeys } from '../../../lib/news-items-db';
 
 const runtime = Astro.locals.runtime;
@@ -46,11 +45,9 @@ if (!allowedKeys.includes(key)) {
 
 const isPublic = item.is_public === 1;
 if (!isPublic) {
-  const session = await getSessionFromCookie(
-    Astro.request.headers.get('cookie') ?? undefined,
-    env?.SESSION_SECRET
-  );
-  if (!session) {
+  const user = Astro.locals.user;
+  const session = Astro.locals.session;
+  if (!session || !user) {
     return new Response('Unauthorized', { status: 401 });
   }
 }

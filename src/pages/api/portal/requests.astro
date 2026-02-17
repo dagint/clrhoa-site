@@ -5,17 +5,15 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie, verifyOrigin } from '../../../lib/auth';
+import { verifyOrigin } from '../../../lib/auth';
 import { listArbRequestsByHousehold, listArbAuditLogForRequest, getSubmittedForReviewAt } from '../../../lib/arb-db';
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
-const session = await getSessionFromCookie(
-  Astro.request.headers.get('cookie') ?? undefined,
-  env?.SESSION_SECRET
-);
+const user = Astro.locals.user;
+const session = Astro.locals.session;
 
-if (!session) {
+if (!session || !user) {
   return new Response(JSON.stringify({ error: 'Unauthorized' }), {
     status: 401,
     headers: { 'Content-Type': 'application/json' },
@@ -46,7 +44,7 @@ if (!db) {
   });
 }
 
-const email = session.email.trim().toLowerCase();
+const email = user.email.trim().toLowerCase();
 const requests = await listArbRequestsByHousehold(db, email);
 const auditByRequestId: Record<string, { id: number; request_id: string; action: string; old_status: string | null; new_status: string | null; changed_by_email: string | null; changed_by_role: string | null; notes: string | null; created: string | null }[]> = {};
 const submittedForReviewAt: Record<string, string | null> = {};

@@ -7,7 +7,7 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie, verifyCsrfToken, verifyOrigin, getEffectiveRole } from '../../lib/auth';
+import { verifyCsrfToken, verifyOrigin, getEffectiveRole } from '../../lib/auth';
 import {
   listPendingSubmissions,
   listSubmissions,
@@ -45,17 +45,12 @@ function parseSubmissionFiles(filesJson: string | null): VendorFile[] {
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
-const userAgent = Astro.request.headers.get('user-agent') ?? null;
-const ipAddress = Astro.request.headers.get('cf-connecting-ip') ?? 
+const user = Astro.locals.user;
+const session = Astro.locals.session;
+const ipAddress = Astro.request.headers.get('cf-connecting-ip') ??
   Astro.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
-let session = await getSessionFromCookie(
-  Astro.request.headers.get('cookie') ?? undefined,
-  env?.SESSION_SECRET,
-  userAgent,
-  ipAddress
-);
 
-if (!session) {
+if (!session || !user) {
   return new Response(JSON.stringify({ error: 'Unauthorized' }), {
     status: 401,
     headers: { 'Content-Type': 'application/json' },
@@ -143,7 +138,7 @@ if (Astro.request.method === 'PUT') {
   }
 
   if (action === 'reject') {
-    const updated = await updateSubmissionStatus(db, id, 'rejected', session.email, reviewNotes, null);
+    const updated = await updateSubmissionStatus(db, id, 'rejected', user.email, reviewNotes, null);
     if (!updated) {
       return new Response(JSON.stringify({ error: 'Update failed.' }), {
         status: 500,
@@ -189,9 +184,9 @@ if (Astro.request.method === 'PUT') {
   }
 
   const clientIp = Astro.clientAddress || Astro.request.headers.get('cf-connecting-ip') || null;
-  await insertVendorAuditLog(db, { vendor_id: vendorId, vendor_name: submission.name ?? null, action: 'created', done_by_email: session.email, ip_address: clientIp });
+  await insertVendorAuditLog(db, { vendor_id: vendorId, vendor_name: submission.name ?? null, action: 'created', done_by_email: user.email, ip_address: clientIp });
 
-  const updated = await updateSubmissionStatus(db, id, 'approved', session.email, reviewNotes, vendorId);
+  const updated = await updateSubmissionStatus(db, id, 'approved', user.email, reviewNotes, vendorId);
   if (!updated) {
     return new Response(JSON.stringify({ error: 'Failed to update submission status.' }), {
       status: 500,
@@ -268,7 +263,7 @@ const submissionId = await insertSubmission(db, {
   website,
   notes,
   filesJson: '[]',
-  submittedBy: session.email,
+  submittedBy: user.email,
 });
 
 const uploadedFiles: VendorFile[] = [];

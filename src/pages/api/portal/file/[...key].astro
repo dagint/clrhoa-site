@@ -5,18 +5,15 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie } from '../../../../lib/auth';
 import { requireArbRequestAccess } from '../../../../lib/access-control';
 import { getMemberDocumentByFileKey } from '../../../../lib/member-documents-db';
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
-const session = await getSessionFromCookie(
-  Astro.request.headers.get('cookie') ?? undefined,
-  env?.SESSION_SECRET
-);
+const user = Astro.locals.user;
+  const session = Astro.locals.session;
 
-if (!session) {
+if (!session || !user) {
   return new Response('Unauthorized', { status: 401 });
 }
 
@@ -66,7 +63,7 @@ const requestId = segments[1];
 if (!requestId) {
   return new Response('Forbidden', { status: 403 });
 }
-const access = await requireArbRequestAccess(db, requestId, session);
+const access = await requireArbRequestAccess(db, requestId, user);
 if ('response' in access) {
   return new Response(access.response.status === 404 ? 'Not Found' : 'Forbidden', { status: access.response.status });
 }

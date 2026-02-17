@@ -7,24 +7,19 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie, verifyCsrfToken, verifyOrigin, addToLoginWhitelistIfMissing, getEffectiveRole, isElevatedRole } from '../../../lib/auth';
+import { verifyCsrfToken, verifyOrigin, addToLoginWhitelistIfMissing, getEffectiveRole, isElevatedRole } from '../../../lib/auth';
 import { getOwnerByEmail, insertOwner, updateOwner } from '../../../lib/directory-db';
 import { checkRateLimit, getRateLimitConfig } from '../../../lib/rate-limit';
 import { getSecurityMonitor } from '../../../lib/monitoring';
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
-const userAgent = Astro.request.headers.get('user-agent') ?? null;
+const user = Astro.locals.user;
+const session = Astro.locals.session;
 const ipAddress = Astro.request.headers.get('cf-connecting-ip') ??
   Astro.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
-let session = await getSessionFromCookie(
-  Astro.request.headers.get('cookie') ?? undefined,
-  env?.SESSION_SECRET,
-  userAgent,
-  ipAddress
-);
 
-if (!session) {
+if (!session || !user) {
   return new Response(JSON.stringify({ error: 'Unauthorized' }), {
     status: 401,
     headers: { 'Content-Type': 'application/json' },
@@ -71,7 +66,7 @@ if (rateLimitConfig && rateLimitKv) {
     rateLimitConfig.windowSeconds
   );
   if (!rateLimit.allowed) {
-    securityMonitor.trackRateLimit(endpoint, session.email, clientIpAddress);
+    securityMonitor.trackRateLimit(endpoint, user.email, clientIpAddress);
     return new Response(
       JSON.stringify({
         error: `Rate limit exceeded. Maximum ${rateLimitConfig.maxRequests} uploads per ${rateLimitConfig.windowSeconds / 60} minutes. Please try again later.`,
@@ -219,7 +214,7 @@ for (let i = startRow; i < lines.length; i++) {
           db,
           existing.id,
           { name, address, lot_number: lotNumber, phone, email },
-          session.email,
+          user.email,
           {
             ip_address: clientIpAddress,
             role: effectiveRole,
@@ -231,7 +226,7 @@ for (let i = startRow; i < lines.length; i++) {
         await insertOwner(
           db,
           { name, address, lot_number: lotNumber, phone, email },
-          session.email,
+          user.email,
           {
             ip_address: clientIpAddress,
             role: effectiveRole,
@@ -245,7 +240,7 @@ for (let i = startRow; i < lines.length; i++) {
       await insertOwner(
         db,
         { name, address, lot_number: lotNumber, phone, email: null },
-        session.email,
+        user.email,
         {
           ip_address: clientIpAddress,
           role: effectiveRole,

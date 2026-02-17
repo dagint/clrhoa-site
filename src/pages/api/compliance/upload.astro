@@ -6,7 +6,7 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie, verifyCsrfToken, verifyOrigin, getEffectiveRole, isBoardOnly } from '../../../lib/auth';
+import { verifyCsrfToken, verifyOrigin, getEffectiveRole, isBoardOnly } from '../../../lib/auth';
 import {
   getComplianceRequirement,
   archiveCurrentDocumentsForRequirement,
@@ -16,12 +16,10 @@ import {
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
-const session = await getSessionFromCookie(
-  Astro.request.headers.get('cookie') ?? undefined,
-  env?.SESSION_SECRET
-);
+const user = Astro.locals.user;
+const session = Astro.locals.session;
 
-if (!session) {
+if (!session || !user) {
   return new Response(JSON.stringify({ error: 'Unauthorized' }), {
     status: 401,
     headers: { 'Content-Type': 'application/json' },
@@ -178,7 +176,7 @@ const documentId = await insertComplianceDocument(db, {
   fileKey,
   fileSize: file.size,
   mimeType: file.type,
-  uploadedBy: session.email,
+  uploadedBy: user.email,
   documentDate: documentDate ?? undefined,
   visibility: requirement.posting_location === 'public' ? 'public' : 'members',
   notes: notes ?? undefined,
@@ -189,7 +187,7 @@ await insertComplianceAuditLog(db, {
   requirementId,
   documentId,
   action: 'DOCUMENT_UPLOADED',
-  actorEmail: session.email,
+  actorEmail: user.email,
   metadata: {
     title,
     fileKey,

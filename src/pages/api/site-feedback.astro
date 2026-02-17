@@ -5,7 +5,7 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie, isElevatedRole, getEffectiveRole } from '../../lib/auth';
+import { isElevatedRole, getEffectiveRole } from '../../lib/auth';
 import { checkRateLimit, getRateLimitConfig } from '../../lib/rate-limit';
 import { insertSiteFeedback, listSiteFeedback } from '../../lib/site-feedback-db';
 
@@ -81,10 +81,8 @@ if (Astro.request.method === 'POST') {
 }
 
 if (Astro.request.method === 'GET') {
-  const session = await getSessionFromCookie(
-    Astro.request.headers.get('cookie') ?? undefined,
-    env?.SESSION_SECRET
-  );
+  const user = Astro.locals.user;
+  const session = Astro.locals.session;
   if (!session || !isElevatedRole(getEffectiveRole(session))) {
     return new Response(JSON.stringify({ error: 'Forbidden' }), {
       status: 403,

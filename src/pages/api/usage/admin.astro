@@ -4,7 +4,7 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie, isElevatedRole, getEffectiveRole } from '../../../lib/auth';
+import { isElevatedRole, getEffectiveRole } from '../../../lib/auth';
 import { getAdminPageViews } from '../../../lib/usage-db';
 
 const runtime = Astro.locals.runtime;
@@ -18,10 +18,8 @@ if (Astro.request.method !== 'GET') {
   });
 }
 
-const session = await getSessionFromCookie(
-  Astro.request.headers.get('cookie') ?? undefined,
-  env?.SESSION_SECRET
-);
+const user = Astro.locals.user;
+const session = Astro.locals.session;
 if (!session || !isElevatedRole(getEffectiveRole(session))) {
   return new Response(JSON.stringify({ error: 'Forbidden' }), {
     status: 403,
