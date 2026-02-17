@@ -16,6 +16,7 @@ import { listMaintenanceByHousehold } from '../../lib/maintenance-db';
 import { listUpcomingWithCountsAndUser, householdHasRsvpd } from '../../lib/meetings-db';
 import { listActiveFeedbackDocs, getFeedbackResponse, householdHasResponded } from '../../lib/feedback-db';
 import { getDismissedKeys } from '../../lib/notification-dismissals';
+import { countApprovedPreapprovalItems } from '../../lib/preapproval-db';
 
 const { env, session, effectiveRole } = await getPortalContext(Astro);
 if (!session) return Astro.redirect('/auth/login');
@@ -54,6 +55,7 @@ const draftCount = allRequests.filter(r => r.status === 'pending').length;
 let maintenanceOpenCount = 0;
 let meetingsRsvpCount = 0;
 let feedbackDueCount = 0;
+let libraryItemCount = 0;
 if (db) {
   const maintenanceList = await listMaintenanceByHousehold(db, email);
   maintenanceOpenCount = maintenanceList.filter((m) => m.status !== 'completed').length;
@@ -74,6 +76,7 @@ if (db) {
     if (await householdHasResponded(db, doc.id, email)) continue;
     if (doc.deadline == null || doc.deadline <= tomorrowStr) feedbackDueCount += 1;
   }
+  libraryItemCount = await countApprovedPreapprovalItems(db);
 }
 const directoryCount = db ? (await listOwners(db)).length : 0;
 
@@ -117,6 +120,7 @@ const showActionNeededBanner = showActionFeedback || showActionMaintenance || sh
       maintenanceOpenCount={maintenanceOpenCount}
       meetingsRsvpCount={meetingsRsvpCount}
       feedbackDueCount={feedbackDueCount}
+      libraryItemCount={libraryItemCount}
     />
 
     <!-- Main Content Area -->

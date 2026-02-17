@@ -100,6 +100,14 @@ export async function listPreapprovalCategories(db: D1Database): Promise<string[
   return (results ?? []).map((r) => r.category);
 }
 
+/** Count approved items (for showing/hiding library nav link). */
+export async function countApprovedPreapprovalItems(db: D1Database): Promise<number> {
+  const result = await db
+    .prepare('SELECT COUNT(*) as count FROM preapproval_items WHERE COALESCE(approved, 1) = 1')
+    .first<{ count: number }>();
+  return result?.count ?? 0;
+}
+
 /** Get one item by id. */
 export async function getPreapprovalById(db: D1Database, id: string): Promise<PreapprovalItem | null> {
   return db
