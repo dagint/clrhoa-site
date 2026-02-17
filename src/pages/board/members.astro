@@ -412,8 +412,9 @@ const csrfToken = session?.csrfToken ?? '';
       <ul class="text-sm text-blue-800 space-y-1 list-disc list-inside">
         <li><strong>Complete Records:</strong> Members with both account + directory entry</li>
         <li><strong>Account Only:</strong> Can log in but not in member directory (admins, service providers)</li>
-        <li><strong>Directory Only:</strong> In directory but haven't set up portal access yet</li>
-        <li><strong>Self-Service:</strong> Members can use "Forgot Password" to create accounts themselves</li>
+        <li><strong>Directory Only:</strong> In directory but haven't set up portal access yet - click "📧 Send Invite" to invite them</li>
+        <li><strong>Pending Setup:</strong> Invitation sent but password not yet created - click "🔄 Resend Invite" if needed</li>
+        <li><strong>Self-Service:</strong> Members can also use "Forgot Password" to create accounts themselves</li>
       </ul>
     </div>
   </PortalPage>
@@ -520,6 +521,25 @@ const csrfToken = session?.csrfToken ?? '';
                 <td class="px-4 py-3 text-sm text-gray-600">${m.address || '-'}</td>
                 <td class="px-4 py-3 text-sm">
                   <div class="flex gap-3">
+                    ${
+                      !m.hasAccount && m.inDirectory
+                        ? `<button
+                      class="text-blue-600 hover:text-blue-800 font-medium"
+                      onclick="sendInvite('${m.email}')"
+                      title="Send password setup invitation"
+                    >
+                      📧 Send Invite
+                    </button>`
+                        : m.hasAccount && m.accountStatus === 'pending_setup'
+                        ? `<button
+                      class="text-amber-600 hover:text-amber-800 font-medium"
+                      onclick="sendInvite('${m.email}')"
+                      title="Resend password setup invitation"
+                    >
+                      🔄 Resend Invite
+                    </button>`
+                        : ''
+                    }
                     <button
                       class="text-clr-green hover:text-clr-green/80 font-medium"
                       onclick="editMember('${m.email}')"
@@ -697,6 +717,37 @@ const csrfToken = session?.csrfToken ?? '';
       }
     } catch (error) {
       console.error('[MEMBERS] Delete error:', error);
+      showMessage('Network error. Please try again.', true);
+    }
+  };
+
+  // Send invite function (global so onclick can call it)
+  window.sendInvite = async function (email) {
+    const confirmed = confirm(`Send password setup invitation to ${email}?\n\nThey will receive an email with a link to create their portal password.`);
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/admin/send-user-invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email,
+          csrf_token: CSRF_TOKEN,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        showMessage(result.message || 'Invitation sent successfully! They will receive an email shortly.');
+        loadMembers(); // Refresh to show updated status (pending_setup)
+      } else {
+        showMessage(result.error || 'Failed to send invitation', true);
+      }
+    } catch (error) {
+      console.error('[MEMBERS] Send invite error:', error);
       showMessage('Network error. Please try again.', true);
     }
   };
