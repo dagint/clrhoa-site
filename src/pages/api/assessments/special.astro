@@ -5,7 +5,7 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie, verifyCsrfToken, verifyOrigin, getEffectiveRole, canRecordPayments } from '../../../lib/auth';
+import { verifyCsrfToken, verifyOrigin, getEffectiveRole, canRecordPayments } from '../../../lib/auth';
 import { listSpecialAssessmentsByOwner, addSpecialAssessment, markSpecialAssessmentPaid } from '../../../lib/assessments-db';
 
 function json(data: object, status = 200) {
@@ -14,11 +14,9 @@ function json(data: object, status = 200) {
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
-const session = await getSessionFromCookie(
-  Astro.request.headers.get('cookie') ?? undefined,
-  env?.SESSION_SECRET
-);
-if (!session) return json({ error: 'Unauthorized' }, 401);
+const user = Astro.locals.user;
+const session = Astro.locals.session;
+if (!session || !user) return json({ error: 'Unauthorized' }, 401);
 const effectiveRole = getEffectiveRole(session);
 if (!canRecordPayments(effectiveRole)) return json({ error: 'Forbidden. Only Board or ARB+Board can manage special assessments.' }, 403);
 
@@ -62,7 +60,7 @@ if (Astro.request.method === 'POST') {
       description,
       amount,
       due_date: due_date || undefined,
-      created_by: session.email,
+      created_by: user.email,
     });
     return json({ success: true, id });
   } catch (e) {

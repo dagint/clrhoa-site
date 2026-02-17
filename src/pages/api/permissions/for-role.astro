@@ -12,7 +12,7 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie, getEffectiveRole } from '../../../lib/auth';
+import { getEffectiveRole } from '../../../lib/auth';
 import { getRolePermissions } from '../../../utils/permissions';
 import { isValidRole } from '../../../utils/permissions';
 
@@ -28,12 +28,10 @@ if (Astro.request.method !== 'GET') {
 }
 
 // Auth check
-const session = await getSessionFromCookie(
-  Astro.request.headers.get('cookie') ?? undefined,
-  env?.SESSION_SECRET
-);
+const user = Astro.locals.user;
+const session = Astro.locals.session;
 
-if (!session) {
+if (!session || !user) {
   return new Response(JSON.stringify({ error: 'Unauthorized' }), {
     status: 401,
     headers: { 'Content-Type': 'application/json' },

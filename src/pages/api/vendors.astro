@@ -5,7 +5,7 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie, verifyCsrfToken, verifyOrigin, getEffectiveRole, isBoardOnly } from '../../lib/auth';
+import { verifyCsrfToken, verifyOrigin, getEffectiveRole, isBoardOnly } from '../../lib/auth';
 import {
   listVendors,
   getVendorById,
@@ -33,17 +33,12 @@ function safeFileName(name: string): string {
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
-const userAgent = Astro.request.headers.get('user-agent') ?? null;
+const user = Astro.locals.user;
+const session = Astro.locals.session;
 const ipAddress = Astro.request.headers.get('cf-connecting-ip') ??
   Astro.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
-let session = await getSessionFromCookie(
-  Astro.request.headers.get('cookie') ?? undefined,
-  env?.SESSION_SECRET,
-  userAgent,
-  ipAddress
-);
 
-if (!session) {
+if (!session || !user) {
   return new Response(JSON.stringify({ error: 'Unauthorized' }), {
     status: 401,
     headers: { 'Content-Type': 'application/json' },
@@ -118,7 +113,7 @@ if (Astro.request.method === 'DELETE') {
       headers: { 'Content-Type': 'application/json' },
     });
   }
-  await insertVendorAuditLog(db, { vendor_id: id, vendor_name: existingVendor?.name ?? null, action: 'deleted', done_by_email: session.email, ip_address: ipAddress });
+  await insertVendorAuditLog(db, { vendor_id: id, vendor_name: existingVendor?.name ?? null, action: 'deleted', done_by_email: user.email, ip_address: ipAddress });
   return new Response(JSON.stringify({ success: true }), {
     status: 200,
     headers: { 'Content-Type': 'application/json' },
@@ -217,7 +212,7 @@ if (Astro.request.method === 'POST' && action === 'create') {
     await updateVendor(db, id, { filesJson: JSON.stringify(uploadedFiles) });
   }
 
-  await insertVendorAuditLog(db, { vendor_id: id, vendor_name: name?.trim() ?? null, action: 'created', done_by_email: session.email, ip_address: ipAddress });
+  await insertVendorAuditLog(db, { vendor_id: id, vendor_name: name?.trim() ?? null, action: 'created', done_by_email: user.email, ip_address: ipAddress });
 
   return new Response(JSON.stringify({ success: true, id }), {
     status: 200,
@@ -279,7 +274,7 @@ if (Astro.request.method === 'PUT' && action === 'update') {
       headers: { 'Content-Type': 'application/json' },
     });
   }
-  await insertVendorAuditLog(db, { vendor_id: id, vendor_name: existing.name, action: 'updated', done_by_email: session.email, ip_address: ipAddress });
+  await insertVendorAuditLog(db, { vendor_id: id, vendor_name: existing.name, action: 'updated', done_by_email: user.email, ip_address: ipAddress });
   return new Response(JSON.stringify({ success: true, id }), {
     status: 200,
     headers: { 'Content-Type': 'application/json' },

@@ -6,27 +6,23 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie, createSessionCookieValue, SESSION_COOKIE_NAME, verifyCsrfToken, verifyOrigin } from '../../lib/auth';
+import { createSessionCookieValue, SESSION_COOKIE_NAME, verifyCsrfToken, verifyOrigin } from '../../lib/auth';
 import { getSecurityMonitor } from '../../lib/monitoring';
 import { createLogger } from '../../lib/logging';
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
-const session = await getSessionFromCookie(
-  Astro.request.headers.get('cookie') ?? undefined,
-  env?.SESSION_SECRET,
-  Astro.request.headers.get('user-agent'),
-  Astro.clientAddress || Astro.request.headers.get('cf-connecting-ip') || null
-);
+const user = Astro.locals.user;
+const session = Astro.locals.session;
 
-if (!session) {
+if (!session || !user) {
   return new Response(JSON.stringify({ error: 'Unauthorized' }), {
     status: 401,
     headers: { 'Content-Type': 'application/json' },
   });
 }
 
-const logger = createLogger({ endpoint: '/api/logout-all-devices', email: session.email });
+const logger = createLogger({ endpoint: '/api/logout-all-devices', email: user.email });
 const securityMonitor = getSecurityMonitor();
 
 // CSRF protection: verify origin
@@ -80,13 +76,13 @@ if (!secret) {
 // Create a new session (new sessionId) - this invalidates all previous sessions
 const userAgent = Astro.request.headers.get('user-agent');
 const newCookieValue = await createSessionCookieValue(
-  { email: session.email, role: session.role, name: session.name },
+  { email: user.email, role: user.role, name: null },
   secret,
   userAgent,
   ipAddress
 );
 
-logger.info('All devices logged out', { email: session.email });
+logger.info('All devices logged out', { email: user.email });
 
 const isSecure = Astro.url.protocol === 'https:';
 const response = new Response(

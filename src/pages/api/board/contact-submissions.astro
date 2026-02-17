@@ -6,17 +6,15 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie, getEffectiveRole } from '../../../lib/auth';
+import { getEffectiveRole } from '../../../lib/auth';
 import { CONTACT_SUBMISSIONS_EXPIRY_WHERE } from '../../../lib/contact-submissions';
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env as { SESSION_SECRET?: string; DB?: D1Database };
-const session = await getSessionFromCookie(
-  Astro.request.headers.get('cookie') ?? undefined,
-  env?.SESSION_SECRET
-);
+const user = Astro.locals.user;
+const session = Astro.locals.session;
 
-if (!session) {
+if (!session || !user) {
   return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
 }
 const effectiveRole = getEffectiveRole(session);

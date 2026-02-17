@@ -5,7 +5,7 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie, getEffectiveRole, isBoardOnly } from '../../../../lib/auth';
+import { getEffectiveRole, isBoardOnly } from '../../../../lib/auth';
 import { getComplianceDocumentByFileKey } from '../../../../lib/compliance-db';
 
 const runtime = Astro.locals.runtime;
@@ -35,12 +35,10 @@ if (!doc) {
 // Access control based on visibility
 if (doc.visibility === 'members') {
   // Members-only document: require board/admin session
-  const session = await getSessionFromCookie(
-    Astro.request.headers.get('cookie') ?? undefined,
-    env?.SESSION_SECRET
-  );
+  const user = Astro.locals.user;
+  const session = Astro.locals.session;
 
-  if (!session) {
+  if (!session || !user) {
     return new Response('Unauthorized', { status: 401 });
   }
 

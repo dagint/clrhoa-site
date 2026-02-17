@@ -6,7 +6,7 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie, verifyCsrfToken, verifyOrigin, getEffectiveRole, canRecordPayments, isAdminActingAs } from '../../../lib/auth';
+import { verifyCsrfToken, verifyOrigin, getEffectiveRole, canRecordPayments, isAdminActingAs } from '../../../lib/auth';
 import { getAssessmentByOwner, recordPayment } from '../../../lib/assessments-db';
 import { insertAdminAssumedRoleAudit } from '../../../lib/admin-assumed-role-db';
 
@@ -16,11 +16,9 @@ function json(data: object, status = 200) {
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
-const session = await getSessionFromCookie(
-  Astro.request.headers.get('cookie') ?? undefined,
-  env?.SESSION_SECRET
-);
-if (!session) return json({ error: 'Unauthorized' }, 401);
+const user = Astro.locals.user;
+const session = Astro.locals.session;
+if (!session || !user) return json({ error: 'Unauthorized' }, 401);
 const effectiveRole = getEffectiveRole(session);
 if (!canRecordPayments(effectiveRole)) return json({ error: 'Forbidden. Only Board or ARB+Board can record payments.' }, 403);
 
@@ -83,7 +81,7 @@ try {
     balance_after,
     fullYear: quarters_to_apply == null ? full_year : false,
     quarters_to_apply,
-    recorded_by: session.email,
+    recorded_by: user.email,
     payment_method,
     check_number,
   });
@@ -91,10 +89,10 @@ try {
     try {
       const actorRole = session.role?.toLowerCase() === 'arb_board' ? 'arb_board' : 'admin';
       await insertAdminAssumedRoleAudit(db, {
-        admin_email: session.email,
+        admin_email: user.email,
         actor_role: actorRole,
         action: 'action',
-        role_assumed: session.assumed_role,
+        role_assumed: session.assumed_role as 'arb' | 'board' | null,
         action_detail: `record_payment owner=${owner_email} amount=${amount} paid_at=${paid_at} paymentId=${paymentId}`,
       });
     } catch (auditErr) {

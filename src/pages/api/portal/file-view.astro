@@ -7,16 +7,13 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie } from '../../../lib/auth';
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
-const session = await getSessionFromCookie(
-  Astro.request.headers.get('cookie') ?? undefined,
-  env?.SESSION_SECRET
-);
+const user = Astro.locals.user;
+const session = Astro.locals.session;
 
-if (!session) {
+if (!session || !user) {
   return new Response('Unauthorized', { status: 401 });
 }
 

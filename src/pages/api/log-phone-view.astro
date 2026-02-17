@@ -6,7 +6,7 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie, verifyCsrfToken, verifyOrigin, isElevatedRole, getEffectiveRole } from '../../lib/auth';
+import { verifyCsrfToken, verifyOrigin, isElevatedRole, getEffectiveRole } from '../../lib/auth';
 import { getOwnerById, getPhonesArray, insertDirectoryLog } from '../../lib/directory-db';
 import { checkRateLimit, getRateLimitConfig } from '../../lib/rate-limit';
 import { getSecurityMonitor } from '../../lib/monitoring';
@@ -14,16 +14,12 @@ import { getSecurityMonitor } from '../../lib/monitoring';
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
 const userAgent = Astro.request.headers.get('user-agent') ?? null;
-const ipAddress = Astro.request.headers.get('cf-connecting-ip') ?? 
+const ipAddress = Astro.request.headers.get('cf-connecting-ip') ??
   Astro.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
-let session = await getSessionFromCookie(
-  Astro.request.headers.get('cookie') ?? undefined,
-  env?.SESSION_SECRET,
-  userAgent,
-  ipAddress
-);
+const user = Astro.locals.user;
+const session = Astro.locals.session;
 
-if (!session) {
+if (!session || !user) {
   return new Response(JSON.stringify({ error: 'Unauthorized' }), {
     status: 401,
     headers: { 'Content-Type': 'application/json' },
@@ -69,10 +65,10 @@ if (rateLimitConfig && rateLimitKv) {
     rateLimitConfig.windowSeconds
   );
   if (!rateLimit.allowed) {
-    securityMonitor.trackRateLimit(endpoint, session.email, clientIpAddress);
+    securityMonitor.trackRateLimit(endpoint, user.email, clientIpAddress);
     if (env?.NOTIFY_BOARD_EMAIL) {
       const { sendEmail } = await import('../../lib/notifications');
-      const body = `<p>Directory abuse / rate limit exceeded.</p><p>User: ${session.email}</p><p>IP: ${clientIpAddress ?? 'unknown'}</p><p>Endpoint: ${endpoint}</p>`;
+      const body = `<p>Directory abuse / rate limit exceeded.</p><p>User: ${user.email}</p><p>IP: ${clientIpAddress ?? 'unknown'}</p><p>Endpoint: ${endpoint}</p>`;
       await sendEmail(env, env.NOTIFY_BOARD_EMAIL, 'Directory abuse / rate limit', body);
     }
     return new Response(
@@ -143,7 +139,7 @@ const viewerRole = getEffectiveRole(session) ?? 'member';
 
 if (reveal === 'email') {
   const email = owner.email?.trim() ?? '';
-  await insertDirectoryLog(db, session.email, owner.name, null, email || null, viewerRole, ipAddress);
+  await insertDirectoryLog(db, user.email, owner.name, null, email || null, viewerRole, ipAddress);
   return new Response(JSON.stringify({ email: email || null }), {
     status: 200,
     headers: { 'Content-Type': 'application/json' },
@@ -152,7 +148,7 @@ if (reveal === 'email') {
 
 const phones = getPhonesArray(owner);
 const firstPhone = phones[0] ?? owner.phone ?? '';
-await insertDirectoryLog(db, session.email, owner.name, firstPhone, null, viewerRole, ipAddress);
+await insertDirectoryLog(db, user.email, owner.name, firstPhone, null, viewerRole, ipAddress);
 
 return new Response(JSON.stringify({ phone: firstPhone, phones }), {
   status: 200,
