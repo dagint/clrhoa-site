@@ -6,6 +6,7 @@ import PortalPage from '../../components/PortalPage.astro';
 import { getPortalContext } from '../../lib/portal-context';
 import { getPortalBadgeCounts } from '../../lib/portal-badge-counts';
 import { listActiveFeedbackDocs, getFeedbackResponse, householdHasResponded } from '../../lib/feedback-db';
+import { formatEasternDate } from '../../lib/timezone';
 
 const { env, session, effectiveRole } = await getPortalContext(Astro, { fingerprint: true });
 if (!session) return Astro.redirect('/auth/login');
@@ -36,12 +37,8 @@ const docsWithMyResponse = db
   : [];
 
 function formatDate(s: string | null): string {
-  if (!s) return '-';
-  try {
-    return new Date(s).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-  } catch {
-    return s;
-  }
+  const formatted = formatEasternDate(s);
+  return formatted === '—' ? '-' : formatted;
 }
 ---
 

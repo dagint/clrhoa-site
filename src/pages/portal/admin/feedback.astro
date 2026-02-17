@@ -7,6 +7,7 @@ import AdminNav from '../../../components/AdminNav.astro';
 import { getAdminContext } from '../../../lib/board-context';
 import { getPortalBadgeCounts } from '../../../lib/portal-badge-counts';
 import { listSiteFeedback } from '../../../lib/site-feedback-db';
+import { formatEasternDateTime } from '../../../lib/timezone';
 
 const ctx = await getAdminContext(Astro);
 if ('redirect' in ctx) return Astro.redirect(ctx.redirect);
@@ -61,15 +62,6 @@ const feedback = db
     })
   : [];
 
-function formatDate(s: string | null): string {
-  if (!s) return '—';
-  try {
-    const d = new Date(s);
-    return Number.isNaN(d.getTime()) ? s : d.toLocaleString();
-  } catch {
-    return s ?? '—';
-  }
-}
 
 const csvParams = new URLSearchParams();
 if (from.trim()) csvParams.set('from', from.trim());
@@ -170,7 +162,7 @@ const csvHref = `/api/site-feedback?${csvParams.toString()}`;
           <tbody>
             {feedback.map((row) => (
               <tr class="border-b border-gray-100 hover:bg-gray-50/50">
-                <td class="py-2 px-3 text-gray-600 whitespace-nowrap">{formatDate(row.created_at)}</td>
+                <td class="py-2 px-3 text-gray-600 whitespace-nowrap">{formatEasternDateTime(row.created_at)}</td>
                 <td class="py-2 px-3">{row.thumbs === 1 ? '👍' : '👎'}</td>
                 <td class="py-2 px-3 max-w-xs truncate" title={row.url}>{row.url || '—'}</td>
                 <td class="py-2 px-3 text-gray-600">{row.viewport ?? '—'}</td>

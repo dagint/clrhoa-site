@@ -12,6 +12,7 @@ import { listUpcomingWithCountsAndUser, householdHasRsvpd } from '../../lib/meet
 import { listActiveFeedbackDocs, getFeedbackResponse, householdHasResponded } from '../../lib/feedback-db';
 import { listMemberDocuments } from '../../lib/member-documents-db';
 import { MEMBER_DOC_CATEGORIES, MEMBER_DOC_CATEGORY_LABELS } from '../../lib/member-documents-db';
+import { formatEasternDate } from '../../lib/timezone';
 
 const { env, session, effectiveRole } = await getPortalContext(Astro);
 if (!session) return Astro.redirect('/auth/login');
@@ -70,12 +71,8 @@ if (db) {
 const docs = db ? await listMemberDocuments(db) : [];
 
 function formatDate(s: string | null): string {
-  if (!s) return '';
-  try {
-    return new Date(s).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-  } catch {
-    return s;
-  }
+  const formatted = formatEasternDate(s);
+  return formatted === '—' ? '' : formatted;
 }
 
 const docsByCategory = MEMBER_DOC_CATEGORIES.map((cat) => ({

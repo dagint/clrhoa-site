@@ -2,6 +2,8 @@
 /**
  * Display search results from API (arb, meetings, vendors, owners, feedback_docs, preapproval).
  */
+import { formatEasternDate } from '../lib/timezone';
+
 interface Props {
   arb: { id: string; description: string; application_type: string | null; status: string }[];
   meetings: { id: string; title: string | null; datetime: string }[];
@@ -12,14 +14,6 @@ interface Props {
   query: string;
 }
 const { arb, meetings, vendors, owners, feedback_docs = [], preapproval = [], query } = Astro.props;
-
-function formatDate(s: string): string {
-  try {
-    return new Date(s).toLocaleDateString('en-US', { dateStyle: 'medium' });
-  } catch {
-    return s;
-  }
-}
 ---
 <div class="search-results space-y-6">
   {arb.length > 0 && (
@@ -46,7 +40,7 @@ function formatDate(s: string): string {
           <li>
             <a href="/portal/meetings" class="block p-3 rounded-lg bg-gray-50 hover:bg-gray-100 portal-theme-card border border-gray-100">
               <span class="font-medium text-gray-900 portal-theme-text">{m.title ?? 'Meeting'}</span>
-              <span class="block text-sm text-gray-500 mt-1">{formatDate(m.datetime)}</span>
+              <span class="block text-sm text-gray-500 mt-1">{formatEasternDate(m.datetime)}</span>
             </a>
           </li>
         ))}

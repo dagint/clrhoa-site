@@ -12,6 +12,7 @@ import { getPortalContext } from '../../lib/portal-context';
 import { getPortalBadgeCounts } from '../../lib/portal-badge-counts';
 import { listPimElevationLog } from '../../lib/pim-db';
 import { ELEVATED_ROLES } from '../../lib/auth';
+import { formatEasternDateTime } from '../../lib/timezone';
 
 const { env, session, effectiveRole } = await getPortalContext(Astro);
 if (!session) return Astro.redirect('/auth/login');
@@ -50,13 +51,7 @@ const badges = await getPortalBadgeCounts(db, email, role, name);
 const pimLog = db ? await listPimElevationLog(db, pageSize, (page - 1) * pageSize) : [];
 
 function formatDate(s: string | null): string {
-  if (!s) return '—';
-  try {
-    const d = new Date(s);
-    return Number.isNaN(d.getTime()) ? s : d.toLocaleString();
-  } catch {
-    return s ?? '—';
-  }
+  return formatEasternDateTime(s);
 }
 ---
 

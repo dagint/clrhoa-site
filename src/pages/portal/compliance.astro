@@ -11,6 +11,7 @@ import { getPortalContext } from '../../lib/portal-context';
 import { getPortalBadgeCounts } from '../../lib/portal-badge-counts';
 import { getComplianceStatus } from '../../lib/compliance-db';
 import { listPublicDocuments } from '../../lib/public-documents-db';
+import { formatEasternDate } from '../../lib/timezone';
 
 const { env, session, effectiveRole } = await getPortalContext(Astro);
 if (!session) return Astro.redirect('/auth/login');
@@ -79,12 +80,8 @@ const groupedStatuses = categories.map((cat) => ({
 })).filter((cat) => cat.items.length > 0);
 
 function formatDate(s: string | null): string {
-  if (!s) return '';
-  try {
-    return new Date(s).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-  } catch {
-    return s;
-  }
+  const formatted = formatEasternDate(s);
+  return formatted === '—' ? '' : formatted;
 }
 
 function getStatusBadge(status: string): { label: string; class: string } {

@@ -8,6 +8,7 @@ import { getPortalBadgeCounts } from '../../lib/portal-badge-counts';
 import { listDirectoryLogsByViewer } from '../../lib/directory-db';
 import { listArbAuditLogForOwner } from '../../lib/arb-db';
 import { getLastLogonTime, listLoginHistoryByEmail } from '../../lib/login-history-db';
+import { formatEasternDateTime } from '../../lib/timezone';
 
 const { env, session, effectiveRole } = await getPortalContext(Astro);
 if (!session) return Astro.redirect('/auth/login');
@@ -49,13 +50,8 @@ const loginHistory = db ? await listLoginHistoryByEmail(db, email, pageSize, (lo
 const BLANK = '—';
 
 function formatDate(s: string | null): string {
-  if (!s) return BLANK;
-  try {
-    const d = new Date(s);
-    return Number.isNaN(d.getTime()) ? s : d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
-  } catch {
-    return s ?? BLANK;
-  }
+  const formatted = formatEasternDateTime(s);
+  return formatted === '—' ? BLANK : formatted;
 }
 
 function formatLoginTime(s: string | null): string {

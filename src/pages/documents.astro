@@ -4,6 +4,7 @@ export const prerender = false;
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { getCollection } from 'astro:content';
 import { listPublicDocuments } from '../lib/public-documents-db';
+import { formatEasternDate } from '../lib/timezone';
 
 const allDocuments = await getCollection('documents');
 console.log('[DOCUMENTS-PAGE] All documents:', allDocuments.map(d => ({ autoSlug: d.slug, dataSlug: d.data.slug, title: d.data.title, category: d.data.category, published: d.data.published })));
@@ -105,11 +106,7 @@ const keyRules = [
                 <p class="text-clr-gray text-sm font-body mb-4">{doc.data.description}</p>
                 {doc.data.effectiveDate && (
                   <p class="text-gray-500 text-xs font-body mb-4">
-                    Effective: {doc.data.effectiveDate.toLocaleDateString('en-US', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric',
-                    })}
+                    Effective: {formatEasternDate(doc.data.effectiveDate.toISOString())}
                   </p>
                 )}
                 <a

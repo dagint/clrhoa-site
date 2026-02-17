@@ -16,6 +16,7 @@ import PortalSidebar from '../../../components/PortalSidebar.astro';
 import PortalHeader from '../../../components/PortalHeader.astro';
 import { getPortalContext } from '../../../lib/portal-context';
 import { getOwnerByEmail } from '../../../lib/directory-db';
+import { formatEasternDateTime } from '../../../lib/timezone';
 
 const { env, session, effectiveRole } = await getPortalContext(Astro);
 if (!session) return Astro.redirect('/auth/login');
@@ -53,12 +54,8 @@ if (db && mfaEnabled) {
 
 function formatDate(iso: string | null | undefined): string {
   if (!iso) return 'Never';
-  try {
-    const d = new Date(iso);
-    return Number.isNaN(d.getTime()) ? iso : d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
-  } catch {
-    return iso ?? 'Never';
-  }
+  const formatted = formatEasternDateTime(iso);
+  return formatted === '—' ? (iso ?? 'Never') : formatted;
 }
 ---
 

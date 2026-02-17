@@ -17,6 +17,7 @@ export const prerender = false;
 import BoardLayout from '../../layouts/BoardLayout.astro';
 import { getAdminContext } from '../../lib/board-context';
 import { listSiteFeedback } from '../../lib/site-feedback-db';
+import { formatEasternDateTime } from '../../lib/timezone';
 
 // Route-level guard: enforce admin-only access
 const ctx = await getAdminContext(Astro);
@@ -69,15 +70,6 @@ const feedback = db
     })
   : [];
 
-function formatDate(s: string | null): string {
-  if (!s) return '—';
-  try {
-    const d = new Date(s);
-    return Number.isNaN(d.getTime()) ? s : d.toLocaleString();
-  } catch {
-    return s ?? '—';
-  }
-}
 
 const csvParams = new URLSearchParams();
 if (from.trim()) csvParams.set('from', from.trim());

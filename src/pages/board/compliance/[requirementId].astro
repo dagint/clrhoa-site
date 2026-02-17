@@ -11,6 +11,7 @@ import {
   listComplianceAuditLogs,
   type ComplianceDocument,
 } from '../../../lib/compliance-db';
+import { formatEasternDateTime, formatEasternDate } from '../../../lib/timezone';
 
 const ctx = await getBoardContext(Astro);
 if ('redirect' in ctx) return Astro.redirect(ctx.redirect);
@@ -37,23 +38,6 @@ const currentDocument = allDocuments.find((d) => d.is_current === 1);
 const archivedDocuments = allDocuments.filter((d) => d.is_current === 0);
 const auditLogs = await listComplianceAuditLogs(db, requirementId);
 
-function formatDate(s: string | null): string {
-  if (!s) return '—';
-  try {
-    return new Date(s).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
-  } catch {
-    return s;
-  }
-}
-
-function formatDateShort(s: string | null): string {
-  if (!s) return '—';
-  try {
-    return new Date(s).toLocaleString(undefined, { dateStyle: 'medium' });
-  } catch {
-    return s;
-  }
-}
 
 function getDocumentYear(dateStr: string | null): number {
   if (!dateStr) return 0;
@@ -219,7 +203,7 @@ const pageTitle = `${requirement.id}: ${requirement.title}`;
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <div class="text-sm text-gray-600 mb-1">Uploaded</div>
-            <div class="text-gray-900">{formatDate(currentDocument.uploaded_at)}</div>
+            <div class="text-gray-900">{formatEasternDateTime(currentDocument.uploaded_at)}</div>
           </div>
           <div>
             <div class="text-sm text-gray-600 mb-1">Uploaded By</div>
@@ -228,7 +212,7 @@ const pageTitle = `${requirement.id}: ${requirement.title}`;
           {currentDocument.document_date && (
             <div>
               <div class="text-sm text-gray-600 mb-1">Document Date</div>
-              <div class="text-gray-900">{formatDateShort(currentDocument.document_date)}</div>
+              <div class="text-gray-900">{formatEasternDate(currentDocument.document_date)}</div>
             </div>
           )}
         </div>
@@ -374,10 +358,10 @@ const pageTitle = `${requirement.id}: ${requirement.title}`;
             {archivedDocuments.map((doc) => (
               <tr class="border-b border-gray-100">
                 <td class="px-4 py-3 text-gray-900">{doc.title}</td>
-                <td class="px-4 py-3 text-gray-600">{formatDate(doc.uploaded_at)}</td>
+                <td class="px-4 py-3 text-gray-600">{formatEasternDateTime(doc.uploaded_at)}</td>
                 <td class="px-4 py-3 text-gray-600">{doc.uploaded_by}</td>
                 <td class="px-4 py-3 text-gray-600">
-                  {formatDateShort(doc.effective_from)} — {formatDateShort(doc.effective_until)}
+                  {formatEasternDate(doc.effective_from)} — {formatEasternDate(doc.effective_until)}
                 </td>
               </tr>
             ))}
@@ -405,7 +389,7 @@ const pageTitle = `${requirement.id}: ${requirement.title}`;
           <tbody>
             {auditLogs.map((log) => (
               <tr class="border-b border-gray-100">
-                <td class="px-4 py-3 text-gray-600 whitespace-nowrap">{formatDate(log.created_at)}</td>
+                <td class="px-4 py-3 text-gray-600 whitespace-nowrap">{formatEasternDateTime(log.created_at)}</td>
                 <td class="px-4 py-3 text-gray-900">{getActionLabel(log.action)}</td>
                 <td class="px-4 py-3 text-gray-600">{log.actor_email}</td>
               </tr>

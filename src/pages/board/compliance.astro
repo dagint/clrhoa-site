@@ -8,6 +8,7 @@ import { getComplianceStatus } from '../../lib/compliance-db';
 import { getUpcomingMeetingsWithCompliance, formatAdvanceNotice } from '../../lib/meeting-compliance';
 import PortalLayout from '../../layouts/PortalLayout.astro';
 import PortalPage from '../../components/PortalPage.astro';
+import { formatEasternDate, formatEasternDateTimeLong } from '../../lib/timezone';
 
 import AdminNav from '../../components/AdminNav.astro';
 const ctx = await getAdminContext(Astro);
@@ -39,12 +40,8 @@ const yearEnd = new Date(now.getFullYear(), 11, 31);
 const daysUntilYearEnd = Math.ceil((yearEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 
 function formatDate(s: string | null): string {
-  if (!s) return '—';
-  try {
-    return new Date(s).toLocaleString(undefined, { dateStyle: 'medium' });
-  } catch {
-    return s;
-  }
+  const formatted = formatEasternDate(s);
+  return formatted === '—' ? '—' : formatted;
 }
 
 function getDocumentYear(doc: any): number {
@@ -163,7 +160,7 @@ function getCategoryLabel(category: string): string {
     <div class="flex items-start justify-between flex-wrap gap-4 mb-4">
       <div>
         <h2 class="text-2xl font-heading font-bold text-clr-green mb-2">Compliance Dashboard</h2>
-        <p class="text-base text-gray-600">Overall compliance score as of {new Date().toLocaleDateString()}</p>
+        <p class="text-base text-gray-600">Overall compliance score as of {formatEasternDate(new Date())}</p>
       </div>
       <div class="text-right">
         <div class="text-5xl font-bold text-clr-green mb-1">{complianceData?.score ?? 0}%</div>
@@ -256,14 +253,7 @@ function getCategoryLabel(category: string): string {
                     )}
                   </div>
                   <div class="text-sm text-gray-600 mb-2">
-                    {meetingDate && meetingDate.toLocaleString('en-US', {
-                      weekday: 'short',
-                      month: 'short',
-                      day: 'numeric',
-                      year: 'numeric',
-                      hour: 'numeric',
-                      minute: '2-digit'
-                    })}
+                    {meetingDate && formatEasternDateTimeLong(meetingDate)}
                   </div>
                   <div class="text-sm space-y-1">
                     <div class={status.noticeCompliant ? 'text-green-700' : 'text-amber-800'}>

@@ -11,6 +11,7 @@ import { getOwnerByEmail } from '../../lib/directory-db';
 import { listMaintenanceByHousehold } from '../../lib/maintenance-db';
 import { listUpcomingWithCountsAndUser, householdHasRsvpd } from '../../lib/meetings-db';
 import { listActiveFeedbackDocs, getFeedbackResponse, householdHasResponded } from '../../lib/feedback-db';
+import { formatEasternDate } from '../../lib/timezone';
 
 const { env, session, effectiveRole } = await getPortalContext(Astro, { fingerprint: true });
 if (!session) return Astro.redirect('/auth/login');
@@ -225,7 +226,7 @@ function parseFiles(filesJson: string | null): { name: string; key: string }[] {
                     )}
                     {sub.submitted_at && (
                       <p class="text-sm text-gray-400">
-                        {new Date(sub.submitted_at).toLocaleDateString(undefined, { dateStyle: 'medium' })}
+                        {formatEasternDate(sub.submitted_at)}
                       </p>
                     )}
                   </div>

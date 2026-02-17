@@ -3,6 +3,7 @@ export const prerender = false;
 
 import BaseLayout from '../../../layouts/BaseLayout.astro';
 import { getPublicMeetingById } from '../../../lib/meetings-db';
+import { formatEasternDateTimeLong } from '../../../lib/timezone';
 
 const { id } = Astro.params;
 if (!id) {
@@ -18,20 +19,6 @@ if (!meeting) {
   return Astro.redirect('/news');
 }
 
-function formatDateTime(dt: string): string {
-  try {
-    return new Date(dt).toLocaleString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-    });
-  } catch {
-    return dt;
-  }
-}
 ---
 
 <BaseLayout title={meeting.title ?? 'Meeting'} description={meeting.description ?? undefined}>
@@ -41,7 +28,7 @@ function formatDateTime(dt: string): string {
         <h1 class="text-4xl font-heading font-bold text-clr-green mb-4">{meeting.title ?? 'Meeting'}</h1>
         <div class="text-clr-gray text-sm mb-4 font-body">
           <time datetime={meeting.datetime}>
-            {formatDateTime(meeting.datetime)}
+            {formatEasternDateTimeLong(meeting.datetime)}
           </time>
         </div>
         {meeting.location && (

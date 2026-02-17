@@ -5,6 +5,7 @@ import { getAdminContext } from '../../lib/board-context';
 import { getPortalBadgeCounts } from '../../lib/portal-badge-counts';
 import { isBoardOnly } from '../../lib/auth';
 import { listAllMaintenance, parsePhotosJson } from '../../lib/maintenance-db';
+import { formatEasternDate } from '../../lib/timezone';
 import PortalLayout from '../../layouts/PortalLayout.astro';
 import PortalPage from '../../components/PortalPage.astro';
 
@@ -49,11 +50,8 @@ function maintenancePageUrl(value: number): string {
 const allRequests = db ? await listAllMaintenance(db, statusFilter, pageSize, (page - 1) * pageSize) : [];
 
 function formatDate(s: string): string {
-  try {
-    return new Date(s).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-  } catch {
-    return s;
-  }
+  const formatted = formatEasternDate(s);
+  return formatted === '—' ? s : formatted;
 }
 
 function categoryLabel(cat: string): string {
