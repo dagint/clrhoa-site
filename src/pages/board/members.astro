@@ -704,7 +704,10 @@ const csrfToken = session?.csrfToken ?? '';
       const response = await fetch('/api/members', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({
+          email,
+          csrf_token: CSRF_TOKEN,
+        }),
       });
 
       const result = await response.json();
