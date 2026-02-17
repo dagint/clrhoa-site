@@ -267,6 +267,22 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
     }
   }
 
+  // General API routes: validate session if present and set context.locals
+  // This catches API routes not handled by specific cases above (e.g., /api/log-phone-view)
+  if (pathname.startsWith('/api/') && env?.DB) {
+    if (context.cookies.has(SESSION_COOKIE_NAME)) {
+      const sessionId = getSessionId(context);
+      const { session, user } = await validateSession(env.DB, sessionId, context.url.hostname);
+
+      if (session && user) {
+        // Store user and session in context for API handlers
+        context.locals.user = user;
+        context.locals.session = session;
+      }
+      // Note: We don't return 401 here - let the endpoint decide if auth is required
+    }
+  }
+
   // Portal: require session for all routes except login (which redirects to /auth/login)
   if (pathname.startsWith('/portal')) {
     // Legacy /portal/login redirect to new /auth/login
