@@ -4,8 +4,7 @@ export const prerender = false;
 import PortalLayout from '../../layouts/PortalLayout.astro';
 import PortalPage from '../../components/PortalPage.astro';
 import PortalElevatedRoleBanner from '../../components/PortalElevatedRoleBanner.astro';
-import BoardNav from '../../components/BoardNav.astro';
-import ArbNav from '../../components/ArbNav.astro';
+import ElevatedNav from '../../components/ElevatedNav.astro';
 import ArbDashboardCard from '../../components/ArbDashboardCard.astro';
 import ArbDashboardExportSection from '../../components/ArbDashboardExportSection.astro';
 import { getPortalContext } from '../../lib/portal-context';
@@ -90,7 +89,7 @@ const needsActionCount = inReview.length + pending.length + arcReview.length + b
   >
     <PortalElevatedRoleBanner role={effectiveRole} session={session} />
 
-    {effectiveRole === 'arb' ? <ArbNav currentPath="/portal/arb-dashboard" /> : <BoardNav currentPath="/portal/arb-dashboard" />}
+    <ElevatedNav persona={effectiveRole === 'arb' ? 'arb' : 'board'} currentPath="/portal/arb-dashboard" effectiveRole={effectiveRole} user={{ email, role: role ?? '' }} session={session} />
 
     <div class="arb-dashboard-content">
       {(effectiveRole === 'arb' || effectiveRole === 'arb_board') && (
@@ -99,7 +98,7 @@ const needsActionCount = inReview.length + pending.length + arcReview.length + b
             <strong>Update the ARB request form</strong> (PDF/Word) that members use to submit requests. Changes appear on the public Documents page.
           </p>
           <a
-            href="/board/public-documents"
+            href="/portal/board/public-documents"
             class="inline-flex items-center gap-2 px-5 py-2.5 bg-clr-green text-white rounded-lg font-semibold text-base hover:brightness-110"
           >
             Update ARB request form

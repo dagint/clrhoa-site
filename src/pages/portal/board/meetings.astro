@@ -1,0 +1,361 @@
+---
+export const prerender = false;
+
+import { getBoardContext } from '../../../lib/board-context';
+import { getPortalBadgeCounts } from '../../../lib/portal-badge-counts';
+import { isBoardOnly } from '../../../lib/auth';
+import { formatEasternDateTimeLong } from '../../../lib/timezone';
+import { listAllMeetings } from '../../../lib/meetings-db';
+import PortalLayout from '../../../layouts/PortalLayout.astro';
+import PortalPage from '../../../components/PortalPage.astro';
+
+import ElevatedNav from '../../../components/ElevatedNav.astro';
+const ctx = await getBoardContext(Astro);
+if ('redirect' in ctx) return Astro.redirect(ctx.redirect);
+const { env, session, effectiveRole } = ctx;
+const isBoard = isBoardOnly(effectiveRole) || effectiveRole === 'admin';
+if (!isBoard) return Astro.redirect('/portal/dashboard');
+
+const MEETINGS_PAGE_SIZES = [10, 25, 50, 100] as const;
+const DEFAULT_MEETINGS_PAGE_SIZE = 25;
+const url = Astro.url;
+const getPage = (): number => {
+  const p = url.searchParams.get('page');
+  const n = p ? parseInt(p, 10) : 1;
+  return Number.isNaN(n) || n < 1 ? 1 : Math.min(n, 1000);
+};
+const getLimit = (): number => {
+  const p = url.searchParams.get('limit');
+  const n = p ? parseInt(p, 10) : DEFAULT_MEETINGS_PAGE_SIZE;
+  return MEETINGS_PAGE_SIZES.includes(n as (typeof MEETINGS_PAGE_SIZES)[number]) ? n : DEFAULT_MEETINGS_PAGE_SIZE;
+};
+const page = getPage();
+const pageSize = getLimit();
+
+function meetingsPageUrl(value: number): string {
+  const u = new URL(url);
+  if (value <= 1) u.searchParams.delete('page');
+  else u.searchParams.set('page', String(value));
+  if (pageSize !== DEFAULT_MEETINGS_PAGE_SIZE) u.searchParams.set('limit', String(pageSize));
+  return u.pathname + u.search;
+}
+
+const db = env?.DB;
+const { email, role, name } = session;
+const badges = await getPortalBadgeCounts(db, email, role, name);
+const meetings = db ? await listAllMeetings(db, pageSize, (page - 1) * pageSize) : [];
+
+
+function formatDateTime(dt: string): string {
+  const formatted = formatEasternDateTimeLong(dt);
+  return formatted === '—' ? dt : formatted;
+}
+---
+
+<PortalLayout title="Meetings | Board | Member Portal | Crooked Lake Reserve HOA">
+  <PortalPage
+    currentPath="/portal/board/meetings"
+    pageTitle="Meetings"
+    userName={badges.displayName ?? undefined}
+    userEmail={email}
+    effectiveRole={effectiveRole}
+    draftCount={badges.draftCount}
+    role={effectiveRole}
+    staffRole={role ?? ''}
+    arbInReviewCount={badges.arbInReviewCount}
+    vendorPendingCount={badges.vendorPendingCount}
+    maintenanceOpenCount={badges.maintenanceOpenCount}
+    meetingsRsvpCount={badges.meetingsRsvpCount}
+  >
+    <ElevatedNav persona="board" currentPath="/portal/board/meetings" effectiveRole={effectiveRole} user={{ email, role: role ?? '' }} session={session} />
+
+<div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+        <h2 class="text-3xl font-heading font-bold text-clr-green">Meetings</h2>
+        <button
+          type="button"
+          id="btn-new-meeting"
+          class="inline-flex items-center gap-2 bg-clr-green hover:brightness-110 text-white px-5 py-2.5 rounded-xl font-semibold text-base"
+        >
+          New meeting
+        </button>
+      </div>
+
+      <div id="form-panel" class="hidden bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-8">
+        <h3 class="text-lg font-heading font-semibold text-clr-green mb-4" id="form-title">New meeting</h3>
+        <form id="meeting-form" class="space-y-4">
+          <input type="hidden" name="id" id="form-id" value="" />
+          <div>
+            <label for="form-meeting-title" class="block text-sm font-medium text-gray-700">Title *</label>
+            <input type="text" id="form-meeting-title" name="title" required class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2" />
+          </div>
+          <div>
+            <label for="form-meeting-datetime" class="block text-sm font-medium text-gray-700">Date & time *</label>
+            <input type="datetime-local" id="form-meeting-datetime" name="datetime" required class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2" />
+          </div>
+          <div>
+            <label for="form-meeting-location" class="block text-sm font-medium text-gray-700">Location</label>
+            <input type="text" id="form-meeting-location" name="location" class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2" />
+          </div>
+          <div>
+            <label for="form-meeting-description" class="block text-sm font-medium text-gray-700">Description</label>
+            <textarea id="form-meeting-description" name="description" rows="3" class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2"></textarea>
+          </div>
+          <div>
+            <label for="form-meeting-agenda" class="block text-sm font-medium text-gray-700">Agenda (PDF or image)</label>
+            <input type="file" id="form-meeting-agenda" name="agenda" accept=".pdf,application/pdf,image/jpeg,image/png,image/webp,image/gif" class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-clr-green file:text-white" />
+            <input type="hidden" name="agenda_r2_key" id="form-agenda-key" value="" />
+            <p class="text-xs text-gray-500 mt-1">Optional. PDF or image; images are resized before upload to save space.</p>
+          </div>
+          <div class="rounded-lg border border-amber-200 bg-amber-50/80 p-4">
+            <label class="flex items-start gap-3 cursor-pointer">
+              <input type="checkbox" name="post_to_public_news" id="form-post-to-public-news" value="1" class="mt-1 rounded border-gray-300 text-clr-green focus:ring-clr-green" />
+              <span class="text-sm">
+                <span class="font-medium text-gray-800">Post to public News</span>
+                <span class="block text-gray-600 mt-0.5">Selecting this option will make the meeting visible on the public website’s News page. Anyone can view the title, date, location, and description.</span>
+              </span>
+            </label>
+          </div>
+          <div class="flex gap-2">
+            <button type="submit" class="bg-clr-green hover:brightness-110 text-white px-5 py-2.5 rounded-lg font-medium text-base">
+              Save
+            </button>
+            <button type="button" id="btn-cancel-form" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-5 py-2.5 rounded-lg font-medium text-base">
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
+
+      {meetings.length === 0 && page === 1 ? (
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center text-gray-500">
+          No meetings yet. Click &quot;New meeting&quot; to add one.
+        </div>
+      ) : (
+        <>
+        <div class="flex flex-wrap items-center gap-2 mb-4">
+          <label for="meetings-per-page" class="text-sm text-gray-600">Per page:</label>
+          <select id="meetings-per-page" name="limit" class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-700 focus:border-clr-green focus:outline-none focus:ring-1 focus:ring-clr-green" aria-label="Entries per page">
+            {MEETINGS_PAGE_SIZES.map((size) => (
+              <option value={size} selected={pageSize === size}>{size}</option>
+            ))}
+          </select>
+        </div>
+        <script is:inline>
+          document.getElementById('meetings-per-page')?.addEventListener('change', function () {
+            const limit = this.value;
+            const u = new URL(window.location.href);
+            u.searchParams.set('limit', limit);
+            u.searchParams.delete('page');
+            if (limit === '25') u.searchParams.delete('limit');
+            window.location.href = u.pathname + u.search;
+          });
+        </script>
+        <ul class="space-y-4">
+          {meetings.map((m) => (
+            <li class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 class="font-semibold text-clr-green">{m.title || 'Meeting'}</h3>
+                <p class="text-base text-gray-500">{formatDateTime(m.datetime)}</p>
+                {m.location && <p class="text-base text-gray-600">{m.location}</p>}
+              </div>
+              <div class="flex gap-2">
+                {m.agenda_r2_key && (
+                  <a
+                    href={`/api/portal/file/${encodeURIComponent(m.agenda_r2_key)}`}
+                    class="text-sm text-clr-green hover:underline"
+                  >
+                    Agenda
+                  </a>
+                )}
+                <button
+                  type="button"
+                  class="edit-meeting text-base text-clr-green hover:underline"
+                  data-id={m.id}
+                  data-title={m.title ?? ''}
+                  data-datetime={m.datetime}
+                  data-post-to-public={m.post_to_public_news ? '1' : '0'}
+                  data-location={m.location ?? ''}
+                  data-description={m.description ?? ''}
+                  data-agenda-key={m.agenda_r2_key ?? ''}
+                >
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  class="delete-meeting text-base text-red-600 hover:underline"
+                  data-id={m.id}
+                  data-title={m.title ?? 'Meeting'}
+                >
+                  Delete
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+        {meetings.length > 0 && (
+          <nav class="flex items-center justify-between gap-2 py-2 px-3 mt-4 border-t border-gray-200 bg-gray-50 text-sm" aria-label="Meetings pagination">
+            <span class="text-gray-600">Page {page}</span>
+            <div class="flex gap-2">
+              {page > 1 && <a href={meetingsPageUrl(page - 1)} class="text-clr-green hover:underline font-medium">Previous</a>}
+              {meetings.length === pageSize && <a href={meetingsPageUrl(page + 1)} class="text-clr-green hover:underline font-medium">Next</a>}
+            </div>
+          </nav>
+        )}
+        </>
+      )}
+
+<script is:inline>
+  const formPanel = document.getElementById('form-panel');
+  const formTitle = document.getElementById('form-title');
+  const form = document.getElementById('meeting-form');
+  const formId = document.getElementById('form-id');
+  const formAgendaKey = document.getElementById('form-agenda-key');
+  const agendaFileInput = document.getElementById('form-meeting-agenda');
+
+  const AGENDA_IMAGE_MAX_WIDTH = 1920;
+  const AGENDA_IMAGE_JPEG_QUALITY = 0.82;
+
+  function optimizeImageForWeb(file) {
+    const imageTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/heic'];
+    const isImage = file.type && (imageTypes.includes(file.type) || file.type.startsWith('image/'));
+    if (!isImage) return Promise.resolve(file);
+    return new Promise(function (resolve) {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = function () {
+        URL.revokeObjectURL(url);
+        let w = img.naturalWidth;
+        let h = img.naturalHeight;
+        if (w > AGENDA_IMAGE_MAX_WIDTH) {
+          h = Math.round((h * AGENDA_IMAGE_MAX_WIDTH) / w);
+          w = AGENDA_IMAGE_MAX_WIDTH;
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { resolve(file); return; }
+        ctx.drawImage(img, 0, 0, w, h);
+        canvas.toBlob(function (blob) {
+          const name = file.name.replace(/\.[^.]+$/i, '.jpg');
+          resolve(blob ? new File([blob], name, { type: 'image/jpeg' }) : file);
+        }, 'image/jpeg', AGENDA_IMAGE_JPEG_QUALITY);
+      };
+      img.onerror = function () {
+        URL.revokeObjectURL(url);
+        resolve(file);
+      };
+      img.src = url;
+    });
+  }
+
+  document.getElementById('btn-new-meeting')?.addEventListener('click', () => {
+    formId.value = '';
+    document.getElementById('form-meeting-title').value = '';
+    document.getElementById('form-meeting-datetime').value = '';
+    document.getElementById('form-meeting-location').value = '';
+    document.getElementById('form-meeting-description').value = '';
+    formAgendaKey.value = '';
+    agendaFileInput.value = '';
+    formTitle.textContent = 'New meeting';
+    formPanel?.classList.remove('hidden');
+  });
+
+  document.getElementById('btn-cancel-form')?.addEventListener('click', () => {
+    formPanel?.classList.add('hidden');
+  });
+
+  document.querySelectorAll('.edit-meeting').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const el = btn;
+      const id = el.dataset.id;
+      const title = el.dataset.title;
+      const datetime = el.dataset.datetime;
+      const location = el.dataset.location ?? '';
+      const description = el.dataset.description ?? '';
+      const agendaKey = el.dataset.agendaKey ?? '';
+      const postToPublic = el.dataset.postToPublic === '1';
+      formId.value = id ?? '';
+      document.getElementById('form-meeting-title').value = title ?? '';
+      document.getElementById('form-meeting-datetime').value = datetime?.slice(0, 16) ?? '';
+      document.getElementById('form-meeting-location').value = location;
+      document.getElementById('form-meeting-description').value = description;
+      formAgendaKey.value = agendaKey;
+      document.getElementById('form-post-to-public-news').checked = postToPublic;
+      agendaFileInput.value = '';
+      formTitle.textContent = 'Edit meeting';
+      formPanel?.classList.remove('hidden');
+    });
+  });
+
+  document.querySelectorAll('.delete-meeting').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const id = btn.dataset.id;
+      const title = btn.dataset.title;
+      if (!id || !confirm(`Delete "${title}"? This cannot be undone.`)) return;
+      try {
+        const res = await fetch(`/api/meetings?id=${encodeURIComponent(id)}`, { method: 'DELETE', credentials: 'same-origin' });
+        const data = await res.json();
+        if (data.success) window.location.reload();
+        else alert(data.error || 'Failed to delete');
+      } catch {
+        alert('Network error');
+      }
+    });
+  });
+
+  agendaFileInput?.addEventListener('change', async () => {
+    const rawFile = agendaFileInput.files?.[0];
+    if (!rawFile) return;
+    const file = rawFile.type && rawFile.type.startsWith('image/')
+      ? await optimizeImageForWeb(rawFile)
+      : rawFile;
+    const fd = new FormData();
+    fd.set('file', file);
+    try {
+      const res = await fetch('/api/meeting-agenda-upload', { method: 'POST', body: fd, credentials: 'same-origin' });
+      const data = await res.json();
+      if (data.key) formAgendaKey.value = data.key;
+      else alert(data.error || 'Upload failed');
+    } catch {
+      alert('Upload failed');
+    }
+  });
+
+  form?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = formId.value.trim();
+    const title = document.getElementById('form-meeting-title').value.trim();
+    const datetime = document.getElementById('form-meeting-datetime').value.trim();
+    const location = document.getElementById('form-meeting-location').value.trim();
+    const description = document.getElementById('form-meeting-description').value.trim();
+    const agendaKey = formAgendaKey.value.trim();
+
+    if (!title || !datetime) {
+      alert('Title and date/time are required');
+      return;
+    }
+
+    const postToPublic = document.getElementById('form-post-to-public-news').checked;
+    const body = { title, datetime, location, description, agenda_r2_key: agendaKey, post_to_public_news: postToPublic };
+    const url = '/api/meetings';
+    const method = id ? 'PUT' : 'POST';
+    if (id) body.id = id;
+
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        credentials: 'same-origin',
+      });
+      const data = await res.json();
+      if (data.success) window.location.reload();
+      else alert(data.error || 'Failed to save');
+    } catch {
+      alert('Network error');
+    }
+  });
+</script>
+  </PortalPage>
+</PortalLayout>

@@ -1,0 +1,488 @@
+---
+export const prerender = false;
+
+import { getAdminContext } from '../../../lib/board-context';
+import { getPortalBadgeCounts } from '../../../lib/portal-badge-counts';
+import { formatEasternDateTime, cronHourToEastern } from '../../../lib/timezone';
+import PortalLayout from '../../../layouts/PortalLayout.astro';
+import PortalPage from '../../../components/PortalPage.astro';
+import ElevatedNav from '../../../components/ElevatedNav.astro';
+
+const ctx = await getAdminContext(Astro);
+if ('redirect' in ctx) return Astro.redirect(ctx.redirect);
+const { env, session, effectiveRole } = ctx;
+// Admin-only page - already enforced by getAdminContext
+
+const db = env?.DB;
+const { email, role, name } = session;
+const badges = await getPortalBadgeCounts(db, email, role, name);
+
+const url = Astro.url;
+const connected = url.searchParams.get('connected') === '1';
+const errorParam = url.searchParams.get('error') ?? '';
+---
+
+<PortalLayout title="Backups | Board | Member Portal | Crooked Lake Reserve HOA">
+  <PortalPage
+    currentPath="/portal/board/backups"
+    pageTitle="Backups"
+    userName={badges.displayName ?? undefined}
+    userEmail={email}
+    effectiveRole={effectiveRole}
+    draftCount={badges.draftCount}
+    role={effectiveRole}
+    staffRole={role ?? ''}
+    arbInReviewCount={badges.arbInReviewCount}
+    vendorPendingCount={badges.vendorPendingCount}
+    maintenanceOpenCount={badges.maintenanceOpenCount}
+    meetingsRsvpCount={badges.meetingsRsvpCount}
+  >
+    <ElevatedNav persona="admin" currentPath="/portal/board/backups" effectiveRole={effectiveRole} user={{ email, role: role ?? '' }} session={session} />
+
+<p class="text-gray-600 mb-6">
+    Database (D1) and login whitelist (KV) backups. Automated backups run daily to Cloudflare R2; you can also send a copy to a Google Workspace Drive folder.
+  </p>
+
+  {connected && (
+    <div class="mb-6 p-4 rounded-xl bg-green-50 border border-green-200 text-green-800 text-sm" role="alert">
+      Google Drive connected. Enter a folder ID below and save to enable backup to Drive.
+    </div>
+  )}
+  {errorParam && (
+    <div class="mb-6 p-4 rounded-xl bg-red-50 border border-red-200 text-red-800 text-sm" role="alert">
+      {errorParam === 'config' && 'Backup or Google Drive not configured (missing env).'}
+      {errorParam === 'no_code' && 'OAuth callback missing code.'}
+      {errorParam === 'no_refresh_token' && 'Google did not return a refresh token; try again with prompt=consent.'}
+      {errorParam === 'token_exchange_failed' && 'Could not exchange OAuth code for token.'}
+      {errorParam === 'db' && 'Database error.'}
+      {!['config', 'no_code', 'no_refresh_token', 'token_exchange_failed', 'db'].includes(errorParam) && `Error: ${errorParam}`}
+    </div>
+  )}
+
+  <section class="mb-8" aria-labelledby="download-backup-heading">
+    <h2 id="download-backup-heading" class="text-2xl font-heading font-semibold text-clr-green mb-3">Download full backup</h2>
+    <p class="text-base text-gray-600 mb-3">
+      Get a ZIP with the current database (SQL) and whitelist (JSON) to save on your computer.
+    </p>
+    <button
+      id="download-backup-btn"
+      type="button"
+      class="inline-flex items-center gap-2 bg-clr-green hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed text-white px-5 py-2.5 rounded-xl font-semibold text-sm"
+    >
+      <span id="download-backup-text">Download backup (ZIP)</span>
+    </button>
+  </section>
+
+  <section class="mb-8" aria-labelledby="backup-status-heading">
+    <h2 id="backup-status-heading" class="text-2xl font-heading font-semibold text-clr-green mb-3">Backup Status</h2>
+    <p class="text-base text-gray-600 mb-3">
+      Overview of all backup methods. Automated backups export D1 and the whitelist to R2 under <code class="bg-gray-100 px-1 rounded">backups/d1/</code> and <code class="bg-gray-100 px-1 rounded">backups/kv/</code>. Retention is applied (default 30 days).
+    </p>
+    <div class="overflow-x-auto rounded-xl border border-gray-200">
+      <table class="min-w-full divide-y divide-gray-200" role="status" aria-live="polite">
+        <thead class="bg-gray-50">
+          <tr>
+            <th scope="col" class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Type</th>
+            <th scope="col" class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Status</th>
+            <th scope="col" class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Last Successful</th>
+            <th scope="col" class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Next Run</th>
+          </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-gray-200 text-sm">
+          <tr>
+            <td class="px-4 py-3 font-medium text-gray-900">Manual Download</td>
+            <td id="backup-status-manual" class="px-4 py-3 text-gray-700">Checking…</td>
+            <td class="px-4 py-3 text-gray-500">On demand</td>
+            <td class="px-4 py-3 text-gray-500">—</td>
+          </tr>
+          <tr>
+            <td class="px-4 py-3 font-medium text-gray-900">Automated (R2)</td>
+            <td id="backup-status-r2" class="px-4 py-3 text-gray-700">Checking…</td>
+            <td id="backup-status-r2-last" class="px-4 py-3 text-gray-700">—</td>
+            <td id="backup-status-r2-next" class="px-4 py-3 text-gray-700">—</td>
+          </tr>
+          <tr>
+            <td class="px-4 py-3 font-medium text-gray-900">Google Drive</td>
+            <td id="backup-status-google" class="px-4 py-3 text-gray-700">Checking…</td>
+            <td id="backup-status-google-last" class="px-4 py-3 text-gray-700">—</td>
+            <td id="backup-status-google-next" class="px-4 py-3 text-gray-700">—</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="text-xs text-gray-500 mt-2">
+      Deploy the Worker with <code class="bg-gray-100 px-1 rounded">npm run backup:deploy</code> and set <code class="bg-gray-100 px-1 rounded">CLOUDFLARE_BACKUP_API_TOKEN</code> and <code class="bg-gray-100 px-1 rounded">CLOUDFLARE_ACCOUNT_ID</code> for the Worker (and for manual download above).
+    </p>
+  </section>
+
+  <section class="mb-8" aria-labelledby="google-drive-heading">
+    <h2 id="google-drive-heading" class="text-2xl font-heading font-semibold text-clr-green mb-3">Google Drive backup</h2>
+    <p class="text-base text-gray-600 mb-4">
+      Optionally upload the same backup set to a Google Workspace Drive folder. Connect your Google account, then set the folder ID (from the folder URL in Drive) and schedule.
+    </p>
+
+    <form id="backup-config-form" class="space-y-4 max-w-xl">
+      <div class="flex items-center gap-2">
+        <input type="checkbox" id="google_drive_enabled" name="google_drive_enabled" class="rounded border-gray-300" />
+        <label for="google_drive_enabled" class="text-sm font-medium text-gray-700">Enable Google Drive backup</label>
+      </div>
+      <div>
+        <label for="google_drive_folder_id" class="block text-sm font-medium text-gray-700 mb-1">Google Drive folder ID</label>
+        <input type="text" id="google_drive_folder_id" name="google_drive_folder_id" placeholder="e.g. from https://drive.google.com/drive/folders/FOLDER_ID" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+      </div>
+      <div class="border-t pt-4">
+        <p class="text-sm font-medium text-gray-700 mb-2">What to backup to Google Drive:</p>
+        <div class="space-y-2 pl-4">
+          <div class="flex items-center gap-2">
+            <input type="checkbox" id="include_r2_manifest" name="include_r2_manifest" class="rounded border-gray-300" checked />
+            <label for="include_r2_manifest" class="text-sm text-gray-700">
+              <span class="font-medium">R2 file manifest</span>
+              <span class="text-gray-500">(JSON inventory of all uploaded files - lightweight, recommended)</span>
+            </label>
+          </div>
+          <div class="flex items-center gap-2">
+            <input type="checkbox" id="include_r2_files" name="include_r2_files" class="rounded border-gray-300" />
+            <label for="include_r2_files" class="text-sm text-gray-700">
+              <span class="font-medium">R2 actual files</span>
+              <span class="text-gray-500">(Incremental - only new/changed files uploaded)</span>
+            </label>
+          </div>
+          <p class="text-xs text-gray-500 italic mt-2">
+            Note: Database and whitelist are always included. R2 files use smart incremental backup - first run uploads all existing files, subsequent runs only upload new/changed files.
+          </p>
+        </div>
+      </div>
+      <div class="flex flex-wrap gap-4">
+        <div>
+          <label for="schedule_type" class="block text-sm font-medium text-gray-700 mb-1">Schedule</label>
+          <select id="schedule_type" name="schedule_type" class="rounded-lg border border-gray-300 px-3 py-2 text-sm">
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+          </select>
+        </div>
+        <div>
+          <label for="schedule_hour_utc" class="block text-sm font-medium text-gray-700 mb-1">
+            Hour (UTC)
+            <span class="text-xs font-normal text-gray-500 ml-1">(2 = {cronHourToEastern(2)})</span>
+          </label>
+          <input type="number" id="schedule_hour_utc" name="schedule_hour_utc" min="0" max="23" value="2" class="w-20 rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+        </div>
+        <div id="schedule_day_wrap" class="hidden">
+          <label for="schedule_day_of_week" class="block text-sm font-medium text-gray-700 mb-1">Day (0=Sun, 6=Sat)</label>
+          <input type="number" id="schedule_day_of_week" name="schedule_day_of_week" min="0" max="6" value="0" class="w-20 rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+        </div>
+      </div>
+      <div class="flex items-center gap-4">
+        <a href="/api/board/google-drive-auth" class="text-sm text-clr-orange hover:underline font-medium">Connect Google Drive</a>
+        <button type="submit" class="bg-clr-green hover:brightness-110 text-white px-5 py-2.5 rounded-xl font-semibold text-base">
+          Save settings
+        </button>
+      </div>
+    </form>
+
+    <div class="mt-6 pt-6 border-t border-gray-200">
+      <h3 class="text-lg font-semibold text-gray-900 mb-3">Test Backup</h3>
+      <p class="text-sm text-gray-600 mb-3">
+        Manually trigger an immediate backup to test your configuration. This runs all configured backups (R2 + Google Drive if enabled).
+      </p>
+      <button
+        id="test-backup-btn"
+        type="button"
+        class="inline-flex items-center gap-2 bg-clr-orange hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-xl font-semibold text-sm"
+      >
+        <span id="test-backup-text">Test Backup Now</span>
+      </button>
+    </div>
+  </section>
+
+  <script is:inline define:vars={{}}>
+    (function () {
+      // Test backup button handler
+      const testBackupBtn = document.getElementById('test-backup-btn');
+      const testBackupText = document.getElementById('test-backup-text');
+      if (testBackupBtn && testBackupText) {
+        testBackupBtn.addEventListener('click', async function () {
+          if (testBackupBtn.disabled) return;
+
+          const confirmed = confirm('This will trigger an immediate backup to R2 and Google Drive (if configured). This may take 30-60 seconds. Continue?');
+          if (!confirmed) return;
+
+          testBackupBtn.disabled = true;
+          testBackupText.textContent = 'Running backup...';
+
+          try {
+            const response = await fetch('/api/board/backup-trigger', {
+              method: 'POST',
+              credentials: 'same-origin',
+            });
+
+            console.log('[TEST BACKUP] Response status:', response.status);
+            const data = await response.json();
+            console.log('[TEST BACKUP] Response data:', data);
+
+            if (!response.ok) {
+              throw new Error(data.error || 'Backup failed');
+            }
+
+            testBackupText.textContent = 'Backup complete!';
+            console.log('[TEST BACKUP] Success! Reloading page in 1.5s...');
+            // Reload backup status to show updated last run time
+            setTimeout(function () {
+              window.location.reload();
+            }, 1500);
+          } catch (error) {
+            console.error('[TEST BACKUP] Error:', error);
+            testBackupText.textContent = 'Error: ' + error.message;
+            setTimeout(function () {
+              testBackupText.textContent = 'Test Backup Now';
+              testBackupBtn.disabled = false;
+            }, 3000);
+          }
+        });
+      }
+
+      // Download backup button handler
+      const downloadBtn = document.getElementById('download-backup-btn');
+      const downloadText = document.getElementById('download-backup-text');
+      if (downloadBtn && downloadText) {
+        downloadBtn.addEventListener('click', async function () {
+          // Prevent multiple clicks
+          if (downloadBtn.disabled) return;
+
+          downloadBtn.disabled = true;
+          downloadText.textContent = 'Downloading...';
+
+          try {
+            const response = await fetch('/api/board/backup-download');
+
+            if (!response.ok) {
+              const errorData = await response.json().catch(() => ({ error: 'Download failed' }));
+              throw new Error(errorData.error || 'Download failed');
+            }
+
+            // Get the blob and create a download link
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+
+            // Extract filename from Content-Disposition header or use default
+            const disposition = response.headers.get('Content-Disposition');
+            let filename = 'clrhoa-backup.zip';
+            if (disposition && disposition.includes('filename=')) {
+              const matches = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(disposition);
+              if (matches != null && matches[1]) {
+                filename = matches[1].replace(/['"]/g, '');
+              }
+            }
+            a.download = filename;
+
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+
+            downloadText.textContent = 'Downloaded!';
+            setTimeout(function () {
+              downloadText.textContent = 'Download backup (ZIP)';
+              downloadBtn.disabled = false;
+            }, 2000);
+          } catch (error) {
+            downloadText.textContent = 'Error: ' + error.message;
+            setTimeout(function () {
+              downloadText.textContent = 'Download backup (ZIP)';
+              downloadBtn.disabled = false;
+            }, 3000);
+          }
+        });
+      }
+
+      const form = document.getElementById('backup-config-form');
+      const scheduleType = document.getElementById('schedule_type');
+      const dayWrap = document.getElementById('schedule_day_wrap');
+
+      scheduleType?.addEventListener('change', function () {
+        if (dayWrap) dayWrap.classList.toggle('hidden', scheduleType.value !== 'weekly');
+      });
+
+      async function load() {
+        try {
+          const r = await fetch('/api/board/backup-config');
+          const c = await r.json();
+          const enabled = document.getElementById('google_drive_enabled');
+          const folderId = document.getElementById('google_drive_folder_id');
+          const hour = document.getElementById('schedule_hour_utc');
+          const day = document.getElementById('schedule_day_of_week');
+          const r2Manifest = document.getElementById('include_r2_manifest');
+          const r2Files = document.getElementById('include_r2_files');
+          if (enabled) enabled.checked = c.google_drive_enabled;
+          if (folderId) folderId.value = c.google_drive_folder_id || '';
+          if (hour) hour.value = c.schedule_hour_utc ?? 2;
+          if (day) day.value = c.schedule_day_of_week ?? 0;
+          if (r2Manifest) r2Manifest.checked = c.include_r2_manifest ?? true;
+          if (r2Files) r2Files.checked = c.include_r2_files ?? false;
+          if (scheduleType) scheduleType.value = c.schedule_type || 'daily';
+          if (dayWrap) dayWrap.classList.toggle('hidden', scheduleType?.value !== 'weekly');
+        } catch (_) {}
+      }
+      load();
+
+      (function loadBackupStatus() {
+        const manualEl = document.getElementById('backup-status-manual');
+        const r2El = document.getElementById('backup-status-r2');
+        const r2LastEl = document.getElementById('backup-status-r2-last');
+        const r2NextEl = document.getElementById('backup-status-r2-next');
+        const googleEl = document.getElementById('backup-status-google');
+        const googleLastEl = document.getElementById('backup-status-google-last');
+        const googleNextEl = document.getElementById('backup-status-google-next');
+
+        if (!manualEl || !r2El || !googleEl) return;
+
+        function calculateNextRun(scheduleType, hourUtc, dayOfWeek, lastRun) {
+          const now = new Date();
+          let next = new Date();
+          next.setUTCHours(hourUtc, 0, 0, 0);
+
+          if (scheduleType === 'daily') {
+            // If today's run time has passed, schedule for tomorrow
+            if (next <= now) {
+              next.setUTCDate(next.getUTCDate() + 1);
+            }
+          } else if (scheduleType === 'weekly') {
+            // Find next occurrence of the specified day of week
+            const currentDay = next.getUTCDay();
+            let daysUntil = (dayOfWeek - currentDay + 7) % 7;
+
+            // If it's today but the time has passed, add 7 days
+            if (daysUntil === 0 && next <= now) {
+              daysUntil = 7;
+            }
+
+            next.setUTCDate(next.getUTCDate() + daysUntil);
+          }
+
+          const formatted = next.toLocaleString('en-US', {
+            dateStyle: 'medium',
+            timeStyle: 'short',
+            timeZone: 'America/New_York'
+          });
+          const tzAbbr = new Intl.DateTimeFormat('en-US', {
+            timeZone: 'America/New_York',
+            timeZoneName: 'short',
+          }).formatToParts(next).find(part => part.type === 'timeZoneName')?.value || 'ET';
+          return formatted + ' ' + tzAbbr;
+        }
+
+        function formatDate(dateStr) {
+          if (!dateStr) return '—';
+          const d = new Date(dateStr);
+          if (isNaN(d.getTime())) return dateStr;
+          const formatted = d.toLocaleString('en-US', {
+            dateStyle: 'medium',
+            timeStyle: 'short',
+            timeZone: 'America/New_York'
+          });
+          const tzAbbr = new Intl.DateTimeFormat('en-US', {
+            timeZone: 'America/New_York',
+            timeZoneName: 'short',
+          }).formatToParts(d).find(part => part.type === 'timeZoneName')?.value || 'ET';
+          return formatted + ' ' + tzAbbr;
+        }
+
+        function getStatusBadge(configured) {
+          return configured
+            ? '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Configured</span>'
+            : '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">Not configured</span>';
+        }
+
+        fetch('/api/board/backup-status', { credentials: 'same-origin' })
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
+            if (data.error) {
+              manualEl.innerHTML = 'Could not load';
+              r2El.innerHTML = 'Could not load';
+              googleEl.innerHTML = 'Could not load';
+              return;
+            }
+
+            // Manual download status
+            manualEl.innerHTML = getStatusBadge(data.manual_download_configured);
+
+            // R2 automated backup status
+            const r2Configured = data.last_r2_backup_at || data.manual_download_configured;
+            r2El.innerHTML = getStatusBadge(r2Configured);
+            r2LastEl.textContent = formatDate(data.last_r2_backup_at);
+            if (r2Configured) {
+              r2NextEl.textContent = calculateNextRun('daily', 2, null, data.last_r2_backup_at);
+            } else {
+              r2NextEl.textContent = 'Not scheduled';
+            }
+
+            // Google Drive backup status
+            googleEl.innerHTML = getStatusBadge(data.google_drive_enabled);
+            googleLastEl.textContent = formatDate(data.last_google_backup_at);
+            if (data.google_drive_enabled) {
+              googleNextEl.textContent = calculateNextRun(
+                data.schedule_type || 'daily',
+                data.schedule_hour_utc ?? 2,
+                data.schedule_day_of_week,
+                data.last_google_backup_at
+              );
+            } else {
+              googleNextEl.textContent = 'Not scheduled';
+            }
+          })
+          .catch(function () {
+            manualEl.innerHTML = 'Error loading';
+            r2El.innerHTML = 'Error loading';
+            googleEl.innerHTML = 'Error loading';
+          });
+      })();
+
+      form?.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        const enabled = document.getElementById('google_drive_enabled');
+        const folderId = document.getElementById('google_drive_folder_id');
+        const hour = document.getElementById('schedule_hour_utc');
+        const day = document.getElementById('schedule_day_of_week');
+        const r2Manifest = document.getElementById('include_r2_manifest');
+        const r2Files = document.getElementById('include_r2_files');
+        const payload = {
+          google_drive_enabled: enabled?.checked ?? false,
+          google_drive_folder_id: folderId?.value ?? '',
+          schedule_type: scheduleType?.value ?? 'daily',
+          schedule_hour_utc: parseInt(hour?.value ?? '2', 10),
+          schedule_day_of_week: parseInt(day?.value ?? '0', 10),
+          include_r2_manifest: r2Manifest?.checked ?? true,
+          include_r2_files: r2Files?.checked ?? false,
+        };
+        console.log('[BACKUP CONFIG] Saving:', payload);
+        try {
+          const r = await fetch('/api/board/backup-config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          console.log('[BACKUP CONFIG] Response status:', r.status);
+          if (r.ok) {
+            const btn = form.querySelector('button[type="submit"]');
+            if (btn) {
+              const orig = btn.textContent;
+              btn.textContent = 'Saved';
+              setTimeout(() => { btn.textContent = orig; }, 2000);
+            }
+            console.log('[BACKUP CONFIG] Saved successfully!');
+          } else {
+            const error = await r.text();
+            console.error('[BACKUP CONFIG] Save failed:', r.status, error);
+            alert('Failed to save settings: ' + error);
+          }
+        } catch (error) {
+          console.error('[BACKUP CONFIG] Error:', error);
+          alert('Error saving settings: ' + error.message);
+        }
+      });
+    })();
+  </script>
+  </PortalPage>
+</PortalLayout>

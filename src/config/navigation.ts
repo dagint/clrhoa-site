@@ -106,10 +106,10 @@ export const footerResourceLinks: NavLink[] = [
 
 /** Landing zone per role. Redirect here after PIM elevation or de-elevation. */
 export const ROLE_LANDING: Record<string, string> = {
-  admin: '/portal/admin',
-  board: '/portal/board',
-  arb: '/portal/arb',
-  arb_board: '/portal/board', // arb_board elevates to board or arb; default landing is board
+  admin: '/portal/admin/dashboard',
+  board: '/portal/board/dashboard',
+  arb: '/portal/arb/dashboard',
+  arb_board: '/portal/board/dashboard', // arb_board elevates to board or arb; default landing is board
   member: '/portal/dashboard', // Baseline member role landing zone
 };
 
@@ -125,8 +125,8 @@ export const adminLinks: NavLink[] = [
   { label: 'Site usage', href: '/portal/admin/usage' },
   { label: 'Audit logs', href: '/portal/admin/audit-logs' },
   { label: 'Permissions', href: '/portal/admin/permissions' },
-  { label: 'Members', href: '/board/members' },
-  { label: 'Compliance', href: '/board/compliance' },
+  { label: 'Members', href: '/portal/board/members' },
+  { label: 'Compliance', href: '/portal/board/compliance' },
   { label: 'Vendors', href: '/portal/admin/vendors' },
   { label: 'Maintenance', href: '/portal/admin/maintenance' },
   { label: 'Directory', href: '/portal/admin/directory' },
@@ -142,19 +142,19 @@ export const adminLinks: NavLink[] = [
 export const boardLinks: NavLink[] = [
   { label: 'Board', href: '/portal/board' },
   { label: 'ARB Dashboard', href: '/portal/arb-dashboard' },
-  { label: 'Members', href: '/board/members' },
-  { label: 'Dues', href: '/board/assessments' },
-  { label: 'Vendors', href: '/board/vendors' },
-  { label: 'Meetings', href: '/board/meetings' },
-  { label: 'Maintenance', href: '/board/maintenance' },
-  { label: 'Feedback', href: '/board/feedback' },
-  { label: 'Contacts', href: '/board/contacts' },
-  { label: 'News', href: '/board/news' },
-  { label: 'Library', href: '/board/library' },
-  { label: 'Public documents', href: '/board/public-documents' },
-  { label: 'Member documents', href: '/board/member-documents' },
-  { label: 'Audit logs', href: '/board/audit-logs' },
-  { label: 'Backups', href: '/board/backups' },
+  { label: 'Members', href: '/portal/board/members' },
+  { label: 'Dues', href: '/portal/board/assessments' },
+  { label: 'Vendors', href: '/portal/board/vendors' },
+  { label: 'Meetings', href: '/portal/board/meetings' },
+  { label: 'Maintenance', href: '/portal/board/maintenance' },
+  { label: 'Feedback', href: '/portal/board/feedback' },
+  { label: 'Contacts', href: '/portal/board/contacts' },
+  { label: 'News', href: '/portal/board/news' },
+  { label: 'Library', href: '/portal/board/library' },
+  { label: 'Public documents', href: '/portal/board/public-documents' },
+  { label: 'Member documents', href: '/portal/board/member-documents' },
+  { label: 'Audit logs', href: '/portal/board/audit-logs' },
+  { label: 'Backups', href: '/portal/board/backups' },
 ];
 
 // ─── ARB only ────────────────────────────────────────────────────────
@@ -163,16 +163,16 @@ export const boardLinks: NavLink[] = [
 export const arbLinks: NavLink[] = [
   { label: 'ARB', href: '/portal/arb' },
   { label: 'ARB Dashboard', href: '/portal/arb-dashboard' },
-  { label: 'Vendors', href: '/board/vendors' },
-  { label: 'Meetings', href: '/board/meetings' },
-  { label: 'Maintenance', href: '/board/maintenance' },
-  { label: 'Feedback', href: '/board/feedback' },
-  { label: 'Contacts', href: '/board/contacts' },
-  { label: 'News', href: '/board/news' },
-  { label: 'Library', href: '/board/library' },
-  { label: 'Member documents', href: '/board/member-documents' },
-  { label: 'Public documents', href: '/board/public-documents' },
-  { label: 'Backups', href: '/board/backups' },
+  { label: 'Vendors', href: '/portal/board/vendors' },
+  { label: 'Meetings', href: '/portal/board/meetings' },
+  { label: 'Maintenance', href: '/portal/board/maintenance' },
+  { label: 'Feedback', href: '/portal/board/feedback' },
+  { label: 'Contacts', href: '/portal/board/contacts' },
+  { label: 'News', href: '/portal/board/news' },
+  { label: 'Library', href: '/portal/board/library' },
+  { label: 'Member documents', href: '/portal/board/member-documents' },
+  { label: 'Public documents', href: '/portal/board/public-documents' },
+  { label: 'Backups', href: '/portal/board/backups' },
 ];
 
 // ─── Portal navigation ──────────────────────────────────────────────

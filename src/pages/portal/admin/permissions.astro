@@ -9,7 +9,7 @@ export const prerender = false;
 
 import PortalLayout from '../../../layouts/PortalLayout.astro';
 import PortalPage from '../../../components/PortalPage.astro';
-import AdminNav from '../../../components/AdminNav.astro';
+import ElevatedNav from '../../../components/ElevatedNav.astro';
 import { getAdminContext } from '../../../lib/board-context';
 import { getPortalBadgeCounts } from '../../../lib/portal-badge-counts';
 import PermissionGrid from '../../../components/PermissionGrid.astro';
@@ -86,7 +86,7 @@ Object.values(permissions).forEach((rolePerms) => {
     feedbackDueCount={badges.feedbackDueCount}
     libraryItemCount={badges.libraryItemCount}
   >
-    <AdminNav currentPath="/portal/admin/permissions" />
+    <ElevatedNav persona="admin" currentPath="/portal/admin/permissions" effectiveRole={effectiveRole} user={{ email, role: role ?? '' }} session={session} />
 
   <!-- Info Banner -->
   <div class="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-4">
