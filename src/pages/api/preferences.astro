@@ -5,21 +5,25 @@
  */
 export const prerender = false;
 
-import { requireSession, requireDb, jsonResponse } from '../../lib/api-helpers';
+import { requireDb, jsonResponse } from '../../lib/api-helpers';
 import { verifyCsrfToken } from '../../lib/auth';
 import { getUserByEmail, updateUserPreferences, type NotificationPreferences } from '../../lib/db';
 import { getOwnerByEmail, getPhonesArray, updateOwnerByEmail } from '../../lib/directory-db';
 
-const auth = await requireSession(Astro);
-if ('response' in auth) return auth.response;
-const { session } = auth;
+// Use session and user from middleware (already validated)
+const session = Astro.locals.session;
+const user = Astro.locals.user;
+if (!session || !user) {
+  return jsonResponse({ error: 'Unauthorized' }, 401);
+}
+const email = user.email;
 
 const dbResult = requireDb(Astro.locals.runtime?.env);
 if ('response' in dbResult) return dbResult.response;
 const { db } = dbResult;
 
 if (Astro.request.method === 'GET') {
-  const user = await getUserByEmail(db, session.email);
+  const user = await getUserByEmail(db, email);
   if (!user) return jsonResponse({ error: 'User not found' }, 404);
   const sms_optin = user.sms_optin === 1 || user.sms_optin === true;
   let notification_preferences: NotificationPreferences = {};
@@ -30,7 +34,7 @@ if (Astro.request.method === 'GET') {
       /* ignore */
     }
   }
-  const owner = await getOwnerByEmail(db, session.email);
+  const owner = await getOwnerByEmail(db, email);
   const share_contact_with_members = owner?.share_contact_with_members !== 0;
   return jsonResponse({ phone: user.phone ?? '', sms_optin, notification_preferences, share_contact_with_members });
 }
@@ -67,9 +71,9 @@ if (body.notification_preferences !== undefined && typeof body.notification_pref
   }
 }
 
-await updateUserPreferences(db, session.email, { phone, sms_optin, notification_preferences });
+await updateUserPreferences(db, email, { phone, sms_optin, notification_preferences });
 
-const owner = await getOwnerByEmail(db, session.email);
+const owner = await getOwnerByEmail(db, email);
 if (owner) {
   const updates: { phones?: string; share_contact_with_members?: number } = {};
   if (share_contact_with_members !== undefined) updates.share_contact_with_members = share_contact_with_members;
@@ -84,7 +88,7 @@ if (owner) {
     }
   }
   if (Object.keys(updates).length > 0) {
-    await updateOwnerByEmail(db, session.email, updates);
+    await updateOwnerByEmail(db, email, updates);
   }
 }
 
