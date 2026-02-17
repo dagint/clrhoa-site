@@ -5,7 +5,7 @@
  * GET: Get current positions
  */
 import type { APIRoute } from 'astro';
-import { getSessionFromCookie, verifyCsrfToken } from '../../../lib/auth';
+import { verifyCsrfToken } from '../../../lib/auth';
 import {
   assignBoardPosition,
   endBoardPosition,
@@ -14,25 +14,42 @@ import {
   BOARD_TITLES,
   type BoardTitle,
 } from '../../../lib/board-positions-db';
+import { getUserRole, getUserEmail, type ExtendedSession } from '../../../types/auth';
 
 export const prerender = false;
 
+/**
+ * Calculate effective role considering PIM elevation and assumed roles
+ */
+function getEffectiveRole(session: ExtendedSession, user: any): string {
+  const baseRole = getUserRole(user)?.toLowerCase() || 'member';
+  const elevatedUntil = session.elevated_until;
+  const now = Date.now();
+
+  // If elevation is active, use assumed_role (if set) or base role
+  if (elevatedUntil && elevatedUntil > now) {
+    return session.assumed_role || baseRole;
+  }
+
+  // No active elevation - return member
+  return 'member';
+}
+
 export const POST: APIRoute = async ({ request, locals }) => {
   const env = locals.runtime?.env;
-  if (!env?.DB || !env?.SESSION_SECRET) {
+  if (!env?.DB) {
     return new Response(JSON.stringify({ error: 'Service unavailable' }), { status: 503 });
   }
 
-  const cookieHeader = request.headers.get('cookie') ?? undefined;
-  const session = await getSessionFromCookie(cookieHeader, env.SESSION_SECRET);
-  if (!session) {
+  const session = locals.session as ExtendedSession;
+  const user = locals.user;
+
+  if (!session || !user) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
   }
 
   // Check permission: admin, board, or arb (for ARB titles only)
-  const effectiveRole = session.elevated_until && session.elevated_until > Date.now()
-    ? session.assumed_role || session.role
-    : session.role;
+  const effectiveRole = getEffectiveRole(session, user);
 
   const canManageBoard = effectiveRole === 'admin' || effectiveRole === 'board' || effectiveRole === 'arb_board';
   const canManageArb = canManageBoard || effectiveRole === 'arb';
@@ -68,7 +85,11 @@ export const POST: APIRoute = async ({ request, locals }) => {
     }
 
     if (action === 'assign') {
-      const result = await assignBoardPosition(env.DB, email, title as BoardTitle, session.email);
+      const userEmail = getUserEmail(user);
+      if (!userEmail) {
+        return new Response(JSON.stringify({ error: 'Invalid user session' }), { status: 401 });
+      }
+      const result = await assignBoardPosition(env.DB, email, title as BoardTitle, userEmail);
       if (!result.success) {
         return new Response(JSON.stringify({ error: result.error || 'Failed to assign position' }), { status: 400 });
       }
@@ -88,22 +109,21 @@ export const POST: APIRoute = async ({ request, locals }) => {
   }
 };
 
-export const GET: APIRoute = async ({ request, locals }) => {
+export const GET: APIRoute = async ({ locals }) => {
   const env = locals.runtime?.env;
-  if (!env?.DB || !env?.SESSION_SECRET) {
+  if (!env?.DB) {
     return new Response(JSON.stringify({ error: 'Service unavailable' }), { status: 503 });
   }
 
-  const cookieHeader = request.headers.get('cookie') ?? undefined;
-  const session = await getSessionFromCookie(cookieHeader, env.SESSION_SECRET);
-  if (!session) {
+  const session = locals.session as ExtendedSession;
+  const user = locals.user;
+
+  if (!session || !user) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
   }
 
   // Allow board, arb, or admin to view positions
-  const effectiveRole = session.elevated_until && session.elevated_until > Date.now()
-    ? session.assumed_role || session.role
-    : session.role;
+  const effectiveRole = getEffectiveRole(session, user);
 
   const canView = effectiveRole === 'admin' || effectiveRole === 'board' || effectiveRole === 'arb' || effectiveRole === 'arb_board';
   if (!canView) {
