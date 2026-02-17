@@ -306,7 +306,7 @@ function formatDate(s: string | null): string {
                   {ownersWithCreator.map((o) => (
                     <tr class="border-b border-gray-100 hover:bg-gray-50/50">
                       <td class="py-2 px-3">{o.name ?? BLANK} / {REDACTED}</td>
-                      <td class="py-2 px-3">{REDACTED}</td>
+                      <td class="py-2 px-3">{o.created_by_email ?? BLANK}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -338,7 +338,7 @@ function formatDate(s: string | null): string {
                     <tr class="border-b border-gray-100 hover:bg-gray-50/50">
                       <td class="py-2 px-3 text-gray-600">{formatDate(o.updated_at ?? null)}</td>
                       <td class="py-2 px-3">{o.name ?? BLANK} / {REDACTED}</td>
-                      <td class="py-2 px-3">{REDACTED}</td>
+                      <td class="py-2 px-3">{o.updated_by ?? BLANK}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -424,7 +424,7 @@ function formatDate(s: string | null): string {
                       <td class="py-2 px-3">{row.action}</td>
                       <td class="py-2 px-3">{row.vendor_name ?? BLANK}</td>
                       <td class="py-2 px-3 font-mono text-gray-600">{row.vendor_id ?? BLANK}</td>
-                      <td class="py-2 px-3">{REDACTED}</td>
+                      <td class="py-2 px-3">{row.done_by_email ?? BLANK}</td>
                       <td class="py-2 px-3 text-gray-500 text-xs">{row.ip_address ?? BLANK}</td>
                     </tr>
                   ))}
@@ -504,7 +504,7 @@ function formatDate(s: string | null): string {
                       <td class="py-2 px-3">{row.category ?? BLANK}</td>
                       <td class="py-2 px-3">{row.title ?? BLANK}</td>
                       <td class="py-2 px-3 text-gray-600">{formatDate(row.uploaded_at)}</td>
-                      <td class="py-2 px-3">{REDACTED}</td>
+                      <td class="py-2 px-3">{row.uploaded_by_email ?? BLANK}</td>
                     </tr>
                   ))}
                 </tbody>
