@@ -321,19 +321,38 @@ const csrfToken = session?.csrfToken ?? '';
             />
           </div>
 
-          <div>
-            <label for="edit-role" class="block text-sm font-medium text-gray-700 mb-1">Role</label>
-            <select
-              id="edit-role"
-              name="role"
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-clr-green focus:border-clr-green"
-            >
-              <option value="member">Member</option>
-              <option value="board">Board</option>
-              <option value="arb">ARB</option>
-              <option value="arb_board">ARB + Board</option>
-              <option value="admin">Admin</option>
-            </select>
+          <div class="grid md:grid-cols-2 gap-4">
+            <div>
+              <label for="edit-role" class="block text-sm font-medium text-gray-700 mb-1">Role</label>
+              <select
+                id="edit-role"
+                name="role"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-clr-green focus:border-clr-green"
+              >
+                <option value="member">Member</option>
+                <option value="board">Board</option>
+                <option value="arb">ARB</option>
+                <option value="arb_board">ARB + Board</option>
+                <option value="admin">Admin</option>
+              </select>
+            </div>
+            <div>
+              <label for="edit-board-title" class="block text-sm font-medium text-gray-700 mb-1">Board/ARB Title</label>
+              <select
+                id="edit-board-title"
+                name="board_title"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-clr-green focus:border-clr-green"
+              >
+                <option value="">None</option>
+                <option value="President">President</option>
+                <option value="Vice President">Vice President</option>
+                <option value="Secretary">Secretary</option>
+                <option value="Treasurer">Treasurer</option>
+                <option value="Member at Large">Member at Large</option>
+                <option value="ARB Chair">ARB Chair</option>
+                <option value="ARB Member">ARB Member</option>
+              </select>
+            </div>
           </div>
 
           <div class="grid md:grid-cols-2 gap-4">
@@ -638,6 +657,7 @@ const csrfToken = session?.csrfToken ?? '';
     }
 
     try {
+      // First create the member
       const response = await fetch('/api/members', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -646,13 +666,36 @@ const csrfToken = session?.csrfToken ?? '';
 
       const result = await response.json();
 
-      if (response.ok) {
-        showMessage(result.message || 'Member added successfully!');
-        addForm.reset();
-        loadMembers();
-      } else {
+      if (!response.ok) {
         showMessage(result.error || 'Failed to add member', true);
+        return;
       }
+
+      // Then assign board title if selected
+      const boardTitle = formData.get('board_title');
+      if (boardTitle) {
+        const titleResponse = await fetch('/api/admin/board-positions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: data.email,
+            title: boardTitle,
+            action: 'assign',
+            csrf_token: CSRF_TOKEN,
+          }),
+        });
+
+        if (!titleResponse.ok) {
+          const titleResult = await titleResponse.json();
+          console.error('[MEMBERS] Failed to assign title:', titleResult.error);
+          showMessage(`Member added, but failed to assign title: ${titleResult.error}`, true);
+          return;
+        }
+      }
+
+      showMessage(result.message || 'Member added successfully!');
+      addForm.reset();
+      loadMembers();
     } catch (error) {
       console.error('[MEMBERS] Add error:', error);
       showMessage('Network error. Please try again.', true);
@@ -666,14 +709,19 @@ const csrfToken = session?.csrfToken ?? '';
 
   // Edit member function (global so onclick can call it)
   let currentMembers = [];
+  let currentEditingMember = null;
   window.editMember = function (email) {
     const member = currentMembers.find((m) => m.email === email);
     if (!member) return;
+
+    // Store current member for comparison when saving
+    currentEditingMember = member;
 
     // Populate form
     document.getElementById('edit-email').value = member.email;
     document.getElementById('edit-name').value = member.name || '';
     document.getElementById('edit-role').value = member.role || 'member';
+    document.getElementById('edit-board-title').value = member.board_title || '';
     document.getElementById('edit-lot').value = member.lot_number || '';
     document.getElementById('edit-phone').value = member.phone || '';
     document.getElementById('edit-address').value = member.address || '';
@@ -710,6 +758,7 @@ const csrfToken = session?.csrfToken ?? '';
     }
 
     try {
+      // First update member basic info
       const response = await fetch('/api/members', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -718,13 +767,62 @@ const csrfToken = session?.csrfToken ?? '';
 
       const result = await response.json();
 
-      if (response.ok) {
-        showMessage(result.message || 'Member updated successfully!');
-        document.getElementById('edit-modal').classList.add('hidden');
-        loadMembers();
-      } else {
+      if (!response.ok) {
         showMessage(result.error || 'Failed to update member', true);
+        return;
       }
+
+      // Then handle board title changes if needed
+      const newTitle = formData.get('board_title');
+      const oldTitle = currentEditingMember?.board_title || '';
+
+      if (newTitle !== oldTitle) {
+        // Remove old title if exists
+        if (oldTitle) {
+          const removeResponse = await fetch('/api/admin/board-positions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: data.email,
+              title: oldTitle,
+              action: 'remove',
+              csrf_token: CSRF_TOKEN,
+            }),
+          });
+
+          if (!removeResponse.ok) {
+            const removeResult = await removeResponse.json();
+            console.error('[MEMBERS] Failed to remove old title:', removeResult.error);
+            showMessage(`Member updated, but failed to remove old title: ${removeResult.error}`, true);
+            return;
+          }
+        }
+
+        // Assign new title if selected
+        if (newTitle) {
+          const assignResponse = await fetch('/api/admin/board-positions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: data.email,
+              title: newTitle,
+              action: 'assign',
+              csrf_token: CSRF_TOKEN,
+            }),
+          });
+
+          if (!assignResponse.ok) {
+            const assignResult = await assignResponse.json();
+            console.error('[MEMBERS] Failed to assign new title:', assignResult.error);
+            showMessage(`Member updated, but failed to assign title: ${assignResult.error}`, true);
+            return;
+          }
+        }
+      }
+
+      showMessage(result.message || 'Member updated successfully!');
+      document.getElementById('edit-modal').classList.add('hidden');
+      loadMembers();
     } catch (error) {
       console.error('[MEMBERS] Edit error:', error);
       showMessage('Network error. Please try again.', true);
