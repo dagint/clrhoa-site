@@ -171,6 +171,7 @@ export const PROTECTED_ROUTES: RouteMetadata[] = [
   { path: '/portal/admin/backups', allowedRoles: ['admin'], description: 'Database backup management' },
   { path: '/portal/admin/usage', allowedRoles: ['admin'], description: 'Site usage analytics' },
   { path: '/portal/admin/audit-logs', allowedRoles: ['admin'], description: 'Security and audit logs' },
+  { path: '/portal/admin/permissions', allowedRoles: ['admin'], description: 'Role permission management' },
   { path: '/portal/admin/vendors', allowedRoles: ['admin'], description: 'Vendor directory management' },
   { path: '/portal/admin/maintenance', allowedRoles: ['admin'], description: 'Maintenance schedule management' },
   { path: '/portal/admin/directory', allowedRoles: ['admin'], description: 'Member directory management (read-only)' },
@@ -193,7 +194,9 @@ export const PROTECTED_ROUTES: RouteMetadata[] = [
   { path: '/board/public-documents', allowedRoles: ['board', 'arb', 'arb_board'], description: 'Public document uploads' },
   { path: '/board/member-documents', allowedRoles: ['board', 'arb', 'arb_board'], description: 'Member document uploads' },
   { path: '/board/audit-logs', allowedRoles: ['board'], description: 'Audit log review' },
-  { path: '/board/backups', allowedRoles: ['board', 'arb', 'arb_board'], description: 'Database backups' },
+  { path: '/board/backups', allowedRoles: ['board', 'arb_board'], description: 'Database backups' },
+  { path: '/board/compliance', allowedRoles: ['board', 'arb_board'], description: 'Florida HOA compliance tracking' },
+  { path: '/board/analytics', allowedRoles: ['board', 'arb_board'], description: 'Board analytics dashboard' },
 
   // ARB routes
   { path: '/portal/arb', allowedRoles: ['arb', 'arb_board'], description: 'ARB landing zone' },
