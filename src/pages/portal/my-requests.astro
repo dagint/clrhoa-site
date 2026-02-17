@@ -11,6 +11,7 @@ import type { ArbFile } from '../../lib/arb-db';
 import { batchLoadElectronicSignatures } from '../../lib/esignature-db';
 import type { ElectronicSignature } from '../../lib/esignature-db';
 import { sanitizeForDisplay } from '../../lib/sanitize';
+import { formatEasternDate, formatEasternDateTime } from '../../lib/timezone';
 
 const { env, session, effectiveRole } = await getPortalContext(Astro, { fingerprint: true });
 if (!session) return Astro.redirect('/auth/login');
@@ -77,7 +78,8 @@ function formatApproval(arbEsign: string | null, esignTimestamp: string | null):
   if (status !== 'approved' && status !== 'rejected') return null;
   const by = parts[1] ?? arbEsign;
   const dateStr = esignTimestamp ?? parts[3];
-  const date = dateStr ? new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
+  const formatted = formatEasternDate(dateStr);
+  const date = formatted !== '—' ? formatted : '';
   return { status, by, date };
 }
 ---
@@ -172,7 +174,7 @@ function formatApproval(arbEsign: string | null, esignTimestamp: string | null):
                             </span>
                           </div>
                           <p class="text-gray-700 text-base line-clamp-2 leading-relaxed" set:html={sanitizeForDisplay(req.description)}></p>
-                          <p class="text-sm text-gray-500 mt-2">Submitted: {new Date(req.created).toLocaleString()}</p>
+                          <p class="text-sm text-gray-500 mt-2">Submitted: {formatEasternDateTime(req.created)}</p>
                         </div>
                         <span class="request-chevron text-gray-400 shrink-0 ml-2 text-xl" aria-hidden="true">&#9660;</span>
                       </button>
@@ -205,7 +207,7 @@ function formatApproval(arbEsign: string | null, esignTimestamp: string | null):
                         </span>
                       </div>
                       <p class="text-gray-700 text-base line-clamp-2 leading-relaxed" set:html={sanitizeForDisplay(req.description)}></p>
-                      <p class="text-sm text-gray-500 mt-2">Submitted: {new Date(req.created).toLocaleString()}</p>
+                      <p class="text-sm text-gray-500 mt-2">Submitted: {formatEasternDateTime(req.created)}</p>
                     </div>
                     <span class="request-chevron text-gray-400 shrink-0 ml-2 text-xl" aria-hidden="true">&#9660;</span>
                   </button>
@@ -229,7 +231,7 @@ function formatApproval(arbEsign: string | null, esignTimestamp: string | null):
                         </div>
                         <div>
                           <label class="block text-sm font-semibold text-gray-500 mb-1">Date of application</label>
-                          <div class="w-full rounded-lg border border-gray-200 bg-gray-100 px-3 py-2 text-gray-600 cursor-not-allowed">{new Date(req.created).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
+                          <div class="w-full rounded-lg border border-gray-200 bg-gray-100 px-3 py-2 text-gray-600 cursor-not-allowed">{formatEasternDate(req.created)}</div>
                         </div>
                       </div>
                       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -267,7 +269,7 @@ function formatApproval(arbEsign: string | null, esignTimestamp: string | null):
                         <label class="block text-sm font-semibold text-gray-500 mb-1">Description of changes</label>
                         <div class="w-full rounded-lg border border-gray-200 bg-gray-100 px-3 py-2 text-gray-700 whitespace-pre-wrap cursor-not-allowed min-h-[100px]" set:html={sanitizeForDisplay(req.description)}></div>
                       </div>
-                      <p class="text-xs text-gray-500">Submitted: {new Date(req.created).toLocaleString()}{req.updated_at ? ` - Last updated: ${new Date(req.updated_at).toLocaleString()}` : ''}</p>
+                      <p class="text-xs text-gray-500">Submitted: {formatEasternDateTime(req.created)}{req.updated_at ? ` - Last updated: ${formatEasternDateTime(req.updated_at)}` : ''}</p>
                       {req.owner_notes && (
                         <div class="mt-3 rounded-lg border border-purple-200 bg-purple-50 p-3">
                           <p class="text-xs font-semibold text-purple-900 mb-1">Your Notes</p>
@@ -320,7 +322,7 @@ function formatApproval(arbEsign: string | null, esignTimestamp: string | null):
                       <div class="no-print pt-6 space-y-4">
                         {req.updated_at && req.updated_at !== req.created && (
                           <p class="text-sm text-gray-500">
-                            Last saved: {new Date(req.updated_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                            Last saved: {formatEasternDateTime(req.updated_at)}
                           </p>
                         )}
                         <div class="flex flex-wrap gap-4 items-center">
@@ -357,7 +359,7 @@ function formatApproval(arbEsign: string | null, esignTimestamp: string | null):
                     <div class="space-y-3 text-sm">
                       <div class="grid grid-cols-2 gap-4">
                         <div><span class="font-semibold text-gray-600">Association:</span> Crooked Lake Reserve</div>
-                        <div><span class="font-semibold text-gray-600">Date of application:</span> {new Date(req.created).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
+                        <div><span class="font-semibold text-gray-600">Date of application:</span> {formatEasternDate(req.created)}</div>
                       </div>
                       <div class="grid grid-cols-2 gap-4">
                         <div><span class="font-semibold text-gray-600">Applicant:</span> {sanitizeForDisplay(req.applicant_name) || '-'}</div>
@@ -370,7 +372,7 @@ function formatApproval(arbEsign: string | null, esignTimestamp: string | null):
                       <div><span class="font-semibold text-gray-600">Application for:</span> {sanitizeForDisplay(req.application_type) || '-'}</div>
                       <div><span class="font-semibold text-gray-600">Description:</span></div>
                       <div class="whitespace-pre-wrap border border-gray-200 p-3 rounded" set:html={sanitizeForDisplay(req.description)}></div>
-                      <div class="text-xs text-gray-500">Submitted: {new Date(req.created).toLocaleString()}</div>
+                      <div class="text-xs text-gray-500">Submitted: {formatEasternDateTime(req.created)}</div>
                       {files.length > 0 && (
                         <div class="print-attachments-section pt-2 border-t">
                           <p class="font-semibold">Attachments ({files.length})</p>

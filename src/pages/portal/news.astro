@@ -6,6 +6,7 @@ import PortalPage from '../../components/PortalPage.astro';
 import { getPortalContext } from '../../lib/portal-context';
 import { getPortalBadgeCounts } from '../../lib/portal-badge-counts';
 import { listPortalNewsItems, getNewsItemImageKeys } from '../../lib/news-items-db';
+import { formatEasternDate } from '../../lib/timezone';
 
 const { env, session, effectiveRole } = await getPortalContext(Astro);
 if (!session) return Astro.redirect('/auth/login');
@@ -44,12 +45,7 @@ function portalNewsPageUrl(value: number): string {
 const items = db ? await listPortalNewsItems(db, pageSize, (page - 1) * pageSize) : [];
 
 function formatDate(s: string | null): string {
-  if (!s) return '—';
-  try {
-    return new Date(s).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-  } catch {
-    return s;
-  }
+  return formatEasternDate(s);
 }
 ---
 

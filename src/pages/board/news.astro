@@ -6,6 +6,7 @@ import { getPortalBadgeCounts } from '../../lib/portal-badge-counts';
 import { isBoardOnly } from '../../lib/auth';
 import { listAllNewsItems, getNewsItemImageKeys } from '../../lib/news-items-db';
 import { escapeHtml } from '../../lib/sanitize';
+import { formatEasternDate } from '../../lib/timezone';
 import PortalLayout from '../../layouts/PortalLayout.astro';
 import PortalPage from '../../components/PortalPage.astro';
 
@@ -47,12 +48,8 @@ const badges = await getPortalBadgeCounts(db, email, role, name);
 const items = db ? await listAllNewsItems(db, pageSize, (page - 1) * pageSize) : [];
 
 function formatDate(s: string | null): string {
-  if (!s) return '—';
-  try {
-    return new Date(s).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-  } catch {
-    return s;
-  }
+  const formatted = formatEasternDate(s);
+  return formatted === '—' ? '-' : formatted;
 }
 ---
 

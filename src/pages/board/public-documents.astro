@@ -8,6 +8,7 @@ import { BOARD_ONLY_SLUGS, ARB_FORM_SLUG } from '../../lib/public-documents-db';
 import { sanitizeForScriptInjection } from '../../lib/sanitize';
 import PortalLayout from '../../layouts/PortalLayout.astro';
 import PortalPage from '../../components/PortalPage.astro';
+import { formatEasternDateTime } from '../../lib/timezone';
 
 import AdminNav from '../../components/BoardNav.astro';
 const ctx = await getAdminContext(Astro);
@@ -38,12 +39,8 @@ function canEdit(slug: string): boolean {
 }
 
 function formatDate(s: string | null): string {
-  if (!s) return '-';
-  try {
-    return new Date(s).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
-  } catch {
-    return s;
-  }
+  const formatted = formatEasternDateTime(s);
+  return formatted === '—' ? '-' : formatted;
 }
 ---
 

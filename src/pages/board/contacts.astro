@@ -7,6 +7,7 @@ import AdminNav from '../../components/BoardNav.astro';
 import { getAdminContext } from '../../lib/board-context';
 import { getPortalBadgeCounts } from '../../lib/portal-badge-counts';
 import { CONTACT_SUBMISSIONS_EXPIRY_WHERE } from '../../lib/contact-submissions';
+import { formatEasternDateTime } from '../../lib/timezone';
 
 const ctx = await getAdminContext(Astro);
 if ('redirect' in ctx) return Astro.redirect(ctx.redirect);
@@ -41,12 +42,8 @@ const start = total === 0 ? 0 : (page - 1) * pageSize + 1;
 const end = Math.min(page * pageSize, total);
 
 function formatDate(s: string | null): string {
-  if (!s) return '—';
-  try {
-    return new Date(s).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
-  } catch {
-    return s;
-  }
+  const formatted = formatEasternDateTime(s);
+  return formatted === '—' ? '—' : formatted;
 }
 
 function recipientLabel(r: string): string {

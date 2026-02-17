@@ -7,6 +7,7 @@ import AdminNav from '../../../components/AdminNav.astro';
 import { getAdminContext } from '../../../lib/board-context';
 import { getPortalBadgeCounts } from '../../../lib/portal-badge-counts';
 import { getSmsFeatureRequestCounts, listSmsFeatureRequests } from '../../../lib/sms-feature-request-db';
+import { formatEasternDateTime } from '../../../lib/timezone';
 
 const ctx = await getAdminContext(Astro);
 if ('redirect' in ctx) return Astro.redirect(ctx.redirect);
@@ -43,15 +44,6 @@ function adminSmsPageUrl(value: number): string {
 const counts = db ? await getSmsFeatureRequestCounts(db) : { distinctLots: 0, totalRequests: 0 };
 const requests = db ? await listSmsFeatureRequests(db, pageSize, (page - 1) * pageSize) : [];
 
-function formatDate(s: string | null): string {
-  if (!s) return '—';
-  try {
-    const d = new Date(s);
-    return Number.isNaN(d.getTime()) ? s : d.toLocaleString();
-  } catch {
-    return s ?? '—';
-  }
-}
 ---
 
 <PortalLayout title="SMS Requests | Admin | Member Portal | Crooked Lake Reserve HOA">
@@ -121,7 +113,7 @@ function formatDate(s: string | null): string {
             {requests.map((row) => (
               <tr class="border-b border-gray-100 hover:bg-gray-50/50">
                 <td class="py-2 px-3 font-medium">{row.lot_number}</td>
-                <td class="py-2 px-3 text-gray-600">{formatDate(row.created_at)}</td>
+                <td class="py-2 px-3 text-gray-600">{formatEasternDateTime(row.created_at)}</td>
               </tr>
             ))}
           </tbody>

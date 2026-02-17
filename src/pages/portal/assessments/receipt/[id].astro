@@ -12,6 +12,7 @@ import { getPortalContext } from '../../../../lib/portal-context';
 import { getOwnerByEmail, getPrimaryOwnerEmailForAddress } from '../../../../lib/directory-db';
 import { getPaymentById } from '../../../../lib/assessments-db';
 import { listArbRequestsByHousehold } from '../../../../lib/arb-db';
+import { formatEasternDate } from '../../../../lib/timezone';
 
 const { id } = Astro.params;
 const { env, session, effectiveRole } = await getPortalContext(Astro);
@@ -76,15 +77,6 @@ const periodsCovered = payment.paid_through_after
   ? getQuartersCovered(payment.paid_through_after)
   : inferQuarterFromPaidAt(payment.paid_at);
 
-function formatDate(s: string | null): string {
-  if (!s) return '—';
-  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(s.trim());
-  if (match) {
-    const d = new Date(parseInt(match[1], 10), parseInt(match[2], 10) - 1, parseInt(match[3], 10));
-    if (!Number.isNaN(d.getTime())) return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-  }
-  return new Date(s).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-}
 
 function formatCurrency(n: number): string {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n);
@@ -118,7 +110,7 @@ function formatCurrency(n: number): string {
               </>
             )}
             <dt class="font-medium text-gray-700">Payment date</dt>
-            <dd class="text-gray-900">{formatDate(payment.paid_at)}</dd>
+            <dd class="text-gray-900">{formatEasternDate(payment.paid_at)}</dd>
             <dt class="font-medium text-gray-700">Amount paid</dt>
             <dd class="text-gray-900 font-semibold">{formatCurrency(payment.amount)}</dd>
             {payment.payment_method && (
@@ -148,7 +140,7 @@ function formatCurrency(n: number): string {
             <p class="text-sm text-gray-600 mb-3">Quarterly dues are due on the 1st of January, April, July, and October. This payment applies to the following period(s):</p>
             <ul class="list-disc list-inside space-y-1 text-sm text-gray-900">
               {periodsCovered.map((p) => (
-                <li>{p.quarter} {p.year} — due {formatDate(p.dueDate)}</li>
+                <li>{p.quarter} {p.year} — due {formatEasternDate(p.dueDate)}</li>
               ))}
             </ul>
           </section>

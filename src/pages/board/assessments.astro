@@ -13,6 +13,7 @@ import {
   isMissingForQuarter,
 } from '../../lib/assessments-db';
 import { escapeHtml } from '../../lib/sanitize';
+import { formatEasternDate } from '../../lib/timezone';
 import PortalLayout from '../../layouts/PortalLayout.astro';
 import PortalPage from '../../components/PortalPage.astro';
 
@@ -61,12 +62,8 @@ const missingThisQuarter = sortedOwners.filter((o) => {
 });
 
 function formatDate(s: string | null): string {
-  if (!s) return '—';
-  try {
-    return new Date(s).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  } catch {
-    return s;
-  }
+  const formatted = formatEasternDate(s);
+  return formatted === '—' ? '—' : formatted;
 }
 
 function formatCurrency(n: number): string {

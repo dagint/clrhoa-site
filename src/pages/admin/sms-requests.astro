@@ -17,6 +17,7 @@ export const prerender = false;
 import BoardLayout from '../../layouts/BoardLayout.astro';
 import { getAdminContext } from '../../lib/board-context';
 import { getSmsFeatureRequestCounts, listSmsFeatureRequests } from '../../lib/sms-feature-request-db';
+import { formatEasternDateTime } from '../../lib/timezone';
 
 // Route-level guard: enforce admin-only access
 const ctx = await getAdminContext(Astro);
@@ -51,13 +52,4 @@ const db = env?.DB;
 const counts = db ? await getSmsFeatureRequestCounts(db) : { distinctLots: 0, totalRequests: 0 };
 const requests = db ? await listSmsFeatureRequests(db, pageSize, (page - 1) * pageSize) : [];
 
-function formatDate(s: string | null): string {
-  if (!s) return '—';
-  try {
-    const d = new Date(s);
-    return Number.isNaN(d.getTime()) ? s : d.toLocaleString();
-  } catch {
-    return s ?? '—';
-  }
-}
 ---

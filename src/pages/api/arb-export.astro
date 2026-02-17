@@ -10,6 +10,7 @@ import { getEffectiveRole } from '../../lib/auth';
 import { listAllArbRequestsFiltered } from '../../lib/arb-db';
 import { escapeHtml } from '../../lib/sanitize';
 import { escapeCsv } from '../../lib/csv-utils';
+import { formatEasternDate } from '../../lib/timezone';
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
@@ -38,15 +39,6 @@ const validFormat = format === 'html' ? 'html' : 'csv';
 
 const requests = await listAllArbRequestsFiltered(db, { fromDate: fromDate || null, toDate: toDate || null, status: status || null });
 
-function formatDate(s: string | null | undefined): string {
-  if (!s) return '';
-  try {
-    const d = new Date(s);
-    return Number.isNaN(d.getTime()) ? s : d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-  } catch {
-    return String(s);
-  }
-}
 
 if (validFormat === 'csv') {
   const headers = ['ID', 'Owner email', 'Applicant', 'Phone', 'Property address', 'Application type', 'Status', 'Created', 'Decision date', 'ARB e-sign'];
@@ -100,7 +92,7 @@ const html = `<!DOCTYPE html>
 </head>
 <body>
   <h1>ARB Requests Report</h1>
-  <p class="meta">Generated ${formatDate(new Date().toISOString())} · Filter: ${escapeHtml(filterDesc)} · ${requests.length} request(s)</p>
+  <p class="meta">Generated ${formatEasternDate(new Date().toISOString())} · Filter: ${escapeHtml(filterDesc)} · ${requests.length} request(s)</p>
   <table>
     <thead>
       <tr>
@@ -124,8 +116,8 @@ ${requests
         <td>${escapeHtml(r.property_address ?? '—')}</td>
         <td>${escapeHtml(r.application_type ?? '—')}</td>
         <td><span class="status ${escapeHtml(r.status)}">${escapeHtml(r.status)}</span></td>
-        <td>${formatDate(r.created)}</td>
-        <td>${formatDate(r.esign_timestamp)}</td>
+        <td>${formatEasternDate(r.created)}</td>
+        <td>${formatEasternDate(r.esign_timestamp)}</td>
         <td class="description">${escapeHtml((r.description ?? '').slice(0, 200))}${(r.description?.length ?? 0) > 200 ? '…' : ''}</td>
       </tr>`
   )

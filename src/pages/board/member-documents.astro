@@ -7,6 +7,7 @@ import { isBoardOnly } from '../../lib/auth';
 import { listMemberDocuments } from '../../lib/member-documents-db';
 import { MEMBER_DOC_CATEGORIES, MEMBER_DOC_CATEGORY_LABELS } from '../../lib/member-documents-db';
 import { sanitizeForScriptInjection } from '../../lib/sanitize';
+import { formatEasternDateTime } from '../../lib/timezone';
 import PortalLayout from '../../layouts/PortalLayout.astro';
 import PortalPage from '../../components/PortalPage.astro';
 
@@ -48,12 +49,8 @@ const docs = db ? await listMemberDocuments(db, pageSize, (page - 1) * pageSize)
 
 
 function formatDate(s: string | null): string {
-  if (!s) return '-';
-  try {
-    return new Date(s).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
-  } catch {
-    return s;
-  }
+  const formatted = formatEasternDateTime(s);
+  return formatted === '—' ? '-' : formatted;
 }
 
 const docsByCategory = MEMBER_DOC_CATEGORIES.map((cat) => ({

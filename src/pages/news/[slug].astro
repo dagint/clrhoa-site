@@ -1,6 +1,7 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import { getCollection } from 'astro:content';
+import { formatEasternDate } from '../../lib/timezone';
 
 export async function getStaticPaths() {
   const newsItems = await getCollection('news');
@@ -26,11 +27,7 @@ const { Content } = await item.render();
         <h1 class="text-4xl font-heading font-bold text-clr-green mb-4">{item.data.title}</h1>
         <div class="flex items-center text-clr-gray text-sm mb-4 flex-wrap gap-2 font-body">
           <time>
-            {item.data.date.toLocaleDateString('en-US', {
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric',
-            })}
+            {formatEasternDate(item.data.date.toISOString())}
           </time>
           {item.data.tags && item.data.tags.length > 0 && (
             <div class="flex flex-wrap gap-2 ml-4">

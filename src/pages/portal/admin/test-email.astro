@@ -143,7 +143,7 @@ const csrfToken = session?.csrfToken ?? '';
         if (first && first.textContent?.includes('No sends yet')) first.remove();
         const div = document.createElement('div');
         div.className = 'border-b border-gray-200 pb-2 last:border-0';
-        const time = new Date().toLocaleString();
+        const time = new Date().toLocaleString('en-US', { timeZone: 'America/New_York' });
         const ok = entry.ok;
         const timeSpan = document.createElement('span');
         timeSpan.className = 'text-gray-500';
@@ -217,7 +217,7 @@ const csrfToken = session?.csrfToken ?? '';
             const data = await res.json().catch(() => ({}));
             if (res.ok && typeof data === 'object' && data !== null) {
               renderEnvRows(data);
-              envMessage.textContent = 'Updated at ' + new Date().toLocaleTimeString();
+              envMessage.textContent = 'Updated at ' + new Date().toLocaleTimeString('en-US', { timeZone: 'America/New_York' });
               envMessage.classList.remove('hidden');
             } else {
               envMessage.textContent = 'Failed to load (' + (data.error || res.status) + ').';

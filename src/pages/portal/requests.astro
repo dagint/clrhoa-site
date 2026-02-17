@@ -8,6 +8,7 @@ import { getPortalBadgeCounts } from '../../lib/portal-badge-counts';
 import { listArbRequestsByHousehold, listArbAuditLogForRequest, getSubmittedForReviewAt } from '../../lib/arb-db';
 import type { ArbRequest, ArbAuditLogRow } from '../../lib/arb-db';
 import { sanitizeForDisplay } from '../../lib/sanitize';
+import { formatEasternDate, formatEasternDateTime } from '../../lib/timezone';
 
 const { env, session, effectiveRole } = await getPortalContext(Astro, { fingerprint: true });
 if (!session) return Astro.redirect('/auth/login');
@@ -35,21 +36,13 @@ const draftCount = requests.filter((r) => r.status === 'pending').length;
 const inReviewCount = requests.filter((r) => r.status === 'in_review').length;
 
 function formatDate(s: string | null | undefined): string {
-  if (!s) return '—';
-  try {
-    return new Date(s).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-  } catch {
-    return s;
-  }
+  const formatted = formatEasternDate(s);
+  return formatted === '—' ? '—' : formatted;
 }
 
 function formatDateTime(s: string | null | undefined): string {
-  if (!s) return '—';
-  try {
-    return new Date(s).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
-  } catch {
-    return s;
-  }
+  const formatted = formatEasternDateTime(s);
+  return formatted === '—' ? '—' : formatted;
 }
 
 function daysInReview(submittedAt: string | null | undefined): number | null {
@@ -338,7 +331,7 @@ function statusLabel(status: string): string {
         .then(function (data) {
           if (!data || !data.requests) return;
           var el = document.getElementById('requests-last-updated');
-          if (el) el.textContent = 'Updated ' + new Date().toLocaleTimeString();
+          if (el) el.textContent = 'Updated ' + new Date().toLocaleTimeString('en-US', { timeZone: 'America/New_York' });
           window.__requestsData = data;
         })
         .catch(function () {});

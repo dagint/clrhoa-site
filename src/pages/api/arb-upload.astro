@@ -22,6 +22,7 @@ import {
   createElectronicSignature,
   type SignatureData,
 } from '../../lib/esignature-db';
+import { formatEasternDate } from '../../lib/timezone';
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
 const MAX_TOTAL_BYTES = 25 * 1024 * 1024;
@@ -410,7 +411,7 @@ try {
     if (descLower === reqDescLower) {
       return new Response(
         JSON.stringify({
-          error: `Duplicate request detected. You submitted an identical request (${req.id}) on ${new Date(req.created).toLocaleDateString()}. Please check your existing requests or modify this submission.`,
+          error: `Duplicate request detected. You submitted an identical request (${req.id}) on ${formatEasternDate(req.created)}. Please check your existing requests or modify this submission.`,
           duplicateRequestId: req.id,
         }),
         { status: 400, headers: { 'Content-Type': 'application/json' } }
@@ -425,7 +426,7 @@ try {
       if (similarity > 0.8) {
         return new Response(
           JSON.stringify({
-            error: `Similar request detected. You submitted a very similar request (${req.id}) on ${new Date(req.created).toLocaleDateString()}. Please review your existing requests or modify this submission to be more distinct.`,
+            error: `Similar request detected. You submitted a very similar request (${req.id}) on ${formatEasternDate(req.created)}. Please review your existing requests or modify this submission to be more distinct.`,
             duplicateRequestId: req.id,
             warning: true,
           }),

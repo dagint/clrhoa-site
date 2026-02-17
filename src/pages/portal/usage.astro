@@ -21,6 +21,7 @@ import AdminNav from '../../components/AdminNav.astro';
 import { getAdminContext } from '../../lib/board-context';
 import { getPortalBadgeCounts } from '../../lib/portal-badge-counts';
 import { getDailyStats, getWeeklyStats, getAdminPageViews, getAdminPageViewsCount, getTopPagesByViews } from '../../lib/usage-db';
+import { formatEasternDateTime } from '../../lib/timezone';
 
 // Route-level guard: enforce admin-only access
 const ctx = await getAdminContext(Astro);
@@ -81,13 +82,7 @@ function viewsPageUrl(key: string, value: number): string {
 }
 
 function formatDate(s: string | null): string {
-  if (!s) return '—';
-  try {
-    const d = new Date(s);
-    return Number.isNaN(d.getTime()) ? s : d.toLocaleString();
-  } catch {
-    return s ?? '—';
-  }
+  return formatEasternDateTime(s);
 }
 
 const chartData = { daily, weekly, topPages };
