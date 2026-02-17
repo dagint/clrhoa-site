@@ -5,6 +5,7 @@ import PortalLayout from '../../layouts/PortalLayout.astro';
 import PortalPage from '../../components/PortalPage.astro';
 import { getPortalContext } from '../../lib/portal-context';
 import { getPortalBadgeCounts } from '../../lib/portal-badge-counts';
+import { formatEasternDateTimeLong } from '../../lib/timezone';
 import { listUpcomingWithCountsAndUser, getHouseholdRsvps } from '../../lib/meetings-db';
 import type { MeetingWithCounts } from '../../lib/meetings-db';
 
@@ -25,19 +26,8 @@ const meetings: (MeetingWithCounts & { household_rsvps: { owner_email: string; r
   : [];
 
 function formatDateTime(dt: string): string {
-  try {
-    const d = new Date(dt);
-    return d.toLocaleString('en-US', {
-      weekday: 'short',
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-    });
-  } catch {
-    return dt;
-  }
+  const formatted = formatEasternDateTimeLong(dt);
+  return formatted === '—' ? dt : formatted;
 }
 
 function googleCalendarUrl(m: { title: string | null; datetime: string; description: string | null; location: string | null }): string {
