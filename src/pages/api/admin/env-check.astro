@@ -5,10 +5,12 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie, getEffectiveRole } from '../../../lib/auth';
+import { getEffectiveRole } from '../../../lib/auth';
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
+const user = Astro.locals.user;
+const session = Astro.locals.session;
 
 if (Astro.request.method !== 'GET') {
   return new Response(JSON.stringify({ error: 'Method not allowed' }), {
@@ -17,11 +19,7 @@ if (Astro.request.method !== 'GET') {
   });
 }
 
-const session = await getSessionFromCookie(
-  Astro.request.headers.get('cookie') ?? undefined,
-  env?.SESSION_SECRET
-);
-if (!session) {
+if (!session || !user) {
   return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
 }
 

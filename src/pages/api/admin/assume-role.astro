@@ -6,13 +6,14 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie, verifyCsrfToken, verifyOrigin, createSessionWithAssumedRole, ASSUMED_ROLES, ASSUMED_ROLE_TTL_MS, type AdminAssumedRole, SESSION_COOKIE_NAME } from '../../../lib/auth';
+import { verifyCsrfToken, verifyOrigin, ASSUMED_ROLE_TTL_MS, type AdminAssumedRole } from '../../../lib/auth';
 import { insertAdminAssumedRoleAudit } from '../../../lib/admin-assumed-role-db';
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
 const db = env?.DB;
-const secret = env?.SESSION_SECRET;
+const user = Astro.locals.user;
+const session = Astro.locals.session;
 const ipAddress = Astro.request.headers.get('cf-connecting-ip') ?? Astro.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
 
 if (Astro.request.method !== 'POST') {
@@ -22,8 +23,8 @@ if (Astro.request.method !== 'POST') {
   });
 }
 
-if (!secret) {
-  return new Response(JSON.stringify({ error: 'Unavailable' }), { status: 503, headers: { 'Content-Type': 'application/json' } });
+if (!session || !user || !db) {
+  return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
 }
 
 const origin = Astro.request.headers.get('origin');
@@ -32,15 +33,7 @@ if (!verifyOrigin(origin, referer, Astro.url.origin)) {
   return new Response(JSON.stringify({ error: 'Invalid origin.' }), { status: 403, headers: { 'Content-Type': 'application/json' } });
 }
 
-const session = await getSessionFromCookie(
-  Astro.request.headers.get('cookie') ?? undefined,
-  secret
-);
-if (!session) {
-  return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
-}
-
-const sessionRole = session.role?.toLowerCase();
+const sessionRole = user.role?.toLowerCase();
 if (sessionRole !== 'admin' && sessionRole !== 'arb_board') {
   return new Response(JSON.stringify({ error: 'Forbidden. Only admins or ARB+Board can assume a role.' }), { status: 403, headers: { 'Content-Type': 'application/json' } });
 }
@@ -62,42 +55,45 @@ if (raw !== 'board' && raw !== 'arb' && raw !== 'none' && raw !== '') {
 }
 const assumed_role: AdminAssumedRole | null = raw === 'none' || raw === '' ? null : (raw as AdminAssumedRole);
 
-const cookieValue = await createSessionWithAssumedRole(
-  Astro.request.headers.get('cookie') ?? undefined,
-  secret,
-  assumed_role
-);
-if (!cookieValue) {
-  return new Response(JSON.stringify({ error: 'Session invalid' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
-}
+// Update session in database with assumed role
+const now = Date.now();
+const assumed_until = assumed_role ? now + ASSUMED_ROLE_TTL_MS : null;
 
-if (db) {
-  try {
-    await insertAdminAssumedRoleAudit(db, {
-      admin_email: session.email,
-      actor_role: sessionRole === 'arb_board' ? 'arb_board' : 'admin',
-      action: assumed_role ? 'assume' : 'clear',
-      role_assumed: assumed_role ?? undefined,
-      action_detail: assumed_role ? `${sessionRole} assumed role: ${assumed_role}` : `${sessionRole} cleared assumed role`,
-      ip_address: ipAddress,
-    });
-  } catch (e) {
-    console.error('[admin assume-role] audit insert failed:', e);
+try {
+  // Update session with assumed_role and timestamps
+  if (assumed_role) {
+    await db.prepare(
+      'UPDATE sessions SET assumed_role = ?, assumed_at = ?, assumed_until = ? WHERE id = ?'
+    ).bind(assumed_role, now, assumed_until, session.id).run();
+  } else {
+    // Clear assumed role
+    await db.prepare(
+      'UPDATE sessions SET assumed_role = NULL, assumed_at = NULL, assumed_until = NULL WHERE id = ?'
+    ).bind(session.id).run();
   }
+
+  // Log to audit trail
+  await insertAdminAssumedRoleAudit(db, {
+    admin_email: user.email,
+    actor_role: sessionRole === 'arb_board' ? 'arb_board' : 'admin',
+    action: assumed_role ? 'assume' : 'clear',
+    role_assumed: assumed_role ?? undefined,
+    action_detail: assumed_role ? `${sessionRole} assumed role: ${assumed_role}` : `${sessionRole} cleared assumed role`,
+    ip_address: ipAddress,
+  });
+} catch (e) {
+  console.error('[admin assume-role] failed to update session or audit:', e);
+  return new Response(
+    JSON.stringify({ error: 'Failed to update assumed role' }),
+    { status: 500, headers: { 'Content-Type': 'application/json' } }
+  );
 }
 
-const isProd = import.meta.env.PROD;
-const cookieHeader = `${SESSION_COOKIE_NAME}=${cookieValue}; Path=/; Max-Age=${60 * 60 * 24 * 7}; SameSite=Lax${isProd ? '; Secure' : ''}; HttpOnly`;
-
-const assumed_until = assumed_role ? Date.now() + ASSUMED_ROLE_TTL_MS : undefined;
 return new Response(
   JSON.stringify({ success: true, assumed_role: assumed_role ?? null, assumed_until: assumed_until ?? null }),
   {
     status: 200,
-    headers: {
-      'Content-Type': 'application/json',
-      'Set-Cookie': cookieHeader,
-    },
+    headers: { 'Content-Type': 'application/json' },
   }
 );
 ---
