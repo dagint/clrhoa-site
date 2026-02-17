@@ -37,8 +37,8 @@ export function normalizeAddress(addr: string | null | undefined): string {
   return (addr ?? '').trim().toLowerCase() || '';
 }
 
-/** Parse phones JSON to array. Falls back to single phone if phones column missing. */
-export function getPhonesArray(owner: Owner): string[] {
+/** Parse phones JSON to array. Falls back to single phone if phones column missing. Accepts any object with phone/phones fields. */
+export function getPhonesArray(owner: { phone?: string | null; phones?: string | null }): string[] {
   if (owner.phones) {
     try {
       const arr = JSON.parse(owner.phones) as unknown;
@@ -199,12 +199,12 @@ export async function listHouseholdMembersWithLogin(
 /**
  * List ALL household members (directory entries) at the same address as current user.
  * Includes members regardless of whether they have portal accounts.
- * Returns name, email (if available), and whether they have a portal account.
+ * Returns name, email, phone(s), sharing status, and whether they have a portal account.
  */
 export async function listAllHouseholdMembers(
   db: D1Database,
   currentUserEmail: string
-): Promise<Array<{ name: string | null; email: string | null; hasAccount: boolean; is_primary: number }>> {
+): Promise<Array<{ name: string | null; email: string | null; phone: string | null; phones: string | null; hasAccount: boolean; is_primary: number; share_contact_with_members: number }>> {
   const current = currentUserEmail.trim().toLowerCase();
   const owner = await getOwnerByEmail(db, current);
   if (!owner?.address?.trim()) return [];
@@ -240,8 +240,11 @@ export async function listAllHouseholdMembers(
     .map((o) => ({
       name: o.name?.trim() ?? null,
       email: o.email?.trim()?.toLowerCase() ?? null,
+      phone: o.phone?.trim() ?? null,
+      phones: o.phones ?? null,
       hasAccount: o.email ? hasLoginSet.has(o.email.trim().toLowerCase()) : false,
       is_primary: (o.is_primary ?? 1) === 1 ? 1 : 0,
+      share_contact_with_members: (o.share_contact_with_members ?? 1) === 1 ? 1 : 0,
     }))
     .sort((a, b) => {
       const aName = a.name || a.email || '';
