@@ -8,7 +8,7 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie, getEffectiveRole } from '../../../lib/auth';
+import { getEffectiveRole } from '../../../lib/auth';
 import {
   getAllPermissions,
   bulkUpdatePermissions,
@@ -18,14 +18,11 @@ import {
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
 const db = env?.DB;
+const user = Astro.locals.user;
+const session = Astro.locals.session;
 
 // Auth check
-const session = await getSessionFromCookie(
-  Astro.request.headers.get('cookie') ?? undefined,
-  env?.SESSION_SECRET
-);
-
-if (!session) {
+if (!session || !user) {
   return new Response(JSON.stringify({ error: 'Unauthorized' }), {
     status: 401,
     headers: { 'Content-Type': 'application/json' },
@@ -135,7 +132,7 @@ if (method === 'PUT') {
     const result = await bulkUpdatePermissions(
       db,
       permissionMap,
-      session.email,
+      user.email,
       ipAddress
     );
 
