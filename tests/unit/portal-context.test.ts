@@ -30,6 +30,7 @@ function mockLuciaSession(userId: string): Session {
     userId,
     expiresAt: new Date(Date.now() + 3600000), // 1 hour from now
     fresh: true,
+    csrfToken: 'session-123', // Added by middleware (ExtendedSession)
   } as Session;
 }
 
