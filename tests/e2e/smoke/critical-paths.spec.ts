@@ -41,8 +41,8 @@ test.describe('Smoke Tests - Critical Paths', () => {
     const page = await context.newPage();
 
     // Can access board members page
-    await page.goto('/board/members');
-    await expect(page).toHaveURL(/\/board\/members/);
+    await page.goto('/portal/board/members');
+    await expect(page).toHaveURL(/\/portal\/board\/members/);
 
     await context.close();
   });
@@ -99,8 +99,8 @@ test.describe('Smoke Tests - Critical Paths', () => {
     const page = await context.newPage();
 
     // Should access board route
-    await page.goto('/board/assessments');
-    await expect(page).toHaveURL(/\/board\/assessments/);
+    await page.goto('/portal/board/assessments');
+    await expect(page).toHaveURL(/\/portal\/board\/assessments/);
 
     // Should show role assumption indicator
     await expect(page.locator('text=/acting as.*board/i')).toBeVisible();
@@ -136,7 +136,7 @@ test.describe('Smoke Tests - Critical Paths', () => {
     const page = await context.newPage();
 
     // Try to access board route
-    await page.goto('/board/assessments');
+    await page.goto('/portal/board/assessments');
 
     // Should redirect to elevation request
     await expect(page).toHaveURL(/\/portal\/request-elevated-access/, { timeout: 5000 });

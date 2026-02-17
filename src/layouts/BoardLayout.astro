@@ -8,9 +8,7 @@ import PortalLayout from './PortalLayout.astro';
 import ProtectedPage from '../components/ProtectedPage.astro';
 import PortalNav from '../components/PortalNav.astro';
 import PortalElevatedRoleBanner from '../components/PortalElevatedRoleBanner.astro';
-import BoardNav from '../components/BoardNav.astro';
-import ArbNav from '../components/ArbNav.astro';
-import AdminNav from '../components/AdminNav.astro';
+import ElevatedNav from '../components/ElevatedNav.astro';
 import PimElevationBanner from '../components/PimElevationBanner.astro';
 import type { SessionPayload } from '../lib/auth';
 
@@ -44,7 +42,13 @@ const csrfToken = session?.csrfToken || '';
       {showPimBanner && <PimElevationBanner elevatedUntil={elevatedUntil!} role={role} elevatedRole={elevatedRole} csrfToken={csrfToken} />}
       <PortalNav currentPath={currentPath} draftCount={draftCount} role={role} staffRole={session?.role ?? role} />
       {showRoleBanner && <PortalElevatedRoleBanner role={role} session={session} />}
-      {role === 'admin' ? <AdminNav currentPath={currentPath} /> : role === 'arb' ? <ArbNav currentPath={currentPath} /> : <BoardNav currentPath={currentPath} />}
+      <ElevatedNav
+        persona={role === 'admin' ? 'admin' : role === 'arb' ? 'arb' : 'board'}
+        currentPath={currentPath}
+        effectiveRole={elevatedRole}
+        user={{ email: session?.email ?? '', role: session?.role ?? role }}
+        session={session}
+      />
 
       <main class={mainWide ? 'max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-12' : 'max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12'}>
         <div class="mb-6">

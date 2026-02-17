@@ -1,0 +1,175 @@
+---
+/**
+ * Unified navigation component for elevated users (Admin, Board, ARB personas).
+ * Replaces AdminNav, BoardNav, and ArbNav with a single, consistent component.
+ *
+ * Features:
+ * - Persona-specific menu items
+ * - Permission-based filtering (future enhancement)
+ * - Elevation indicator with countdown timer
+ * - Consistent styling and isCurrent logic
+ */
+
+interface Props {
+  persona: 'admin' | 'board' | 'arb';
+  currentPath: string;
+  effectiveRole: string;
+  user: { email: string; role: string; };
+  session?: any; // For elevation timer display
+}
+
+const { persona, currentPath, effectiveRole, user, session } = Astro.props;
+
+// Define menu items per persona
+const menuItems = {
+  admin: [
+    { label: 'Dashboard', href: '/portal/admin/dashboard' },
+    { label: 'Users', href: '/portal/board/members' },
+    { label: 'Permissions', href: '/portal/admin/permissions' },
+    { label: 'Menu Order', href: '/portal/admin/menu-order' },
+    { label: 'Site feedback', href: '/portal/admin/feedback' },
+    { label: 'SMS requests', href: '/portal/admin/sms-requests' },
+    { label: 'Test email', href: '/portal/admin/test-email' },
+    { label: 'Backups', href: '/portal/admin/backups' },
+    { label: 'Site usage', href: '/portal/admin/usage' },
+    { label: 'Audit logs', href: '/portal/admin/audit-logs' },
+    { label: 'Compliance', href: '/portal/board/compliance' },
+    { label: 'Vendors', href: '/portal/admin/vendors' },
+    { label: 'Maintenance', href: '/portal/admin/maintenance' },
+    { label: 'Directory', href: '/portal/admin/directory' },
+    { label: 'Contacts', href: '/portal/admin/contacts' },
+    { label: 'News', href: '/portal/admin/news' },
+    { label: 'Member docs', href: '/portal/admin/member-documents' },
+    { label: 'Public docs', href: '/portal/admin/public-documents' },
+  ],
+  board: [
+    { label: 'Dashboard', href: '/portal/board/dashboard' },
+    { label: 'ARB Dashboard', href: '/portal/arb/dashboard' },
+    { label: 'Members', href: '/portal/board/members' },
+    { label: 'Dues', href: '/portal/board/assessments' },
+    { label: 'Vendors', href: '/portal/board/vendors' },
+    { label: 'Meetings', href: '/portal/board/meetings' },
+    { label: 'Maintenance', href: '/portal/board/maintenance' },
+    { label: 'Feedback', href: '/portal/board/feedback' },
+    { label: 'Contacts', href: '/portal/board/contacts' },
+    { label: 'News', href: '/portal/board/news' },
+    { label: 'Library', href: '/portal/board/library' },
+    { label: 'Public docs', href: '/portal/board/public-documents' },
+    { label: 'Member docs', href: '/portal/board/member-documents' },
+    { label: 'Audit logs', href: '/portal/board/audit-logs' },
+    { label: 'Backups', href: '/portal/board/backups' },
+    { label: 'Compliance', href: '/portal/board/compliance' },
+    { label: 'Analytics', href: '/portal/board/analytics' },
+  ],
+  arb: [
+    { label: 'Dashboard', href: '/portal/arb/dashboard' },
+    { label: 'Vendors', href: '/portal/board/vendors' },
+    { label: 'Meetings', href: '/portal/board/meetings' },
+    { label: 'Maintenance', href: '/portal/board/maintenance' },
+    { label: 'Feedback', href: '/portal/board/feedback' },
+    { label: 'Contacts', href: '/portal/board/contacts' },
+    { label: 'News', href: '/portal/board/news' },
+    { label: 'Library', href: '/portal/board/library' },
+    { label: 'Member docs', href: '/portal/board/member-documents' },
+    { label: 'Public docs', href: '/portal/board/public-documents' },
+    { label: 'Backups', href: '/portal/board/backups' },
+  ],
+};
+
+const links = menuItems[persona];
+
+function isCurrent(href: string): boolean {
+  // Exact match for dashboard routes
+  if (href.endsWith('/dashboard')) {
+    return currentPath === href || currentPath === href + '/';
+  }
+  // Prefix match for other routes
+  return currentPath === href || currentPath.startsWith(href + '/');
+}
+
+// Elevation status
+const sessionRole = session?.role?.toLowerCase();
+const isElevated = ['arb', 'board', 'admin', 'arb_board'].includes(effectiveRole);
+const assumedRole = session?.assumed_role ?? null;
+const assumedUntil = session?.assumed_until;
+
+const personaLabel = {
+  admin: 'Administrator',
+  board: 'Board Member',
+  arb: 'ARB Member',
+}[persona];
+---
+
+{isElevated && (
+  <div class="bg-gradient-to-r from-amber-50 to-orange-50 border-b border-amber-200 px-4 py-2 no-print">
+    <div class="max-w-6xl mx-auto">
+      <div class="flex items-center justify-between flex-wrap gap-2">
+        <div class="flex items-center gap-2 text-sm">
+          <svg class="w-4 h-4 text-amber-600" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+          </svg>
+          <span class="font-medium text-amber-900">
+            Elevated: <strong>{personaLabel}</strong>
+          </span>
+        </div>
+        {assumedUntil && (
+          <div class="text-xs text-amber-700 font-medium" id="elevated-countdown" data-until={assumedUntil}>
+            Session expires in <span class="countdown-text">—</span>
+          </div>
+        )}
+      </div>
+    </div>
+  </div>
+)}
+
+<nav class="bg-white border-b border-gray-200 portal-theme-header px-4 sm:px-6 py-2 sticky top-0 z-40" aria-label={`${personaLabel} navigation`}>
+  <div class="max-w-6xl mx-auto flex flex-wrap items-center gap-x-4 gap-y-1">
+    {links.map(({ href, label }) => (
+      <a
+        href={href}
+        class={`text-sm py-1.5 px-2 rounded hover:bg-gray-100 portal-theme-text transition-colors ${
+          isCurrent(href)
+            ? 'font-semibold text-clr-green border-b-2 border-clr-green'
+            : 'text-gray-600 portal-theme-text-muted hover:text-clr-green'
+        }`}
+      >
+        {label}
+      </a>
+    ))}
+  </div>
+</nav>
+
+{assumedUntil && (
+  <script>
+    (function () {
+      function formatCountdown(untilMs: number): string {
+        const now = Date.now();
+        const rem = untilMs - now;
+        if (rem <= 0) return 'Expired';
+        const mins = Math.floor(rem / 60000);
+        if (mins < 60) return `${mins}m`;
+        const h = Math.floor(mins / 60);
+        const m = mins % 60;
+        return m ? `${h}h ${m}m` : `${h}h`;
+      }
+
+      function updateCountdown() {
+        const el = document.getElementById('elevated-countdown');
+        if (!el) return;
+        const until = el.getAttribute('data-until');
+        if (!until) return;
+        const untilMs = parseInt(until, 10);
+        if (Number.isNaN(untilMs)) return;
+        const text = el.querySelector('.countdown-text');
+        if (text) text.textContent = formatCountdown(untilMs);
+      }
+
+      // Update immediately and then every minute
+      updateCountdown();
+      const interval = setInterval(updateCountdown, 60000);
+
+      // Clean up on page unload
+      window.addEventListener('beforeunload', () => clearInterval(interval));
+    })();
+  </script>
+)}

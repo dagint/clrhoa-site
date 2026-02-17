@@ -3,7 +3,7 @@ export const prerender = false;
 
 import PortalLayout from '../../../layouts/PortalLayout.astro';
 import PortalPage from '../../../components/PortalPage.astro';
-import AdminNav from '../../../components/AdminNav.astro';
+import ElevatedNav from '../../../components/ElevatedNav.astro';
 import { getAdminContext } from '../../../lib/board-context';
 import { getPortalBadgeCounts } from '../../../lib/portal-badge-counts';
 
@@ -54,7 +54,7 @@ const csrfToken = session?.csrfToken ?? '';
     feedbackDueCount={badges.feedbackDueCount}
     libraryItemCount={badges.libraryItemCount}
   >
-    <AdminNav currentPath="/portal/admin/test-email" />
+    <ElevatedNav persona="admin" currentPath="/portal/admin/test-email" effectiveRole={effectiveRole} user={{ email, role: role ?? '' }} session={session} />
   <div class="space-y-8">
     <section class="rounded-xl border border-gray-200 bg-white p-6">
       <h2 class="text-lg font-semibold text-gray-800 mb-4">Send test email</h2>

@@ -1,0 +1,244 @@
+---
+export const prerender = false;
+
+import { getBoardContext } from '../../../lib/board-context';
+import { getPortalBadgeCounts } from '../../../lib/portal-badge-counts';
+import { isBoardOnly } from '../../../lib/auth';
+import { listAllFeedbackDocs, getFeedbackResponseCounts } from '../../../lib/feedback-db';
+import { listOwners } from '../../../lib/directory-db';
+import { formatEasternDate } from '../../../lib/timezone';
+import PortalLayout from '../../../layouts/PortalLayout.astro';
+import PortalPage from '../../../components/PortalPage.astro';
+
+import ElevatedNav from '../../../components/ElevatedNav.astro';
+const ctx = await getBoardContext(Astro);
+if ('redirect' in ctx) return Astro.redirect(ctx.redirect);
+const { env, session, effectiveRole } = ctx;
+const isBoard = isBoardOnly(effectiveRole) || effectiveRole === 'admin';
+if (!isBoard) return Astro.redirect('/portal/dashboard');
+
+const FEEDBACK_PAGE_SIZES = [10, 25, 50, 100] as const;
+const DEFAULT_FEEDBACK_PAGE_SIZE = 25;
+const url = Astro.url;
+const getPage = (): number => {
+  const p = url.searchParams.get('page');
+  const n = p ? parseInt(p, 10) : 1;
+  return Number.isNaN(n) || n < 1 ? 1 : Math.min(n, 1000);
+};
+const getLimit = (): number => {
+  const p = url.searchParams.get('limit');
+  const n = p ? parseInt(p, 10) : DEFAULT_FEEDBACK_PAGE_SIZE;
+  return FEEDBACK_PAGE_SIZES.includes(n as (typeof FEEDBACK_PAGE_SIZES)[number]) ? n : DEFAULT_FEEDBACK_PAGE_SIZE;
+};
+const page = getPage();
+const pageSize = getLimit();
+
+function feedbackPageUrl(value: number): string {
+  const u = new URL(url);
+  if (value <= 1) u.searchParams.delete('page');
+  else u.searchParams.set('page', String(value));
+  if (pageSize !== DEFAULT_FEEDBACK_PAGE_SIZE) u.searchParams.set('limit', String(pageSize));
+  return u.pathname + u.search;
+}
+
+const db = env?.DB;
+const { email, role, name } = session;
+const badges = await getPortalBadgeCounts(db, email, role, name);
+const docs = db ? await listAllFeedbackDocs(db, pageSize, (page - 1) * pageSize) : [];
+const owners = db ? await listOwners(db) : [];
+const totalOwners = owners.length;
+
+const docsWithCounts = db
+  ? await Promise.all(
+      docs.map(async (d) => {
+        const counts = await getFeedbackResponseCounts(db, d.id);
+        return { ...d, counts };
+      })
+    )
+  : [];
+
+function formatDate(s: string | null): string {
+  const formatted = formatEasternDate(s);
+  return formatted === '—' ? '-' : formatted;
+}
+---
+
+<PortalLayout title="Feedback | Board | Member Portal | Crooked Lake Reserve HOA">
+  <PortalPage
+    currentPath="/portal/board/feedback"
+    pageTitle="Feedback"
+    userName={badges.displayName ?? undefined}
+    userEmail={email}
+    effectiveRole={effectiveRole}
+    draftCount={badges.draftCount}
+    role={effectiveRole}
+    staffRole={role ?? ''}
+    arbInReviewCount={badges.arbInReviewCount}
+    vendorPendingCount={badges.vendorPendingCount}
+    maintenanceOpenCount={badges.maintenanceOpenCount}
+    meetingsRsvpCount={badges.meetingsRsvpCount}
+  >
+    <ElevatedNav persona="board" currentPath="/portal/board/feedback" effectiveRole={effectiveRole} user={{ email, role: role ?? '' }} session={session} />
+
+<div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+        <h2 class="text-3xl font-heading font-bold text-clr-green">Feedback documents</h2>
+        <button type="button" id="btn-new-feedback" class="inline-flex items-center gap-2 bg-clr-green hover:brightness-110 text-white px-5 py-2.5 rounded-xl font-semibold text-base">
+          New feedback request
+        </button>
+      </div>
+
+      <div id="form-panel" class="hidden bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-8">
+        <h3 class="text-lg font-heading font-semibold text-clr-green mb-4">New feedback document</h3>
+        <form id="feedback-form" class="space-y-4">
+          <input type="hidden" name="r2_key" id="form-r2-key" value="" />
+          <div>
+            <label for="form-title" class="block text-sm font-medium text-gray-700">Title *</label>
+            <input type="text" id="form-title" name="title" required class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2" />
+          </div>
+          <div>
+            <label for="form-description" class="block text-sm font-medium text-gray-700">Description</label>
+            <textarea id="form-description" name="description" rows="3" class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2"></textarea>
+          </div>
+          <div>
+            <label for="form-deadline" class="block text-sm font-medium text-gray-700">Deadline (responses due by)</label>
+            <input type="date" id="form-deadline" name="deadline" class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2" />
+          </div>
+          <div>
+            <label for="form-pdf" class="block text-sm font-medium text-gray-700">PDF document</label>
+            <input type="file" id="form-pdf" name="file" accept=".pdf,application/pdf" class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-clr-green file:text-white" />
+          </div>
+          <div class="flex gap-2">
+            <button type="submit" class="bg-clr-green hover:brightness-110 text-white px-5 py-2.5 rounded-lg font-medium text-base">Create</button>
+            <button type="button" id="btn-cancel-form" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-5 py-2.5 rounded-lg font-medium text-base">Cancel</button>
+          </div>
+        </form>
+      </div>
+
+      {docsWithCounts.length === 0 && page === 1 ? (
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center text-gray-500">
+          No feedback documents yet. Click &quot;New feedback request&quot; to add one.
+        </div>
+      ) : (
+        <>
+        <div class="flex flex-wrap items-center gap-2 mb-4">
+          <label for="feedback-per-page" class="text-sm text-gray-600">Per page:</label>
+          <select id="feedback-per-page" name="limit" class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-700 focus:border-clr-green focus:outline-none focus:ring-1 focus:ring-clr-green" aria-label="Entries per page">
+            {FEEDBACK_PAGE_SIZES.map((size) => (
+              <option value={size} selected={pageSize === size}>{size}</option>
+            ))}
+          </select>
+        </div>
+        <script is:inline>
+          document.getElementById('feedback-per-page')?.addEventListener('change', function () {
+            const limit = this.value;
+            const u = new URL(window.location.href);
+            u.searchParams.set('limit', limit);
+            u.searchParams.delete('page');
+            if (limit === '25') u.searchParams.delete('limit');
+            window.location.href = u.pathname + u.search;
+          });
+        </script>
+        <ul class="space-y-4">
+          {docsWithCounts.map((d) => {
+            const responded = d.counts.total;
+            const pct = totalOwners > 0 ? Math.round((responded / totalOwners) * 100) : 0;
+            return (
+              <li class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h3 class="font-semibold text-clr-green">{d.title || 'Document'}</h3>
+                  <p class="text-base text-gray-500">Due {formatDate(d.deadline)}</p>
+                  <p class="text-base text-gray-600 mt-1">
+                    {responded}/{totalOwners} owners responded ({pct}%) - {d.counts.approved} approved, {d.counts.rejected} rejected
+                  </p>
+                </div>
+                <div class="flex gap-2">
+                  {d.r2_key && (
+                    <a
+                      href={`/api/portal/file/${encodeURIComponent(d.r2_key)}`}
+                      class="text-sm text-clr-green hover:underline"
+                    >
+                      PDF
+                    </a>
+                  )}
+                  <a
+                    href={`/api/feedback?export=csv&id=${encodeURIComponent(d.id)}`}
+                    class="text-sm text-clr-green hover:underline"
+                    download
+                  >
+                    Export CSV
+                  </a>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+        {docsWithCounts.length > 0 && (
+          <nav class="flex items-center justify-between gap-2 py-2 px-3 mt-4 border-t border-gray-200 bg-gray-50 text-sm" aria-label="Feedback pagination">
+            <span class="text-gray-600">Page {page}</span>
+            <div class="flex gap-2">
+              {page > 1 && <a href={feedbackPageUrl(page - 1)} class="text-clr-green hover:underline font-medium">Previous</a>}
+              {docsWithCounts.length === pageSize && <a href={feedbackPageUrl(page + 1)} class="text-clr-green hover:underline font-medium">Next</a>}
+            </div>
+          </nav>
+        )}
+        </>
+      )}
+
+<script is:inline>
+  const formPanel = document.getElementById('form-panel');
+  const form = document.getElementById('feedback-form');
+  const formR2Key = document.getElementById('form-r2-key');
+  const pdfInput = document.getElementById('form-pdf');
+
+  document.getElementById('btn-new-feedback')?.addEventListener('click', () => {
+    form?.reset();
+    if (formR2Key) formR2Key.value = '';
+    formPanel?.classList.remove('hidden');
+  });
+
+  document.getElementById('btn-cancel-form')?.addEventListener('click', () => {
+    formPanel?.classList.add('hidden');
+  });
+
+  pdfInput?.addEventListener('change', async () => {
+    const file = pdfInput.files?.[0];
+    if (!file) return;
+    const fd = new FormData();
+    fd.set('file', file);
+    try {
+      const res = await fetch('/api/feedback-upload', { method: 'POST', body: fd, credentials: 'same-origin' });
+      const data = await res.json();
+      if (data.key && formR2Key) formR2Key.value = data.key;
+      else alert(data.error || 'Upload failed');
+    } catch {
+      alert('Upload failed');
+    }
+  });
+
+  form?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const title = document.getElementById('form-title')?.value?.trim() ?? '';
+    const description = document.getElementById('form-description')?.value?.trim() ?? '';
+    const deadline = document.getElementById('form-deadline')?.value?.trim() || null;
+    const r2_key = formR2Key?.value?.trim() || null;
+    if (!title) {
+      alert('Title is required');
+      return;
+    }
+    try {
+      const res = await fetch('/api/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'create', title, description, deadline, r2_key }),
+        credentials: 'same-origin',
+      });
+      const data = await res.json();
+      if (data.success) window.location.reload();
+      else alert(data.error || 'Failed to create');
+    } catch {
+      alert('Network error');
+    }
+  });
+</script>
+  </PortalPage>
+</PortalLayout>

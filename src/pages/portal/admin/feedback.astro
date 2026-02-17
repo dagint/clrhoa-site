@@ -3,7 +3,7 @@ export const prerender = false;
 
 import PortalLayout from '../../../layouts/PortalLayout.astro';
 import PortalPage from '../../../components/PortalPage.astro';
-import AdminNav from '../../../components/AdminNav.astro';
+import ElevatedNav from '../../../components/ElevatedNav.astro';
 import { getAdminContext } from '../../../lib/board-context';
 import { getPortalBadgeCounts } from '../../../lib/portal-badge-counts';
 import { listSiteFeedback } from '../../../lib/site-feedback-db';
@@ -89,7 +89,7 @@ const csvHref = `/api/site-feedback?${csvParams.toString()}`;
     feedbackDueCount={badges.feedbackDueCount}
     libraryItemCount={badges.libraryItemCount}
   >
-    <AdminNav currentPath="/portal/admin/feedback" />
+    <ElevatedNav persona="admin" currentPath="/portal/admin/feedback" effectiveRole={effectiveRole} user={{ email, role: role ?? '' }} session={session} />
 
     <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8 mb-8">
       <h1 class="text-3xl font-heading font-bold text-clr-green mb-2">Site Feedback</h1>

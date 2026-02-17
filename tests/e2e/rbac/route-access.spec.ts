@@ -104,7 +104,7 @@ test.describe('Route Access Control', () => {
         '/portal/admin',
         '/portal/board',
         '/portal/arb',
-        '/board/members',
+        '/portal/board/members',
       ];
 
       for (const path of routesToTest) {
@@ -132,7 +132,7 @@ test.describe('Route Access Control', () => {
       const page = await context.newPage();
 
       // Admin should now be able to access board-only routes
-      const response = await page.goto('/board/assessments');
+      const response = await page.goto('/portal/board/assessments');
       expect(response?.status()).toBe(200);
 
       // Should see "Acting as Board" or similar indicator
@@ -193,7 +193,7 @@ test.describe('Route Access Control', () => {
       const page = await context.newPage();
 
       // Try to access board-only route
-      await page.goto('/board/assessments');
+      await page.goto('/portal/board/assessments');
 
       // Should be redirected to request elevation
       await expect(page).toHaveURL(/\/portal\/request-elevated-access/, { timeout: 5000 });
