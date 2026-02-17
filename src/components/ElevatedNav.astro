@@ -24,16 +24,13 @@ const { persona, currentPath, effectiveRole, user, session } = Astro.props;
 const menuItems = {
   admin: [
     { label: 'Dashboard', href: '/portal/admin/dashboard' },
-    { label: 'Users', href: '/portal/board/members' },
     { label: 'Permissions', href: '/portal/admin/permissions' },
     { label: 'Menu Order', href: '/portal/admin/menu-order' },
     { label: 'Site feedback', href: '/portal/admin/feedback' },
     { label: 'SMS requests', href: '/portal/admin/sms-requests' },
     { label: 'Test email', href: '/portal/admin/test-email' },
-    { label: 'Backups', href: '/portal/admin/backups' },
     { label: 'Site usage', href: '/portal/admin/usage' },
     { label: 'Audit logs', href: '/portal/admin/audit-logs' },
-    { label: 'Compliance', href: '/portal/board/compliance' },
     { label: 'Vendors', href: '/portal/admin/vendors' },
     { label: 'Maintenance', href: '/portal/admin/maintenance' },
     { label: 'Directory', href: '/portal/admin/directory' },
