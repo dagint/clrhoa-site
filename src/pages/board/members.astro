@@ -421,6 +421,9 @@ const csrfToken = session?.csrfToken ?? '';
 </PortalLayout>
 
 <script is:inline define:vars={{ csrfToken: sanitizeForScriptInjection(csrfToken) }}>
+  // Make CSRF token available to all functions
+  const CSRF_TOKEN = csrfToken;
+
   const msgEl = document.getElementById('members-message');
   const loadingEl = document.getElementById('members-loading');
   const containerEl = document.getElementById('members-container');
