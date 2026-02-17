@@ -31,6 +31,7 @@ import type { APIRoute } from 'astro';
 import { checkRateLimit } from '../../../lib/rate-limit';
 import { logSecurityEvent } from '../../../lib/audit-log';
 import { generateResetToken, sendResetEmail } from '../../../lib/auth/reset-tokens';
+import { generateSetupToken, sendSetupEmail } from '../../../lib/auth/setup-tokens';
 import { getResendClient } from '../../../lib/resend-client';
 import crypto from 'node:crypto';
 
@@ -214,7 +215,44 @@ export const POST: APIRoute = async ({ request, locals }) => {
       }
     }
 
-    // 4. Check if user account is active
+    // 4. Check if user account is active or pending setup
+    // Active users get reset emails, pending_setup users get setup emails
+    if (user.status === 'pending_setup') {
+      // User has account but hasn't set up password yet - send setup email
+      const { token } = await generateSetupToken(db, user.email, 'forgot-password-auto');
+
+      if (resend) {
+        try {
+          const siteUrl = new URL(request.url).origin;
+          await sendSetupEmail(resend, user.email, token, user.name || undefined, siteUrl);
+
+          await logSecurityEvent(db, {
+            eventType: 'forgot_password_setup_email_sent',
+            severity: 'info',
+            userId: user.email,
+            details: {
+              status: 'pending_setup',
+              ip_address: ipAddress,
+              user_agent: userAgent,
+            },
+          });
+        } catch (emailError) {
+          console.error('Failed to send setup email:', emailError);
+          await logSecurityEvent(db, {
+            eventType: 'forgot_password_setup_email_failed',
+            severity: 'critical',
+            userId: user.email,
+            details: {
+              error: emailError instanceof Error ? emailError.message : 'Unknown error',
+              ip_address: ipAddress,
+            },
+          });
+        }
+      }
+
+      return genericSuccessResponse;
+    }
+
     // Only send reset emails to active accounts
     if (user.status !== 'active') {
       await logSecurityEvent(db, {
