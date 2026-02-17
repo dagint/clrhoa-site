@@ -18,6 +18,7 @@ import { listAdminAssumedRoleAudit } from '../../../lib/admin-assumed-role-db';
 import { listArbAuditLog } from '../../../lib/arb-db';
 import PortalLayout from '../../../layouts/PortalLayout.astro';
 import PortalPage from '../../../components/PortalPage.astro';
+import ElevatedNav from '../../../components/ElevatedNav.astro';
 
 const ctx = await getAdminContext(Astro);
 if ('redirect' in ctx) return Astro.redirect(ctx.redirect);

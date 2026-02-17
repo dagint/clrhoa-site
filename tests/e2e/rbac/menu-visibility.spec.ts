@@ -29,7 +29,7 @@ test.describe('Menu Visibility', () => {
 
       // Should NOT see board items
       await expect(page.locator('a[href="/portal/board"]')).not.toBeVisible();
-      await expect(page.locator('a[href="/board/members"]')).not.toBeVisible();
+      await expect(page.locator('a[href="/portal/board/members"]')).not.toBeVisible();
 
       // Should NOT see ARB items
       await expect(page.locator('a[href="/portal/arb"]')).not.toBeVisible();
@@ -49,8 +49,8 @@ test.describe('Menu Visibility', () => {
 
       // Should see board items
       await expect(page.locator('a[href="/portal/board"]')).toBeVisible();
-      await expect(page.locator('a[href="/board/members"]')).toBeVisible();
-      await expect(page.locator('a[href="/board/assessments"]')).toBeVisible();
+      await expect(page.locator('a[href="/portal/board/members"]')).toBeVisible();
+      await expect(page.locator('a[href="/portal/board/assessments"]')).toBeVisible();
 
       // Should see member items (board has member access)
       await expect(page.locator('a[href="/portal/dashboard"]')).toBeVisible();
@@ -94,7 +94,7 @@ test.describe('Menu Visibility', () => {
       await expect(page.locator('a[href="/portal/admin"]')).not.toBeVisible();
 
       // Should NOT see board-only items (like board assessments)
-      await expect(page.locator('a[href="/board/assessments"]')).not.toBeVisible();
+      await expect(page.locator('a[href="/portal/board/assessments"]')).not.toBeVisible();
 
       await context.close();
     });
@@ -110,7 +110,7 @@ test.describe('Menu Visibility', () => {
 
       // Should see board items
       await expect(page.locator('a[href="/portal/board"]')).toBeVisible();
-      await expect(page.locator('a[href="/board/members"]')).toBeVisible();
+      await expect(page.locator('a[href="/portal/board/members"]')).toBeVisible();
 
       // Should see ARB items
       await expect(page.locator('a[href="/portal/arb"]')).toBeVisible();
@@ -142,7 +142,7 @@ test.describe('Menu Visibility', () => {
       await expect(page.locator('a[href="/portal/dashboard"]')).toBeVisible();
 
       // Should NOT see board-only items (unless assuming board role)
-      await expect(page.locator('a[href="/board/assessments"]')).not.toBeVisible();
+      await expect(page.locator('a[href="/portal/board/assessments"]')).not.toBeVisible();
 
       // Should NOT see ARB-only items (unless assuming arb role)
       // Note: arb-dashboard might be visible as read-only, but ARB landing should not be
@@ -160,8 +160,8 @@ test.describe('Menu Visibility', () => {
 
       // Should see board items now
       await expect(page.locator('a[href="/portal/board"]')).toBeVisible();
-      await expect(page.locator('a[href="/board/members"]')).toBeVisible();
-      await expect(page.locator('a[href="/board/assessments"]')).toBeVisible();
+      await expect(page.locator('a[href="/portal/board/members"]')).toBeVisible();
+      await expect(page.locator('a[href="/portal/board/assessments"]')).toBeVisible();
 
       // Should see "Acting as Board" indicator
       await expect(page.locator('text=/acting as.*board/i')).toBeVisible();

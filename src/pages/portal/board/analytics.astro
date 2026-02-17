@@ -50,6 +50,7 @@ const formatPercent = (numerator: number, denominator: number) => {
     vendorPendingCount={badges.vendorPendingCount}
     maintenanceOpenCount={badges.maintenanceOpenCount}
     meetingsRsvpCount={badges.meetingsRsvpCount}
+  >
     <ElevatedNav persona="board" currentPath="/portal/board/analytics" effectiveRole={effectiveRole} user={{ email, role: role ?? '' }} session={session} />
 
     <div class="flex flex-wrap items-center justify-between gap-4 mb-6">

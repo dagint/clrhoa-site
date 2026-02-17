@@ -145,28 +145,28 @@ describe('Auth Middleware', () => {
     });
   });
 
-  describe('/board/* and /admin/* Routes', () => {
-    it('should allow public access to /board (exact)', async () => {
-      // TODO: Public Board & Committees page
+  describe('/portal/board/* and /portal/admin/* Routes', () => {
+    it('should allow public access to /board (exact - redirects to /portal/board)', async () => {
+      // TODO: Public Board & Committees page with 301 redirect
       expect(true).toBe(true);
     });
 
-    it('should require authentication for /board/*', async () => {
+    it('should require authentication for /portal/board/*', async () => {
       // TODO: Nested board routes require session
       expect(true).toBe(true);
     });
 
-    it('should require elevated role for /board/*', async () => {
-      // TODO: Member cannot access /board/assessments
+    it('should require elevated role for /portal/board/*', async () => {
+      // TODO: Member cannot access /portal/board/assessments
       expect(true).toBe(true);
     });
 
-    it('should require admin role for /admin/*', async () => {
+    it('should require admin role for /portal/admin/*', async () => {
       // TODO: Non-admin users redirected
       expect(true).toBe(true);
     });
 
-    it('should check hasRouteAccess for /board/* routes', async () => {
+    it('should check hasRouteAccess for /portal/board/* routes', async () => {
       // TODO: Verify centralized RBAC logic
       expect(true).toBe(true);
     });
