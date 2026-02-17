@@ -3,6 +3,7 @@ export const prerender = false;
 
 import { getAdminContext } from '../../lib/board-context';
 import { getPortalBadgeCounts } from '../../lib/portal-badge-counts';
+import { formatEasternDateTime } from '../../lib/timezone';
 import { listOwners, listDirectoryLogs } from '../../lib/directory-db';
 import { listAssessmentPaymentsForAudit } from '../../lib/assessments-db';
 import { listSubmissions } from '../../lib/vendor-submissions-db';
@@ -92,13 +93,8 @@ const BLANK = '-';
 const REDACTED = '—';
 
 function formatDate(s: string | null): string {
-  if (!s) return BLANK;
-  try {
-    const d = new Date(s);
-    return Number.isNaN(d.getTime()) ? s : d.toLocaleString();
-  } catch {
-    return s ?? BLANK;
-  }
+  const formatted = formatEasternDateTime(s);
+  return formatted === '—' ? BLANK : formatted;
 }
 ---
 
