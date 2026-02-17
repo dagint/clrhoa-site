@@ -163,9 +163,9 @@ const icons: Record<string, string> = {
 
   <!-- Elevated Access Section -->
   {isStaffFromWhitelist && elevatedLink && (
-    <div class="px-4 pb-4">
+    <div class="px-4 pb-4 elevated-section">
       <div class="border-t border-white/20 pt-4">
-        <p class="px-4 py-1 text-xs font-semibold text-amber-200 uppercase tracking-wide">
+        <p class="px-4 py-1 text-xs font-semibold text-amber-200 uppercase tracking-wide elevated-heading">
           Elevated Access
         </p>
         <ul class="space-y-1 mt-2">
@@ -177,7 +177,7 @@ const icons: Record<string, string> = {
                   : `/portal/request-elevated-access?return=${encodeURIComponent(elevatedLink.href)}`
               }
               title={elevatedLink.label}
-              class={`flex items-center gap-3 px-4 py-3 rounded-lg text-base font-medium transition-colors ${
+              class={`elevated-link flex items-center gap-3 px-4 py-3 rounded-lg text-base font-medium transition-colors ${
                 isCurrent(elevatedLink.href)
                   ? 'bg-amber-500 text-white'
                   : 'text-amber-200 hover:bg-amber-600/30 hover:text-amber-100'
@@ -192,9 +192,9 @@ const icons: Record<string, string> = {
               >
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={icons.shield} />
               </svg>
-              <span class="flex-1">{elevatedLink.label}</span>
+              <span class="flex-1 elevated-text">{elevatedLink.label}</span>
               {!isElevated && (
-                <svg class="w-4 h-4 text-amber-200" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <svg class="w-4 h-4 text-amber-200 elevated-lock-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                 </svg>
               )}
@@ -285,6 +285,29 @@ const icons: Record<string, string> = {
     z-index: 50;
     pointer-events: none;
   }
+
+  /* Collapsed state for elevated access section */
+  .portal-sidebar[data-collapsed="true"] .elevated-link {
+    position: relative;
+    justify-content: center;
+  }
+
+  .portal-sidebar[data-collapsed="true"] .elevated-link:hover::after {
+    content: attr(title);
+    position: absolute;
+    left: 100%;
+    top: 50%;
+    transform: translateY(-50%);
+    margin-left: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background: rgb(31 41 55);
+    color: white;
+    font-size: 0.875rem;
+    white-space: nowrap;
+    border-radius: 0.5rem;
+    z-index: 50;
+    pointer-events: none;
+  }
 </style>
 
 <script is:inline>
@@ -315,6 +338,11 @@ const icons: Record<string, string> = {
         });
         sidebar.querySelectorAll('.sidebar-collapse-icon').forEach(el => el.classList.add('hidden'));
         sidebar.querySelectorAll('.sidebar-expand-icon').forEach(el => el.classList.remove('hidden'));
+
+        // Hide elevated access section text
+        sidebar.querySelectorAll('.elevated-heading').forEach(el => el.classList.add('sidebar-text-hidden'));
+        sidebar.querySelectorAll('.elevated-text').forEach(el => el.classList.add('sidebar-text-hidden'));
+        sidebar.querySelectorAll('.elevated-lock-icon').forEach(el => el.classList.add('sidebar-text-hidden'));
 
         if (header) {
           header.classList.remove('lg:left-72');
@@ -372,6 +400,11 @@ const icons: Record<string, string> = {
         });
         sidebar.querySelectorAll('.sidebar-collapse-icon').forEach(el => el.classList.add('hidden'));
         sidebar.querySelectorAll('.sidebar-expand-icon').forEach(el => el.classList.remove('hidden'));
+
+        // Hide elevated access section text
+        sidebar.querySelectorAll('.elevated-heading').forEach(el => el.classList.add('sidebar-text-hidden'));
+        sidebar.querySelectorAll('.elevated-text').forEach(el => el.classList.add('sidebar-text-hidden'));
+        sidebar.querySelectorAll('.elevated-lock-icon').forEach(el => el.classList.add('sidebar-text-hidden'));
 
         if (header) {
           header.classList.remove('lg:left-72');
