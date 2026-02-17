@@ -609,7 +609,7 @@ const csrfToken = session?.csrfToken ?? '';
                     </button>
                     <button
                       class="text-red-600 hover:text-red-800 font-medium"
-                      onclick="deleteMember('${m.email}')"
+                      onclick="deleteMember('${m.email}', '${m.ownerId}', '${m.userId}')"
                     >
                       Delete
                     </button>
@@ -835,8 +835,9 @@ const csrfToken = session?.csrfToken ?? '';
   });
 
   // Delete member function (global so onclick can call it)
-  window.deleteMember = async function (email) {
-    if (!confirm(`Delete member ${email}? This will remove them from both the directory and authentication system.`)) {
+  window.deleteMember = async function (email, ownerId, userId) {
+    const displayName = email && email !== 'null' ? email : 'this member';
+    if (!confirm(`Delete ${displayName}? This will remove them from both the directory and authentication system.`)) {
       return;
     }
 
@@ -845,7 +846,9 @@ const csrfToken = session?.csrfToken ?? '';
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email,
+          email: email && email !== 'null' ? email : null,
+          ownerId: ownerId && ownerId !== 'null' ? ownerId : null,
+          userId: userId && userId !== 'null' ? userId : null,
           csrf_token: CSRF_TOKEN,
         }),
       });
