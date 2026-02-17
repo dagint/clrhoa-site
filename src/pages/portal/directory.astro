@@ -4,6 +4,7 @@ export const prerender = false;
 import PortalLayout from '../../layouts/PortalLayout.astro';
 import PortalPage from '../../components/PortalPage.astro';
 import { getPortalContext } from '../../lib/portal-context';
+import { getPortalBadgeCounts } from '../../lib/portal-badge-counts';
 import { getRolesForEmails, isElevatedRole } from '../../lib/auth';
 import { listOwners, countOwners, getOwnerByEmail } from '../../lib/directory-db';
 import { getArbRequestCountsByStatus, listArbRequestsByHousehold } from '../../lib/arb-db';
@@ -18,6 +19,7 @@ if (!session) return Astro.redirect('/auth/login');
 
 const { email, role, name } = session;
 const db = env?.DB;
+const badges = await getPortalBadgeCounts(db, email, role, name);
 
 // User display name
 let displayName = name?.trim() || null;
@@ -106,6 +108,7 @@ function canRevealContact(owner: { share_contact_with_members?: number | null })
     maintenanceOpenCount={maintenanceOpenCount}
     meetingsRsvpCount={meetingsRsvpCount}
     feedbackDueCount={feedbackDueCount}
+    libraryItemCount={badges.libraryItemCount}
   >
     <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8 mb-6">
       <h1 class="text-3xl font-heading font-bold text-clr-green mb-3">Homeowner Directory</h1>

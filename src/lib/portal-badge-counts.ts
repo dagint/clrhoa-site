@@ -9,6 +9,7 @@ import { getOwnerByEmail } from './directory-db';
 import { listMaintenanceByHousehold } from './maintenance-db';
 import { listUpcomingWithCountsAndUser, householdHasRsvpd } from './meetings-db';
 import { listActiveFeedbackDocs, getFeedbackResponse, householdHasResponded } from './feedback-db';
+import { countApprovedPreapprovalItems } from './preapproval-db';
 
 export interface PortalBadgeCounts {
   displayName: string | null;
@@ -19,6 +20,7 @@ export interface PortalBadgeCounts {
   maintenanceOpenCount: number;
   meetingsRsvpCount: number;
   feedbackDueCount: number;
+  libraryItemCount: number;
 }
 
 export async function getPortalBadgeCounts(
@@ -55,6 +57,7 @@ export async function getPortalBadgeCounts(
   let maintenanceOpenCount = 0;
   let meetingsRsvpCount = 0;
   let feedbackDueCount = 0;
+  let libraryItemCount = 0;
 
   if (db) {
     const maintenanceList = await listMaintenanceByHousehold(db, email);
@@ -78,6 +81,9 @@ export async function getPortalBadgeCounts(
       if (await householdHasResponded(db, doc.id, email)) continue;
       if (doc.deadline == null || doc.deadline <= tomorrowStr) feedbackDueCount += 1;
     }
+
+    // Library item count (for hiding nav link when empty)
+    libraryItemCount = await countApprovedPreapprovalItems(db);
   }
 
   return {
@@ -89,5 +95,6 @@ export async function getPortalBadgeCounts(
     maintenanceOpenCount,
     meetingsRsvpCount,
     feedbackDueCount,
+    libraryItemCount,
   };
 }

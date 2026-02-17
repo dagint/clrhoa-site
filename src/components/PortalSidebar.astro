@@ -16,6 +16,7 @@ interface Props {
   maintenanceOpenCount?: number;
   meetingsRsvpCount?: number;
   feedbackDueCount?: number;
+  libraryItemCount?: number;
 }
 
 const {
@@ -28,12 +29,14 @@ const {
   maintenanceOpenCount = 0,
   meetingsRsvpCount = 0,
   feedbackDueCount = 0,
+  libraryItemCount = 0,
 } = Astro.props;
 
 const nonFinalCount = draftCount + arbInReviewCount;
 const elevatedLink = getPortalElevatedLink(staffRole);
 const isElevated = role === 'board' || role === 'admin' || role === 'arb' || role === 'arb_board';
 const isStaffFromWhitelist = !!elevatedLink;
+const isStaff = isElevated || isStaffFromWhitelist;
 
 function isCurrent(href: string) {
   if (href === '/portal/dashboard') return currentPath === '/portal/dashboard';
@@ -45,7 +48,7 @@ function isCurrent(href: string) {
 }
 
 // Navigation items with icons
-const mainNavItems = [
+const allNavItems = [
   { label: 'Dashboard', href: '/portal/dashboard', icon: 'home', badge: 0 },
   { label: 'ARB Requests', href: '/portal/requests', icon: 'clipboard', badge: nonFinalCount },
   { label: 'Maintenance', href: '/portal/maintenance', icon: 'wrench', badge: maintenanceOpenCount },
@@ -57,6 +60,14 @@ const mainNavItems = [
   { label: 'Feedback', href: '/portal/feedback', icon: 'message', badge: feedbackDueCount },
   { label: 'Library', href: '/portal/library', icon: 'book', badge: 0 },
 ];
+
+// Hide Library link if no content available (unless user is staff)
+const mainNavItems = allNavItems.filter(item => {
+  if (item.label === 'Library') {
+    return libraryItemCount > 0 || isStaff;
+  }
+  return true;
+});
 
 // Icon SVG paths
 const icons: Record<string, string> = {

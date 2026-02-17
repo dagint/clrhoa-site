@@ -23,6 +23,7 @@ interface Props {
   maintenanceOpenCount?: number;
   meetingsRsvpCount?: number;
   feedbackDueCount?: number;
+  libraryItemCount?: number;
   elevatedUntil?: number | null;
 }
 
@@ -40,6 +41,7 @@ const {
   maintenanceOpenCount = 0,
   meetingsRsvpCount = 0,
   feedbackDueCount = 0,
+  libraryItemCount = 0,
   elevatedUntil = null,
 } = Astro.props;
 
@@ -73,6 +75,7 @@ const showPimBanner = actualElevatedUntil && actualElevatedUntil > now;
     maintenanceOpenCount={maintenanceOpenCount}
     meetingsRsvpCount={meetingsRsvpCount}
     feedbackDueCount={feedbackDueCount}
+    libraryItemCount={libraryItemCount}
   />
 
   <!-- Main Content Area -->

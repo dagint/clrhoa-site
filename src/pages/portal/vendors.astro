@@ -4,6 +4,7 @@ export const prerender = false;
 import PortalLayout from '../../layouts/PortalLayout.astro';
 import PortalPage from '../../components/PortalPage.astro';
 import { getPortalContext } from '../../lib/portal-context';
+import { getPortalBadgeCounts } from '../../lib/portal-badge-counts';
 import { listPortalVendors } from '../../lib/vendors-db';
 import { getArbRequestCountsByStatus, listArbRequestsByHousehold } from '../../lib/arb-db';
 import { listPendingSubmissions, listVendorSubmissionsByHousehold } from '../../lib/vendor-submissions-db';
@@ -18,6 +19,7 @@ if (!session) return Astro.redirect('/auth/login');
 
 const { email, role, name } = session;
 const db = env?.DB;
+const badges = await getPortalBadgeCounts(db, email, role, name);
 
 // User display name
 let displayName = name?.trim() || null;
@@ -107,6 +109,7 @@ function parseFiles(filesJson: string | null): { name: string; key: string }[] {
     maintenanceOpenCount={maintenanceOpenCount}
     meetingsRsvpCount={meetingsRsvpCount}
     feedbackDueCount={feedbackDueCount}
+    libraryItemCount={badges.libraryItemCount}
   >
     {submitted && (
       <div class="mb-6 rounded-xl border border-green-200 bg-green-50 p-4" role="status">
