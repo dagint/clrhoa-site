@@ -29,7 +29,17 @@ if (!session || !user) {
 const origin = Astro.request.headers.get('origin');
 const referer = Astro.request.headers.get('referer');
 const expectedOrigin = Astro.url.origin;
+
+// Debug logging for origin verification
+console.log('[LOG-PHONE-VIEW] Origin verification:', {
+  origin,
+  referer,
+  expectedOrigin,
+  astroUrlHref: Astro.url.href,
+});
+
 if (!verifyOrigin(origin, referer, expectedOrigin)) {
+  console.error('[LOG-PHONE-VIEW] Origin verification FAILED');
   return new Response(JSON.stringify({ error: 'Invalid origin. Request blocked for security.' }), {
     status: 403,
     headers: { 'Content-Type': 'application/json' },
