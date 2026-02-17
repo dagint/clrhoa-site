@@ -19,7 +19,6 @@
 export const prerender = false;
 
 import {
-  getSessionFromCookie,
   verifyCsrfToken,
   verifyOrigin,
   getEffectiveRole,
@@ -34,12 +33,10 @@ const runtime = Astro.locals.runtime;
 const env = runtime?.env;
 
 // Auth check
-const session = await getSessionFromCookie(
-  Astro.request.headers.get('cookie') ?? undefined,
-  env?.SESSION_SECRET
-);
+const user = Astro.locals.user;
+const session = Astro.locals.session;
 
-if (!session) {
+if (!session || !user) {
   return new Response(JSON.stringify({ error: 'Unauthorized' }), {
     status: 401,
     headers: { 'Content-Type': 'application/json' },
@@ -177,8 +174,8 @@ try {
     requestId,
     'ARC_REVIEW',
     'ARC_REVIEW',
-    session.email,
-    `ARC review started by ${session.email}`,
+    user.email,
+    `ARC review started by ${user.email}`,
     ipAddress
   );
 
@@ -207,7 +204,7 @@ try {
 
   logger.info('ARC review started', {
     requestId,
-    startedBy: session.email,
+    startedBy: user.email,
   });
 
   return new Response(
@@ -224,7 +221,7 @@ try {
   logger.error('Failed to begin ARC review', {
     error,
     requestId,
-    startedBy: session.email,
+    startedBy: user.email,
   });
   return new Response(
     JSON.stringify({ error: 'Failed to begin review. Please try again.' }),

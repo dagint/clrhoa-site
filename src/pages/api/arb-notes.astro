@@ -5,7 +5,7 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie, verifyCsrfToken, verifyOrigin, getEffectiveRole, canApproveArb } from '../../lib/auth';
+import { verifyCsrfToken, verifyOrigin, getEffectiveRole, canApproveArb } from '../../lib/auth';
 import { checkRateLimit, getRateLimitConfig } from '../../lib/rate-limit';
 import { getSecurityMonitor } from '../../lib/monitoring';
 import { getArbRequest } from '../../lib/arb-db';
@@ -13,12 +13,10 @@ import { listEmailsAtSameAddress } from '../../lib/directory-db.js';
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
-const session = await getSessionFromCookie(
-  Astro.request.headers.get('cookie') ?? undefined,
-  env?.SESSION_SECRET
-);
+const user = Astro.locals.user;
+const session = Astro.locals.session;
 
-if (!session) {
+if (!session || !user) {
   return new Response(JSON.stringify({ error: 'Unauthorized' }), {
     status: 401,
     headers: { 'Content-Type': 'application/json' },
@@ -86,7 +84,7 @@ if (!request) {
 }
 
 const householdEmails = await listEmailsAtSameAddress(db, request.owner_email);
-const isOwnerOrHousehold = householdEmails.includes(session.email.trim().toLowerCase());
+const isOwnerOrHousehold = householdEmails.includes(user.email.trim().toLowerCase());
 const effectiveRole = getEffectiveRole(session);
 const canSetArbNotes = canApproveArb(effectiveRole);
 
@@ -97,7 +95,7 @@ if (body.arbInternalNotes !== undefined && canSetArbNotes) {
     .prepare(`UPDATE arb_requests SET arb_internal_notes = ?, updated_at = datetime('now') WHERE id = ?`)
     .bind(notes, requestId)
     .run();
-  
+
   if ((result.meta.changes ?? 0) > 0) {
     return new Response(
       JSON.stringify({ success: true, requestId, message: 'ARB notes updated.' }),
@@ -117,7 +115,7 @@ if (body.ownerNotes !== undefined && isOwnerOrHousehold && request.status === 'p
     .prepare(`UPDATE arb_requests SET owner_notes = ?, updated_at = datetime('now') WHERE id = ? AND status = 'pending'`)
     .bind(notes, requestId)
     .run();
-  
+
   if ((result.meta.changes ?? 0) > 0) {
     return new Response(
       JSON.stringify({ success: true, requestId, message: 'Owner notes updated.' }),

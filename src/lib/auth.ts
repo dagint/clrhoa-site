@@ -527,7 +527,7 @@ export async function createSessionWithAssumedRole(
 }
 
 /** True if the current effective role is due to admin or arb_board assuming Board or ARB (for audit logging). */
-export function isAdminActingAs(session: SessionPayload | null): boolean {
+export function isAdminActingAs(session: SessionPayload | import('../types/auth').ExtendedSession | null): boolean {
   const r = session?.role?.toLowerCase();
   return (r === 'admin' || r === 'arb_board') && Boolean(session?.assumed_role);
 }

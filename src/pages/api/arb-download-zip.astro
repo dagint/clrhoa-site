@@ -5,18 +5,16 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie, getEffectiveRole } from '../../lib/auth';
+import { getEffectiveRole } from '../../lib/auth';
 import { getArbRequest, listArbFilesByRequest } from '../../lib/arb-db';
 import { listEmailsAtSameAddress } from '../../lib/directory-db.js';
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
-const session = await getSessionFromCookie(
-  Astro.request.headers.get('cookie') ?? undefined,
-  env?.SESSION_SECRET
-);
+const user = Astro.locals.user;
+const session = Astro.locals.session;
 
-if (!session) {
+if (!session || !user) {
   return new Response(JSON.stringify({ error: 'Unauthorized' }), {
     status: 401,
     headers: { 'Content-Type': 'application/json' },
@@ -51,7 +49,7 @@ if (!request) {
 // Check permissions: owner, household member, or ARB/Board/Admin
 const allowedRoles = ['arb', 'board', 'admin', 'arb_board'];
 const householdEmails = await listEmailsAtSameAddress(db, request.owner_email);
-const isOwnerOrHousehold = householdEmails.includes(session.email.trim().toLowerCase());
+const isOwnerOrHousehold = householdEmails.includes(user.email.trim().toLowerCase());
 const effectiveRole = getEffectiveRole(session);
 const isAuthorized = isOwnerOrHousehold || allowedRoles.includes(effectiveRole);
 

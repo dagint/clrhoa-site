@@ -7,19 +7,17 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie, verifyCsrfToken, verifyOrigin } from '../../lib/auth';
+import { verifyCsrfToken, verifyOrigin } from '../../lib/auth';
 import { checkRateLimit, getRateLimitConfig } from '../../lib/rate-limit';
 import { getSecurityMonitor } from '../../lib/monitoring';
 import { copyArbRequest } from '../../lib/arb-db';
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
-const session = await getSessionFromCookie(
-  Astro.request.headers.get('cookie') ?? undefined,
-  env?.SESSION_SECRET
-);
+const user = Astro.locals.user;
+const session = Astro.locals.session;
 
-if (!session) {
+if (!session || !user) {
   return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
 }
 
@@ -38,9 +36,9 @@ if (rateLimitConfig && rateLimitKv) {
     rateLimitConfig.maxRequests,
     rateLimitConfig.windowSeconds
   );
-  
+
   if (!rateLimit.allowed) {
-    securityMonitor.trackRateLimit(endpoint, session.email, ipAddress);
+    securityMonitor.trackRateLimit(endpoint, user.email, ipAddress);
     return new Response(
       JSON.stringify({
         error: `Rate limit exceeded. Maximum ${rateLimitConfig.maxRequests} requests per ${rateLimitConfig.windowSeconds} seconds. Please try again later.`,
@@ -101,7 +99,7 @@ if (!requestId) {
 
 const clientIp = Astro.clientAddress || Astro.request.headers.get('cf-connecting-ip') || null;
 try {
-  const newId = await copyArbRequest(db, requestId, session.email, clientIp);
+  const newId = await copyArbRequest(db, requestId, user.email, clientIp);
   return new Response(
     JSON.stringify({
       success: true,

@@ -6,19 +6,17 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie, getEffectiveRole } from '../../lib/auth';
+import { getEffectiveRole } from '../../lib/auth';
 import { listAllArbRequestsFiltered } from '../../lib/arb-db';
 import { escapeHtml } from '../../lib/sanitize';
 import { escapeCsv } from '../../lib/csv-utils';
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
-const session = await getSessionFromCookie(
-  Astro.request.headers.get('cookie') ?? undefined,
-  env?.SESSION_SECRET
-);
+const user = Astro.locals.user;
+const session = Astro.locals.session;
 
-if (!session) {
+if (!session || !user) {
   return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
 }
 const allowedRoles = ['arb', 'board', 'admin', 'arb_board'];

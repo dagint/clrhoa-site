@@ -5,7 +5,7 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie, verifyCsrfToken, verifyOrigin } from '../../lib/auth';
+import { verifyCsrfToken, verifyOrigin } from '../../lib/auth';
 import { checkRateLimit, getRateLimitConfig } from '../../lib/rate-limit';
 import { getSecurityMonitor } from '../../lib/monitoring';
 import { getArbRequest, setArbRequestInReview } from '../../lib/arb-db';
@@ -14,12 +14,10 @@ import { canTransitionStatus } from '../../lib/arb-status-machine';
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
-const session = await getSessionFromCookie(
-  Astro.request.headers.get('cookie') ?? undefined,
-  env?.SESSION_SECRET
-);
+const user = Astro.locals.user;
+const session = Astro.locals.session;
 
-if (!session) {
+if (!session || !user) {
   return new Response(JSON.stringify({ error: 'Unauthorized' }), {
     status: 401,
     headers: { 'Content-Type': 'application/json' },
@@ -97,7 +95,7 @@ if (!request) {
 }
 
 // Check ownership
-if (request.owner_email.toLowerCase() !== session.email.toLowerCase()) {
+if (request.owner_email.toLowerCase() !== user.email.toLowerCase()) {
   return new Response(
     JSON.stringify({ error: 'You do not own this request.' }),
     { status: 403, headers: { 'Content-Type': 'application/json' } }
@@ -106,7 +104,7 @@ if (request.owner_email.toLowerCase() !== session.email.toLowerCase()) {
 
 // Handle v1 (legacy) workflow
 if (request.workflow_version !== 2) {
-  const updated = await setArbRequestInReview(db, requestId, session.email, clientIp);
+  const updated = await setArbRequestInReview(db, requestId, user.email, clientIp);
   if (!updated) {
     return new Response(
       JSON.stringify({
@@ -161,7 +159,7 @@ const updated = await transitionStatus(
   requestId,
   'SUBMITTED',
   'SUBMITTED',
-  session.email,
+  user.email,
   `Request resubmitted by owner after ${currentStage}`,
   clientIp
 );

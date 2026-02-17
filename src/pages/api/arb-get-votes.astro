@@ -24,7 +24,7 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie, getEffectiveRole } from '../../lib/auth';
+import { getEffectiveRole } from '../../lib/auth';
 import { createLogger } from '../../lib/logging';
 import { getArbRequest } from '../../lib/arb-db';
 import {
@@ -39,12 +39,10 @@ const runtime = Astro.locals.runtime;
 const env = runtime?.env;
 
 // Auth check
-const session = await getSessionFromCookie(
-  Astro.request.headers.get('cookie') ?? undefined,
-  env?.SESSION_SECRET
-);
+const user = Astro.locals.user;
+const session = Astro.locals.session;
 
-if (!session) {
+if (!session || !user) {
   return new Response(JSON.stringify({ error: 'Unauthorized' }), {
     status: 401,
     headers: { 'Content-Type': 'application/json' },
@@ -139,7 +137,7 @@ const stage = currentStage as 'ARC_REVIEW' | 'BOARD_REVIEW';
 const cycle = request.current_cycle || 1;
 
 // Determine if user is the request owner
-const isOwner = request.owner_email.toLowerCase() === session.email.toLowerCase();
+const isOwner = request.owner_email.toLowerCase() === user.email.toLowerCase();
 
 // Determine if user is a reviewer (ARC or Board)
 const effectiveRole = getEffectiveRole(session);
@@ -156,7 +154,7 @@ const votes = await getVotesForRequest(db, requestId, stage, cycle);
 const resolution = await resolveVotes(db, kv, requestId, stage, cycle);
 
 // Get user's own vote (if any)
-const myVote = await getVoteByVoter(db, requestId, session.email, stage, cycle);
+const myVote = await getVoteByVoter(db, requestId, user.email, stage, cycle);
 
 // Get eligible voter count
 const eligibleVoterCount = await getEligibleVoterCount(db, kv, requestId, stage, cycle);

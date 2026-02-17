@@ -6,7 +6,7 @@
  */
 export const prerender = false;
 
-import { getSessionFromCookie, verifyCsrfToken, verifyOrigin, updateSessionActivity, SESSION_COOKIE_NAME } from '../../lib/auth';
+import { verifyCsrfToken, verifyOrigin } from '../../lib/auth';
 import { createLogger, maskRequestId } from '../../lib/logging';
 import { getSecurityMonitor } from '../../lib/monitoring';
 import {
@@ -40,17 +40,12 @@ function isAllowedType(t: string): boolean {
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
 const logger = createLogger({ endpoint: '/api/arb-auto-save' });
-const userAgent = Astro.request.headers.get('user-agent') ?? null;
-const ipAddress = Astro.request.headers.get('cf-connecting-ip') ?? 
+const user = Astro.locals.user;
+const session = Astro.locals.session;
+const ipAddress = Astro.request.headers.get('cf-connecting-ip') ??
                   Astro.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
-let session = await getSessionFromCookie(
-  Astro.request.headers.get('cookie') ?? undefined,
-  env?.SESSION_SECRET,
-  userAgent,
-  ipAddress
-);
 
-if (!session) {
+if (!session || !user) {
   return new Response(JSON.stringify({ error: 'Unauthorized' }), {
     status: 401,
     headers: { 'Content-Type': 'application/json' },
@@ -96,38 +91,17 @@ try {
   formData = await Astro.request.formData();
   csrfToken = (formData.get('csrf_token') as string)?.trim() || null;
   requestId = (formData.get('request_id') as string)?.trim() || null; // Optional: for updating existing draft
-  
+
   // CSRF validation with fallback
   let csrfValid = false;
   if (csrfToken && session.csrfToken) {
     csrfValid = verifyCsrfToken(session, csrfToken);
   }
-  
-  // Fallback: try updating session if CSRF token is missing
-  if (!csrfValid && env?.SESSION_SECRET) {
-    if (!session.csrfToken) {
-      await updateSessionActivity(Astro.request.headers.get('cookie') ?? undefined, env.SESSION_SECRET, userAgent, ipAddress);
-      // Re-fetch session
-      session = await getSessionFromCookie(
-        Astro.request.headers.get('cookie') ?? undefined,
-        env.SESSION_SECRET,
-        userAgent,
-        ipAddress
-      ) || await getSessionFromCookie(
-        Astro.request.headers.get('cookie') ?? undefined,
-        env.SESSION_SECRET
-      );
-      if (session && csrfToken) {
-        csrfValid = verifyCsrfToken(session, csrfToken);
-      }
-    }
-  }
-  
   if (!csrfValid) {
-    logger.warn('CSRF token validation failed for auto-save', { 
+    logger.warn('CSRF token validation failed for auto-save', {
       hasSessionToken: !!session?.csrfToken,
       hasRequestToken: !!csrfToken,
-      sessionEmail: session?.email 
+      sessionEmail: user?.email
     });
     securityMonitor.trackCsrfFailure('/api/arb-auto-save', clientIpAddress);
     return new Response(
@@ -135,7 +109,7 @@ try {
       { status: 403, headers: { 'Content-Type': 'application/json' } }
     );
   }
-  
+
   description = (formData.get('description') as string)?.trim() ?? '';
   applicantName = (formData.get('applicant_name') as string)?.trim() || null;
   phone = (formData.get('phone') as string)?.trim() || null;
@@ -152,7 +126,7 @@ try {
   );
 }
 
-if (!session) {
+if (!session || !user) {
   return new Response(JSON.stringify({ error: 'Unauthorized' }), {
     status: 401,
     headers: { 'Content-Type': 'application/json' },
@@ -174,7 +148,7 @@ if (requestId) {
   const canUpdateDraft =
     existingReq &&
     existingReq.status === 'pending' &&
-    householdEmails.includes(session.email.trim().toLowerCase());
+    householdEmails.includes(user.email.trim().toLowerCase());
   if (canUpdateDraft) {
     isUpdate = true;
     // Update existing draft (use request owner_email so WHERE clause matches)
@@ -219,14 +193,14 @@ if (!isUpdate) {
 
   const clientIp = Astro.clientAddress || Astro.request.headers.get('cf-connecting-ip') || null;
   try {
-    await insertArbRequest(db, requestId, session.email, description, {
+    await insertArbRequest(db, requestId, user.email, description, {
       applicantName,
       phone,
       propertyAddress,
       applicationType,
       ip_address: clientIp,
     });
-    
+
     // Get created timestamp
     const newReq = await getArbRequest(db, requestId);
     return new Response(
