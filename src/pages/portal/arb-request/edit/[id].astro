@@ -300,7 +300,9 @@ const selectedTypes = req.application_type ? req.application_type.split(',').map
           }
 
           try {
-            const res = await fetch(form.action, { method: 'POST', body: formData });
+            // Use getAttribute to avoid RadioNodeList shadowing from name="action" buttons
+            const formAction = form.getAttribute('action') || '/api/arb-update';
+            const res = await fetch(formAction, { method: 'POST', body: formData });
             console.log('[ARB-EDIT] Update response status:', res.status, res.statusText);
             const data = await res.json().catch(function () {
               console.error('[ARB-EDIT] Failed to parse response JSON');
