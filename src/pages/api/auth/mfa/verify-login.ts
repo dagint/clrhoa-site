@@ -149,6 +149,7 @@ export const POST: APIRoute = async (context) => {
     const userRecord = await db
       .prepare(
         `SELECT
+          id,
           email,
           role,
           name,
@@ -159,6 +160,7 @@ export const POST: APIRoute = async (context) => {
       )
       .bind(normalizedEmail)
       .first<{
+        id: string;
         email: string;
         role: string;
         name: string | null;
@@ -285,7 +287,7 @@ export const POST: APIRoute = async (context) => {
     const session = await createSession(
       db,
       lucia,
-      normalizedEmail,
+      userRecord.id,
       ipAddress,
       userAgent
     );

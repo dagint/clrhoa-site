@@ -168,6 +168,7 @@ export const POST: APIRoute = async ({ request, locals, cookies }) => {
           st.user_id,
           st.expires_at,
           st.used,
+          u.id as actual_user_id,
           u.email,
           u.status,
           u.password_hash
@@ -181,6 +182,7 @@ export const POST: APIRoute = async ({ request, locals, cookies }) => {
         user_id: string;
         expires_at: number;
         used: number;
+        actual_user_id: string;
         email: string;
         status: string;
         password_hash: string | null;
@@ -289,7 +291,7 @@ export const POST: APIRoute = async ({ request, locals, cookies }) => {
     const session = await createSession(
       db,
       lucia,
-      setupTokenResult.email,
+      setupTokenResult.actual_user_id,
       ipAddress,
       userAgent
     );
