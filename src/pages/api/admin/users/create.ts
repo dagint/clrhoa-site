@@ -135,6 +135,7 @@ export const POST: APIRoute = async (context) => {
     await db
       .prepare(
         `INSERT INTO users (
+          id,
           email,
           role,
           name,
@@ -143,9 +144,10 @@ export const POST: APIRoute = async (context) => {
           created_by,
           created,
           updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
       )
       .bind(
+        normalizedEmail,
         normalizedEmail,
         normalizedRole,
         name || null,
