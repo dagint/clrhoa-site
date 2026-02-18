@@ -9,7 +9,7 @@
 
 import type { User, Session } from 'lucia';
 import { getUserEmail, getUserRole } from '../types/auth';
-import { isElevatedRole } from './auth/middleware';
+import { getEffectiveRole } from './auth';
 
 /** Env shape available to portal pages (DB, SESSION_SECRET, etc.). Explicit type so Astro.locals inference does not narrow to never. */
 export interface PortalEnv {
@@ -88,15 +88,18 @@ export async function getPortalContext(
         csrfToken: (luciaSession as any).csrfToken, // Use the CSRF token from ExtendedSession (set by middleware)
         createdAt: (luciaSession as any).created_at,
         fingerprint: (luciaSession as any).fingerprint,
+        // Propagate assumed_role fields so getEffectiveRole() can apply them
+        assumed_role: (luciaSession as any).assumed_role ?? undefined,
+        assumed_at: (luciaSession as any).assumed_at ?? undefined,
+        assumed_until: (luciaSession as any).assumed_until ?? undefined,
       };
     }
   }
 
-  // Determine effective role based on PIM elevation
-  // User must have both: (1) elevated role, and (2) active elevation
-  const userRole = session?.role?.toLowerCase() || 'member';
-  const hasElevation = session && typeof session.elevated_until === 'number' && session.elevated_until > Date.now();
-  const effectiveRole = isElevatedRole(userRole) && hasElevation ? userRole : 'member';
+  // Determine effective role using the authoritative getEffectiveRole() from auth.ts.
+  // This correctly handles PIM elevation windows, assumed roles (admin/arb_board acting
+  // as board/arb), and falls back to 'member' when elevation is inactive.
+  const effectiveRole = getEffectiveRole(session);
 
   return {
     env,

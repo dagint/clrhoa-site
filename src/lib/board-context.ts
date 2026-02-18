@@ -82,6 +82,10 @@ export async function getAdminContext(astro: RoleContextAstro): Promise<GetRoleC
     sessionId: luciaSession.id,
     elevated_until: (luciaSession as any).elevated_until,
     csrfToken: (luciaSession as any).csrfToken,
+    // Propagate assumed_role fields so getEffectiveRole() can apply them for admin/arb_board
+    assumed_role: (luciaSession as any).assumed_role ?? undefined,
+    assumed_at: (luciaSession as any).assumed_at ?? undefined,
+    assumed_until: (luciaSession as any).assumed_until ?? undefined,
   };
 
   const effectiveRole = getEffectiveRole(session);
@@ -138,6 +142,10 @@ export async function getBoardContext(astro: RoleContextAstro): Promise<GetRoleC
     sessionId: luciaSession.id,
     elevated_until: (luciaSession as any).elevated_until,
     csrfToken: (luciaSession as any).csrfToken,
+    // Propagate assumed_role fields so getEffectiveRole() can apply them for admin/arb_board
+    assumed_role: (luciaSession as any).assumed_role ?? undefined,
+    assumed_at: (luciaSession as any).assumed_at ?? undefined,
+    assumed_until: (luciaSession as any).assumed_until ?? undefined,
   };
 
   const effectiveRole = getEffectiveRole(session);
@@ -194,6 +202,10 @@ export async function getArbContext(astro: RoleContextAstro): Promise<GetRoleCon
     sessionId: luciaSession.id,
     elevated_until: (luciaSession as any).elevated_until,
     csrfToken: (luciaSession as any).csrfToken,
+    // Propagate assumed_role fields so getEffectiveRole() can apply them for admin/arb_board
+    assumed_role: (luciaSession as any).assumed_role ?? undefined,
+    assumed_at: (luciaSession as any).assumed_at ?? undefined,
+    assumed_until: (luciaSession as any).assumed_until ?? undefined,
   };
 
   const effectiveRole = getEffectiveRole(session);
