@@ -402,6 +402,18 @@ function formatApproval(arbEsign: string | null, esignTimestamp: string | null):
       header, .no-print, .request-summary, [role="status"] { display: none !important; }
       main > p:first-of-type { display: none !important; }
 
+      /* CRITICAL: Hide all scrollbars in print */
+      * {
+        overflow: visible !important;
+        -webkit-overflow-scrolling: auto !important;
+      }
+
+      *::-webkit-scrollbar {
+        display: none !important;
+        width: 0 !important;
+        height: 0 !important;
+      }
+
       /* Remove overflow and height constraints to prevent scroll bars */
       body, html {
         overflow: visible !important;
@@ -459,6 +471,18 @@ function formatApproval(arbEsign: string | null, esignTimestamp: string | null):
       /* Remove max-width constraints for better print layout */
       .max-w-5xl, .max-w-7xl, .max-w-4xl {
         max-width: none !important;
+      }
+
+      /* Override all Tailwind overflow classes */
+      .overflow-auto, .overflow-scroll, .overflow-x-auto, .overflow-y-auto,
+      .overflow-x-scroll, .overflow-y-scroll, .overflow-hidden {
+        overflow: visible !important;
+      }
+
+      /* Ensure all containers are visible */
+      div, section, article, aside {
+        overflow: visible !important;
+        max-height: none !important;
       }
     }
   </style>
