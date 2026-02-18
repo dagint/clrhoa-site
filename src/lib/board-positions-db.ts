@@ -4,7 +4,7 @@
  */
 
 import { generateId } from '../utils/id-generator.js';
-import { updateOwner, getOwnerByEmail } from './directory-db';
+import { getOwnerByEmail } from './directory-db';
 
 /**
  * Valid board and ARB titles
@@ -189,8 +189,8 @@ export async function assignBoardPosition(
       .bind(id, normalizedEmail, title, start, assignedBy)
       .run();
 
-    // Update owners.board_title for directory display
-    await updateOwner(db, owner.id, { board_title: title });
+    // Update owners.board_title for directory display (direct update to avoid fallback chain losing board_title)
+    await db.prepare('UPDATE owners SET board_title = ? WHERE id = ?').bind(title, owner.id).run();
 
     return { success: true };
   } catch (error) {
@@ -240,8 +240,8 @@ export async function endBoardPosition(
         .run();
     }
 
-    // Clear board_title in owners
-    await updateOwner(db, owner.id, { board_title: null });
+    // Clear board_title in owners (direct update to avoid fallback chain losing board_title)
+    await db.prepare('UPDATE owners SET board_title = NULL WHERE id = ?').bind(owner.id).run();
 
     return true;
   } catch (error) {
