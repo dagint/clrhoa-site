@@ -180,13 +180,14 @@ export const POST: APIRoute = async ({ request, locals, cookies }) => {
   // Get user from database
   const user = await db
     .prepare(
-      `SELECT email, password_hash, role, name, status, mfa_enabled,
+      `SELECT id, email, password_hash, role, name, status, mfa_enabled,
               failed_login_attempts, locked_until
        FROM users
        WHERE email = ?`
     )
     .bind(normalizedEmail)
     .first<{
+      id: string;
       email: string;
       password_hash: string | null;
       role: string;
@@ -410,7 +411,7 @@ export const POST: APIRoute = async ({ request, locals, cookies }) => {
   // No MFA - create session directly
   const requestUrl = request.url;
   const lucia = createLucia(db, requestUrl);
-  const session = await createSession(db, lucia, normalizedEmail, ipAddress, userAgent);
+  const session = await createSession(db, lucia, user.id, ipAddress, userAgent);
 
   // Set session cookie
   const sessionCookie = lucia.createSessionCookie(session.id);
