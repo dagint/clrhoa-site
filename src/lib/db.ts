@@ -53,13 +53,13 @@ export async function upsertUser(
   const normalized = email.trim().toLowerCase();
   await db
     .prepare(
-      `INSERT INTO users (email, role, name, created)
-       VALUES (?, ?, ?, datetime('now'))
+      `INSERT INTO users (id, email, role, name, created)
+       VALUES (?, ?, ?, ?, datetime('now'))
        ON CONFLICT(email) DO UPDATE SET
          name = COALESCE(excluded.name, name),
          role = COALESCE(users.role, excluded.role)`
     )
-    .bind(normalized, role, name ?? null)
+    .bind(normalized, normalized, role, name ?? null)
     .run();
 
   const user = await getUserByEmail(db, normalized);
