@@ -200,7 +200,7 @@ const showActionNeededBanner = showActionFeedback || showActionMaintenance || sh
                 {(arbCounts.in_review > 0 || arbCounts.pending > 0) && (
                   <li>
                     <a
-                      href={isStaffRole ? '/portal/arb-dashboard' : '/portal/request-elevated-access?return=' + encodeURIComponent('/portal/arb-dashboard')}
+                      href={isStaffRole ? '/portal/arb/dashboard' : '/portal/request-elevated-access?return=' + encodeURIComponent('/portal/arb/dashboard')}
                       class="flex items-center justify-between p-4 bg-white rounded-lg hover:shadow-md transition-shadow"
                     >
                       <div>
@@ -423,7 +423,7 @@ const showActionNeededBanner = showActionFeedback || showActionMaintenance || sh
                 )}
                 {(effectiveRole === 'arb' || effectiveRole === 'admin' || effectiveRole === 'arb_board') && (
                   <a
-                    href="/portal/arb-dashboard"
+                    href="/portal/arb/dashboard"
                     class="inline-flex items-center gap-2 px-5 py-3 rounded-xl border-2 border-clr-green text-clr-green hover:bg-clr-green/10 font-semibold transition-all"
                   >
                     ARB Dashboard
