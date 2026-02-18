@@ -251,11 +251,12 @@ const selectedTypes = req.application_type ? req.application_type.split(',').map
       const addFilesError = document.getElementById('add-files-error');
 
       // Defensive: verify form action is correct (not corrupted)
-      if (form && form.action) {
-        var actionUrl = String(form.action);
-        if (!actionUrl.endsWith('/api/arb-update')) {
-          console.error('[ARB-EDIT] Form action is incorrect:', actionUrl, 'Expected: /api/arb-update');
-          form.action = '/api/arb-update';
+      // NOTE: Use getAttribute() because form.action can return RadioNodeList when buttons have name="action"
+      if (form) {
+        var actionAttr = form.getAttribute('action');
+        if (!actionAttr || !actionAttr.endsWith('/api/arb-update')) {
+          console.error('[ARB-EDIT] Form action is incorrect:', actionAttr, 'Expected: /api/arb-update');
+          form.setAttribute('action', '/api/arb-update');
         }
       }
 
