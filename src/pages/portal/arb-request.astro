@@ -265,7 +265,7 @@ const arbInputClass = 'w-full rounded-lg border border-gray-300 px-4 py-3 text-b
             Attachments <span class="text-gray-400 font-normal">(optional but recommended)</span>
             <span class="ml-1 text-gray-400 cursor-help" title="Photos are resized before upload. PDFs stay full quality. By submitting you confirm you have reviewed your attachments." aria-label="Help: Attachments">(i)</span>
           </label>
-          <p class="text-sm text-gray-500 mb-2">Submit as applicable: written description, lot survey, specifications (plans, dimensions, materials, colors), paint/color samples, photos, brochures. Max 5MB per file, 25MB total. <strong>Photos are resized before upload</strong> to save space; PDFs are kept as-is. By submitting, you confirm you have reviewed your attachments. Allowed: JPEG, PNG, GIF, WebP, HEIC, PDF.</p>
+          <p class="text-sm text-gray-500 mb-2">Submit as applicable: written description, lot survey, specifications (plans, dimensions, materials, colors), paint/color samples, photos, brochures. Max 10MB per file, 40MB total. <strong>Photos are resized before upload</strong> to save space; PDFs are kept as-is. By submitting, you confirm you have reviewed your attachments. Allowed: JPEG, PNG, GIF, WebP, HEIC, PDF.</p>
           <input
             type="file"
             name="files"
@@ -309,7 +309,7 @@ const arbInputClass = 'w-full rounded-lg border border-gray-300 px-4 py-3 text-b
       </form>
     </div>
 
-  <script is:inline define:vars={{ maxFileBytes: 5 * 1024 * 1024, maxTotalBytes: 25 * 1024 * 1024, reviewMaxWidth: 2000, archiveMaxWidth: 1200 }}>
+  <script is:inline define:vars={{ maxFileBytes: 10 * 1024 * 1024, maxTotalBytes: 40 * 1024 * 1024, reviewMaxWidth: 2000, archiveMaxWidth: 1200 }}>
     (function () {
       const form = document.getElementById('arb-form');
       const fileInput = form?.querySelector('input[name="files"]');
@@ -477,14 +477,14 @@ const arbInputClass = 'w-full rounded-lg border border-gray-300 px-4 py-3 text-b
           let total = 0;
           for (const f of files) {
             if (f.size > maxFileBytes) {
-              showErr(fileError, `"${f.name}" exceeds 5MB. Maximum 5MB per file.`);
+              showErr(fileError, `"${f.name}" exceeds 10MB. Maximum 10MB per file.`);
               if (fileSizePreview) { fileSizePreview.classList.add('hidden'); }
               return;
             }
             total += f.size;
           }
           if (total > maxTotalBytes) {
-            showErr(fileError, `Total size ${(total / 1024 / 1024).toFixed(1)}MB exceeds 25MB limit.`);
+            showErr(fileError, `Total size ${(total / 1024 / 1024).toFixed(1)}MB exceeds 40MB limit.`);
           }
           // Show file size preview
           if (fileSizePreview && files.length > 0) {
