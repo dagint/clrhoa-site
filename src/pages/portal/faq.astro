@@ -56,7 +56,7 @@ const badges = await getPortalBadgeCounts(db, email, role, name);
           <section class="bg-white rounded-2xl border border-gray-200 p-6 sm:p-8 portal-theme-card">
         <h2 class="text-2xl font-heading font-bold text-clr-green mb-3">Why don't I see Board or ARB links?</h2>
             <p class="text-gray-700 text-base leading-relaxed">
-              Board and ARB tools are only visible when you have <strong>elevated access</strong>. If you're a board or ARB member, you normally see the same portal as everyone else; when you need to use board tools (record payments, ARB dashboard, etc.), go to the <strong>Dashboard</strong> and click <strong>Request elevated access</strong>. You get <strong>1 hour</strong> of elevated access, then you're back to the normal view. Use <strong>Drop access</strong> when you're done.
+              Board and ARB management tools require <strong>elevated access</strong> before they appear in the menu. This is intentional — board members see the same portal as everyone else by default. When you need to use board or ARB tools, go to the <strong>Dashboard</strong> and click <strong>Request elevated access</strong>, then re-enter your password to confirm. You get <strong>1 hour</strong> of elevated access; after that you return to the standard view automatically. Click <strong>Drop access</strong> in the menu whenever you are done early. All elevated sessions are logged for security.
             </p>
           </section>
 
@@ -70,7 +70,7 @@ const badges = await getPortalBadgeCounts(db, email, role, name);
           <section class="bg-white rounded-2xl border border-gray-200 p-6 sm:p-8 portal-theme-card">
         <h2 class="text-2xl font-heading font-bold text-clr-green mb-3">How do I change my password?</h2>
             <p class="text-gray-700 text-base leading-relaxed">
-              The portal uses your email to sign in; there is no separate password. Access is controlled by the board. If you need to sign in from a new device or have trouble logging in, contact the board.
+              On the login page, click <strong>Forgot password?</strong> and enter your email address. You will receive a link to set a new password. If you do not receive the email within a few minutes, check your spam folder or contact the board to resend your invite.
             </p>
           </section>
 
@@ -117,6 +117,27 @@ const badges = await getPortalBadgeCounts(db, email, role, name);
           </section>
 
           <section class="bg-white rounded-2xl border border-gray-200 p-6 sm:p-8 portal-theme-card">
+        <h2 class="text-2xl font-heading font-bold text-clr-green mb-3">Why do some members show a title like &quot;President&quot; or &quot;ARB Chair&quot; in the Directory?</h2>
+            <p class="text-gray-700 text-base leading-relaxed">
+              Board and ARB members are shown with their current role title next to their name (for example, <em>President</em>, <em>Secretary</em>, <em>ARB Chair</em>). This helps you know who to contact for specific matters. Titles are updated by the board when positions change.
+            </p>
+          </section>
+
+          <section class="bg-white rounded-2xl border border-gray-200 p-6 sm:p-8 portal-theme-card">
+        <h2 class="text-2xl font-heading font-bold text-clr-green mb-3">How do I RSVP to or view upcoming meetings?</h2>
+            <p class="text-gray-700 text-base leading-relaxed">
+              Click <strong>Meetings</strong> in the main menu. You will see scheduled board and member meetings, including date, time, and location. Where an RSVP is open, you can confirm attendance directly from that page. Meeting notices and agendas (when posted) are also linked there.
+            </p>
+          </section>
+
+          <section class="bg-white rounded-2xl border border-gray-200 p-6 sm:p-8 portal-theme-card">
+        <h2 class="text-2xl font-heading font-bold text-clr-green mb-3">How do I submit general feedback or a survey response?</h2>
+            <p class="text-gray-700 text-base leading-relaxed">
+              Click <strong>Feedback</strong> in the main menu to see and respond to any open surveys or community feedback requests posted by the board. For feedback specifically about the portal itself (bugs, confusing wording, feature ideas), use the <strong>thumbs up/down button</strong> in the bottom-right corner of any portal page.
+            </p>
+          </section>
+
+          <section class="bg-white rounded-2xl border border-gray-200 p-6 sm:p-8 portal-theme-card">
         <h2 class="text-2xl font-heading font-bold text-clr-green mb-3">Where do I pay my dues?</h2>
             <p class="text-gray-700 text-base leading-relaxed">
               The portal does not process payments. Go to <strong>More</strong> then <strong>Dues</strong> to view your balance and payment history. Pay by the method the board specifies (e.g. check sent to the HOA address). Contact the board for current payment options.
@@ -126,7 +147,7 @@ const badges = await getPortalBadgeCounts(db, email, role, name);
           <section class="bg-white rounded-2xl border border-gray-200 p-6 sm:p-8 portal-theme-card">
         <h2 class="text-2xl font-heading font-bold text-clr-green mb-3">I cannot find what I need. What should I do?</h2>
             <p class="text-gray-700 text-base leading-relaxed">
-              Use the <strong>search bar</strong> at the top to search ARB requests, meetings, vendors, the directory, and the pre-approval library. Read the <strong>Documentation</strong> (under Help) for a guide to each section. If you still need help, contact the board.
+              Use the <strong>search bar</strong> at the top to search ARB requests, meetings, vendors, the directory, and the pre-approval library. Check the questions on this page — most common tasks are covered above. If you still need help, contact the board using the information on the <strong>Dues</strong> page or the public site.
             </p>
           </section>
 
