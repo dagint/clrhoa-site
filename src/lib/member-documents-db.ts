@@ -1,15 +1,39 @@
 /**
  * D1 helpers for member-only documents (minutes, budgets, other).
  * Board uploads; files in R2 under member-docs/; members view on /portal/documents.
+ *
+ * Categories aligned with FL Statute 720.303(4) compliance requirements.
  */
 
-export const MEMBER_DOC_CATEGORIES = ['minutes', 'budgets', 'other'] as const;
+export const MEMBER_DOC_CATEGORIES = [
+  'minutes',
+  'budgets',
+  'financials',
+  'special-assessments',
+  'contracts',
+  'insurance',
+  'other',
+] as const;
 export type MemberDocCategory = (typeof MEMBER_DOC_CATEGORIES)[number];
 
 export const MEMBER_DOC_CATEGORY_LABELS: Record<MemberDocCategory, string> = {
-  minutes: 'Minutes (redacted)',
-  budgets: 'Budgets',
-  other: 'Other',
+  minutes: 'Meeting Minutes (redacted)',
+  budgets: 'Annual Budgets',
+  financials: 'Financial Statements',
+  'special-assessments': 'Special Assessments',
+  contracts: 'Contracts (redacted)',
+  insurance: 'Insurance Policies',
+  other: 'Other Documents',
+};
+
+export const MEMBER_DOC_CATEGORY_DESCRIPTIONS: Record<MemberDocCategory, string> = {
+  minutes: 'Board and member meeting minutes with PII redacted',
+  budgets: 'Annual budgets and budget amendments',
+  financials: 'Quarterly or annual financial statements, balance sheets',
+  'special-assessments': 'Special assessment notices and documentation',
+  contracts: 'Vendor and service contracts with pricing redacted',
+  insurance: 'Insurance policies, certificates of insurance',
+  other: 'Other member-only documents',
 };
 
 export interface MemberDocumentRow {

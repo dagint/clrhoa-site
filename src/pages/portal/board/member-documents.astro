@@ -5,7 +5,7 @@ import { getAdminContext } from '../../../lib/board-context';
 import { getPortalBadgeCounts } from '../../../lib/portal-badge-counts';
 import { isBoardOnly } from '../../../lib/auth';
 import { listMemberDocuments } from '../../../lib/member-documents-db';
-import { MEMBER_DOC_CATEGORIES, MEMBER_DOC_CATEGORY_LABELS } from '../../../lib/member-documents-db';
+import { MEMBER_DOC_CATEGORIES, MEMBER_DOC_CATEGORY_LABELS, MEMBER_DOC_CATEGORY_DESCRIPTIONS } from '../../../lib/member-documents-db';
 import { sanitizeForScriptInjection } from '../../../lib/sanitize';
 import { formatEasternDateTime } from '../../../lib/timezone';
 import PortalLayout from '../../../layouts/PortalLayout.astro';
@@ -96,8 +96,8 @@ const docsByCategory = MEMBER_DOC_CATEGORIES.map((cat) => ({
               <option value={cat}>{MEMBER_DOC_CATEGORY_LABELS[cat]}</option>
             ))}
           </select>
-          <p class="text-xs text-amber-700 mt-1.5 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-            <strong>Minutes:</strong> Redact confidential or sensitive content before uploading.
+          <p id="member-doc-category-description" class="text-xs text-blue-700 mt-1.5 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+            {MEMBER_DOC_CATEGORY_DESCRIPTIONS['minutes']}
           </p>
         </div>
         <div>
@@ -173,7 +173,10 @@ const docsByCategory = MEMBER_DOC_CATEGORIES.map((cat) => ({
   </PortalPage>
 </PortalLayout>
 
-<script is:inline define:vars={{ csrfToken: sanitizeForScriptInjection(session?.csrfToken ?? '') }}>
+<script is:inline define:vars={{
+  csrfToken: sanitizeForScriptInjection(session?.csrfToken ?? ''),
+  categoryDescriptions: MEMBER_DOC_CATEGORY_DESCRIPTIONS
+}}>
   (function () {
     if (typeof window === 'undefined') return;
 
@@ -230,12 +233,17 @@ const docsByCategory = MEMBER_DOC_CATEGORIES.map((cat) => ({
     }
 
     var categorySelect = document.getElementById('member-doc-category');
+    var categoryDescEl = document.getElementById('member-doc-category-description');
     if (categorySelect && fileInput) {
       var acceptMinutes = fileInput.getAttribute('data-accept-minutes') || '';
       var acceptAll = fileInput.getAttribute('data-accept-all') || '';
       categorySelect.addEventListener('change', function () {
         fileInput.accept = this.value === 'minutes' ? acceptMinutes : acceptAll;
         fileInput.value = '';
+        // Update description text based on selected category
+        if (categoryDescEl && categoryDescriptions && categoryDescriptions[this.value]) {
+          categoryDescEl.textContent = categoryDescriptions[this.value];
+        }
       });
       fileInput.accept = categorySelect.value === 'minutes' ? acceptMinutes : acceptAll;
     }
