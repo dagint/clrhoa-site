@@ -205,7 +205,7 @@ const selectedTypes = req.application_type ? req.application_type.split(',').map
           ) : (
             <p class="text-sm text-gray-500 mb-4">No attachments yet.</p>
           )}
-          <p class="text-sm text-gray-500 mb-2">Add more: images or PDF, 5MB per file, 25MB total. Photos are resized before upload; by adding them you confirm you have reviewed the selection.</p>
+          <p class="text-sm text-gray-500 mb-2">Add more: images or PDF, 10MB per file, 40MB total. Photos are resized before upload; by adding them you confirm you have reviewed the selection.</p>
           <input type="file" id="add-files-input" name="add_files" multiple accept="image/*,application/pdf" class="w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-clr-beige file:text-clr-green file:font-semibold" />
           <button type="button" id="add-files-btn" class="mt-2 px-4 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-sm font-semibold text-gray-700">Add selected files</button>
           <p id="add-files-error" class="mt-1 text-sm text-red-600 hidden" role="alert"></p>
@@ -239,7 +239,7 @@ const selectedTypes = req.application_type ? req.application_type.split(',').map
       </form>
     </div>
 
-  <script is:inline define:vars={{ requestId: req.id, reviewMaxWidth: 2000, archiveMaxWidth: 1200, maxFileBytes: 5 * 1024 * 1024, maxTotalBytes: 25 * 1024 * 1024 }}>
+  <script is:inline define:vars={{ requestId: req.id, reviewMaxWidth: 2000, archiveMaxWidth: 1200, maxFileBytes: 10 * 1024 * 1024, maxTotalBytes: 40 * 1024 * 1024 }}>
     (function () {
       const form = document.getElementById('arb-edit-form');
       const formError = document.getElementById('form-error');
@@ -377,7 +377,7 @@ const selectedTypes = req.application_type ? req.application_type.split(',').map
             for (var i = 0; i < files.length; i++) {
               var file = files[i];
               if (file.size > maxFileBytes) {
-                addFilesError.textContent = 'File "' + file.name + '" exceeds 5MB.';
+                addFilesError.textContent = 'File "' + file.name + '" exceeds 10MB.';
                 addFilesError.classList.remove('hidden');
                 addFilesBtn.disabled = false;
                 addFilesBtn.textContent = 'Add selected files';
