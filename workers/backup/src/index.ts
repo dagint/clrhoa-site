@@ -312,7 +312,8 @@ async function recordLastBackupTime(env: Env): Promise<void> {
   if (!env.DB) return;
   try {
     await env.DB.prepare(
-      `UPDATE backup_config SET last_backup_at = datetime('now') WHERE id = 1`
+      `INSERT INTO backup_config (id, last_backup_at) VALUES (1, datetime('now'))
+       ON CONFLICT(id) DO UPDATE SET last_backup_at = datetime('now')`
     ).run();
   } catch (e) {
     // Column may not exist yet; log but don't fail the backup
@@ -598,10 +599,11 @@ async function recordLastGoogleBackupTime(env: Env): Promise<void> {
   if (!env.DB) return;
   try {
     await env.DB.prepare(
-      `UPDATE backup_config SET last_google_backup_at = datetime('now') WHERE id = 1`
+      `INSERT INTO backup_config (id, google_last_backup_at) VALUES (1, datetime('now'))
+       ON CONFLICT(id) DO UPDATE SET google_last_backup_at = datetime('now')`
     ).run();
   } catch (e) {
-    console.warn("Could not update last_google_backup_at:", e);
+    console.warn("Could not update google_last_backup_at:", e);
   }
 }
 
