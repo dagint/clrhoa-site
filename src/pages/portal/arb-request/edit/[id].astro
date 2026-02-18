@@ -2,11 +2,11 @@
 export const prerender = false;
 
 import PortalLayout from '../../../../layouts/PortalLayout.astro';
-import ProtectedPage from '../../../../components/ProtectedPage.astro';
-import PortalNav from '../../../../components/PortalNav.astro';
+import PortalPage from '../../../../components/PortalPage.astro';
 import { getPortalContext } from '../../../../lib/portal-context';
+import { getPortalBadgeCounts } from '../../../../lib/portal-badge-counts';
 import { SESSION_COOKIE_NAME } from '../../../../lib/auth';
-import { getArbRequest, listArbFilesByRequest, listArbRequestsByHousehold } from '../../../../lib/arb-db';
+import { getArbRequest, listArbFilesByRequest } from '../../../../lib/arb-db';
 import { listEmailsAtSameAddress } from '../../../../lib/directory-db.js';
 import type { ArbFile } from '../../../../lib/arb-db';
 
@@ -74,9 +74,9 @@ if (!db || !id) {
   return Astro.redirect('/portal/my-requests');
 }
 
-// Get draft count for navigation badge
-const allRequests = await listArbRequestsByHousehold(db, session.email);
-const draftCount = allRequests.filter(r => r.status === 'pending').length;
+// Get badge counts for navigation
+const { email, role, name } = session;
+const badges = await getPortalBadgeCounts(db, email, role, name);
 
 const req = await getArbRequest(db, id);
 if (!req) {
@@ -101,12 +101,22 @@ const selectedTypes = req.application_type ? req.application_type.split(',').map
 ---
 
 <PortalLayout title="Edit ARB Request | Member Portal | Crooked Lake Reserve HOA">
-  <ProtectedPage>
-  <div class="min-h-screen portal-theme-bg font-body">
-    <PortalNav currentPath="/portal/my-requests" draftCount={draftCount} role={effectiveRole} staffRole={session?.role ?? ''} />
-
-    <main class="max-w-2xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
-      <h2 class="text-2xl font-heading font-bold text-clr-green mb-2">Edit ARB request #{req.id}</h2>
+  <PortalPage
+    currentPath="/portal/my-requests"
+    pageTitle={`Edit ARB Request #${req.id}`}
+    userName={badges.displayName ?? undefined}
+    userEmail={email}
+    effectiveRole={effectiveRole}
+    role={role}
+    draftCount={badges.draftCount}
+    arbInReviewCount={badges.arbInReviewCount}
+    vendorPendingCount={badges.vendorPendingCount}
+    maintenanceOpenCount={badges.maintenanceOpenCount}
+    meetingsRsvpCount={badges.meetingsRsvpCount}
+    feedbackDueCount={badges.feedbackDueCount}
+    libraryItemCount={badges.libraryItemCount}
+  >
+    <div class="max-w-2xl mx-auto">
       <p class="text-gray-600 mb-6">Update the details below and save. Changes are saved electronically. Only pending requests can be edited. Existing attachments are kept. <a href="/arb-request-how-to" class="text-clr-orange hover:underline">How to submit an ARB request</a></p>
 
       {req.revision_notes && (
@@ -227,8 +237,7 @@ const selectedTypes = req.application_type ? req.application_type.split(',').map
         </div>
         <p class="mt-2 text-sm text-gray-500">Save keeps your changes and lets you continue editing. Save and submit sends your request to the ARB for review.</p>
       </form>
-    </main>
-  </div>
+    </div>
 
   <script is:inline define:vars={{ requestId: req.id, reviewMaxWidth: 2000, archiveMaxWidth: 1200, maxFileBytes: 5 * 1024 * 1024, maxTotalBytes: 25 * 1024 * 1024 }}>
     (function () {
@@ -467,5 +476,5 @@ const selectedTypes = req.application_type ? req.application_type.split(',').map
       setInterval(checkSessionTimeout, 60 * 1000);
     })();
   </script>
-  </ProtectedPage>
+  </PortalPage>
 </PortalLayout>
