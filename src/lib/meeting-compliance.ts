@@ -87,19 +87,36 @@ export async function getUpcomingMeetingsWithCompliance(
   db: D1Database,
   limit = 10
 ): Promise<MeetingComplianceStatus[]> {
-  const { results } = await db
-    .prepare(
-      `SELECT id, title, datetime, notice_posted_at, agenda_posted_at, created
-       FROM meetings
-       WHERE datetime >= datetime('now')
-       ORDER BY datetime ASC
-       LIMIT ?`
-    )
-    .bind(limit)
-    .all<Meeting>();
+  try {
+    const { results } = await db
+      .prepare(
+        `SELECT id, title, datetime, notice_posted_at, agenda_posted_at, created
+         FROM meetings
+         WHERE datetime >= datetime('now')
+         ORDER BY datetime ASC
+         LIMIT ?`
+      )
+      .bind(limit)
+      .all<Meeting>();
 
-  const meetings = results ?? [];
-  return meetings.map(checkMeetingCompliance);
+    const meetings = results ?? [];
+    return meetings.map(checkMeetingCompliance);
+  } catch {
+    // Fallback if notice_posted_at / agenda_posted_at columns are missing (schema migration not yet run)
+    const { results } = await db
+      .prepare(
+        `SELECT id, title, datetime, NULL as notice_posted_at, NULL as agenda_posted_at, created
+         FROM meetings
+         WHERE datetime >= datetime('now')
+         ORDER BY datetime ASC
+         LIMIT ?`
+      )
+      .bind(limit)
+      .all<Meeting>();
+
+    const meetings = results ?? [];
+    return meetings.map(checkMeetingCompliance);
+  }
 }
 
 /**
@@ -110,20 +127,38 @@ export async function getRecentMeetingsWithCompliance(
   db: D1Database,
   limit = 10
 ): Promise<MeetingComplianceStatus[]> {
-  const { results } = await db
-    .prepare(
-      `SELECT id, title, datetime, notice_posted_at, agenda_posted_at, created
-       FROM meetings
-       WHERE datetime < datetime('now')
-         AND datetime >= datetime('now', '-90 days')
-       ORDER BY datetime DESC
-       LIMIT ?`
-    )
-    .bind(limit)
-    .all<Meeting>();
+  try {
+    const { results } = await db
+      .prepare(
+        `SELECT id, title, datetime, notice_posted_at, agenda_posted_at, created
+         FROM meetings
+         WHERE datetime < datetime('now')
+           AND datetime >= datetime('now', '-90 days')
+         ORDER BY datetime DESC
+         LIMIT ?`
+      )
+      .bind(limit)
+      .all<Meeting>();
 
-  const meetings = results ?? [];
-  return meetings.map(checkMeetingCompliance);
+    const meetings = results ?? [];
+    return meetings.map(checkMeetingCompliance);
+  } catch {
+    // Fallback if notice_posted_at / agenda_posted_at columns are missing
+    const { results } = await db
+      .prepare(
+        `SELECT id, title, datetime, NULL as notice_posted_at, NULL as agenda_posted_at, created
+         FROM meetings
+         WHERE datetime < datetime('now')
+           AND datetime >= datetime('now', '-90 days')
+         ORDER BY datetime DESC
+         LIMIT ?`
+      )
+      .bind(limit)
+      .all<Meeting>();
+
+    const meetings = results ?? [];
+    return meetings.map(checkMeetingCompliance);
+  }
 }
 
 /**
