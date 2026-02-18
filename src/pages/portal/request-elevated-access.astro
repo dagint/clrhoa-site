@@ -191,12 +191,17 @@ const returnLabel = returnParam && returnParam.startsWith('/board') ? 'Board' : 
     </div>
   </PortalPage>
 
-  <script is:inline define:vars={{ returnParam, staffRole: whitelistRole, adminLanding: '/portal/admin', boardLanding: '/portal/board', arbLanding: '/portal/arb' }}>
+  <script is:inline define:vars={{ returnParam, staffRole: whitelistRole }}>
     (function () {
       var form = document.getElementById('pim-elevate-form');
       var btn = document.getElementById('pim-elevate-btn');
       var passwordInput = document.getElementById('password');
       var messageDiv = document.getElementById('pim-message');
+
+      // Landing zones for each persona
+      var adminLanding = '/portal/admin/dashboard';
+      var boardLanding = '/portal/board/dashboard';
+      var arbLanding = '/portal/arb/dashboard';
 
       if (!form || !btn || !passwordInput || !messageDiv) return;
 
@@ -249,9 +254,17 @@ const returnLabel = returnParam && returnParam.startsWith('/board') ? 'Board' : 
           .then(function (result) {
             if (result.ok) {
               showMessage('Elevated access granted! Redirecting...', false);
+
+              // Determine redirect based on elevated_role returned from API (or targetRole selected)
+              var elevatedRole = result.data.elevated_role || targetRole || staffRole;
+              var defaultLanding = elevatedRole === 'admin' ? adminLanding
+                : elevatedRole === 'arb' ? arbLanding
+                : boardLanding;
+
               var go = (typeof returnParam === 'string' && returnParam.startsWith('/') && !returnParam.startsWith('//'))
                 ? returnParam
-                : (staffRole === 'admin' ? adminLanding : staffRole === 'arb' ? arbLanding : boardLanding) || '/portal/dashboard';
+                : defaultLanding;
+
               setTimeout(function () {
                 window.location.href = go;
               }, 1000);
