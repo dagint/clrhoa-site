@@ -121,15 +121,15 @@ const icons: Record<string, string> = {
   <button
     type="button"
     id="sidebar-collapse-btn"
-    class="hidden lg:flex absolute top-20 -right-3 z-50 w-6 h-12 items-center justify-center bg-clr-green border border-white/20 rounded-r-lg text-white hover:bg-clr-green-dark transition-colors shadow-lg"
+    class="hidden lg:flex absolute top-20 -right-3 z-50 w-8 h-16 items-center justify-center bg-clr-green border-2 border-white/30 rounded-r-xl text-white hover:bg-clr-green-dark hover:border-white/50 transition-all shadow-xl hover:shadow-2xl hover:scale-105"
     aria-label="Toggle sidebar width"
     title="Collapse sidebar"
   >
-    <svg class="w-4 h-4 sidebar-collapse-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+    <svg class="w-5 h-5 sidebar-collapse-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7" />
     </svg>
-    <svg class="w-4 h-4 sidebar-expand-icon hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+    <svg class="w-5 h-5 sidebar-expand-icon hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7" />
     </svg>
   </button>
 
@@ -432,6 +432,14 @@ const icons: Record<string, string> = {
     if (collapseBtn) {
       collapseBtn.addEventListener('click', toggleSidebarCollapse);
     }
+
+    // Double-click sidebar to toggle (alternative method)
+    sidebar.addEventListener('dblclick', function(e) {
+      // Only on desktop, and only if clicking the sidebar itself (not links)
+      if (window.innerWidth >= 1024 && e.target === sidebar) {
+        toggleSidebarCollapse();
+      }
+    });
 
     // Toggle sidebar on mobile
     window.togglePortalSidebar = function () {
