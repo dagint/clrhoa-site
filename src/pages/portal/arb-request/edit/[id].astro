@@ -250,6 +250,22 @@ const selectedTypes = req.application_type ? req.application_type.split(',').map
       const addFilesBtn = document.getElementById('add-files-btn');
       const addFilesError = document.getElementById('add-files-error');
 
+      // Defensive: verify form action is correct (not corrupted)
+      if (form && form.action && !form.action.endsWith('/api/arb-update')) {
+        console.error('[ARB-EDIT] Form action is incorrect:', form.action, 'Expected: /api/arb-update');
+        form.action = '/api/arb-update';
+      }
+
+      // Defensive: verify requestId is a string
+      if (typeof requestId !== 'string' || !requestId || requestId.includes('[object')) {
+        console.error('[ARB-EDIT] Invalid requestId in script vars:', requestId);
+        if (formError) {
+          formError.textContent = 'Page error: Invalid request ID. Please refresh the page.';
+          formError.classList.remove('hidden');
+        }
+        return; // Don't set up form handlers
+      }
+
       function showErr(msg) {
         if (formError) { formError.textContent = msg; formError.classList.remove('hidden'); }
       }
@@ -268,6 +284,17 @@ const selectedTypes = req.application_type ? req.application_type.split(',').map
           if (saveSubmitBtn) { saveSubmitBtn.disabled = true; saveSubmitBtn.textContent = doSubmitForReview ? 'Saving and submitting…' : 'Saving…'; }
           const formData = new FormData(form);
           formData.delete('add_files');
+
+          // Defensive: validate request_id is a string, not a RadioNodeList or other object
+          const requestIdValue = formData.get('request_id');
+          if (!requestIdValue || typeof requestIdValue !== 'string' || requestIdValue.includes('[object')) {
+            console.error('[ARB-EDIT] Invalid request_id:', requestIdValue);
+            showErr('Invalid request ID. Please refresh the page and try again.');
+            if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Save'; }
+            if (saveSubmitBtn) { saveSubmitBtn.disabled = false; saveSubmitBtn.textContent = 'Save and submit'; }
+            return;
+          }
+
           try {
             const res = await fetch(form.action, { method: 'POST', body: formData });
             const data = await res.json().catch(function () { return {}; });
