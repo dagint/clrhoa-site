@@ -56,11 +56,11 @@ export function getPhonesArray(owner: { phone?: string | null; phones?: string |
 /** Maximum directory size returned in one call. Prevents unbounded queries at scale. */
 export const LIST_OWNERS_MAX = 2000;
 
-const OWNERS_SELECT_FULL = 'SELECT id, name, address, phone, email, phones, created_by_email, share_contact_with_members FROM owners';
-const OWNERS_SELECT_FULL_LOT = 'SELECT id, name, address, phone, email, phones, created_by_email, share_contact_with_members, lot_number FROM owners';
-const OWNERS_SELECT_FULL_WITH_PRIMARY = 'SELECT id, name, address, phone, email, phones, created_by_email, share_contact_with_members, COALESCE(is_primary, 1) as is_primary, lot_number FROM owners';
-const OWNERS_SELECT_FULL_WITH_UPDATED = 'SELECT id, name, address, phone, email, phones, created_by_email, share_contact_with_members, COALESCE(is_primary, 1) as is_primary, updated_by, updated_at, lot_number FROM owners';
-const OWNERS_SELECT = 'SELECT id, name, address, phone, email, phones FROM owners';
+const OWNERS_SELECT_FULL = 'SELECT id, name, address, phone, email, phones, created_by_email, share_contact_with_members, board_title FROM owners';
+const OWNERS_SELECT_FULL_LOT = 'SELECT id, name, address, phone, email, phones, created_by_email, share_contact_with_members, lot_number, board_title FROM owners';
+const OWNERS_SELECT_FULL_WITH_PRIMARY = 'SELECT id, name, address, phone, email, phones, created_by_email, share_contact_with_members, COALESCE(is_primary, 1) as is_primary, lot_number, board_title FROM owners';
+const OWNERS_SELECT_FULL_WITH_UPDATED = 'SELECT id, name, address, phone, email, phones, created_by_email, share_contact_with_members, COALESCE(is_primary, 1) as is_primary, updated_by, updated_at, lot_number, board_title FROM owners';
+const OWNERS_SELECT = 'SELECT id, name, address, phone, email, phones, board_title FROM owners';
 
 export async function listOwners(db: D1Database, limit = LIST_OWNERS_MAX, offset = 0): Promise<Owner[]> {
   const safeLimit = Math.max(1, Math.min(limit, LIST_OWNERS_MAX));
