@@ -10,6 +10,7 @@ import { requireArbRequestOwner } from '../../lib/access-control';
 import { checkRateLimit, getRateLimitConfig } from '../../lib/rate-limit';
 import { getSecurityMonitor } from '../../lib/monitoring';
 import { listArbFilesByRequest, createArbFileId, insertArbFile } from '../../lib/arb-db';
+import { createLogger, maskRequestId } from '../../lib/logging';
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10MB per file
 const MAX_TOTAL_BYTES = 40 * 1024 * 1024; // 40MB total
@@ -64,10 +65,12 @@ async function validateFileMimeType(file: File | Blob): Promise<boolean> {
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
+const logger = createLogger({ endpoint: 'arb-add-files' });
 const user = Astro.locals.user;
 const session = Astro.locals.session;
 
 if (!session || !user) {
+  logger.warn('Unauthorized file upload attempt');
   return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
 }
 
@@ -138,13 +141,20 @@ if (!verifyCsrfToken(session, csrfToken)) {
   );
 }
 
-const requestId = (formData.get('request_id') as string)?.trim();
-if (!requestId) {
-  return new Response(JSON.stringify({ error: 'request_id is required.' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
-}
+try {
+  const requestId = (formData.get('request_id') as string)?.trim();
+  if (!requestId) {
+    logger.warn('Missing request_id in file upload', { user: user.email });
+    return new Response(JSON.stringify({ error: 'request_id is required.' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+  }
 
-const ownerCheck = await requireArbRequestOwner(db, requestId, user, { requirePending: true });
-if ('response' in ownerCheck) return ownerCheck.response;
+  logger.info('File upload attempt', { requestId: maskRequestId(requestId), user: user.email });
+
+  const ownerCheck = await requireArbRequestOwner(db, requestId, user, { requirePending: true });
+  if ('response' in ownerCheck) {
+    logger.warn('Owner check failed for file upload', { requestId: maskRequestId(requestId), user: user.email });
+    return ownerCheck.response;
+  }
 
 const existingFiles = await listArbFilesByRequest(db, requestId);
 const existingTotal = existingFiles.reduce((sum, f) => sum + f.original_size, 0);
@@ -185,8 +195,16 @@ if (fileGroups.length === 0) {
 }
 
 if (fileGroups.length === 0) {
+  logger.warn('No files provided', { requestId: maskRequestId(requestId), user: user.email });
   return new Response(JSON.stringify({ error: 'No files to add.' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
 }
+
+logger.info('Files validated', {
+  requestId: maskRequestId(requestId),
+  user: user.email,
+  fileCount: fileGroups.length,
+  fileNames: fileGroups.map(f => f.name)
+});
 
 let newTotal = 0;
 for (const f of fileGroups) {
@@ -239,11 +257,24 @@ if (existingTotal + newTotal > MAX_TOTAL_BYTES) {
 }
 
 const r2Prefix = `arb/${requestId}`;
+logger.info('Starting R2 upload', {
+  requestId: maskRequestId(requestId),
+  user: user.email,
+  fileCount: fileGroups.length
+});
+
 for (const f of fileGroups) {
   const fileId = createArbFileId();
   const ext = f.name.includes('.') ? f.name.split('.').pop()! : 'bin';
   const safeName = `${fileId}.${ext}`;
   const originalKey = `${r2Prefix}/originals/${safeName}`;
+
+  logger.info('Uploading file to R2', {
+    requestId: maskRequestId(requestId),
+    fileId,
+    fileName: f.name,
+    size: f.size
+  });
 
   const origBuf = await f.original.arrayBuffer();
   await r2.put(originalKey, origBuf, { httpMetadata: { contentType: f.type || 'application/octet-stream' } });
@@ -265,10 +296,35 @@ for (const f of fileGroups) {
     archive: archiveKey ? [archiveKey] : [],
   });
   await insertArbFile(db, fileId, requestId, f.name, r2KeysJson, f.size);
+
+  logger.info('File saved to database', {
+    requestId: maskRequestId(requestId),
+    fileId,
+    fileName: f.name
+  });
 }
 
-return new Response(
-  JSON.stringify({ success: true, message: `${fileGroups.length} file(s) added.`, count: fileGroups.length }),
-  { status: 200, headers: { 'Content-Type': 'application/json' } }
-);
+  logger.info('All files uploaded successfully', {
+    requestId: maskRequestId(requestId),
+    user: user.email,
+    count: fileGroups.length
+  });
+
+  return new Response(
+    JSON.stringify({ success: true, message: `${fileGroups.length} file(s) added.`, count: fileGroups.length }),
+    { status: 200, headers: { 'Content-Type': 'application/json' } }
+  );
+} catch (e) {
+  const errorMessage = e instanceof Error ? e.message : String(e);
+  const errorStack = e instanceof Error ? e.stack : undefined;
+  logger.error('File upload failed with exception', {
+    error: errorMessage,
+    stack: errorStack,
+    user: user.email
+  });
+  return new Response(
+    JSON.stringify({ error: 'File upload failed. Please try again.' }),
+    { status: 500, headers: { 'Content-Type': 'application/json' } }
+  );
+}
 ---

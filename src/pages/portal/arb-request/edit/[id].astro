@@ -439,16 +439,30 @@ const selectedTypes = req.application_type ? req.application_type.split(',').map
                 formData.append('file_' + i, file);
               }
             }
+            console.log('[ARB-EDIT] Uploading', files.length, 'file(s) to /api/arb-add-files');
             var res = await fetch('/api/arb-add-files', { method: 'POST', body: formData });
-            var data = await res.json().catch(function () { return {}; });
+            console.log('[ARB-EDIT] Add files response status:', res.status, res.statusText);
+            var data = await res.json().catch(function (e) {
+              console.error('[ARB-EDIT] Failed to parse add files response JSON:', e);
+              return {};
+            });
+            console.log('[ARB-EDIT] Add files response data:', data);
             if (res.ok && data.success) {
+              console.log('[ARB-EDIT] Files added successfully, reloading page');
               addFilesInput.value = '';
               window.location.reload();
             } else {
+              console.error('[ARB-EDIT] Add files failed:', {
+                status: res.status,
+                ok: res.ok,
+                success: data.success,
+                error: data.error
+              });
               addFilesError.textContent = data.error || 'Add failed.';
               addFilesError.classList.remove('hidden');
             }
           } catch (err) {
+            console.error('[ARB-EDIT] Network error during file upload:', err);
             addFilesError.textContent = 'Network error.';
             addFilesError.classList.remove('hidden');
           }
