@@ -11,6 +11,8 @@ import {
   listComplianceAuditLogs,
   type ComplianceDocument,
 } from '../../../../lib/compliance-db';
+import { listMemberDocuments, MEMBER_DOC_CATEGORY_LABELS } from '../../../../lib/member-documents-db';
+import { listPublicDocuments } from '../../../../lib/public-documents-db';
 import { formatEasternDateTime, formatEasternDate } from '../../../../lib/timezone';
 
 const ctx = await getBoardContext(Astro);
@@ -37,6 +39,10 @@ const allDocuments = await listComplianceDocuments(db, requirementId);
 const currentDocument = allDocuments.find((d) => d.is_current === 1);
 const archivedDocuments = allDocuments.filter((d) => d.is_current === 0);
 const auditLogs = await listComplianceAuditLogs(db, requirementId);
+
+// Existing portal documents available for linking
+const allMemberDocs = await listMemberDocuments(db, 500, 0);
+const allPublicDocs = (await listPublicDocuments(db)).filter((d) => d.file_key); // only those with files uploaded
 
 
 function getDocumentYear(dateStr: string | null): number {
@@ -96,6 +102,7 @@ function getActionLabel(action: string): string {
     'DOCUMENT_UPLOADED': 'Document Uploaded',
     'DOCUMENT_REPLACED': 'Document Replaced',
     'DOCUMENT_ARCHIVED': 'Document Archived',
+    'DOCUMENT_LINKED': 'Existing Document Linked',
     'REQUIREMENT_REVIEWED': 'Requirement Reviewed',
   };
   return labels[action] ?? action;
@@ -340,6 +347,99 @@ const pageTitle = `${requirement.id}: ${requirement.title}`;
     </form>
   </div>
 
+  <!-- Link Existing Document -->
+  {(allMemberDocs.length > 0 || allPublicDocs.length > 0) && (
+    <details id="link-section" class="mb-6 p-6 rounded-2xl bg-white shadow-sm border border-gray-100">
+      <summary class="text-lg font-heading font-semibold text-clr-green cursor-pointer select-none">
+        Link Existing Portal Document
+        <span class="text-sm font-normal text-gray-500 ml-2">— use a document already uploaded to the portal</span>
+      </summary>
+
+      <div class="mt-4">
+        <p class="text-sm text-gray-600 mb-4">
+          Select an existing document from the member portal or public documents to satisfy this compliance requirement.
+          The file stays in its original location — no duplicate uploads needed.
+        </p>
+
+        <div id="link-message" class="hidden mb-4 p-4 rounded-xl border" role="status" aria-live="polite"></div>
+
+        <form id="link-form" class="space-y-4">
+          <input type="hidden" name="csrf_token" value={session.csrfToken ?? ''} />
+          <input type="hidden" name="requirement_id" value={requirementId} />
+          <input type="hidden" id="link-source-type" name="source_type" value="" />
+          <input type="hidden" id="link-source-id" name="source_id" value="" />
+
+          <div>
+            <label for="link-doc-select" class="block text-sm font-medium text-gray-700 mb-1">
+              Select Document *
+            </label>
+            <select
+              id="link-doc-select"
+              required
+              class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+            >
+              <option value="">— Choose a document —</option>
+              {allMemberDocs.length > 0 && (
+                <optgroup label="Member Portal Documents">
+                  {allMemberDocs.map((doc) => (
+                    <option value={`member:${doc.id}`}>
+                      {doc.title} ({MEMBER_DOC_CATEGORY_LABELS[doc.category as keyof typeof MEMBER_DOC_CATEGORY_LABELS] ?? doc.category})
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              {allPublicDocs.length > 0 && (
+                <optgroup label="Public Documents">
+                  {allPublicDocs.map((doc) => (
+                    <option value={`public:${doc.slug}`}>
+                      {doc.title}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+            </select>
+          </div>
+
+          {requirement.requires_annual_update === 1 && (
+            <div>
+              <label for="link-document-date" class="block text-sm font-medium text-gray-700 mb-1">
+                Document Date * <span class="text-xs text-gray-500">(for annual tracking)</span>
+              </label>
+              <input
+                type="date"
+                id="link-document-date"
+                name="document_date"
+                required
+                class="w-full rounded-lg border border-gray-200 px-3 py-2"
+              />
+            </div>
+          )}
+
+          <div>
+            <label for="link-notes" class="block text-sm font-medium text-gray-700 mb-1">
+              Notes <span class="text-xs text-gray-500">(optional)</span>
+            </label>
+            <textarea
+              id="link-notes"
+              name="notes"
+              rows="2"
+              placeholder="Why this document satisfies the requirement..."
+              class="w-full rounded-lg border border-gray-200 px-3 py-2"
+            ></textarea>
+          </div>
+
+          <button
+            type="submit"
+            id="link-submit"
+            class="px-4 py-2 bg-clr-green text-white rounded-lg font-medium hover:brightness-110 disabled:opacity-70 disabled:cursor-not-allowed"
+          >
+            Link as Current Document
+          </button>
+        </form>
+      </div>
+    </details>
+  )}
+
   <!-- Document History -->
   {archivedDocuments.length > 0 && (
     <div class="mb-6 p-6 rounded-2xl bg-white shadow-sm border border-gray-100">
@@ -468,5 +568,73 @@ const pageTitle = `${requirement.id}: ${requirement.title}`;
         if (titleInput) titleInput.focus();
       }
     }, 100);
+  }
+
+  // Link existing document: parse source combo and submit
+  const linkDocSelect = document.getElementById('link-doc-select') as unknown as HTMLSelectElement;
+  const linkSourceType = document.getElementById('link-source-type') as HTMLInputElement;
+  const linkSourceId = document.getElementById('link-source-id') as HTMLInputElement;
+  const linkForm = document.getElementById('link-form') as HTMLFormElement;
+  const linkSubmit = document.getElementById('link-submit') as HTMLButtonElement;
+  const linkMessage = document.getElementById('link-message') as HTMLDivElement;
+
+  if (linkDocSelect && linkSourceType && linkSourceId) {
+    linkDocSelect.addEventListener('change', () => {
+      const val = linkDocSelect.value; // e.g. "member:42" or "public:bylaws"
+      if (val && val.includes(':')) {
+        const [type, id] = val.split(':');
+        linkSourceType.value = type;
+        linkSourceId.value = id;
+      } else {
+        linkSourceType.value = '';
+        linkSourceId.value = '';
+      }
+    });
+  }
+
+  if (linkForm && linkSubmit && linkMessage) {
+    linkForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      if (!linkSourceType.value || !linkSourceId.value) {
+        linkMessage.className = 'mb-4 p-4 rounded-xl border bg-red-50 border-red-200 text-red-900';
+        linkMessage.textContent = 'Please select a document to link.';
+        return;
+      }
+
+      linkSubmit.disabled = true;
+      linkSubmit.textContent = 'Linking...';
+      linkMessage.className = 'hidden';
+
+      try {
+        const formData = new FormData(linkForm);
+        const response = await fetch('/api/compliance/link-document', {
+          method: 'POST',
+          body: formData,
+        });
+
+        const result = await response.json() as { success?: boolean; message?: string; error?: string };
+
+        if (response.ok && result.success) {
+          linkMessage.className = 'mb-4 p-4 rounded-xl border bg-green-50 border-green-200 text-green-900';
+          linkMessage.textContent = result.message || 'Document linked successfully!';
+          linkForm.reset();
+          linkSourceType.value = '';
+          linkSourceId.value = '';
+
+          setTimeout(() => { window.location.reload(); }, 2000);
+        } else {
+          linkMessage.className = 'mb-4 p-4 rounded-xl border bg-red-50 border-red-200 text-red-900';
+          linkMessage.textContent = result.error || 'Failed to link document. Please try again.';
+          linkSubmit.disabled = false;
+          linkSubmit.textContent = 'Link as Current Document';
+        }
+      } catch {
+        linkMessage.className = 'mb-4 p-4 rounded-xl border bg-red-50 border-red-200 text-red-900';
+        linkMessage.textContent = 'Network error. Please try again.';
+        linkSubmit.disabled = false;
+        linkSubmit.textContent = 'Link as Current Document';
+      }
+    });
   }
 </script>

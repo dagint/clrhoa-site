@@ -1,0 +1,211 @@
+---
+/**
+ * POST /api/compliance/link-document — Board/Admin only.
+ * Links an existing member_documents or public_documents record as the current
+ * compliance document for a requirement — without re-uploading the file.
+ *
+ * FormData:
+ *   requirement_id  — compliance requirement ID (e.g. HOA-01)
+ *   source_type     — 'member' | 'public'
+ *   source_id       — member doc integer id OR public doc slug
+ *   document_date   — optional ISO date (required if requirement has annual update)
+ *   notes           — optional notes
+ *   csrf_token
+ */
+export const prerender = false;
+
+import { verifyCsrfToken, verifyOrigin, getEffectiveRole, isBoardOnly } from '../../../lib/auth';
+import {
+  getComplianceRequirement,
+  archiveCurrentDocumentsForRequirement,
+  insertComplianceDocument,
+  insertComplianceAuditLog,
+} from '../../../lib/compliance-db';
+import { getMemberDocument } from '../../../lib/member-documents-db';
+import { getPublicDocument } from '../../../lib/public-documents-db';
+
+const runtime = Astro.locals.runtime;
+const env = runtime?.env;
+const user = Astro.locals.user;
+const session = Astro.locals.session;
+
+if (!session || !user) {
+  return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+    status: 401,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const effectiveRole = getEffectiveRole(session);
+const isBoard = isBoardOnly(effectiveRole) || effectiveRole === 'admin';
+if (!isBoard) {
+  return new Response(JSON.stringify({ error: 'Forbidden. Board or Admin only.' }), {
+    status: 403,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const origin = Astro.request.headers.get('origin');
+const referer = Astro.request.headers.get('referer');
+if (!verifyOrigin(origin, referer, Astro.url.origin)) {
+  return new Response(JSON.stringify({ error: 'Invalid origin' }), {
+    status: 403,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+if (Astro.request.method !== 'POST') {
+  return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+    status: 405,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+let body: FormData;
+try {
+  body = await Astro.request.formData();
+} catch {
+  return new Response(JSON.stringify({ error: 'Invalid form data' }), {
+    status: 400,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const csrf = body.get('csrf_token')?.toString();
+if (!verifyCsrfToken(session, csrf)) {
+  return new Response(JSON.stringify({ error: 'Invalid CSRF token' }), {
+    status: 403,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const requirementId = body.get('requirement_id')?.toString()?.trim();
+const sourceType = body.get('source_type')?.toString()?.trim(); // 'member' | 'public'
+const sourceId = body.get('source_id')?.toString()?.trim();
+const documentDate = body.get('document_date')?.toString()?.trim() || null;
+const notes = body.get('notes')?.toString()?.trim() || null;
+
+if (!requirementId || !sourceType || !sourceId) {
+  return new Response(JSON.stringify({ error: 'requirement_id, source_type, and source_id are required' }), {
+    status: 400,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+if (sourceType !== 'member' && sourceType !== 'public') {
+  return new Response(JSON.stringify({ error: 'source_type must be "member" or "public"' }), {
+    status: 400,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const db = env?.DB;
+if (!db) {
+  return new Response(JSON.stringify({ error: 'Server configuration error' }), {
+    status: 503,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+// Verify requirement exists
+const requirement = await getComplianceRequirement(db, requirementId);
+if (!requirement) {
+  return new Response(JSON.stringify({ error: 'Invalid requirement ID' }), {
+    status: 400,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+// Look up the source document
+let fileKey: string | null = null;
+let contentType: string | null = null;
+let docTitle = '';
+let sourceLabel = '';
+
+if (sourceType === 'member') {
+  const id = parseInt(sourceId, 10);
+  if (isNaN(id)) {
+    return new Response(JSON.stringify({ error: 'Invalid member document ID' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  const doc = await getMemberDocument(db, id);
+  if (!doc) {
+    return new Response(JSON.stringify({ error: 'Member document not found' }), {
+      status: 404,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  fileKey = doc.file_key;
+  contentType = doc.content_type;
+  docTitle = doc.title;
+  sourceLabel = `member portal (id: ${id}, category: ${doc.category})`;
+} else {
+  // public
+  const doc = await getPublicDocument(db, sourceId);
+  if (!doc) {
+    return new Response(JSON.stringify({ error: 'Public document not found' }), {
+      status: 404,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  if (!doc.file_key) {
+    return new Response(JSON.stringify({ error: 'That public document has no file uploaded yet. Upload it via Public Documents first.' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  fileKey = doc.file_key;
+  contentType = doc.content_type;
+  docTitle = doc.title;
+  sourceLabel = `public documents (slug: ${sourceId})`;
+}
+
+if (!fileKey) {
+  return new Response(JSON.stringify({ error: 'Source document has no file attached. Upload a file to it first.' }), {
+    status: 400,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+// Archive existing current compliance docs for this requirement
+await archiveCurrentDocumentsForRequirement(db, requirementId);
+
+// Create compliance_documents entry pointing to the same file_key
+const documentId = await insertComplianceDocument(db, {
+  requirementId,
+  title: docTitle,
+  fileKey,
+  mimeType: contentType ?? undefined,
+  uploadedBy: user.email,
+  documentDate: documentDate ?? undefined,
+  visibility: requirement.posting_location === 'public' ? 'public' : 'members',
+  notes: notes
+    ? `${notes} [Linked from ${sourceLabel}]`
+    : `Linked from ${sourceLabel}`,
+});
+
+// Audit log
+await insertComplianceAuditLog(db, {
+  requirementId,
+  documentId,
+  action: 'DOCUMENT_LINKED',
+  actorEmail: user.email,
+  metadata: {
+    sourceType,
+    sourceId,
+    title: docTitle,
+    fileKey,
+  },
+});
+
+return new Response(
+  JSON.stringify({
+    success: true,
+    documentId,
+    message: `"${docTitle}" linked successfully and marked as current for this requirement.`,
+  }),
+  { status: 200, headers: { 'Content-Type': 'application/json' } }
+);
+---
