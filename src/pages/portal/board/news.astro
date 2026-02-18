@@ -149,9 +149,20 @@ function formatDate(s: string | null): string {
               <p class="text-base text-gray-500 mt-0.5">{formatDate(item.created_at)} · {placement}{imageCount > 0 ? ` · ${imageCount} photo${imageCount === 1 ? '' : 's'}` : ''}</p>
               <p class="text-base text-gray-600 mt-1 line-clamp-2">{item.body.slice(0, 150)}{item.body.length > 150 ? '…' : ''}</p>
             </div>
-            {item.is_public === 1 && (
-              <a href={`/news/item/${item.id}`} target="_blank" rel="noopener noreferrer" class="text-sm text-clr-orange hover:underline shrink-0">View on site →</a>
-            )}
+            <div class="flex items-center gap-3 shrink-0">
+              {item.is_public === 1 && (
+                <a href={`/news/item/${item.id}`} target="_blank" rel="noopener noreferrer" class="text-sm text-clr-orange hover:underline">View on site →</a>
+              )}
+              <button
+                type="button"
+                class="news-delete-btn text-sm text-red-600 hover:text-red-800 hover:underline"
+                data-id={item.id}
+                data-title={escapeHtml(item.title)}
+                aria-label={`Delete "${item.title}"`}
+              >
+                Delete
+              </button>
+            </div>
           </li>
         );})}
       </ul>
@@ -220,6 +231,45 @@ function formatDate(s: string | null): string {
           img.src = url;
         });
       }
+
+      // Delete handlers
+      document.querySelectorAll('.news-delete-btn').forEach(function (btn) {
+        btn.addEventListener('click', async function () {
+          const id = btn.getAttribute('data-id');
+          const title = btn.getAttribute('data-title') || 'this post';
+          if (!id) return;
+          if (!confirm('Delete "' + title + '"?\n\nThis cannot be undone. Any attached photos will also be removed.')) return;
+
+          btn.disabled = true;
+          btn.textContent = 'Deleting…';
+
+          try {
+            const res = await fetch('/api/news-items', {
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'same-origin',
+              body: JSON.stringify({ id, csrf_token: getCsrf() }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (res.ok && data.success) {
+              const li = btn.closest('li');
+              if (li) {
+                li.style.transition = 'opacity 0.2s';
+                li.style.opacity = '0';
+                setTimeout(() => li.remove(), 200);
+              }
+            } else {
+              alert(data.error || 'Delete failed. Please try again.');
+              btn.disabled = false;
+              btn.textContent = 'Delete';
+            }
+          } catch {
+            alert('Network error. Please try again.');
+            btn.disabled = false;
+            btn.textContent = 'Delete';
+          }
+        });
+      });
 
       form?.addEventListener('submit', async (e) => {
         e.preventDefault();

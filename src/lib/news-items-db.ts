@@ -158,6 +158,12 @@ export async function insertNewsItem(
   return id;
 }
 
+/** Hard-delete a news item by ID. Returns true if a row was deleted. */
+export async function deleteNewsItem(db: D1Database, id: string): Promise<boolean> {
+  const result = await db.prepare(`DELETE FROM news_items WHERE id = ?`).bind(id).run();
+  return (result.meta.changes ?? 0) > 0;
+}
+
 /** Append R2 keys to a news item's images. Returns new keys array. */
 export async function appendNewsItemImages(
   db: D1Database,
