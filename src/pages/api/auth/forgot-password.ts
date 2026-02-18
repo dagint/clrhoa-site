@@ -166,7 +166,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
           const userId = crypto.randomBytes(16).toString('hex');
           await db
             .prepare(
-              `INSERT INTO users (id, email, name, role, status, created_at)
+              `INSERT INTO users (id, email, name, role, status, created)
                VALUES (?, ?, ?, ?, ?, datetime('now'))`
             )
             .bind(userId, normalizedEmail, directoryEntry.name, role, 'pending_setup')
