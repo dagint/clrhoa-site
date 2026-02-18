@@ -113,7 +113,13 @@ function formatDate(s: string | null): string {
     maintenanceOpenCount={badges.maintenanceOpenCount}
     meetingsRsvpCount={badges.meetingsRsvpCount}
   >
-    <ElevatedNav persona="board" currentPath="/portal/board/audit-logs" effectiveRole={effectiveRole} user={{ email, role: role ?? '' }} session={session} />
+    <ElevatedNav
+      persona={effectiveRole === 'admin' ? 'admin' : 'board'}
+      currentPath={effectiveRole === 'admin' ? '/portal/admin/audit-logs' : '/portal/board/audit-logs'}
+      effectiveRole={effectiveRole}
+      user={{ email, role: role ?? '' }}
+      session={session}
+    />
 
 <p class="text-gray-600 mb-4">
         Full audit logs for transparency: PIM elevated access requests, directory (contact reveals, who added/updated owners), assessment payments recorded, vendor list changes and vendor submission approvals/rejections, member document uploads, special assessments, preapproval library, feedback docs, meetings, and ARB status changes. <strong>Revealed contact information (phone numbers and emails that were viewed) is redacted for privacy, but the identity of who performed each action is shown for accountability.</strong>
