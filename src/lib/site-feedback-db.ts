@@ -102,3 +102,19 @@ export async function listSiteFeedback(
 
   return results ?? [];
 }
+
+/**
+ * Delete a site feedback entry by ID (admin only).
+ * Returns true if deleted, false if not found.
+ */
+export async function deleteSiteFeedback(
+  db: D1Database,
+  id: string
+): Promise<boolean> {
+  const result = await db
+    .prepare('DELETE FROM site_feedback WHERE id = ?')
+    .bind(id)
+    .run();
+
+  return (result.meta?.changes ?? 0) > 0;
+}

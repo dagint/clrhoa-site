@@ -158,17 +158,28 @@ const csvHref = `/api/site-feedback?${csvParams.toString()}`;
               <th class="text-left py-2 px-3 font-medium text-gray-700">Viewport</th>
               <th class="text-left py-2 px-3 font-medium text-gray-700">Session</th>
               <th class="text-left py-2 px-3 font-medium text-gray-700">Comment</th>
+              <th class="text-left py-2 px-3 font-medium text-gray-700">Actions</th>
             </tr>
           </thead>
           <tbody>
             {feedback.map((row) => (
-              <tr class="border-b border-gray-100 hover:bg-gray-50/50">
+              <tr class="border-b border-gray-100 hover:bg-gray-50/50" data-feedback-id={row.id}>
                 <td class="py-2 px-3 text-gray-600 whitespace-nowrap">{formatEasternDateTime(row.created_at)}</td>
                 <td class="py-2 px-3">{row.thumbs === 1 ? '👍' : '👎'}</td>
                 <td class="py-2 px-3 max-w-xs truncate" title={row.url}>{row.url || '—'}</td>
                 <td class="py-2 px-3 text-gray-600">{row.viewport ?? '—'}</td>
                 <td class="py-2 px-3 font-mono text-gray-500 text-xs">{row.session_id ?? '—'}</td>
                 <td class="py-2 px-3 max-w-sm">{row.comment ?? '—'}</td>
+                <td class="py-2 px-3">
+                  <button
+                    type="button"
+                    class="delete-feedback-btn text-red-600 hover:text-red-800 text-sm font-medium transition-colors"
+                    data-feedback-id={row.id}
+                    title="Delete this feedback"
+                  >
+                    Delete
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -188,4 +199,57 @@ const csvHref = `/api/site-feedback?${csvParams.toString()}`;
     </div>
     </div>
   </PortalPage>
+
+  <script is:inline>
+    (function() {
+      document.querySelectorAll('.delete-feedback-btn').forEach(function(btn) {
+        btn.addEventListener('click', async function() {
+          const feedbackId = this.getAttribute('data-feedback-id');
+          if (!feedbackId) return;
+
+          const confirmed = confirm('Are you sure you want to delete this feedback entry? This action cannot be undone.');
+          if (!confirmed) return;
+
+          const row = this.closest('tr');
+          btn.disabled = true;
+          btn.textContent = 'Deleting...';
+
+          try {
+            const res = await fetch('/api/site-feedback-delete', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ id: feedbackId })
+            });
+
+            const data = await res.json();
+
+            if (res.ok && data.success) {
+              // Fade out and remove the row
+              if (row) {
+                row.style.transition = 'opacity 0.3s';
+                row.style.opacity = '0';
+                setTimeout(function() {
+                  row.remove();
+                  // Reload page if no rows left
+                  const remainingRows = document.querySelectorAll('tbody tr').length;
+                  if (remainingRows === 0) {
+                    window.location.reload();
+                  }
+                }, 300);
+              }
+            } else {
+              alert(data.error || 'Failed to delete feedback entry');
+              btn.disabled = false;
+              btn.textContent = 'Delete';
+            }
+          } catch (error) {
+            console.error('Delete error:', error);
+            alert('Network error. Please try again.');
+            btn.disabled = false;
+            btn.textContent = 'Delete';
+          }
+        });
+      });
+    })();
+  </script>
 </PortalLayout>
