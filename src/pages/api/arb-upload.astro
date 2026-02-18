@@ -394,14 +394,17 @@ if (totalBytes > MAX_TOTAL_BYTES) {
 }
 
 // Check for duplicate requests (same owner, similar description within last 30 days)
+// Exclude requests created in last 2 minutes to avoid flagging current session's auto-saves
 try {
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const twoMinutesAgo = new Date();
+  twoMinutesAgo.setMinutes(twoMinutesAgo.getMinutes() - 2);
   const recentRequests = await db
     .prepare(
-      `SELECT id, description, created FROM arb_requests WHERE owner_email = ? AND created > ? ORDER BY created DESC LIMIT 10`
+      `SELECT id, description, created FROM arb_requests WHERE owner_email = ? AND created > ? AND created < ? ORDER BY created DESC LIMIT 10`
     )
-    .bind(user.email.toLowerCase(), thirtyDaysAgo.toISOString())
+    .bind(user.email.toLowerCase(), thirtyDaysAgo.toISOString(), twoMinutesAgo.toISOString())
     .all<{ id: string; description: string; created: string }>();
 
   // Simple similarity check: if description is very similar (80%+ match) or exact duplicate
