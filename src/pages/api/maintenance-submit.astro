@@ -6,7 +6,7 @@
  */
 export const prerender = false;
 
-import { requireSession, requireDb, jsonResponse } from '../../lib/api-helpers';
+import { jsonResponse } from '../../lib/api-helpers';
 import { verifyCsrfToken } from '../../lib/auth';
 import { createMaintenanceId, insertMaintenanceRequest, MAINTENANCE_CATEGORIES } from '../../lib/maintenance-db';
 import { escapeHtml } from '../../lib/sanitize';
@@ -15,16 +15,23 @@ const MAX_FILE_BYTES = 5 * 1024 * 1024;
 const MAX_TOTAL_BYTES = 25 * 1024 * 1024;
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/heic'];
 
-const auth = await requireSession(Astro);
-if ('response' in auth) return auth.response;
-const { session } = auth;
+// Use Lucia session from middleware
+const user = Astro.locals.user;
+const session = Astro.locals.session;
+
+if (!session || !user) {
+  return jsonResponse({ error: 'Unauthorized' }, 401);
+}
 
 const env = Astro.locals.runtime?.env;
-const dbResult = requireDb(env);
-if ('response' in dbResult) return dbResult.response;
-const { db } = dbResult;
+const db = env?.DB;
+if (!db) {
+  return jsonResponse({ error: 'Server configuration error' }, 503);
+}
 const r2 = env?.CLOURHOA_FILES;
-if (!r2) return jsonResponse({ error: 'Server configuration error' }, 503);
+if (!r2) {
+  return jsonResponse({ error: 'Server configuration error' }, 503);
+}
 
 if (Astro.request.method !== 'POST') {
   return new Response(null, { status: 405, headers: { Allow: 'POST' } });
@@ -92,7 +99,7 @@ for (let i = 0; i < files.length; i++) {
 }
 
 const photosJson = JSON.stringify(photoKeys);
-await insertMaintenanceRequest(db, id, session.email, category, description, photosJson);
+await insertMaintenanceRequest(db, id, user.email, category, description, photosJson);
 
 let notifyStatus: 'sent' | 'skipped' | 'failed' = 'skipped';
 let notifyError: string | null = null;
@@ -101,7 +108,7 @@ if (env?.NOTIFY_BOARD_EMAIL) {
   try {
     const { sendEmail } = await import('../../lib/notifications');
     const link = `${Astro.url.origin}/board/maintenance`;
-    const body = `<p>New maintenance request <strong>#${id}</strong></p><p>From: ${escapeHtml(session.email)}</p><p>Category: ${escapeHtml(category)}</p><p>Description: ${escapeHtml(description.slice(0, 500))}${description.length > 500 ? '…' : ''}</p><p><a href="${escapeHtml(link)}">View Board Maintenance</a></p>`;
+    const body = `<p>New maintenance request <strong>#${id}</strong></p><p>From: ${escapeHtml(user.email)}</p><p>Category: ${escapeHtml(category)}</p><p>Description: ${escapeHtml(description.slice(0, 500))}${description.length > 500 ? '…' : ''}</p><p><a href="${escapeHtml(link)}">View Board Maintenance</a></p>`;
     const result = await sendEmail(env, env.NOTIFY_BOARD_EMAIL, `New Maintenance Request #${id}`, body);
     if (result.ok) {
       notifyStatus = 'sent';
