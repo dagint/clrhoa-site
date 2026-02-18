@@ -248,6 +248,13 @@ export const PUT: APIRoute = async ({ request, locals, clientAddress }) => {
     });
   }
 
+  console.log('[MEMBERS-API] PUT request received:', {
+    email,
+    role: body.role,
+    name: body.name,
+    hasRoleField: 'role' in body,
+  });
+
   try {
     const member = await getMemberByEmail(db, email);
     if (!member) {
@@ -279,16 +286,35 @@ export const PUT: APIRoute = async ({ request, locals, clientAddress }) => {
 
     // Update user role in KV if role changed
     if (body.role && kv && VALID_ROLES.has(body.role.toLowerCase())) {
+      console.log('[MEMBERS-API] Updating KV role:', { email, role: body.role.toLowerCase() });
       await setLoginWhitelistRole(kv, email, body.role.toLowerCase());
     }
 
     // Update user record in users table if exists
     if (member.hasAccount && member.userId) {
       const role = body.role?.toLowerCase() || member.role || 'member';
-      await db
+      console.log('[MEMBERS-API] Updating users table:', {
+        userId: member.userId,
+        email,
+        oldRole: member.role,
+        newRole: role,
+        name: body.name?.trim() || member.name,
+      });
+      const result = await db
         .prepare('UPDATE users SET name = ?, role = ? WHERE id = ?')
         .bind(body.name?.trim() || member.name, role, member.userId)
         .run();
+      console.log('[MEMBERS-API] Update result:', {
+        success: result.success,
+        changes: result.meta?.changes,
+        rowsAffected: result.meta?.rows_written,
+      });
+    } else {
+      console.log('[MEMBERS-API] Skipping users table update:', {
+        email,
+        hasAccount: member.hasAccount,
+        userId: member.userId,
+      });
     }
 
     return new Response(
