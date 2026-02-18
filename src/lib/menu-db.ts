@@ -30,11 +30,12 @@ export const DEFAULT_MENU_ITEMS: Omit<MenuItem, 'created_at' | 'updated_at'>[] =
   { id: 'maintenance', label: 'Maintenance', href: '/portal/maintenance', icon: 'wrench', position: 3, visible: 1, badge_key: 'maintenanceOpenCount' },
   { id: 'meetings', label: 'Meetings', href: '/portal/meetings', icon: 'calendar', position: 4, visible: 1, badge_key: 'meetingsRsvpCount' },
   { id: 'directory', label: 'Directory', href: '/portal/directory', icon: 'users', position: 5, visible: 1, badge_key: null },
-  { id: 'vendors', label: 'Vendors', href: '/portal/vendors', icon: 'briefcase', position: 6, visible: 1, badge_key: null },
-  { id: 'documents', label: 'Documents', href: '/portal/documents', icon: 'folder', position: 7, visible: 1, badge_key: null },
-  { id: 'dues', label: 'Dues', href: '/portal/assessments', icon: 'dollar', position: 8, visible: 1, badge_key: null },
-  { id: 'feedback', label: 'Feedback', href: '/portal/feedback', icon: 'message', position: 9, visible: 1, badge_key: 'feedbackDueCount' },
-  { id: 'library', label: 'Library', href: '/portal/library', icon: 'book', position: 10, visible: 1, badge_key: 'libraryItemCount' },
+  { id: 'leadership', label: 'Leadership', href: '/portal/leadership', icon: 'star', position: 6, visible: 1, badge_key: null },
+  { id: 'vendors', label: 'Vendors', href: '/portal/vendors', icon: 'briefcase', position: 7, visible: 1, badge_key: null },
+  { id: 'documents', label: 'Documents', href: '/portal/documents', icon: 'folder', position: 8, visible: 1, badge_key: null },
+  { id: 'dues', label: 'Dues', href: '/portal/assessments', icon: 'dollar', position: 9, visible: 1, badge_key: null },
+  { id: 'feedback', label: 'Feedback', href: '/portal/feedback', icon: 'message', position: 10, visible: 1, badge_key: 'feedbackDueCount' },
+  { id: 'library', label: 'Library', href: '/portal/library', icon: 'book', position: 11, visible: 1, badge_key: 'libraryItemCount' },
 ];
 
 /**
