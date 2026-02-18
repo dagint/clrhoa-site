@@ -10,7 +10,6 @@ export interface Meeting {
   id: string;
   title: string | null;
   datetime: string | null;
-  meeting_type: string | null;
   notice_posted_at: string | null;
   agenda_posted_at: string | null;
   created: string | null;
@@ -38,11 +37,10 @@ export function checkMeetingCompliance(meeting: Meeting): MeetingComplianceStatu
   const meetingDate = meeting.datetime ? new Date(meeting.datetime) : null;
   const noticePosted = meeting.notice_posted_at ? new Date(meeting.notice_posted_at) : null;
   const agendaPosted = meeting.agenda_posted_at ? new Date(meeting.agenda_posted_at) : null;
-  const meetingType = meeting.meeting_type?.toLowerCase() || 'board';
 
-  // Determine requirements based on meeting type
-  const isBoardMeeting = meetingType === 'board';
-  const isMemberMeeting = meetingType === 'member';
+  // Default to board meeting (meeting_type column doesn't exist yet)
+  const isBoardMeeting = true;
+  const isMemberMeeting = false;
 
   // Required advance notice
   const noticeHoursRequired = isBoardMeeting ? 48 : 14 * 24; // 48 hours or 14 days
@@ -91,7 +89,7 @@ export async function getUpcomingMeetingsWithCompliance(
 ): Promise<MeetingComplianceStatus[]> {
   const { results } = await db
     .prepare(
-      `SELECT id, title, datetime, meeting_type, notice_posted_at, agenda_posted_at, created
+      `SELECT id, title, datetime, notice_posted_at, agenda_posted_at, created
        FROM meetings
        WHERE datetime >= datetime('now')
        ORDER BY datetime ASC
@@ -114,7 +112,7 @@ export async function getRecentMeetingsWithCompliance(
 ): Promise<MeetingComplianceStatus[]> {
   const { results } = await db
     .prepare(
-      `SELECT id, title, datetime, meeting_type, notice_posted_at, agenda_posted_at, created
+      `SELECT id, title, datetime, notice_posted_at, agenda_posted_at, created
        FROM meetings
        WHERE datetime < datetime('now')
          AND datetime >= datetime('now', '-90 days')
