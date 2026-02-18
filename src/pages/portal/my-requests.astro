@@ -397,13 +397,46 @@ function formatApproval(arbEsign: string | null, esignTimestamp: string | null):
       @page {
         margin: 0.5in;
       }
+
+      /* Hide navigation, headers, and interactive elements */
       header, .no-print, .request-summary, [role="status"] { display: none !important; }
       main > p:first-of-type { display: none !important; }
+
+      /* Remove overflow and height constraints to prevent scroll bars */
+      body, html {
+        overflow: visible !important;
+        height: auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
+      }
+
+      /* Remove PortalPage layout constraints */
+      #portal-content {
+        overflow: visible !important;
+        margin-left: 0 !important;
+        height: auto !important;
+        max-height: none !important;
+      }
+
+      main {
+        overflow: visible !important;
+        height: auto !important;
+        max-height: none !important;
+        padding-top: 0 !important;
+      }
+
+      /* Only show the card being printed */
       #request-list > li:not(.print-this-card) { display: none !important; }
+
+      /* Show request details */
       .print-this-card .request-details { display: block !important; }
       .print-this-card .request-details-screen { display: block !important; }
       .print-this-card .print-form-view { display: block !important; }
+
+      /* Conditionally show/hide attachments */
       body:not(.print-with-attachments) .print-attachments-section { display: none !important; }
+
+      /* Print card styling */
       .print-this-card {
         break-inside: avoid;
         box-shadow: none;
@@ -411,11 +444,22 @@ function formatApproval(arbEsign: string | null, esignTimestamp: string | null):
         page-break-inside: avoid;
         margin-bottom: 1rem;
         padding: 1rem;
+        overflow: visible !important;
+        max-height: none !important;
+        height: auto !important;
       }
+
+      /* Hide iframes in print */
       .print-this-card .request-details-screen iframe { display: none !important; }
+
       /* Ensure print-form-view is visible when printing */
       .print-this-card .print-form-view.hidden { display: block !important; }
       .print-this-card .print-form-view[aria-hidden="true"] { display: block !important; }
+
+      /* Remove max-width constraints for better print layout */
+      .max-w-5xl, .max-w-7xl, .max-w-4xl {
+        max-width: none !important;
+      }
     }
   </style>
 
