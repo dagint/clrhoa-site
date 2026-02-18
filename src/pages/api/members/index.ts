@@ -290,8 +290,9 @@ export const PUT: APIRoute = async ({ request, locals, clientAddress }) => {
       await setLoginWhitelistRole(kv, email, body.role.toLowerCase());
     }
 
-    // Update user record in users table if exists
+    // Update or create user record in users table
     if (member.hasAccount && member.userId) {
+      // User has account - update existing record
       const role = body.role?.toLowerCase() || member.role || 'member';
       console.log('[MEMBERS-API] Updating users table:', {
         userId: member.userId,
@@ -309,11 +310,38 @@ export const PUT: APIRoute = async ({ request, locals, clientAddress }) => {
         changes: result.meta?.changes,
         rowsAffected: result.meta?.rows_written,
       });
+    } else if (body.role || body.name) {
+      // User doesn't have account yet - create placeholder record so role is visible
+      const role = body.role?.toLowerCase() || 'member';
+      const name = body.name?.trim() || member.name || null;
+      console.log('[MEMBERS-API] Creating placeholder users record:', {
+        email,
+        role,
+        name,
+        status: 'pending',
+      });
+
+      // Generate a user ID
+      const userId = crypto.randomUUID();
+
+      const result = await db
+        .prepare(
+          `INSERT INTO users (id, email, name, role, status, created_at, updated_at)
+           VALUES (?, ?, ?, ?, 'pending', datetime('now'), datetime('now'))`
+        )
+        .bind(userId, email, name, role)
+        .run();
+
+      console.log('[MEMBERS-API] Placeholder created:', {
+        success: result.success,
+        userId,
+      });
     } else {
       console.log('[MEMBERS-API] Skipping users table update:', {
         email,
         hasAccount: member.hasAccount,
         userId: member.userId,
+        reason: 'No role or name to update',
       });
     }
 
