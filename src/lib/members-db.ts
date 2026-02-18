@@ -46,6 +46,7 @@ export async function listAllMembers(
 ): Promise<UnifiedMember[]> {
   // Since D1 doesn't support FULL OUTER JOIN, we'll do UNION of LEFT JOINs
   // Wrap in subquery to allow ORDER BY with UNION
+  // Join with board_positions to get current title (where end_date IS NULL)
   const query = `
     SELECT * FROM (
       SELECT
@@ -59,10 +60,11 @@ export async function listAllMembers(
         o.lot_number as lot_number,
         o.phone as phone,
         o.phones as phones,
-        o.board_title as board_title,
+        bp.title as board_title,
         o.created_at as created_at
       FROM users u
       LEFT JOIN owners o ON u.email = o.email
+      LEFT JOIN board_positions bp ON u.email = bp.user_email AND bp.end_date IS NULL
 
       UNION
 
@@ -77,10 +79,11 @@ export async function listAllMembers(
         o.lot_number as lot_number,
         o.phone as phone,
         o.phones as phones,
-        o.board_title as board_title,
+        bp.title as board_title,
         o.created_at as created_at
       FROM owners o
       LEFT JOIN users u ON o.email = u.email
+      LEFT JOIN board_positions bp ON o.email = bp.user_email AND bp.end_date IS NULL
     )
     ORDER BY
       CASE WHEN address IS NULL THEN 1 ELSE 0 END,
@@ -145,9 +148,10 @@ export async function getMemberByEmail(
   const normalizedEmail = email.toLowerCase().trim();
 
   const userQuery = `SELECT id, email, name, role, status, created FROM users WHERE email = ?`;
-  const ownerQuery = `SELECT id, email, name, address, lot_number, phone, phones, board_title, created_at FROM owners WHERE email = ?`;
+  const ownerQuery = `SELECT id, email, name, address, lot_number, phone, phones, created_at FROM owners WHERE email = ?`;
+  const positionQuery = `SELECT title FROM board_positions WHERE user_email = ? AND end_date IS NULL LIMIT 1`;
 
-  const [userResult, ownerResult] = await Promise.all([
+  const [userResult, ownerResult, positionResult] = await Promise.all([
     db.prepare(userQuery).bind(normalizedEmail).first<{
       id: string;
       email: string;
@@ -164,8 +168,10 @@ export async function getMemberByEmail(
       lot_number: string | null;
       phone: string | null;
       phones: string | null;
-      board_title: string | null;
       created_at: string;
+    }>(),
+    db.prepare(positionQuery).bind(normalizedEmail).first<{
+      title: string;
     }>()
   ]);
 
@@ -187,7 +193,7 @@ export async function getMemberByEmail(
     lot_number: ownerResult?.lot_number || null,
     phone: ownerResult?.phone || null,
     phones: ownerResult?.phones || null,
-    board_title: ownerResult?.board_title || null,
+    board_title: positionResult?.title || null,
     created_at: userResult?.created || ownerResult?.created_at || null,
     updated_at: null,
   };
