@@ -198,6 +198,8 @@ CREATE TABLE IF NOT EXISTS meetings (
   location TEXT,
   agenda_r2_key TEXT,
   post_to_public_news INTEGER DEFAULT 0,  -- From schema-meetings-post-to-public-news.sql
+  notice_posted_at TEXT,                  -- When meeting notice was posted (§720.303 compliance)
+  agenda_posted_at TEXT,                  -- When agenda was posted (§720.303 compliance)
   created_by TEXT,
   created TEXT DEFAULT (datetime('now'))
 );
