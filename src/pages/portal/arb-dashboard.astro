@@ -109,7 +109,7 @@ const needsActionCount = inReview.length + pending.length + arcReview.length + b
 
       {!canApprove && (effectiveRole === 'arb_board' || effectiveRole === 'admin') && (
         <div class="mb-6 p-5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-base" role="status">
-          <strong>View only.</strong> To approve or reject requests, set deadlines, or add ARB notes, use <strong>Act as ARB</strong> in the yellow banner at the top of the page.
+          <strong>View only.</strong> To approve or reject requests, set deadlines, or add ARB notes, elevate to ARB role from your profile menu.
         </div>
       )}
       {!canApprove && effectiveRole === 'board' && (
