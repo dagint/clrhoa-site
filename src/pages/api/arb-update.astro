@@ -57,6 +57,7 @@ try {
   // CSRF token verification
   const csrfToken = formData.get('csrf_token') as string | null;
   if (!verifyCsrfToken(session, csrfToken)) {
+    logger.warn('CSRF token verification failed', { user: user.email });
     return new Response(
       JSON.stringify({ error: 'Invalid security token. Please refresh the page and try again.' }),
       { status: 403, headers: { 'Content-Type': 'application/json' } }
@@ -65,18 +66,25 @@ try {
 
   const requestId = (formData.get('request_id') as string)?.trim();
   if (!requestId) {
+    logger.warn('Missing request_id', { user: user.email });
     return new Response(JSON.stringify({ error: 'Request ID is required.' }), {
       status: 400,
       headers: { 'Content-Type': 'application/json' },
     });
   }
 
+  logger.info('ARB update attempt', { requestId: maskRequestId(requestId), user: user.email });
+
   const ownerCheck = await requireArbRequestOwner(db, requestId, user, { requirePending: true });
-  if ('response' in ownerCheck) return ownerCheck.response;
+  if ('response' in ownerCheck) {
+    logger.warn('Owner check failed', { requestId: maskRequestId(requestId), user: user.email });
+    return ownerCheck.response;
+  }
   const { request } = ownerCheck;
 
   const description = (formData.get('description') as string)?.trim();
   if (!description) {
+    logger.warn('Missing description', { requestId: maskRequestId(requestId), user: user.email });
     return new Response(JSON.stringify({ error: 'Description is required.' }), {
       status: 400,
       headers: { 'Content-Type': 'application/json' },
@@ -88,18 +96,21 @@ try {
   const propertyAddress = (formData.get('property_address') as string)?.trim() || null;
 
   if (!applicantName) {
+    logger.warn('Missing applicant_name', { requestId: maskRequestId(requestId), user: user.email });
     return new Response(JSON.stringify({ error: "Applicant's name is required." }), {
       status: 400,
       headers: { 'Content-Type': 'application/json' },
     });
   }
   if (!phone) {
+    logger.warn('Missing phone', { requestId: maskRequestId(requestId), user: user.email });
     return new Response(JSON.stringify({ error: 'Phone number is required.' }), {
       status: 400,
       headers: { 'Content-Type': 'application/json' },
     });
   }
   if (!propertyAddress) {
+    logger.warn('Missing property_address', { requestId: maskRequestId(requestId), user: user.email });
     return new Response(JSON.stringify({ error: 'Property address is required.' }), {
       status: 400,
       headers: { 'Content-Type': 'application/json' },
@@ -111,6 +122,16 @@ try {
     : null;
   const ownerNotes = (formData.get('owner_notes') as string)?.trim() || null;
 
+  logger.info('Updating ARB request', {
+    requestId: maskRequestId(requestId),
+    user: user.email,
+    hasApplicantName: !!applicantName,
+    hasPhone: !!phone,
+    hasPropertyAddress: !!propertyAddress,
+    hasApplicationType: !!applicationType,
+    hasDescription: !!description
+  });
+
   const updated = await updateArbRequestByOwner(db, requestId, request.owner_email, {
     applicantName,
     phone,
@@ -121,18 +142,26 @@ try {
   });
 
   if (!updated) {
+    logger.warn('Update returned false', { requestId: maskRequestId(requestId), user: user.email });
     return new Response(
       JSON.stringify({ error: 'Request not found, already decided, or you do not have access to this request.' }),
       { status: 404, headers: { 'Content-Type': 'application/json' } }
     );
   }
 
+  logger.info('ARB request updated successfully', { requestId: maskRequestId(requestId), user: user.email });
   return new Response(
     JSON.stringify({ success: true, message: 'Your request has been updated.' }),
     { status: 200, headers: { 'Content-Type': 'application/json' } }
   );
 } catch (e) {
-  logger.error('ARB update failed', { error: String(e) });
+  const errorMessage = e instanceof Error ? e.message : String(e);
+  const errorStack = e instanceof Error ? e.stack : undefined;
+  logger.error('ARB update failed with exception', {
+    error: errorMessage,
+    stack: errorStack,
+    user: user.email
+  });
   return new Response(
     JSON.stringify({ error: 'Update failed. Please try again.' }),
     { status: 500, headers: { 'Content-Type': 'application/json' } }

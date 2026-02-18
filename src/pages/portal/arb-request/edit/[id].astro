@@ -297,7 +297,12 @@ const selectedTypes = req.application_type ? req.application_type.split(',').map
 
           try {
             const res = await fetch(form.action, { method: 'POST', body: formData });
-            const data = await res.json().catch(function () { return {}; });
+            console.log('[ARB-EDIT] Update response status:', res.status, res.statusText);
+            const data = await res.json().catch(function () {
+              console.error('[ARB-EDIT] Failed to parse response JSON');
+              return {};
+            });
+            console.log('[ARB-EDIT] Update response data:', data);
             if (res.ok && data.success) {
               if (doSubmitForReview) {
                 const res2 = await fetch('/api/arb-resubmit', {
@@ -323,11 +328,18 @@ const selectedTypes = req.application_type ? req.application_type.split(',').map
                 if (saveSubmitBtn) { saveSubmitBtn.disabled = false; saveSubmitBtn.textContent = 'Save and submit'; }
               }
             } else {
+              console.error('[ARB-EDIT] Update failed:', {
+                status: res.status,
+                ok: res.ok,
+                success: data.success,
+                error: data.error
+              });
               showErr(data.error || 'Update failed. Please try again.');
               if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Save'; }
               if (saveSubmitBtn) { saveSubmitBtn.disabled = false; saveSubmitBtn.textContent = 'Save and submit'; }
             }
           } catch (err) {
+            console.error('[ARB-EDIT] Network error during update:', err);
             showErr('Network error. Please try again.');
             if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Save'; }
             if (saveSubmitBtn) { saveSubmitBtn.disabled = false; saveSubmitBtn.textContent = 'Save and submit'; }
