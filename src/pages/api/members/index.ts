@@ -326,8 +326,8 @@ export const PUT: APIRoute = async ({ request, locals, clientAddress }) => {
 
       const result = await db
         .prepare(
-          `INSERT INTO users (id, email, name, role, status, created_at, updated_at)
-           VALUES (?, ?, ?, ?, 'pending', datetime('now'), datetime('now'))`
+          `INSERT INTO users (id, email, name, role, status, created)
+           VALUES (?, ?, ?, ?, 'pending', datetime('now'))`
         )
         .bind(userId, email, name, role)
         .run();
