@@ -77,7 +77,7 @@ export const POST: APIRoute = async ({ request, locals, clientAddress }) => {
   }
 
   const db = locals.runtime?.env?.DB;
-  const kv = locals.runtime?.env?.CLOURHOA_USERS;
+  const kv = locals.runtime?.env?.CLRHOA_USERS;
   if (!db) {
     return new Response(JSON.stringify({ error: 'Server configuration error' }), {
       status: 503,
@@ -211,7 +211,7 @@ export const PUT: APIRoute = async ({ request, locals, clientAddress }) => {
   }
 
   const db = locals.runtime?.env?.DB;
-  const kv = locals.runtime?.env?.CLOURHOA_USERS;
+  const kv = locals.runtime?.env?.CLRHOA_USERS;
   if (!db) {
     return new Response(JSON.stringify({ error: 'Server configuration error' }), {
       status: 503,
@@ -324,7 +324,7 @@ export const DELETE: APIRoute = async ({ request, locals, clientAddress }) => {
   }
 
   const db = locals.runtime?.env?.DB;
-  const kv = locals.runtime?.env?.CLOURHOA_USERS;
+  const kv = locals.runtime?.env?.CLRHOA_USERS;
   if (!db) {
     return new Response(JSON.stringify({ error: 'Server configuration error' }), {
       status: 503,

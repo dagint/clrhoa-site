@@ -163,7 +163,12 @@ export async function assignBoardPosition(
     // Check if user already has a current position
     const currentPosition = await getUserCurrentPosition(db, normalizedEmail);
     if (currentPosition) {
-      return { success: false, error: `User already holds position: ${currentPosition}` };
+      // If they're being assigned the SAME position, treat it as a no-op success
+      if (currentPosition === title) {
+        return { success: true };
+      }
+      // Otherwise, they need to have their current position removed first
+      return { success: false, error: `User already holds position: ${currentPosition}. Remove it first before assigning a new position.` };
     }
 
     // For singular positions, end the current holder's term
