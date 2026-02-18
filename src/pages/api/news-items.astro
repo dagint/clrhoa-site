@@ -5,8 +5,9 @@
  */
 export const prerender = false;
 
-import { isElevatedRole, getEffectiveRole } from '../../lib/auth';
-import { listPublicNewsItems, listAllNewsItems, insertNewsItem } from '../../lib/news-items-db';
+import { isElevatedRole, getEffectiveRole, isBoardOnly } from '../../lib/auth';
+import { listPublicNewsItems, listAllNewsItems, insertNewsItem, getNewsItemById, getNewsItemImageKeys, deleteNewsItem } from '../../lib/news-items-db';
+import { logAdminEvent } from '../../lib/audit-log';
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
@@ -78,6 +79,96 @@ if (Astro.request.method === 'POST') {
   }
   const id = await insertNewsItem(db, { title, body: bodyText, is_public: isPublic, show_on_portal: showOnPortal });
   return new Response(JSON.stringify({ success: true, id }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+if (Astro.request.method === 'DELETE') {
+  const user = Astro.locals.user;
+  const session = Astro.locals.session;
+  if (!session) {
+    return new Response(JSON.stringify({ error: 'Forbidden' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  const effectiveRole = getEffectiveRole(session);
+  const isBoard = isBoardOnly(effectiveRole) || effectiveRole === 'admin';
+  if (!isBoard) {
+    return new Response(JSON.stringify({ error: 'Forbidden' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  let body: { id?: string; csrf_token?: string };
+  try {
+    body = await Astro.request.json();
+  } catch {
+    return new Response(JSON.stringify({ error: 'Invalid JSON' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  // CSRF check
+  const csrfToken = (session as any)?.csrfToken;
+  if (!body.csrf_token || body.csrf_token !== csrfToken) {
+    return new Response(JSON.stringify({ error: 'Invalid CSRF token' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  const id = typeof body.id === 'string' ? body.id.trim() : '';
+  if (!id) {
+    return new Response(JSON.stringify({ error: 'id required' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  // Fetch item before deletion for audit + image cleanup
+  const item = await getNewsItemById(db, id);
+  if (!item) {
+    return new Response(JSON.stringify({ error: 'News item not found' }), {
+      status: 404,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  const imageKeys = getNewsItemImageKeys(item);
+
+  // Delete from D1
+  const deleted = await deleteNewsItem(db, id);
+  if (!deleted) {
+    return new Response(JSON.stringify({ error: 'Delete failed' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  // Delete images from R2 (best-effort)
+  const r2 = env?.CLOURHOA_FILES as R2Bucket | undefined;
+  if (r2 && imageKeys.length > 0) {
+    await Promise.allSettled(imageKeys.map((key) => r2.delete(key)));
+  }
+
+  // Audit log
+  const actorEmail = user?.email ?? (session as any)?.email ?? 'unknown';
+  await logAdminEvent(db, {
+    eventType: 'news_item_deleted',
+    userId: actorEmail,
+    action: `Deleted news item "${item.title}"`,
+    resourceType: 'news_item',
+    resourceId: id,
+    details: { title: item.title, imageCount: imageKeys.length },
+    ipAddress: Astro.request.headers.get('cf-connecting-ip') ?? null,
+    outcome: 'success',
+  }).catch(() => {});
+
+  return new Response(JSON.stringify({ success: true }), {
     status: 200,
     headers: { 'Content-Type': 'application/json' },
   });
