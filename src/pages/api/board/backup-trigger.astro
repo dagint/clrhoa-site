@@ -61,6 +61,20 @@ try {
   }
 
   const result = await response.json();
+
+  // Record successful backup timestamp from the portal side (worker DB binding is optional)
+  const db = (env as any)?.DB as D1Database | undefined;
+  if (db) {
+    try {
+      await db.prepare(
+        `INSERT INTO backup_config (id, last_backup_at) VALUES (1, datetime('now'))
+         ON CONFLICT(id) DO UPDATE SET last_backup_at = datetime('now')`
+      ).run();
+    } catch (e) {
+      console.warn('[BACKUP TRIGGER] Could not update last_backup_at:', e);
+    }
+  }
+
   return new Response(JSON.stringify(result), {
     status: 200,
     headers: { 'Content-Type': 'application/json' },

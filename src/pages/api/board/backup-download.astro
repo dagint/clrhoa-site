@@ -138,6 +138,19 @@ for (let i = 0; i < 8; i++) {
       { name: `whitelist-${date}.json`, data: JSON.stringify(whitelist, null, 2) },
     ]);
 
+    // Record successful manual download timestamp
+    const db = env?.DB as D1Database | undefined;
+    if (db) {
+      try {
+        await db.prepare(
+          `INSERT INTO backup_config (id, last_backup_at) VALUES (1, datetime('now'))
+           ON CONFLICT(id) DO UPDATE SET last_backup_at = datetime('now')`
+        ).run();
+      } catch (e) {
+        console.warn('[BACKUP DOWNLOAD] Could not update last_backup_at:', e);
+      }
+    }
+
     return new Response(zip, {
       headers: {
         'Content-Type': 'application/zip',
