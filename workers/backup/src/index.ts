@@ -312,11 +312,11 @@ async function recordLastBackupTime(env: Env): Promise<void> {
   if (!env.DB) return;
   try {
     await env.DB.prepare(
-      `UPDATE backup_config SET last_r2_backup_at = datetime('now') WHERE id = 1`
+      `UPDATE backup_config SET last_backup_at = datetime('now') WHERE id = 1`
     ).run();
   } catch (e) {
     // Column may not exist yet; log but don't fail the backup
-    console.warn("Could not update last_r2_backup_at:", e);
+    console.warn("Could not update last_backup_at:", e);
   }
 }
 

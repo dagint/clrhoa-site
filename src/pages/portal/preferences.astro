@@ -153,7 +153,7 @@ const pushEnabled = notification_preferences['push_enabled'] === true;
           <p class="text-base font-semibold text-gray-900 mb-3">SMS text alerts (optional)</p>
           <p class="text-sm text-gray-600 mb-4">Opt in to receive urgent notifications via text message. Standard messaging rates apply.</p>
 
-          <label class="flex items-start gap-3 cursor-pointer">
+          <label class="flex items-start gap-3 cursor-pointer mb-4">
             <input
               type="checkbox"
               id="sms_optin"
@@ -166,6 +166,19 @@ const pushEnabled = notification_preferences['push_enabled'] === true;
               <p class="text-sm text-gray-600">You'll need to provide a phone number in your profile.</p>
             </div>
           </label>
+
+          <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <p class="text-sm text-blue-900 font-semibold mb-2">SMS feature is in development</p>
+            <p class="text-sm text-blue-800 mb-3">Help us prioritize SMS notifications by requesting this feature. We'll notify you when it's ready.</p>
+            <button
+              type="button"
+              id="btn-request-sms"
+              class="px-4 py-2 bg-clr-green text-white rounded-lg hover:brightness-110 font-medium text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Request SMS feature
+            </button>
+            <div id="sms-request-message" class="hidden mt-3 text-sm font-medium"></div>
+          </div>
         </div>
 
         <!-- Browser Push Notifications -->
@@ -468,6 +481,43 @@ const pushEnabled = notification_preferences['push_enabled'] === true;
       showMessage(notificationsMessageEl, 'Push notifications disabled.', false);
     } else {
       showMessage(notificationsMessageEl, 'Failed to disable push notifications', true);
+    }
+  });
+
+  // SMS Feature Request
+  const smsRequestBtn = document.getElementById('btn-request-sms');
+  const smsRequestMessage = document.getElementById('sms-request-message');
+
+  smsRequestBtn?.addEventListener('click', async function () {
+    smsRequestBtn.disabled = true;
+    smsRequestBtn.textContent = 'Submitting...';
+
+    try {
+      const res = await fetch('/api/sms-feature-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        smsRequestMessage.textContent = '✓ Request submitted! You\'ll be notified when SMS is available.';
+        smsRequestMessage.className = 'mt-3 text-sm font-medium text-green-700';
+        smsRequestMessage.classList.remove('hidden');
+        smsRequestBtn.textContent = 'Request submitted';
+      } else {
+        smsRequestMessage.textContent = data.error || 'Failed to submit request.';
+        smsRequestMessage.className = 'mt-3 text-sm font-medium text-red-700';
+        smsRequestMessage.classList.remove('hidden');
+        smsRequestBtn.disabled = false;
+        smsRequestBtn.textContent = 'Request SMS feature';
+      }
+    } catch (error) {
+      smsRequestMessage.textContent = 'Network error. Please try again.';
+      smsRequestMessage.className = 'mt-3 text-sm font-medium text-red-700';
+      smsRequestMessage.classList.remove('hidden');
+      smsRequestBtn.disabled = false;
+      smsRequestBtn.textContent = 'Request SMS feature';
     }
   });
   })();

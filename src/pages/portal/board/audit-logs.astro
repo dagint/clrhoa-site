@@ -465,8 +465,8 @@ function formatDate(s: string | null): string {
                       <td class="py-2 px-3 text-gray-600">{formatDate(row.reviewed_at)}</td>
                       <td class="py-2 px-3">{row.name ?? BLANK}</td>
                       <td class="py-2 px-3">{row.status ?? BLANK}</td>
-                      <td class="py-2 px-3">{REDACTED}</td>
-                      <td class="py-2 px-3">{REDACTED}</td>
+                      <td class="py-2 px-3">{row.reviewed_by ?? BLANK}</td>
+                      <td class="py-2 px-3">{row.submitted_by ?? BLANK}</td>
                     </tr>
                   ))}
                 </tbody>
