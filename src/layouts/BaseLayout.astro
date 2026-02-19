@@ -187,21 +187,27 @@ const resourcesByCategory = getResourcesByCategory();
               <a href={link.href} class={`text-lg font-medium transition-colors ${isActive(link.href) ? 'text-clr-green border-b-2 border-clr-green pb-1' : 'text-gray-700 hover:text-clr-green'}`}>{link.label}</a>
             ))}
 
-            <!-- Quick Contact Button -->
+            <!-- Nav CTAs -->
+            <a
+              href="/portal"
+              class="ml-2 bg-clr-green hover:brightness-110 text-white px-4 py-2 rounded-lg font-semibold text-sm shadow-md hover:shadow-lg transition-all no-print"
+            >
+              Member Portal
+            </a>
             <a
               href="/contact"
-              class="ml-2 bg-clr-orange hover:brightness-110 text-white px-4 py-2 rounded-lg font-semibold text-sm shadow-md hover:shadow-lg transition-all no-print"
+              class="bg-clr-orange hover:brightness-110 text-white px-4 py-2 rounded-lg font-semibold text-sm shadow-md hover:shadow-lg transition-all no-print"
             >
               Contact Board
             </a>
           </nav>
           <div class="flex items-center gap-2">
-            <!-- Quick Contact Button (Mobile) -->
+            <!-- Member Portal Button (Mobile header) -->
             <a
-              href="/contact"
-              class="md:hidden bg-clr-orange hover:brightness-110 text-white px-3 py-2 rounded-lg font-semibold text-xs shadow-md hover:shadow-lg transition-all no-print"
+              href="/portal"
+              class="md:hidden bg-clr-green hover:brightness-110 text-white px-3 py-2 rounded-lg font-semibold text-xs shadow-md hover:shadow-lg transition-all no-print"
             >
-              Contact
+              Portal
             </a>
             <button
               id="mobile-menu-button"
@@ -261,6 +267,15 @@ const resourcesByCategory = getResourcesByCategory();
           {publicMainLinks.filter(l => l.href === '/news').map((link) => (
             <a href={link.href} class={`block text-lg font-medium transition-colors py-3 px-2 rounded-lg ${isActive(link.href) ? 'bg-clr-beige/30 text-clr-green font-semibold' : 'text-gray-700 hover:bg-clr-beige/20 hover:text-clr-green'}`}>{link.label}</a>
           ))}
+
+          <div class="border-t border-gray-200 pt-3 mt-1 space-y-1">
+            <a href="/portal" class="block text-lg font-semibold transition-colors py-3 px-2 rounded-lg bg-clr-green/10 text-clr-green hover:bg-clr-green/20">
+              Member Portal
+            </a>
+            <a href="/contact" class={`block text-lg font-medium transition-colors py-3 px-2 rounded-lg ${isActive('/contact') ? 'bg-clr-beige/30 text-clr-green font-semibold' : 'text-gray-700 hover:bg-clr-beige/20 hover:text-clr-green'}`}>
+              Contact Board
+            </a>
+          </div>
         </nav>
       </div>
     </header>
