@@ -83,8 +83,8 @@ export async function runPortalSearch(
       `SELECT id, name, category FROM vendors WHERE name LIKE ? OR category LIKE ? OR notes LIKE ? ORDER BY name ASC LIMIT 20`
     ).bind(like, like, like).all(),
     db.prepare(
-      `SELECT id, name, address FROM owners WHERE name LIKE ? OR address LIKE ? ORDER BY name ASC LIMIT 20`
-    ).bind(like, like).all(),
+      `SELECT id, name, address FROM owners WHERE name LIKE ? OR address LIKE ? OR board_title LIKE ? ORDER BY name ASC LIMIT 20`
+    ).bind(like, like, like).all(),
     db.prepare(
       `SELECT id, title, description FROM feedback_docs WHERE title LIKE ? OR description LIKE ? ORDER BY created DESC LIMIT 20`
     ).bind(like, like).all(),

@@ -149,7 +149,7 @@ function canRevealContact(owner: { share_contact_with_members?: number | null })
       <input
         id="dir-search"
         type="search"
-        placeholder="Search by name, address, lot #, or email..."
+        placeholder="Search by name, address, lot #, email, role, or title..."
         class="w-full px-4 py-3 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-clr-green focus:border-clr-green"
       />
     </div>
@@ -181,7 +181,7 @@ function canRevealContact(owner: { share_contact_with_members?: number | null })
               {owners.map((owner) => {
                 const ownerRole = owner.email ? ownerRoles.get(owner.email.trim().toLowerCase()) : null;
                 return (
-                <tr class="dir-row hover:bg-gray-50" data-name={(owner.name ?? '').toLowerCase()} data-address={(owner.address ?? '').toLowerCase()} data-email={(owner.email ?? '').toLowerCase()} data-lot={(owner.lot_number ?? '').toLowerCase()}>
+                <tr class="dir-row hover:bg-gray-50" data-name={(owner.name ?? '').toLowerCase()} data-address={(owner.address ?? '').toLowerCase()} data-email={(owner.email ?? '').toLowerCase()} data-lot={(owner.lot_number ?? '').toLowerCase()} data-role={(ownerRole ? roleLabel(ownerRole) : '').toLowerCase()} data-title={(owner.board_title ?? '').toLowerCase()}>
                   <td class="px-6 py-4 text-gray-900 font-medium text-base">{owner.name ?? '-'}</td>
                   <td class="px-6 py-4">
                     {ownerRole ? (
@@ -316,7 +316,9 @@ function canRevealContact(owner: { share_contact_with_members?: number | null })
               const address = (row.getAttribute('data-address') || '');
               const emailData = (row.getAttribute('data-email') || '');
               const lot = (row.getAttribute('data-lot') || '');
-              const show = !q || name.includes(q) || address.includes(q) || emailData.includes(q) || lot.includes(q);
+              const roleData = (row.getAttribute('data-role') || '');
+              const titleData = (row.getAttribute('data-title') || '');
+              const show = !q || name.includes(q) || address.includes(q) || emailData.includes(q) || lot.includes(q) || roleData.includes(q) || titleData.includes(q);
               row.style.display = show ? '' : 'none';
             });
           });
