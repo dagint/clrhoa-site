@@ -85,7 +85,7 @@ export function resourcesByCategory(): Record<ResourceCategory, ResourceLink[]> 
 
 /** Footer "Quick Links" column. */
 export const footerQuickLinks: NavLink[] = [
-  { label: 'Member Portal', href: '/portal' },
+  { label: 'Member Portal', href: '/portal/dashboard' },
   { label: 'Documents', href: '/documents' },
   { label: 'Dues & Payment', href: '/dues' },
   { label: 'Board & Committees', href: '/board' },
