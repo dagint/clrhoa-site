@@ -32,10 +32,12 @@ updates:
     # Assignees (optional - add GitHub usernames)
     # assignees:
     #   - "username"
-    # Ignore specific dependencies (if needed)
-    # ignore:
-    #   - dependency-name: "package-name"
-    #     update-types: ["version-update:semver-major"]
+    # Ignore major version bumps for packages that require manual migration
+    ignore:
+      - dependency-name: "tailwindcss"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@astrojs/tailwind"
+        update-types: ["version-update:semver-major"]
 
   # Enable version updates for GitHub Actions (if using CI/CD)
   - package-ecosystem: "github-actions"
