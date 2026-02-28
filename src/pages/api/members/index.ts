@@ -12,6 +12,7 @@ import { getMemberByEmail, listAllMembers } from '../../../lib/members-db';
 import { getEffectiveRole, isElevatedRole, VALID_ROLES } from '../../../lib/auth';
 import { insertOwner, updateOwner, deleteOwners } from '../../../lib/directory-db';
 import { setLoginWhitelistRole, removeFromLoginWhitelistUnlessAdmin } from '../../../lib/auth';
+import { logAuditEvent } from '../../../lib/audit-log';
 
 export const prerender = false;
 
@@ -318,7 +319,7 @@ export const PUT: APIRoute = async ({ request, locals, clientAddress }) => {
         email,
         role,
         name,
-        status: 'pending',
+        status: 'pending_setup',
       });
 
       // Generate a user ID
@@ -327,7 +328,7 @@ export const PUT: APIRoute = async ({ request, locals, clientAddress }) => {
       const result = await db
         .prepare(
           `INSERT INTO users (id, email, name, role, status, created)
-           VALUES (?, ?, ?, ?, 'pending', datetime('now'))`
+           VALUES (?, ?, ?, ?, 'pending_setup', datetime('now'))`
         )
         .bind(userId, email, name, role)
         .run();
@@ -462,11 +463,33 @@ export const DELETE: APIRoute = async ({ request, locals, clientAddress }) => {
     // Delete from users table if exists
     if (member.hasAccount && member.userId) {
       await db.prepare('DELETE FROM users WHERE id = ?').bind(member.userId).run();
+      await logAuditEvent(db, {
+        eventType: 'user_account_deleted',
+        eventCategory: 'administrative',
+        userId: user.email,
+        targetUserId: member.email,
+        action: `Deleted user account for ${member.email}`,
+        resourceType: 'user',
+        resourceId: member.userId,
+        ipAddress: clientIp,
+        details: { role: member.role, name: member.name, had_directory_entry: member.inDirectory },
+      }).catch(() => {});
     }
 
     // Remove from KV whitelist (only if we have an email)
     if (kv && member.email) {
       await removeFromLoginWhitelistUnlessAdmin(kv, member.email);
+      await logAuditEvent(db, {
+        eventType: 'user_whitelist_removed',
+        eventCategory: 'administrative',
+        userId: user.email,
+        targetUserId: member.email,
+        action: `Removed ${member.email} from login whitelist (KV)`,
+        resourceType: 'user',
+        resourceId: member.email,
+        ipAddress: clientIp,
+        details: { role: effectiveRole },
+      }).catch(() => {});
     }
 
     return new Response(

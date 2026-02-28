@@ -465,6 +465,16 @@ export async function insertDirectoryLog(
           .run();
       }
     }
+    // Also write to unified audit log
+    await insertDirectoryAuditLog(db, {
+      actor_email: viewer,
+      actor_role: role,
+      ip_address: ip,
+      operation: 'view_email',
+      owner_name: name || null,
+      owner_email: targetEmail.trim(),
+      target_phone: phone || null,
+    });
     return;
   }
 
@@ -495,6 +505,15 @@ export async function insertDirectoryLog(
         .run();
     }
   }
+  // Also write to unified audit log
+  await insertDirectoryAuditLog(db, {
+    actor_email: viewer,
+    actor_role: role,
+    ip_address: ip,
+    operation: 'view_phone',
+    owner_name: name || null,
+    target_phone: phone || null,
+  });
 }
 
 /** Log a single audit entry when an elevated user exports the full directory (emails and phones). One log per export, not per member. */
@@ -536,6 +555,13 @@ export async function insertDirectoryExportLog(
         .run();
     }
   }
+  // Also write to unified audit log
+  await insertDirectoryAuditLog(db, {
+    actor_email: viewer,
+    actor_role: role,
+    ip_address: ip,
+    operation: 'export',
+  });
 }
 
 export async function insertOwner(
@@ -902,6 +928,64 @@ export async function upsertOwnerByEmail(
 }
 
 // ============================================================================
+// UNIFIED DIRECTORY AUDIT LOG
+// ============================================================================
+
+/**
+ * Insert into the unified directory_audit_log table.
+ * This covers both view/reveal events and owner CRUD events in one place.
+ * Old tables (directory_logs, owner_audit_log) are preserved for history.
+ */
+async function insertDirectoryAuditLog(
+  db: D1Database,
+  params: {
+    actor_email: string | null;
+    actor_role?: string | null;
+    ip_address?: string | null;
+    operation: string;
+    operation_type?: string | null;
+    owner_id?: string | null;
+    owner_name?: string | null;
+    owner_email?: string | null;
+    target_phone?: string | null;
+    old_values?: string | null;
+    new_values?: string | null;
+    fields_changed?: string | null;
+    correlation_id?: string | null;
+  }
+): Promise<void> {
+  try {
+    await db
+      .prepare(
+        `INSERT INTO directory_audit_log
+          (actor_email, actor_role, ip_address, operation, operation_type,
+           owner_id, owner_name, owner_email, target_phone,
+           old_values, new_values, fields_changed, correlation_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .bind(
+        params.actor_email?.trim().toLowerCase() ?? null,
+        params.actor_role?.trim() ?? null,
+        params.ip_address?.trim() ?? null,
+        params.operation,
+        params.operation_type ?? null,
+        params.owner_id ?? null,
+        params.owner_name?.trim() ?? null,
+        params.owner_email?.trim().toLowerCase() ?? null,
+        params.target_phone?.trim() ?? null,
+        params.old_values ?? null,
+        params.new_values ?? null,
+        params.fields_changed ?? null,
+        params.correlation_id ?? null
+      )
+      .run();
+  } catch (error) {
+    // Table may not exist yet (run: npm run db:directory-audit-log:local)
+    console.error('[DIRECTORY-DB] Failed to insert directory_audit_log:', error);
+  }
+}
+
+// ============================================================================
 // OWNER AUDIT LOGGING
 // ============================================================================
 
@@ -974,6 +1058,24 @@ export async function insertOwnerAuditLog(
     // Table may not exist yet (migration not run)
     console.error('[DIRECTORY-DB] Failed to insert owner audit log:', error);
   }
+
+  // Also write to unified directory_audit_log
+  // Map action values: 'created_via_csv_upload' → 'csv_upload', others pass through
+  const operation = params.action.includes('csv') ? 'csv_upload' : params.action;
+  await insertDirectoryAuditLog(db, {
+    actor_email: params.changed_by_email ?? null,
+    actor_role: params.changed_by_role ?? null,
+    ip_address: params.ip_address ?? null,
+    operation,
+    operation_type: params.operation_type ?? null,
+    owner_id: params.owner_id,
+    owner_name: params.owner_name ?? null,
+    owner_email: params.owner_email ?? null,
+    old_values: params.old_values ?? null,
+    new_values: params.new_values ?? null,
+    fields_changed: params.fields_changed ?? null,
+    correlation_id: params.correlation_id ?? null,
+  });
 }
 
 /**

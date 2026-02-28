@@ -78,6 +78,17 @@ if (Astro.request.method === 'POST') {
     });
   }
   const id = await insertNewsItem(db, { title, body: bodyText, is_public: isPublic, show_on_portal: showOnPortal });
+  const actorEmail = user?.email ?? (session as any)?.email ?? 'unknown';
+  await logAdminEvent(db, {
+    eventType: 'news_item_created',
+    userId: actorEmail,
+    action: `Created news item "${title}"`,
+    resourceType: 'news_item',
+    resourceId: id,
+    details: { title, is_public: isPublic, show_on_portal: showOnPortal },
+    ipAddress: Astro.request.headers.get('cf-connecting-ip') ?? null,
+    outcome: 'success',
+  }).catch(() => {});
   return new Response(JSON.stringify({ success: true, id }), {
     status: 200,
     headers: { 'Content-Type': 'application/json' },

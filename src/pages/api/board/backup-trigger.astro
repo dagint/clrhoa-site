@@ -6,6 +6,7 @@
 export const prerender = false;
 
 import { getUserRole } from '../../../types/auth';
+import { logAdminEvent } from '../../../lib/audit-log';
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env as Env & {
@@ -62,8 +63,10 @@ try {
 
   const result = await response.json();
 
-  // Record successful backup timestamp from the portal side (worker DB binding is optional)
+  // Record successful backup timestamp and audit who triggered it
   const db = (env as any)?.DB as D1Database | undefined;
+  const actorEmail = (user as any)?.email ?? 'unknown';
+  const ipAddress = Astro.request.headers.get('cf-connecting-ip') ?? null;
   if (db) {
     try {
       await db.prepare(
@@ -73,6 +76,14 @@ try {
     } catch (e) {
       console.warn('[BACKUP TRIGGER] Could not update last_backup_at:', e);
     }
+    await logAdminEvent(db, {
+      eventType: 'backup_triggered',
+      userId: actorEmail,
+      action: 'Manually triggered backup worker',
+      resourceType: 'backup',
+      ipAddress,
+      outcome: 'success',
+    }).catch(() => {});
   }
 
   return new Response(JSON.stringify(result), {
