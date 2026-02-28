@@ -19,6 +19,7 @@ import {
   updateMeeting,
   deleteMeeting,
 } from '../../lib/meetings-db';
+import { logEvent } from '../../lib/audit-log';
 
 const auth = await requireSession(Astro);
 if ('response' in auth) return auth.response;
@@ -78,6 +79,17 @@ if (Astro.request.method === 'POST') {
     post_to_public_news: postToPublic ? 1 : 0,
     created_by: session.email,
   });
+  await logEvent(db, {
+    actorEmail: session.email,
+    actorRole: effectiveRole,
+    ipAddress: Astro.request.headers.get('cf-connecting-ip') ?? null,
+    category: 'meeting',
+    action: 'meeting_created',
+    actionLabel: 'Meeting created',
+    resourceType: 'meeting',
+    resourceId: id,
+    details: { title, datetime },
+  });
   return jsonResponse({ success: true, id, message: 'Meeting created' });
 }
 
@@ -110,6 +122,16 @@ if (Astro.request.method === 'PUT') {
     agenda_r2_key: body.agenda_r2_key !== undefined ? (body.agenda_r2_key ? String(body.agenda_r2_key).trim() : null) : undefined,
     post_to_public_news: postToPublic,
   });
+  await logEvent(db, {
+    actorEmail: session.email,
+    actorRole: effectiveRole,
+    ipAddress: Astro.request.headers.get('cf-connecting-ip') ?? null,
+    category: 'meeting',
+    action: 'meeting_updated',
+    actionLabel: 'Meeting updated',
+    resourceType: 'meeting',
+    resourceId: id,
+  });
   return jsonResponse({ success: true, message: 'Meeting updated' });
 }
 
@@ -141,6 +163,17 @@ if (Astro.request.method === 'DELETE') {
   }
   const ok = await deleteMeeting(db, id);
   if (!ok) return jsonResponse({ error: 'Meeting not found' }, 404);
+  await logEvent(db, {
+    actorEmail: session.email,
+    actorRole: effectiveRole,
+    ipAddress: Astro.request.headers.get('cf-connecting-ip') ?? null,
+    category: 'meeting',
+    action: 'meeting_deleted',
+    actionLabel: 'Meeting deleted',
+    resourceType: 'meeting',
+    resourceId: id,
+    details: { title: meeting.title },
+  });
   return jsonResponse({ success: true, message: 'Meeting deleted' });
 }
 

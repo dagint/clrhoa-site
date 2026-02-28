@@ -25,6 +25,7 @@ import {
 import { listOwners } from '../../lib/directory-db';
 import { getUserByEmail, getNotificationPrefsForEmails } from '../../lib/db';
 import { sendEmail, shouldSendNotification, type NotificationEnv } from '../../lib/notifications';
+import { logEvent } from '../../lib/audit-log';
 
 const auth = await requireSession(Astro);
 if ('response' in auth) return auth.response;
@@ -135,6 +136,16 @@ if (Astro.request.method === 'POST') {
           : null;
     const comments = body.comments != null ? String(body.comments).trim() : undefined;
     await setFeedbackResponse(db, docId, session.email, { acknowledged, approved, comments: comments ?? null });
+    await logEvent(db, {
+      actorEmail: session.email,
+      ipAddress: Astro.request.headers.get('cf-connecting-ip') ?? null,
+      category: 'feedback',
+      action: 'feedback_response_recorded',
+      actionLabel: 'Feedback response recorded',
+      resourceType: 'feedback_doc',
+      resourceId: docId,
+      details: { acknowledged, approved },
+    });
     if (env?.NOTIFY_NOREPLY_EMAIL) {
       const user = await getUserByEmail(db, session.email);
       let prefs: Record<string, boolean> | null = null;
@@ -170,6 +181,17 @@ if (Astro.request.method === 'POST') {
       r2_key: body.r2_key != null ? String(body.r2_key).trim() : null,
       deadline,
       created_by: session.email,
+    });
+    await logEvent(db, {
+      actorEmail: session.email,
+      actorRole: effectiveRole,
+      ipAddress: Astro.request.headers.get('cf-connecting-ip') ?? null,
+      category: 'feedback',
+      action: 'feedback_doc_created',
+      actionLabel: 'Feedback document created',
+      resourceType: 'feedback_doc',
+      resourceId: id,
+      details: { title, deadline },
     });
     const owners = await listOwners(db);
     const ownerEmails = owners.map((o) => o.email).filter(Boolean) as string[];
@@ -226,6 +248,16 @@ if (Astro.request.method === 'PUT') {
     r2_key: body.r2_key !== undefined ? (body.r2_key ? String(body.r2_key).trim() : null) : undefined,
     deadline: body.deadline !== undefined ? (body.deadline ? String(body.deadline).trim() : null) : undefined,
   });
+  await logEvent(db, {
+    actorEmail: session.email,
+    actorRole: effectiveRole,
+    ipAddress: Astro.request.headers.get('cf-connecting-ip') ?? null,
+    category: 'feedback',
+    action: 'feedback_doc_updated',
+    actionLabel: 'Feedback document updated',
+    resourceType: 'feedback_doc',
+    resourceId: id,
+  });
   return jsonResponse({ success: true });
 }
 
@@ -256,6 +288,17 @@ if (Astro.request.method === 'DELETE') {
   }
   const ok = await deleteFeedbackDoc(db, id);
   if (!ok) return jsonResponse({ error: 'Not found' }, 404);
+  await logEvent(db, {
+    actorEmail: session.email,
+    actorRole: effectiveRole,
+    ipAddress: Astro.request.headers.get('cf-connecting-ip') ?? null,
+    category: 'feedback',
+    action: 'feedback_doc_deleted',
+    actionLabel: 'Feedback document deleted',
+    resourceType: 'feedback_doc',
+    resourceId: id,
+    details: { title: doc.title },
+  });
   return jsonResponse({ success: true });
 }
 

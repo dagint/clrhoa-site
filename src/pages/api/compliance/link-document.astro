@@ -21,6 +21,7 @@ import {
   insertComplianceDocument,
   insertComplianceAuditLog,
 } from '../../../lib/compliance-db';
+import { logEvent } from '../../../lib/audit-log';
 import { getMemberDocument } from '../../../lib/member-documents-db';
 import { getPublicDocument } from '../../../lib/public-documents-db';
 
@@ -198,6 +199,17 @@ await insertComplianceAuditLog(db, {
     title: docTitle,
     fileKey,
   },
+});
+await logEvent(db, {
+  actorEmail: user.email,
+  actorRole: effectiveRole,
+  ipAddress: Astro.request.headers.get('cf-connecting-ip') ?? null,
+  category: 'compliance',
+  action: 'compliance_doc_linked',
+  actionLabel: 'Compliance document linked from existing source',
+  resourceType: 'compliance_document',
+  resourceId: documentId,
+  details: { requirementId, sourceType, sourceId, title: docTitle },
 });
 
 return new Response(

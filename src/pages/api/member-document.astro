@@ -7,6 +7,7 @@ export const prerender = false;
 
 import { verifyCsrfToken, verifyOrigin, getEffectiveRole, isBoardOnly } from '../../lib/auth';
 import { getMemberDocument, deleteMemberDocument } from '../../lib/member-documents-db';
+import { logEvent } from '../../lib/audit-log';
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
@@ -75,6 +76,18 @@ if (r2 && row.file_key) {
     await r2.delete(row.file_key);
   } catch (_) {}
 }
+
+await logEvent(db, {
+  actorEmail: user.email,
+  actorRole: effectiveRole,
+  ipAddress: Astro.request.headers.get('cf-connecting-ip') ?? null,
+  category: 'document',
+  action: 'member_doc_deleted',
+  actionLabel: 'Member document deleted',
+  resourceType: 'member_document',
+  resourceId: String(id),
+  details: { title: row.title, category: row.category },
+});
 
 return new Response(
   JSON.stringify({ success: true, message: 'Document deleted.' }),

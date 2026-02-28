@@ -11,6 +11,7 @@ import { checkRateLimit, getRateLimitConfig } from '../../lib/rate-limit';
 import { getSecurityMonitor } from '../../lib/monitoring';
 import { listArbFilesByRequest, createArbFileId, insertArbFile } from '../../lib/arb-db';
 import { createLogger, maskRequestId } from '../../lib/logging';
+import { logEvent } from '../../lib/audit-log';
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10MB per file
 const MAX_TOTAL_BYTES = 40 * 1024 * 1024; // 40MB total
@@ -308,6 +309,17 @@ for (const f of fileGroups) {
     requestId: maskRequestId(requestId),
     user: user.email,
     count: fileGroups.length
+  });
+
+  await logEvent(db, {
+    actorEmail: user.email,
+    ipAddress: Astro.request.headers.get('cf-connecting-ip') ?? null,
+    category: 'arb',
+    action: 'arb_files_added',
+    actionLabel: 'ARB files added',
+    resourceType: 'arb_request',
+    resourceId: requestId,
+    details: { fileCount: fileGroups.length },
   });
 
   return new Response(

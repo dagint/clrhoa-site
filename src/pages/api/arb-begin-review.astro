@@ -28,6 +28,7 @@ import { getSecurityMonitor } from '../../lib/monitoring';
 import { getArbRequest } from '../../lib/arb-db';
 import { transitionStatus, setDeadline } from '../../lib/arb-voting-db';
 import { canTransitionStatus } from '../../lib/arb-status-machine';
+import { logEvent } from '../../lib/audit-log';
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
@@ -205,6 +206,18 @@ try {
   logger.info('ARC review started', {
     requestId,
     startedBy: user.email,
+  });
+
+  await logEvent(db, {
+    actorEmail: user.email,
+    actorRole: effectiveRole,
+    ipAddress,
+    category: 'arb',
+    action: 'arb_review_started',
+    actionLabel: 'ARB review started',
+    resourceType: 'arb_request',
+    resourceId: requestId,
+    targetEmail: request.owner_email,
   });
 
   return new Response(

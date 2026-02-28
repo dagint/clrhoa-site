@@ -11,6 +11,7 @@ import { getSecurityMonitor } from '../../lib/monitoring';
 import { getArbRequest, setArbRequestInReview } from '../../lib/arb-db';
 import { incrementCycle, transitionStatus, setDeadline } from '../../lib/arb-voting-db';
 import { canTransitionStatus } from '../../lib/arb-status-machine';
+import { logEvent } from '../../lib/audit-log';
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
@@ -113,6 +114,16 @@ if (request.workflow_version !== 2) {
       { status: 400, headers: { 'Content-Type': 'application/json' } }
     );
   }
+  await logEvent(db, {
+    actorEmail: user.email,
+    ipAddress: clientIp,
+    category: 'arb',
+    action: 'arb_request_submitted',
+    actionLabel: 'ARB request submitted for review',
+    resourceType: 'arb_request',
+    resourceId: requestId,
+    targetEmail: request.owner_email,
+  });
   return new Response(
     JSON.stringify({
       success: true,
@@ -185,6 +196,17 @@ await db
 // Set deadline (submitted_at + 30 days)
 await setDeadline(db, requestId, now);
 
+await logEvent(db, {
+  actorEmail: user.email,
+  ipAddress: clientIp,
+  category: 'arb',
+  action: 'arb_request_resubmitted',
+  actionLabel: 'ARB request resubmitted',
+  resourceType: 'arb_request',
+  resourceId: requestId,
+  targetEmail: request.owner_email,
+  details: { previous_stage: currentStage },
+});
 return new Response(
   JSON.stringify({
     success: true,

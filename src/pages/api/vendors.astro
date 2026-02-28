@@ -15,6 +15,7 @@ import {
   insertVendorAuditLog,
   type VendorFile,
 } from '../../lib/vendors-db';
+import { logEvent } from '../../lib/audit-log';
 
 const REQUEST_TIMEOUT_MS = 30 * 1000;
 
@@ -114,6 +115,17 @@ if (Astro.request.method === 'DELETE') {
     });
   }
   await insertVendorAuditLog(db, { vendor_id: id, vendor_name: existingVendor?.name ?? null, action: 'deleted', done_by_email: user.email, ip_address: ipAddress });
+  await logEvent(db, {
+    actorEmail: user.email,
+    actorRole: effectiveRole,
+    ipAddress,
+    category: 'vendor',
+    action: 'vendor_deleted',
+    actionLabel: 'Vendor deleted',
+    resourceType: 'vendor',
+    resourceId: id,
+    details: { vendorName: existingVendor?.name },
+  });
   return new Response(JSON.stringify({ success: true }), {
     status: 200,
     headers: { 'Content-Type': 'application/json' },
@@ -213,6 +225,17 @@ if (Astro.request.method === 'POST' && action === 'create') {
   }
 
   await insertVendorAuditLog(db, { vendor_id: id, vendor_name: name?.trim() ?? null, action: 'created', done_by_email: user.email, ip_address: ipAddress });
+  await logEvent(db, {
+    actorEmail: user.email,
+    actorRole: effectiveRole,
+    ipAddress,
+    category: 'vendor',
+    action: 'vendor_created',
+    actionLabel: 'Vendor created',
+    resourceType: 'vendor',
+    resourceId: id,
+    details: { vendorName: name?.trim(), category: category ?? 'Other' },
+  });
 
   return new Response(JSON.stringify({ success: true, id }), {
     status: 200,
@@ -275,6 +298,17 @@ if (Astro.request.method === 'PUT' && action === 'update') {
     });
   }
   await insertVendorAuditLog(db, { vendor_id: id, vendor_name: existing.name, action: 'updated', done_by_email: user.email, ip_address: ipAddress });
+  await logEvent(db, {
+    actorEmail: user.email,
+    actorRole: effectiveRole,
+    ipAddress,
+    category: 'vendor',
+    action: 'vendor_updated',
+    actionLabel: 'Vendor updated',
+    resourceType: 'vendor',
+    resourceId: id,
+    details: { vendorName: existing.name },
+  });
   return new Response(JSON.stringify({ success: true, id }), {
     status: 200,
     headers: { 'Content-Type': 'application/json' },

@@ -88,7 +88,7 @@ try {
   });
   // Log to unified audit log (FL §720.303 financial record requirement)
   const ipAddress = Astro.request.headers.get('cf-connecting-ip') ?? Astro.request.headers.get('x-forwarded-for');
-  logEvent(db, {
+  await logEvent(db, {
     actorEmail: user.email,
     actorRole: effectiveRole,
     ipAddress,
@@ -99,7 +99,7 @@ try {
     resourceId: String(paymentId),
     targetEmail: owner_email,
     details: { amount, paid_at, balance_after, payment_method, check_number, quarters_to_apply, full_year },
-  }).catch(() => {});
+  });
 
   if (isAdminActingAs(session) && session.assumed_role && db) {
     try {

@@ -7,6 +7,7 @@ export const prerender = false;
 
 import { requireSession, jsonResponse } from '../../lib/api-helpers';
 import { getEffectiveRole, verifyCsrfToken, isBoardOnly } from '../../lib/auth';
+import { logEvent } from '../../lib/audit-log';
 
 const auth = await requireSession(Astro);
 if ('response' in auth) return auth.response;
@@ -17,6 +18,7 @@ const isBoard = isBoardOnly(effectiveRole) || effectiveRole === 'admin';
 if (!isBoard) return jsonResponse({ error: 'Forbidden' }, 403);
 
 const r2 = Astro.locals.runtime?.env?.CLOURHOA_FILES;
+const db = Astro.locals.runtime?.env?.DB;
 if (!r2) return jsonResponse({ error: 'Server configuration error' }, 503);
 
 if (Astro.request.method !== 'POST') {
@@ -51,5 +53,17 @@ await r2.put(key, await file.arrayBuffer(), {
   httpMetadata: { contentType: 'application/pdf' },
 });
 
+if (db) {
+  await logEvent(db, {
+    actorEmail: session.email,
+    actorRole: effectiveRole,
+    ipAddress: Astro.request.headers.get('cf-connecting-ip') ?? null,
+    category: 'feedback',
+    action: 'feedback_file_uploaded',
+    actionLabel: 'Feedback PDF uploaded',
+    resourceType: 'feedback_file',
+    resourceId: key,
+  });
+}
 return jsonResponse({ success: true, key });
 ---

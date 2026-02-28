@@ -8,6 +8,7 @@ export const prerender = false;
 import { requireSession, requireDb, jsonResponse } from '../../lib/api-helpers';
 import { getEffectiveRole, verifyCsrfToken, isBoardOnly } from '../../lib/auth';
 import { getMaintenanceById, updateMaintenanceRequest } from '../../lib/maintenance-db';
+import { logEvent } from '../../lib/audit-log';
 
 const auth = await requireSession(Astro);
 if ('response' in auth) return auth.response;
@@ -54,6 +55,18 @@ if (!existing) return jsonResponse({ error: 'Request not found' }, 404);
 await updateMaintenanceRequest(db, id, {
   status: status ?? existing.status,
   vendor_assigned: vendorAssigned !== undefined ? vendorAssigned : existing.vendor_assigned,
+});
+
+await logEvent(db, {
+  actorEmail: session.email,
+  actorRole: effectiveRole,
+  ipAddress: Astro.request.headers.get('cf-connecting-ip') ?? null,
+  category: 'maintenance',
+  action: 'maintenance_request_updated',
+  actionLabel: 'Maintenance request updated',
+  resourceType: 'maintenance_request',
+  resourceId: id,
+  details: { status, vendorAssigned },
 });
 
 return jsonResponse({ success: true, message: 'Updated' });

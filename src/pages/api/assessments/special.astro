@@ -64,7 +64,7 @@ if (Astro.request.method === 'POST') {
       created_by: user.email,
     });
     const ipPost = Astro.request.headers.get('cf-connecting-ip') ?? Astro.request.headers.get('x-forwarded-for');
-    logEvent(db, {
+    await logEvent(db, {
       actorEmail: user.email,
       actorRole: effectiveRole,
       ipAddress: ipPost,
@@ -75,7 +75,7 @@ if (Astro.request.method === 'POST') {
       resourceId: String(id),
       targetEmail: owner_email,
       details: { description, amount, due_date },
-    }).catch(() => {});
+    });
     return json({ success: true, id });
   } catch (e) {
     console.error('[special-assessment add]', e);
@@ -102,7 +102,7 @@ if (Astro.request.method === 'PATCH') {
   const ok = await markSpecialAssessmentPaid(db, id, owner_email, paid_at);
   if (!ok) return json({ error: 'Special assessment not found or already paid' }, 404);
   const ipPatch = Astro.request.headers.get('cf-connecting-ip') ?? Astro.request.headers.get('x-forwarded-for');
-  logEvent(db, {
+  await logEvent(db, {
     actorEmail: user.email,
     actorRole: effectiveRole,
     ipAddress: ipPatch,
@@ -113,7 +113,7 @@ if (Astro.request.method === 'PATCH') {
     resourceId: id,
     targetEmail: owner_email,
     details: { paid_at },
-  }).catch(() => {});
+  });
   return json({ success: true });
 }
 

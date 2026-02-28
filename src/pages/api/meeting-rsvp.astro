@@ -8,6 +8,7 @@ export const prerender = false;
 import { requireSession, requireDb, jsonResponse } from '../../lib/api-helpers';
 import { verifyCsrfToken } from '../../lib/auth';
 import { getMeetingById, setRsvp } from '../../lib/meetings-db';
+import { logEvent } from '../../lib/audit-log';
 
 const auth = await requireSession(Astro);
 if ('response' in auth) return auth.response;
@@ -44,5 +45,15 @@ const meeting = await getMeetingById(db, meetingId);
 if (!meeting) return jsonResponse({ error: 'Meeting not found' }, 404);
 
 await setRsvp(db, meetingId, session.email, response);
+await logEvent(db, {
+  actorEmail: session.email,
+  ipAddress: Astro.request.headers.get('cf-connecting-ip') ?? null,
+  category: 'meeting',
+  action: 'meeting_rsvp_recorded',
+  actionLabel: 'Meeting RSVP recorded',
+  resourceType: 'meeting',
+  resourceId: meetingId,
+  details: { response },
+});
 return jsonResponse({ success: true, response });
 ---

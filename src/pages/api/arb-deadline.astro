@@ -8,6 +8,7 @@ import { verifyCsrfToken, verifyOrigin, getEffectiveRole, canApproveArb } from '
 import { checkRateLimit, getRateLimitConfig } from '../../lib/rate-limit';
 import { getSecurityMonitor } from '../../lib/monitoring';
 import { getArbRequest } from '../../lib/arb-db';
+import { logEvent } from '../../lib/audit-log';
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
@@ -84,6 +85,18 @@ const result = await db
   .run();
 
 if ((result.meta.changes ?? 0) > 0) {
+  await logEvent(db, {
+    actorEmail: user.email,
+    actorRole: getEffectiveRole(session),
+    ipAddress: Astro.request.headers.get('cf-connecting-ip') ?? null,
+    category: 'arb',
+    action: deadline ? 'arb_deadline_set' : 'arb_deadline_cleared',
+    actionLabel: deadline ? 'ARB deadline set' : 'ARB deadline cleared',
+    resourceType: 'arb_request',
+    resourceId: requestId,
+    targetEmail: request.owner_email,
+    details: { deadline },
+  });
   return new Response(
     JSON.stringify({
       success: true,

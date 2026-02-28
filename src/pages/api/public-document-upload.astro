@@ -16,6 +16,7 @@ import {
 } from '../../lib/public-documents-db';
 import { sanitizeFileName } from '../../lib/sanitize';
 import { archiveCurrentDocumentsForRequirement, insertComplianceDocument } from '../../lib/compliance-db';
+import { logEvent } from '../../lib/audit-log';
 
 // FL §720.303(4) compliance requirement IDs that map to public doc slugs
 const SLUG_TO_COMPLIANCE: Partial<Record<string, { reqId: string; title: string }>> = {
@@ -196,6 +197,17 @@ if (complianceMapping) {
   }
 }
 
+await logEvent(db, {
+  actorEmail: user.email,
+  actorRole: effectiveRole,
+  ipAddress: Astro.request.headers.get('cf-connecting-ip') ?? null,
+  category: 'document',
+  action: 'public_doc_uploaded',
+  actionLabel: 'Public document uploaded',
+  resourceType: 'public_document',
+  resourceId: slug,
+  details: { slug, fileSize: file.size, mimeType: file.type },
+});
 return new Response(
   JSON.stringify({
     success: true,
