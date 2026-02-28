@@ -9,6 +9,7 @@ export const prerender = false;
 import { verifyCsrfToken, verifyOrigin, getEffectiveRole, canRecordPayments, isAdminActingAs } from '../../../lib/auth';
 import { getAssessmentByOwner, recordPayment } from '../../../lib/assessments-db';
 import { insertAdminAssumedRoleAudit } from '../../../lib/admin-assumed-role-db';
+import { logEvent } from '../../../lib/audit-log';
 
 function json(data: object, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
@@ -85,6 +86,21 @@ try {
     payment_method,
     check_number,
   });
+  // Log to unified audit log (FL §720.303 financial record requirement)
+  const ipAddress = Astro.request.headers.get('cf-connecting-ip') ?? Astro.request.headers.get('x-forwarded-for');
+  logEvent(db, {
+    actorEmail: user.email,
+    actorRole: effectiveRole,
+    ipAddress,
+    category: 'financial',
+    action: 'payment_recorded',
+    actionLabel: 'Payment recorded',
+    resourceType: 'assessment_payment',
+    resourceId: String(paymentId),
+    targetEmail: owner_email,
+    details: { amount, paid_at, balance_after, payment_method, check_number, quarters_to_apply, full_year },
+  }).catch(() => {});
+
   if (isAdminActingAs(session) && session.assumed_role && db) {
     try {
       const actorRole = session.role?.toLowerCase() === 'arb_board' ? 'arb_board' : 'admin';

@@ -7,6 +7,7 @@ export const prerender = false;
 
 import { verifyCsrfToken, verifyOrigin, getEffectiveRole, canRecordPayments } from '../../../lib/auth';
 import { listSpecialAssessmentsByOwner, addSpecialAssessment, markSpecialAssessmentPaid } from '../../../lib/assessments-db';
+import { logEvent } from '../../../lib/audit-log';
 
 function json(data: object, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
@@ -62,6 +63,19 @@ if (Astro.request.method === 'POST') {
       due_date: due_date || undefined,
       created_by: user.email,
     });
+    const ipPost = Astro.request.headers.get('cf-connecting-ip') ?? Astro.request.headers.get('x-forwarded-for');
+    logEvent(db, {
+      actorEmail: user.email,
+      actorRole: effectiveRole,
+      ipAddress: ipPost,
+      category: 'financial',
+      action: 'special_assessment_created',
+      actionLabel: 'Special assessment created',
+      resourceType: 'special_assessment',
+      resourceId: String(id),
+      targetEmail: owner_email,
+      details: { description, amount, due_date },
+    }).catch(() => {});
     return json({ success: true, id });
   } catch (e) {
     console.error('[special-assessment add]', e);
@@ -87,6 +101,19 @@ if (Astro.request.method === 'PATCH') {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(paid_at)) return json({ error: 'paid_at must be YYYY-MM-DD' }, 400);
   const ok = await markSpecialAssessmentPaid(db, id, owner_email, paid_at);
   if (!ok) return json({ error: 'Special assessment not found or already paid' }, 404);
+  const ipPatch = Astro.request.headers.get('cf-connecting-ip') ?? Astro.request.headers.get('x-forwarded-for');
+  logEvent(db, {
+    actorEmail: user.email,
+    actorRole: effectiveRole,
+    ipAddress: ipPatch,
+    category: 'financial',
+    action: 'special_assessment_marked_paid',
+    actionLabel: 'Special assessment marked paid',
+    resourceType: 'special_assessment',
+    resourceId: id,
+    targetEmail: owner_email,
+    details: { paid_at },
+  }).catch(() => {});
   return json({ success: true });
 }
 
