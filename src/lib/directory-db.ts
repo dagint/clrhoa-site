@@ -3,6 +3,7 @@
  */
 
 import { generateId } from '../utils/id-generator.js';
+import { logEvent } from './audit-log.js';
 
 export interface Owner {
   id: string;
@@ -983,6 +984,39 @@ async function insertDirectoryAuditLog(
     // Table may not exist yet (run: npm run db:directory-audit-log:local)
     console.error('[DIRECTORY-DB] Failed to insert directory_audit_log:', error);
   }
+
+  // Dual-write to unified_audit_log so the board audit viewer captures directory events
+  const ACTION_MAP: Record<string, string> = {
+    created:    'owner_created',
+    updated:    'owner_updated',
+    deleted:    'owner_deleted',
+    csv_upload: 'owner_csv_import',
+    view_phone: 'directory_phone_viewed',
+    view_email: 'directory_email_viewed',
+    export:     'directory_exported',
+  };
+  const LABEL_MAP: Record<string, string> = {
+    created:    'Owner record created',
+    updated:    'Owner record updated',
+    deleted:    'Owner record deleted',
+    csv_upload: 'Owner records imported via CSV',
+    view_phone: 'Phone number viewed',
+    view_email: 'Email viewed',
+    export:     'Directory exported',
+  };
+  await logEvent(db, {
+    actorEmail: params.actor_email ?? 'system',
+    actorRole:  params.actor_role ?? null,
+    ipAddress:  params.ip_address ?? null,
+    category:   'directory',
+    action:     ACTION_MAP[params.operation] ?? params.operation,
+    actionLabel: LABEL_MAP[params.operation] ?? params.operation,
+    targetEmail: params.owner_email ?? null,
+    resourceType: 'owner',
+    resourceId:  params.owner_id ?? null,
+    details: params.fields_changed ? { fields_changed: params.fields_changed, owner_name: params.owner_name } : undefined,
+    correlationId: params.correlation_id ?? null,
+  });
 }
 
 // ============================================================================
