@@ -142,6 +142,10 @@ export async function getBoardContext(astro: RoleContextAstro): Promise<GetRoleC
     sessionId: luciaSession.id,
     elevated_until: (luciaSession as any).elevated_until,
     csrfToken: (luciaSession as any).csrfToken,
+    // Propagate assumed_role so getEffectiveRole() returns the assumed role for admin acting as board
+    assumed_role: (luciaSession as any).assumed_role,
+    assumed_at: (luciaSession as any).assumed_at,
+    assumed_until: (luciaSession as any).assumed_until,
   };
 
   const effectiveRole = getEffectiveRole(session);
@@ -198,6 +202,10 @@ export async function getArbContext(astro: RoleContextAstro): Promise<GetRoleCon
     sessionId: luciaSession.id,
     elevated_until: (luciaSession as any).elevated_until,
     csrfToken: (luciaSession as any).csrfToken,
+    // Propagate assumed_role so getEffectiveRole() returns the assumed role for admin acting as arb
+    assumed_role: (luciaSession as any).assumed_role,
+    assumed_at: (luciaSession as any).assumed_at,
+    assumed_until: (luciaSession as any).assumed_until,
   };
 
   const effectiveRole = getEffectiveRole(session);
