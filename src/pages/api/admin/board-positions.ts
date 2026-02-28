@@ -15,6 +15,7 @@ import {
   type BoardTitle,
 } from '../../../lib/board-positions-db';
 import { getUserRole, getUserEmail, type ExtendedSession } from '../../../types/auth';
+import { logEvent } from '../../../lib/audit-log';
 
 export const prerender = false;
 
@@ -93,12 +94,37 @@ export const POST: APIRoute = async ({ request, locals }) => {
       if (!result.success) {
         return new Response(JSON.stringify({ error: result.error || 'Failed to assign position' }), { status: 400 });
       }
+      await logEvent(env.DB, {
+        actorEmail: userEmail,
+        actorRole: effectiveRole,
+        ipAddress: request.headers.get('cf-connecting-ip') ?? null,
+        category: 'user',
+        action: 'board_position_assigned',
+        actionLabel: 'Board position assigned',
+        resourceType: 'board_position',
+        resourceId: email,
+        targetEmail: email,
+        details: { title },
+      });
       return new Response(JSON.stringify({ success: true, message: `Assigned ${title} to ${email}` }), { status: 200 });
     } else if (action === 'remove') {
       const success = await endBoardPosition(env.DB, email, title as BoardTitle);
       if (!success) {
         return new Response(JSON.stringify({ error: 'Failed to remove position' }), { status: 400 });
       }
+      const actorEmail = getUserEmail(user) ?? session?.userId ?? 'unknown';
+      await logEvent(env.DB, {
+        actorEmail,
+        actorRole: effectiveRole,
+        ipAddress: request.headers.get('cf-connecting-ip') ?? null,
+        category: 'user',
+        action: 'board_position_removed',
+        actionLabel: 'Board position removed',
+        resourceType: 'board_position',
+        resourceId: email,
+        targetEmail: email,
+        details: { title },
+      });
       return new Response(JSON.stringify({ success: true, message: `Removed ${title} from ${email}` }), { status: 200 });
     } else {
       return new Response(JSON.stringify({ error: 'Invalid action' }), { status: 400 });

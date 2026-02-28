@@ -11,6 +11,7 @@ import { verifyCsrfToken, verifyOrigin } from '../../lib/auth';
 import { checkRateLimit, getRateLimitConfig } from '../../lib/rate-limit';
 import { getSecurityMonitor } from '../../lib/monitoring';
 import { copyArbRequest } from '../../lib/arb-db';
+import { logEvent } from '../../lib/audit-log';
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
@@ -100,6 +101,16 @@ if (!requestId) {
 const clientIp = Astro.clientAddress || Astro.request.headers.get('cf-connecting-ip') || null;
 try {
   const newId = await copyArbRequest(db, requestId, user.email, clientIp);
+  await logEvent(db, {
+    actorEmail: user.email,
+    ipAddress: clientIp,
+    category: 'arb',
+    action: 'arb_request_copied',
+    actionLabel: 'ARB request copied',
+    resourceType: 'arb_request',
+    resourceId: newId,
+    details: { source_request_id: requestId },
+  });
   return new Response(
     JSON.stringify({
       success: true,

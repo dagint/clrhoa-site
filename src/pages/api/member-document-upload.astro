@@ -8,6 +8,7 @@ export const prerender = false;
 import { verifyCsrfToken, verifyOrigin, getEffectiveRole, isBoardOnly } from '../../lib/auth';
 import { isMemberDocCategory, insertMemberDocument } from '../../lib/member-documents-db';
 import { archiveCurrentDocumentsForRequirement, insertComplianceDocument } from '../../lib/compliance-db';
+import { logEvent } from '../../lib/audit-log';
 
 // FL §720.303(4) compliance requirement IDs that map to member doc categories
 const CATEGORY_TO_COMPLIANCE: Partial<Record<string, string>> = {
@@ -151,6 +152,18 @@ await r2.put(fileKey, buf, {
 });
 
 const id = await insertMemberDocument(db, category, title, fileKey, file.type, user.email);
+
+await logEvent(db, {
+  actorEmail: user.email,
+  actorRole: effectiveRole,
+  ipAddress: Astro.request.headers.get('cf-connecting-ip') ?? null,
+  category: 'document',
+  action: 'member_doc_uploaded',
+  actionLabel: 'Member document uploaded',
+  resourceType: 'member_document',
+  resourceId: String(id),
+  details: { category, title, fileSize: file.size, mimeType: file.type },
+});
 
 // Auto-sync to compliance_documents for categories that satisfy FL §720.303(4) requirements
 const complianceReqId = CATEGORY_TO_COMPLIANCE[category];

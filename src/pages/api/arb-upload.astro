@@ -23,6 +23,7 @@ import {
   type SignatureData,
 } from '../../lib/esignature-db';
 import { formatEasternDate } from '../../lib/timezone';
+import { logEvent } from '../../lib/audit-log';
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10MB per file (construction plans, blueprints, high-res photos)
 const MAX_TOTAL_BYTES = 40 * 1024 * 1024; // 40MB total (allows 4 large files or many small ones)
@@ -683,6 +684,17 @@ if (isSubmit && env) {
   }
 }
 
+await logEvent(db, {
+  actorEmail: user.email,
+  ipAddress: clientIp,
+  category: 'arb',
+  action: isSubmit ? 'arb_request_submitted' : 'arb_request_saved_as_draft',
+  actionLabel: isSubmit ? 'ARB request submitted' : 'ARB request saved as draft',
+  resourceType: 'arb_request',
+  resourceId: requestId,
+  targetEmail: user.email,
+  details: { applicationType, fileCount: fileGroups.length, hasSignature: !!signatureId },
+});
 return new Response(
   JSON.stringify({
     success: true,

@@ -9,6 +9,7 @@
 export const prerender = false;
 
 import { verifyCsrfToken, verifyOrigin, getEffectiveRole } from '../../lib/auth';
+import { logEvent } from '../../lib/audit-log';
 import { requireSession, requireDb, jsonResponse } from '../../lib/api-helpers';
 import { canRecordPayments } from '../../lib/auth';
 import {
@@ -95,6 +96,17 @@ if (Astro.request.method === 'POST') {
     photos: photos.length > 0 ? JSON.stringify(photos) : null,
     created_by: session.email,
   });
+  await logEvent(db, {
+    actorEmail: session.email,
+    actorRole: effectiveRole,
+    ipAddress: Astro.request.headers.get('cf-connecting-ip') ?? null,
+    category: 'arb',
+    action: 'preapproval_item_created',
+    actionLabel: 'Pre-approval library item created',
+    resourceType: 'preapproval_item',
+    resourceId: id,
+    details: { title, category, photoCount: photos.length },
+  });
   return jsonResponse({ success: true, id });
 }
 
@@ -119,6 +131,16 @@ if (Astro.request.method === 'PUT') {
     photos: body.photos ?? undefined,
   });
   if (!updated) return jsonResponse({ error: 'Item not found' }, 404);
+  await logEvent(db, {
+    actorEmail: session.email,
+    actorRole: effectiveRole,
+    ipAddress: Astro.request.headers.get('cf-connecting-ip') ?? null,
+    category: 'arb',
+    action: 'preapproval_item_updated',
+    actionLabel: 'Pre-approval library item updated',
+    resourceType: 'preapproval_item',
+    resourceId: id,
+  });
   return jsonResponse({ success: true });
 }
 
@@ -137,6 +159,17 @@ if (Astro.request.method === 'PATCH') {
   const approved = body.approved === 1 ? 1 : 0;
   const updated = await setPreapprovalApproved(db, id, approved as 0 | 1);
   if (!updated) return jsonResponse({ error: 'Item not found' }, 404);
+  await logEvent(db, {
+    actorEmail: session.email,
+    actorRole: effectiveRole,
+    ipAddress: Astro.request.headers.get('cf-connecting-ip') ?? null,
+    category: 'arb',
+    action: approved === 1 ? 'preapproval_item_approved' : 'preapproval_item_unapproved',
+    actionLabel: approved === 1 ? 'Pre-approval item approved for library' : 'Pre-approval item removed from library',
+    resourceType: 'preapproval_item',
+    resourceId: id,
+    details: { approved },
+  });
   return jsonResponse({ success: true });
 }
 
@@ -156,6 +189,17 @@ if (Astro.request.method === 'DELETE') {
   if (!item) return jsonResponse({ error: 'Item not found' }, 404);
   const deleted = await deletePreapprovalItem(db, id);
   if (!deleted) return jsonResponse({ error: 'Delete failed' }, 500);
+  await logEvent(db, {
+    actorEmail: session.email,
+    actorRole: effectiveRole,
+    ipAddress: Astro.request.headers.get('cf-connecting-ip') ?? null,
+    category: 'arb',
+    action: 'preapproval_item_deleted',
+    actionLabel: 'Pre-approval library item deleted',
+    resourceType: 'preapproval_item',
+    resourceId: id,
+    details: { title: item.title },
+  });
   return jsonResponse({ success: true });
 }
 

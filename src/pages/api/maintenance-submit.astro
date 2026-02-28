@@ -10,6 +10,7 @@ import { jsonResponse } from '../../lib/api-helpers';
 import { verifyCsrfToken } from '../../lib/auth';
 import { createMaintenanceId, insertMaintenanceRequest, MAINTENANCE_CATEGORIES } from '../../lib/maintenance-db';
 import { escapeHtml } from '../../lib/sanitize';
+import { logEvent } from '../../lib/audit-log';
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
 const MAX_TOTAL_BYTES = 25 * 1024 * 1024;
@@ -100,6 +101,17 @@ for (let i = 0; i < files.length; i++) {
 
 const photosJson = JSON.stringify(photoKeys);
 await insertMaintenanceRequest(db, id, user.email, category, description, photosJson);
+
+await logEvent(db, {
+  actorEmail: user.email,
+  ipAddress: Astro.request.headers.get('cf-connecting-ip') ?? null,
+  category: 'maintenance',
+  action: 'maintenance_request_created',
+  actionLabel: 'Maintenance request submitted',
+  resourceType: 'maintenance_request',
+  resourceId: id,
+  details: { category, photoCount: photoKeys.length },
+});
 
 let notifyStatus: 'sent' | 'skipped' | 'failed' = 'skipped';
 let notifyError: string | null = null;

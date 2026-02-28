@@ -10,6 +10,7 @@ import { checkRateLimit, getRateLimitConfig } from '../../lib/rate-limit';
 import { getSecurityMonitor } from '../../lib/monitoring';
 import { getArbRequest } from '../../lib/arb-db';
 import { listEmailsAtSameAddress } from '../../lib/directory-db.js';
+import { logEvent } from '../../lib/audit-log';
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
@@ -97,6 +98,17 @@ if (body.arbInternalNotes !== undefined && canSetArbNotes) {
     .run();
 
   if ((result.meta.changes ?? 0) > 0) {
+    await logEvent(db, {
+      actorEmail: user.email,
+      actorRole: effectiveRole,
+      ipAddress: Astro.request.headers.get('cf-connecting-ip') ?? null,
+      category: 'arb',
+      action: 'arb_internal_notes_updated',
+      actionLabel: 'ARB internal notes updated',
+      resourceType: 'arb_request',
+      resourceId: requestId,
+      targetEmail: request.owner_email,
+    });
     return new Response(
       JSON.stringify({ success: true, requestId, message: 'ARB notes updated.' }),
       { status: 200, headers: { 'Content-Type': 'application/json' } }
@@ -117,6 +129,16 @@ if (body.ownerNotes !== undefined && isOwnerOrHousehold && request.status === 'p
     .run();
 
   if ((result.meta.changes ?? 0) > 0) {
+    await logEvent(db, {
+      actorEmail: user.email,
+      ipAddress: Astro.request.headers.get('cf-connecting-ip') ?? null,
+      category: 'arb',
+      action: 'arb_owner_notes_updated',
+      actionLabel: 'ARB owner notes updated',
+      resourceType: 'arb_request',
+      resourceId: requestId,
+      targetEmail: request.owner_email,
+    });
     return new Response(
       JSON.stringify({ success: true, requestId, message: 'Owner notes updated.' }),
       { status: 200, headers: { 'Content-Type': 'application/json' } }

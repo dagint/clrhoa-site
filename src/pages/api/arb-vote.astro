@@ -36,6 +36,7 @@ import {
   checkAndApplyDeadlines,
 } from '../../lib/arb-voting-db';
 import { canTransitionStatus } from '../../lib/arb-status-machine';
+import { logEvent } from '../../lib/audit-log';
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
@@ -337,6 +338,19 @@ try {
       });
     }
   }
+
+  await logEvent(db, {
+    actorEmail: user.email,
+    actorRole: getEffectiveRole(session),
+    ipAddress,
+    category: 'arb',
+    action: 'arb_vote_cast',
+    actionLabel: 'ARB vote cast',
+    resourceType: 'arb_request',
+    resourceId: requestId,
+    targetEmail: request.owner_email,
+    details: { vote, stage, cycle, comment, resolution_outcome: resolution.outcome, status_changed: statusChanged, new_status: newStatus },
+  });
 
   return new Response(
     JSON.stringify({

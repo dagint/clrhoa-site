@@ -11,6 +11,7 @@ import { createLogger } from '../../lib/logging';
 import { checkRateLimit, getRateLimitConfig } from '../../lib/rate-limit';
 import { getSecurityMonitor } from '../../lib/monitoring';
 import { getArbFile, deleteArbFile } from '../../lib/arb-db';
+import { logEvent } from '../../lib/audit-log';
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
@@ -115,5 +116,15 @@ if (r2 && !file.reference_only) {
   }
 }
 
+await logEvent(db, {
+  actorEmail: user.email,
+  ipAddress: Astro.request.headers.get('cf-connecting-ip') ?? null,
+  category: 'arb',
+  action: 'arb_file_removed',
+  actionLabel: 'ARB file removed',
+  resourceType: 'arb_request',
+  resourceId: requestId,
+  details: { fileId, fileName: file.filename },
+});
 return new Response(JSON.stringify({ success: true, message: 'Attachment removed.' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
 ---

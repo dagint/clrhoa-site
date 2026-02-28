@@ -11,6 +11,7 @@ import { checkRateLimit, getRateLimitConfig } from '../../lib/rate-limit';
 import { getSecurityMonitor } from '../../lib/monitoring';
 import { updateArbRequestByOwner } from '../../lib/arb-db';
 import { requireArbRequestOwner } from '../../lib/access-control';
+import { logEvent } from '../../lib/audit-log';
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
@@ -150,6 +151,17 @@ try {
   }
 
   logger.info('ARB request updated successfully', { requestId: maskRequestId(requestId), user: user.email });
+  await logEvent(db, {
+    actorEmail: user.email,
+    ipAddress: Astro.request.headers.get('cf-connecting-ip') ?? null,
+    category: 'arb',
+    action: 'arb_request_updated',
+    actionLabel: 'ARB request updated by owner',
+    resourceType: 'arb_request',
+    resourceId: requestId,
+    targetEmail: request.owner_email,
+    details: { hasApplicantName: !!applicantName, hasPhone: !!phone, hasPropertyAddress: !!propertyAddress },
+  });
   return new Response(
     JSON.stringify({ success: true, message: 'Your request has been updated.' }),
     { status: 200, headers: { 'Content-Type': 'application/json' } }

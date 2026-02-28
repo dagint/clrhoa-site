@@ -12,6 +12,7 @@ import { createLogger, maskRequestId } from '../../lib/logging';
 import { checkRateLimit, getRateLimitConfig } from '../../lib/rate-limit';
 import { getSecurityMonitor } from '../../lib/monitoring';
 import { listArbFilesByRequest, deleteAllArbFilesByRequest, cancelArbRequest } from '../../lib/arb-db';
+import { logEvent } from '../../lib/audit-log';
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
@@ -133,6 +134,16 @@ if (r2DeleteErrors > 0) {
   logger.warn('Some R2 files could not be deleted', { requestId: maskRequestId(requestId), errors: r2DeleteErrors });
 }
 
+await logEvent(db, {
+  actorEmail: user.email,
+  ipAddress,
+  category: 'arb',
+  action: 'arb_request_cancelled',
+  actionLabel: 'ARB request cancelled',
+  resourceType: 'arb_request',
+  resourceId: requestId,
+  targetEmail: req.owner_email,
+});
 return new Response(
   JSON.stringify({
     success: true,

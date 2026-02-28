@@ -12,6 +12,7 @@ import { getSecurityMonitor } from '../../lib/monitoring';
 import { getArbRequest, updateArbRequestStatus, setArbRequestPendingForRevision } from '../../lib/arb-db';
 import { verifySignedRequest, extractSignedRequest } from '../../lib/request-signing';
 import { createLogger } from '../../lib/logging';
+import { logEvent } from '../../lib/audit-log';
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
@@ -168,6 +169,18 @@ if (action === 'request_revision' || action === 'request revision') {
       headers: { 'Content-Type': 'application/json' },
     });
   }
+  await logEvent(db, {
+    actorEmail: user.email,
+    actorRole: effectiveRole,
+    ipAddress,
+    category: 'arb',
+    action: 'arb_returned_for_revision',
+    actionLabel: 'ARB request returned for revision',
+    resourceType: 'arb_request',
+    resourceId: requestId,
+    targetEmail: request.owner_email,
+    details: { revisionNotes },
+  });
   return new Response(
     JSON.stringify({
       success: true,
@@ -226,6 +239,19 @@ if (isAdminActingAs(session) && session.assumed_role) {
     console.error('[arb-approve] assume-role audit insert failed:', auditErr);
   }
 }
+
+await logEvent(db, {
+  actorEmail: user.email,
+  actorRole: effectiveRole,
+  ipAddress,
+  category: 'arb',
+  action: action === 'approve' ? 'arb_approved' : 'arb_rejected',
+  actionLabel: action === 'approve' ? 'ARB request approved' : 'ARB request rejected',
+  resourceType: 'arb_request',
+  resourceId: requestId,
+  targetEmail: request.owner_email,
+  details: { status, arbEsign },
+});
 
 return new Response(
   JSON.stringify({

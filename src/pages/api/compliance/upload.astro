@@ -13,6 +13,7 @@ import {
   insertComplianceDocument,
   insertComplianceAuditLog,
 } from '../../../lib/compliance-db';
+import { logEvent } from '../../../lib/audit-log';
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
@@ -194,6 +195,17 @@ await insertComplianceAuditLog(db, {
     fileSize: file.size,
     mimeType: file.type,
   },
+});
+await logEvent(db, {
+  actorEmail: user.email,
+  actorRole: effectiveRole,
+  ipAddress: Astro.request.headers.get('cf-connecting-ip') ?? null,
+  category: 'compliance',
+  action: 'compliance_doc_uploaded',
+  actionLabel: 'Compliance document uploaded',
+  resourceType: 'compliance_document',
+  resourceId: documentId,
+  details: { requirementId, title, fileSize: file.size, mimeType: file.type },
 });
 
 return new Response(
