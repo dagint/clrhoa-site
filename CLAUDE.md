@@ -1,5 +1,12 @@
 # CLRHOA.COM HOA PORTAL - DEVELOPMENT RULES
 
+## PRIMARY GOAL
+The primary purpose of this website is Florida Statute §720.303(4) compliance —
+ensuring CLR HOA legally satisfies every document posting and member access
+requirement under Florida HOA law. Every feature decision should be evaluated
+through this lens first. Compliance visibility, document accessibility, and audit
+trails are non-negotiable requirements, not nice-to-haves.
+
 ## FLORIDA HOA COMPLIANCE (Statute 720.303(4))
 MUST HAVE:
 - /documents → public: covenants, bylaws, ARB form, proxy (src/public/*.pdf)

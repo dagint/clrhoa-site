@@ -7,6 +7,15 @@ export const prerender = false;
 
 import { verifyCsrfToken, verifyOrigin, getEffectiveRole, isBoardOnly } from '../../lib/auth';
 import { isMemberDocCategory, insertMemberDocument } from '../../lib/member-documents-db';
+import { archiveCurrentDocumentsForRequirement, insertComplianceDocument } from '../../lib/compliance-db';
+
+// FL §720.303(4) compliance requirement IDs that map to member doc categories
+const CATEGORY_TO_COMPLIANCE: Partial<Record<string, string>> = {
+  budgets: 'HOA-06',
+  financials: 'HOA-07',
+  insurance: 'HOA-08',
+  contracts: 'HOA-05',
+};
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
@@ -142,6 +151,26 @@ await r2.put(fileKey, buf, {
 });
 
 const id = await insertMemberDocument(db, category, title, fileKey, file.type, user.email);
+
+// Auto-sync to compliance_documents for categories that satisfy FL §720.303(4) requirements
+const complianceReqId = CATEGORY_TO_COMPLIANCE[category];
+if (complianceReqId) {
+  try {
+    await archiveCurrentDocumentsForRequirement(db, complianceReqId);
+    await insertComplianceDocument(db, {
+      requirementId: complianceReqId,
+      title,
+      fileKey,
+      fileSize: file.size,
+      mimeType: file.type,
+      uploadedBy: user.email,
+      visibility: 'members',
+    });
+  } catch (err) {
+    // Don't fail the upload if compliance sync fails — log and continue
+    console.error('[MEMBER-DOC-UPLOAD] Compliance sync failed for', complianceReqId, err);
+  }
+}
 
 return new Response(
   JSON.stringify({
