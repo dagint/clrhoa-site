@@ -6,7 +6,7 @@
  */
 /// <reference types="@cloudflare/workers-types" />
 
-import { sendEmail, type NotificationEnv } from './notifications.js';
+import { sendEmail, shouldSendNotification, type NotificationEnv } from './notifications.js';
 import type { ArbRequest } from './arb-db.js';
 import {
   getRequestSubmittedEmail,
@@ -49,23 +49,35 @@ async function getUsersByRole(
 }
 
 /**
- * Get user info by email.
+ * Get user info by email, including notification preferences.
  */
 async function getUserByEmail(
   db: D1Database,
   email: string
-): Promise<{ email: string; name: string | null } | null> {
+): Promise<{ email: string; name: string | null; notification_preferences: string | null } | null> {
   const user = await db
     .prepare(
-      `SELECT email, name
+      `SELECT email, name, notification_preferences
        FROM users
        WHERE email = ?
        LIMIT 1`
     )
     .bind(email.toLowerCase())
-    .first<{ email: string; name: string | null }>();
+    .first<{ email: string; name: string | null; notification_preferences: string | null }>();
 
   return user;
+}
+
+/** Parse notification_preferences JSON and check if a type should be sent. */
+function ownerWantsNotification(
+  user: { notification_preferences: string | null },
+  type: string
+): boolean {
+  let prefs: Record<string, boolean> = {};
+  if (user.notification_preferences) {
+    try { prefs = JSON.parse(user.notification_preferences); } catch { /* malformed — default to send */ }
+  }
+  return shouldSendNotification(prefs, type);
 }
 
 /**
@@ -148,6 +160,7 @@ export async function notifyArcReviewStarted(
 ): Promise<void> {
   const owner = await getUserByEmail(db, request.owner_email);
   if (!owner) return;
+  if (!ownerWantsNotification(owner, 'arb_updates')) return;
 
   const ownerName = owner.name || owner.email;
 
@@ -227,8 +240,10 @@ export async function notifyArcDecision(
     comment
   );
 
-  // Notify owner
-  await sendEmail(env, owner.email, subject, html, { html: true });
+  // Notify owner (respects arb_updates preference)
+  if (ownerWantsNotification(owner, 'arb_updates')) {
+    await sendEmail(env, owner.email, subject, html, { html: true });
+  }
 
   // If approved, notify Board members
   if (decision === 'APPROVED') {
@@ -253,9 +268,9 @@ export async function notifyBoardReviewStarted(
   db: D1Database,
   request: ArbRequest
 ): Promise<void> {
-  // Notify owner
+  // Notify owner (respects arb_updates preference)
   const owner = await getUserByEmail(db, request.owner_email);
-  if (owner) {
+  if (owner && ownerWantsNotification(owner, 'arb_updates')) {
     const ownerName = owner.name || owner.email;
     const { subject, html } = getBoardReviewStartedEmail(request.id, ownerName, true);
     await sendEmail(env, owner.email, subject, html, { html: true });
@@ -288,6 +303,7 @@ export async function notifyBoardDecision(
 ): Promise<void> {
   const owner = await getUserByEmail(db, request.owner_email);
   if (!owner) return;
+  if (!ownerWantsNotification(owner, 'arb_updates')) return;
 
   const ownerName = owner.name || owner.email;
 
@@ -341,6 +357,7 @@ export async function notifyAutoApproved(
 ): Promise<void> {
   const owner = await getUserByEmail(db, request.owner_email);
   if (!owner) return;
+  if (!ownerWantsNotification(owner, 'arb_updates')) return;
 
   const ownerName = owner.name || owner.email;
 
