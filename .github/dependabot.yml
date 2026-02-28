@@ -38,12 +38,26 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: "@astrojs/tailwind"
         update-types: ["version-update:semver-major"]
+      - dependency-name: "astro"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@astrojs/cloudflare"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "lucia"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "wrangler"
+        update-types: ["version-update:semver-major"]
+    rebase-strategy: "auto"
 
-  # Enable version updates for GitHub Actions (if using CI/CD)
+  # Enable version updates for GitHub Actions
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "monthly"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+    rebase-strategy: "auto"
     labels:
       - "github-actions"
       - "dependencies"
