@@ -1,21 +1,14 @@
 ---
+/**
+ * Unified audit log viewer — queries unified_audit_log with search + filters.
+ * Board / admin only. Replaces the previous multi-table stitched view.
+ */
 export const prerender = false;
 
 import { getAdminContext } from '../../../lib/board-context';
 import { getPortalBadgeCounts } from '../../../lib/portal-badge-counts';
 import { formatEasternDateTime } from '../../../lib/timezone';
-import { listOwners, listDirectoryLogs } from '../../../lib/directory-db';
-import { listAssessmentPaymentsForAudit } from '../../../lib/assessments-db';
-import { listSubmissions } from '../../../lib/vendor-submissions-db';
-import { listMemberDocuments } from '../../../lib/member-documents-db';
-import { listAllSpecialAssessments } from '../../../lib/assessments-db';
-import { listPreapprovalItems } from '../../../lib/preapproval-db';
-import { listAllFeedbackDocs } from '../../../lib/feedback-db';
-import { listAllMeetings } from '../../../lib/meetings-db';
-import { listVendorAuditLog } from '../../../lib/vendors-db';
-import { listPimElevationLog } from '../../../lib/pim-db';
-import { listAdminAssumedRoleAudit } from '../../../lib/admin-assumed-role-db';
-import { listArbAuditLog } from '../../../lib/arb-db';
+import { queryUnifiedAuditLog, type UnifiedAuditRow } from '../../../lib/audit-log';
 import PortalLayout from '../../../layouts/PortalLayout.astro';
 import PortalPage from '../../../components/PortalPage.astro';
 import ElevatedNav from '../../../components/ElevatedNav.astro';
@@ -24,84 +17,135 @@ const ctx = await getAdminContext(Astro);
 if ('redirect' in ctx) return Astro.redirect(ctx.redirect);
 const { env, session, effectiveRole } = ctx;
 
-const AUDIT_PAGE_SIZES = [10, 25, 50, 100] as const;
-const DEFAULT_AUDIT_PAGE_SIZE = 10;
-const url = Astro.url;
-const getPage = (key: string): number => {
-  const p = url.searchParams.get(key);
-  const n = p ? parseInt(p, 10) : 1;
-  return Number.isNaN(n) || n < 1 ? 1 : Math.min(n, 1000);
-};
-const getLimit = (): number => {
-  const p = url.searchParams.get('audit_limit');
-  const n = p ? parseInt(p, 10) : DEFAULT_AUDIT_PAGE_SIZE;
-  return AUDIT_PAGE_SIZES.includes(n as (typeof AUDIT_PAGE_SIZES)[number]) ? n : DEFAULT_AUDIT_PAGE_SIZE;
-};
-const adminPage = getPage('admin_page');
-const pimPage = getPage('pim_page');
-const directoryPage = getPage('directory_page');
-const paymentsPage = getPage('payments_page');
-const vendorPage = getPage('vendor_page');
-const arbPage = getPage('arb_page');
-const pageSize = getLimit();
-
-function auditPageUrl(key: string, value: number): string {
-  const u = new URL(url);
-  if (value <= 1) u.searchParams.delete(key);
-  else u.searchParams.set(key, String(value));
-  if (pageSize !== DEFAULT_AUDIT_PAGE_SIZE) u.searchParams.set('audit_limit', String(pageSize));
-  return u.pathname + u.search;
-}
-
 const db = env?.DB;
 const { email, role, name } = session;
 const badges = await getPortalBadgeCounts(db, email, role, name);
-const directoryLogs = db ? await listDirectoryLogs(db, pageSize, (directoryPage - 1) * pageSize) : [];
-const arbLogs = db ? await listArbAuditLog(db, pageSize, (arbPage - 1) * pageSize) : [];
-const owners = db ? await listOwners(db) : [];
-const ownersWithCreator = owners.filter((o) => o.created_by_email?.trim());
-const ownersWithUpdater = owners.filter((o) => o.updated_by?.trim()).sort((a, b) => (b.updated_at ?? '').localeCompare(a.updated_at ?? ''));
 
+// ─── Parse query params ───────────────────────────────────────────────────────
+const sp = Astro.url.searchParams;
+const PAGE_SIZES = [25, 50, 100, 250] as const;
+const limit = PAGE_SIZES.includes(Number(sp.get('limit')) as typeof PAGE_SIZES[number])
+  ? Number(sp.get('limit'))
+  : 50;
+const page   = Math.max(1, parseInt(sp.get('page') ?? '1', 10));
+const offset = (page - 1) * limit;
 
-const paymentAudit = db ? await listAssessmentPaymentsForAudit(db, pageSize, (paymentsPage - 1) * pageSize) : [];
-const vendorApproved = db ? await listSubmissions(db, { status: 'approved' }) : [];
-const vendorRejected = db ? await listSubmissions(db, { status: 'rejected' }) : [];
-const vendorSubmissionsAudit = [...vendorApproved, ...vendorRejected]
-  .sort((a, b) => (b.reviewed_at ?? b.submitted_at ?? '').localeCompare(a.reviewed_at ?? a.submitted_at ?? ''))
-  .slice(0, 200);
-const memberDocsAudit = db ? await listMemberDocuments(db) : [];
-const specialAssessmentsAudit = db
-  ? (await listAllSpecialAssessments(db)).sort((a, b) => (b.created ?? '').localeCompare(a.created ?? '')).slice(0, 200)
-  : [];
-const preapprovalAudit = db ? await listPreapprovalItems(db) : [];
-const feedbackDocsAudit = db ? await listAllFeedbackDocs(db) : [];
-const meetingsAudit = db ? (await listAllMeetings(db)).slice(0, 200) : [];
-const vendorAuditLog = db ? await listVendorAuditLog(db, pageSize, (vendorPage - 1) * pageSize) : [];
-const pimElevationLog = db ? await listPimElevationLog(db, pageSize, (pimPage - 1) * pageSize) : [];
-const showAdminAssumeRoleAudit = effectiveRole === 'board' || effectiveRole === 'admin';
-let adminAssumedRoleLog: Awaited<ReturnType<typeof listAdminAssumedRoleAudit>> = [];
-if (db && showAdminAssumeRoleAudit) {
-  try {
-    adminAssumedRoleLog = await listAdminAssumedRoleAudit(db, pageSize, (adminPage - 1) * pageSize);
-  } catch {
-    // Table may not exist yet (run schema-admin-assumed-role.sql)
+const filters = {
+  category:     sp.get('category')  || undefined,
+  action:       sp.get('action')    || undefined,
+  actorEmail:   sp.get('actor')     || undefined,
+  targetEmail:  sp.get('target')    || undefined,
+  resourceType: sp.get('rtype')     || undefined,
+  resourceId:   sp.get('rid')       || undefined,
+  outcome:      sp.get('outcome')   || undefined,
+  search:       sp.get('q')         || undefined,
+  dateFrom:     sp.get('from')      || undefined,
+  dateTo:       sp.get('to')        || undefined,
+  limit,
+  offset,
+};
+
+// ─── CSV export ───────────────────────────────────────────────────────────────
+if (sp.get('export') === 'csv' && db) {
+  const exportFilters = { ...filters, limit: 500, offset: 0 };
+  const { rows: csvRows } = await queryUnifiedAuditLog(db, exportFilters);
+  const CSV_COLS = ['timestamp','category','action','action_label','actor_email','actor_role','ip_address','target_email','resource_type','resource_id','outcome','details'] as const;
+  const escape = (v: unknown) => {
+    if (v == null) return '';
+    const s = String(v).replace(/"/g, '""');
+    return /[",\n\r]/.test(s) ? `"${s}"` : s;
+  };
+  const header = CSV_COLS.join(',');
+  const dataRows = csvRows.map(r => CSV_COLS.map(c => escape(r[c as keyof UnifiedAuditRow])).join(','));
+  const csv = [header, ...dataRows].join('\r\n');
+  return new Response(csv, {
+    headers: {
+      'Content-Type': 'text/csv; charset=utf-8',
+      'Content-Disposition': `attachment; filename="audit-log-${new Date().toISOString().slice(0,10)}.csv"`,
+    },
+  });
+}
+
+const { rows, total } = db
+  ? await queryUnifiedAuditLog(db, filters)
+  : { rows: [] as UnifiedAuditRow[], total: 0 };
+
+const totalPages = Math.ceil(total / limit);
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+const CATEGORIES: { value: string; label: string }[] = [
+  { value: 'auth',        label: 'Auth' },
+  { value: 'user',        label: 'Users' },
+  { value: 'arb',         label: 'ARB' },
+  { value: 'directory',   label: 'Directory' },
+  { value: 'vendor',      label: 'Vendors' },
+  { value: 'compliance',  label: 'Compliance' },
+  { value: 'financial',   label: 'Financial' },
+  { value: 'document',    label: 'Documents' },
+  { value: 'meeting',     label: 'Meetings' },
+  { value: 'maintenance', label: 'Maintenance' },
+  { value: 'feedback',    label: 'Feedback' },
+  { value: 'system',      label: 'System' },
+  { value: 'security',    label: 'Security' },
+];
+
+const CATEGORY_COLORS: Record<string, string> = {
+  auth:        'bg-blue-100 text-blue-800',
+  user:        'bg-purple-100 text-purple-800',
+  arb:         'bg-green-100 text-green-800',
+  directory:   'bg-yellow-100 text-yellow-800',
+  vendor:      'bg-orange-100 text-orange-800',
+  compliance:  'bg-teal-100 text-teal-800',
+  financial:   'bg-red-100 text-red-800',
+  document:    'bg-indigo-100 text-indigo-800',
+  meeting:     'bg-cyan-100 text-cyan-800',
+  maintenance: 'bg-slate-100 text-slate-800',
+  feedback:    'bg-pink-100 text-pink-800',
+  system:      'bg-gray-100 text-gray-700',
+  security:    'bg-red-200 text-red-900',
+};
+
+const OUTCOME_COLORS: Record<string, string> = {
+  success: 'bg-green-100 text-green-800',
+  failure: 'bg-red-100 text-red-800',
+  partial: 'bg-amber-100 text-amber-800',
+};
+
+function catColor(cat: string) { return CATEGORY_COLORS[cat] ?? 'bg-gray-100 text-gray-700'; }
+function outcomeColor(o: string) { return OUTCOME_COLORS[o] ?? 'bg-gray-100 text-gray-700'; }
+
+function filterUrl(overrides: Record<string, string | number | undefined>): string {
+  const u = new URL(Astro.url);
+  const next = { ...Object.fromEntries(u.searchParams), ...overrides };
+  const out = new URLSearchParams();
+  for (const [k, v] of Object.entries(next)) {
+    if (v !== undefined && v !== '' && v !== null) out.set(k, String(v));
   }
+  // Reset to page 1 when any filter changes (except page itself)
+  if (!('page' in overrides)) out.delete('page');
+  return `${u.pathname}?${out.toString()}`;
 }
 
-const BLANK = '-';
-/** Shown in place of sensitive content (revealed phone/email) in audit views to avoid exposing PII. */
-const REDACTED = '—';
+function pageUrl(p: number) { return filterUrl({ page: p }); }
 
-function formatDate(s: string | null): string {
-  const formatted = formatEasternDateTime(s);
-  return formatted === '—' ? BLANK : formatted;
+function fmt(s: string | null) {
+  return formatEasternDateTime(s) === '—' ? '—' : formatEasternDateTime(s);
 }
+
+// For CSV export — build a query-string-only URL
+const exportUrl = (() => {
+  const u = new URL(Astro.url);
+  u.searchParams.set('export', 'csv');
+  u.searchParams.delete('page');
+  u.searchParams.set('limit', '500');
+  return u.pathname + u.search;
+})();
 ---
 
-<PortalLayout title="Audit logs | Board | Member Portal | Crooked Lake Reserve HOA">
+<PortalLayout title="Audit Log | Board | Member Portal | Crooked Lake Reserve HOA">
   <PortalPage
     currentPath="/portal/board/audit-logs"
-    pageTitle="Audit logs"
+    pageTitle="Audit Log"
     userName={badges.displayName ?? undefined}
     userEmail={email}
     effectiveRole={effectiveRole}
@@ -112,595 +156,376 @@ function formatDate(s: string | null): string {
     vendorPendingCount={badges.vendorPendingCount}
     maintenanceOpenCount={badges.maintenanceOpenCount}
     meetingsRsvpCount={badges.meetingsRsvpCount}
+    feedbackDueCount={badges.feedbackDueCount}
+    libraryItemCount={badges.libraryItemCount}
   >
-    <ElevatedNav
-      persona={effectiveRole === 'admin' ? 'admin' : 'board'}
-      currentPath={effectiveRole === 'admin' ? '/portal/admin/audit-logs' : '/portal/board/audit-logs'}
-      effectiveRole={effectiveRole}
-      user={{ email, role: role ?? '' }}
-      session={session}
-    />
-
-<p class="text-gray-600 mb-4">
-        Full audit logs for transparency: PIM elevated access requests, directory (contact reveals, who added/updated owners), assessment payments recorded, vendor list changes and vendor submission approvals/rejections, member document uploads, special assessments, preapproval library, feedback docs, meetings, and ARB status changes. <strong>Revealed contact information (phone numbers and emails that were viewed) is redacted for privacy, but the identity of who performed each action is shown for accountability.</strong>
-  </p>
-  <div class="flex flex-wrap items-center gap-2 mb-8">
-    <label for="audit-per-page" class="text-sm text-gray-600">Per page:</label>
-    <select id="audit-per-page" name="audit_limit" class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-700 focus:border-clr-green focus:outline-none focus:ring-1 focus:ring-clr-green" aria-label="Audit log entries per page">
-      {AUDIT_PAGE_SIZES.map((size) => (
-        <option value={size} selected={pageSize === size}>{size}</option>
-      ))}
-    </select>
-    <span class="text-sm text-gray-500">Each paged section shows this many entries. Use Previous and Next at the bottom of a section to browse.</span>
-  </div>
-  <script>
-    document.getElementById('audit-per-page')?.addEventListener('change', function (this: HTMLSelectElement) {
-      const limit = this.value;
-      const u = new URL(window.location.href);
-      u.searchParams.set('audit_limit', limit);
-      u.searchParams.delete('admin_page');
-      u.searchParams.delete('pim_page');
-      u.searchParams.delete('directory_page');
-      u.searchParams.delete('payments_page');
-      u.searchParams.delete('vendor_page');
-      u.searchParams.delete('arb_page');
-      if (limit === '10') u.searchParams.delete('audit_limit');
-      window.location.href = u.pathname + u.search;
-    });
-  </script>
-
-  <!-- Admin assume role: when admins assumed Board/ARB or cleared (Board and Admin only) -->
-  {showAdminAssumeRoleAudit && adminAssumedRoleLog.length > 0 && (
-  <section aria-labelledby="admin-assume-heading">
-    <h2 id="admin-assume-heading" class="text-2xl font-heading font-semibold text-clr-green mb-3">Admin assume role (technical assistance)</h2>
-    <p class="text-base text-gray-600 mb-3">When an administrator assumed Board or ARB role to provide technical assistance, and actions they performed while assumed. One role at a time; all actions are logged.</p>
-    <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
-      <div class="overflow-x-auto">
-        <table class="w-full text-sm">
-          <thead class="bg-gray-50 border-b border-gray-200">
-            <tr>
-              <th class="text-left py-2 px-3 font-medium text-gray-700">When</th>
-              <th class="text-left py-2 px-3 font-medium text-gray-700">Email</th>
-              <th class="text-left py-2 px-3 font-medium text-gray-700">Actor</th>
-              <th class="text-left py-2 px-3 font-medium text-gray-700">Action</th>
-              <th class="text-left py-2 px-3 font-medium text-gray-700">Role assumed</th>
-              <th class="text-left py-2 px-3 font-medium text-gray-700">Detail</th>
-              <th class="text-left py-2 px-3 font-medium text-gray-700">IP</th>
-            </tr>
-          </thead>
-          <tbody>
-            {adminAssumedRoleLog.map((row) => (
-              <tr class="border-b border-gray-100 hover:bg-gray-50/50">
-                <td class="py-2 px-3 text-gray-600">{formatDate(row.created)}</td>
-                <td class="py-2 px-3 font-mono text-sm">{row.admin_email ?? BLANK}</td>
-                <td class="py-2 px-3">{row.actor_role ?? '—'}</td>
-                <td class="py-2 px-3">{row.action === 'assume' ? 'Assume' : row.action === 'clear' ? 'Clear' : 'Action'}</td>
-                <td class="py-2 px-3">{row.role_assumed ?? '—'}</td>
-                <td class="py-2 px-3 text-gray-600 max-w-xs truncate" title={row.action_detail ?? ''}>{row.action_detail ?? '—'}</td>
-                <td class="py-2 px-3 text-gray-500 text-xs">{row.ip_address ?? '—'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <nav class="flex items-center justify-between gap-2 py-2 px-3 border-t border-gray-200 bg-gray-50 text-sm" aria-label="Admin assume role pagination">
-        <span class="text-gray-600">Page {adminPage}</span>
-        <div class="flex gap-2">
-          {adminPage > 1 && <a href={auditPageUrl('admin_page', adminPage - 1)} class="text-clr-green hover:underline font-medium">Previous</a>}
-          {adminAssumedRoleLog.length === pageSize && <a href={auditPageUrl('admin_page', adminPage + 1)} class="text-clr-green hover:underline font-medium">Next</a>}
-        </div>
-      </nav>
-    </div>
-  </section>
-  )}
-
-  <!-- PIM: elevated access requests (who elevated when, who dropped) -->
-  <section aria-labelledby="pim-elevation-heading">
-    <h2 id="pim-elevation-heading" class="text-2xl font-heading font-semibold text-clr-green mb-3">PIM: elevated access requests</h2>
-    <p class="text-base text-gray-600 mb-3">When someone with an elevated role (Board, ARB, Admin) requested temporary elevated access or dropped it. All CRUD operations while elevated are covered by the other audit sections below.</p>
-    <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
-      {pimElevationLog.length === 0 ? (
-        <p class="p-4 text-gray-500">No PIM elevation entries yet.</p>
-      ) : (
-        <div class="overflow-x-auto">
-          <table class="w-full text-sm">
-            <thead class="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th class="text-left py-2 px-3 font-medium text-gray-700">When</th>
-                <th class="text-left py-2 px-3 font-medium text-gray-700">Email</th>
-                <th class="text-left py-2 px-3 font-medium text-gray-700">Role</th>
-                <th class="text-left py-2 px-3 font-medium text-gray-700">Action</th>
-                <th class="text-left py-2 px-3 font-medium text-gray-700">Expires at</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pimElevationLog.map((row) => (
-                <tr class="border-b border-gray-100 hover:bg-gray-50/50">
-                  <td class="py-2 px-3 text-gray-600">{formatDate(row.elevated_at)}</td>
-                  <td class="py-2 px-3 font-mono text-sm">{row.email ?? BLANK}</td>
-                  <td class="py-2 px-3">{row.role ?? BLANK}</td>
-                  <td class="py-2 px-3">{row.action === 'elevate' ? 'Elevated' : 'Dropped'}</td>
-                  <td class="py-2 px-3 text-gray-600">{row.expires_at ? formatDate(row.expires_at) : '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-      {pimElevationLog.length > 0 && (
-        <nav class="flex items-center justify-between gap-2 py-2 px-3 border-t border-gray-200 bg-gray-50 text-sm" aria-label="PIM elevation pagination">
-          <span class="text-gray-600">Page {pimPage}</span>
-          <div class="flex gap-2">
-            {pimPage > 1 && <a href={auditPageUrl('pim_page', pimPage - 1)} class="text-clr-green hover:underline font-medium">Previous</a>}
-            {pimElevationLog.length === pageSize && <a href={auditPageUrl('pim_page', pimPage + 1)} class="text-clr-green hover:underline font-medium">Next</a>}
+    <div class="space-y-6">
+      <!-- Header -->
+      <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+        <div class="flex items-center justify-between flex-wrap gap-4 mb-2">
+          <div>
+            <h1 class="text-2xl font-heading font-bold text-clr-green">Audit Log</h1>
+            <p class="text-sm text-gray-500 mt-1">
+              All system activity — {total.toLocaleString()} event{total !== 1 ? 's' : ''} matching current filters.
+              Financial and compliance records retained 7 years per FL §720.303.
+            </p>
           </div>
-        </nav>
+          <div class="flex items-center gap-3">
+            <a
+              href={exportUrl}
+              class="inline-flex items-center gap-2 px-4 py-2 bg-clr-green text-white rounded-lg text-sm font-medium hover:brightness-110"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+              </svg>
+              Export CSV
+            </a>
+            <a href="/portal/board/audit-logs" class="text-sm text-gray-500 hover:text-gray-700 underline">Clear filters</a>
+          </div>
+        </div>
+
+        <!-- ElevatedNav for board/admin actions -->
+        <ElevatedNav persona="board" currentPath="/portal/board/audit-logs" effectiveRole={effectiveRole} user={{ email, role: role ?? '' }} session={session} />
+      </div>
+
+      <!-- Filters -->
+      <form method="get" action="/portal/board/audit-logs" class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+          <!-- Full-text search -->
+          <div class="lg:col-span-2">
+            <label class="block text-xs font-semibold text-gray-600 mb-1">Search</label>
+            <input
+              type="text"
+              name="q"
+              value={sp.get('q') ?? ''}
+              placeholder="Email, action, resource ID, details…"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-clr-green focus:border-clr-green"
+            />
+          </div>
+
+          <!-- Category -->
+          <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1">Category</label>
+            <select name="category" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-clr-green">
+              <option value="">All categories</option>
+              {CATEGORIES.map(c => (
+                <option value={c.value} selected={sp.get('category') === c.value}>{c.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <!-- Outcome -->
+          <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1">Outcome</label>
+            <select name="outcome" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-clr-green">
+              <option value="">All outcomes</option>
+              <option value="success" selected={sp.get('outcome') === 'success'}>Success</option>
+              <option value="failure" selected={sp.get('outcome') === 'failure'}>Failure</option>
+              <option value="partial" selected={sp.get('outcome') === 'partial'}>Partial</option>
+            </select>
+          </div>
+
+          <!-- Actor email -->
+          <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1">Actor (email)</label>
+            <input
+              type="text"
+              name="actor"
+              value={sp.get('actor') ?? ''}
+              placeholder="who performed the action"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-clr-green focus:border-clr-green"
+            />
+          </div>
+
+          <!-- Target email -->
+          <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1">Target (email)</label>
+            <input
+              type="text"
+              name="target"
+              value={sp.get('target') ?? ''}
+              placeholder="who was affected"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-clr-green focus:border-clr-green"
+            />
+          </div>
+
+          <!-- Date from -->
+          <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1">From date</label>
+            <input
+              type="date"
+              name="from"
+              value={sp.get('from') ?? ''}
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-clr-green focus:border-clr-green"
+            />
+          </div>
+
+          <!-- Date to -->
+          <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1">To date</label>
+            <input
+              type="date"
+              name="to"
+              value={sp.get('to') ?? ''}
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-clr-green focus:border-clr-green"
+            />
+          </div>
+
+          <!-- Resource type -->
+          <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1">Resource type</label>
+            <input
+              type="text"
+              name="rtype"
+              value={sp.get('rtype') ?? ''}
+              placeholder="e.g. arb_request, payment"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-clr-green focus:border-clr-green"
+            />
+          </div>
+
+          <!-- Resource ID -->
+          <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1">Resource ID</label>
+            <input
+              type="text"
+              name="rid"
+              value={sp.get('rid') ?? ''}
+              placeholder="exact ID of the resource"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-clr-green focus:border-clr-green"
+            />
+          </div>
+
+          <!-- Rows per page -->
+          <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1">Rows per page</label>
+            <select name="limit" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-clr-green">
+              {PAGE_SIZES.map(n => (
+                <option value={n} selected={limit === n}>{n}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <button type="submit" class="px-5 py-2 bg-clr-green text-white rounded-lg text-sm font-medium hover:brightness-110">
+            Apply filters
+          </button>
+          <a href="/portal/board/audit-logs" class="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
+            Reset
+          </a>
+        </div>
+      </form>
+
+      <!-- Active filter chips -->
+      {(filters.category || filters.actorEmail || filters.targetEmail || filters.outcome || filters.search || filters.dateFrom || filters.dateTo || filters.resourceId) && (
+        <div class="flex flex-wrap gap-2 items-center">
+          <span class="text-xs font-semibold text-gray-500">Active filters:</span>
+          {filters.search      && <a href={filterUrl({ q: undefined })}       class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-gray-100 text-gray-700 text-xs hover:bg-gray-200">Search: "{filters.search}" ×</a>}
+          {filters.category    && <a href={filterUrl({ category: undefined })} class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-gray-100 text-gray-700 text-xs hover:bg-gray-200">Category: {filters.category} ×</a>}
+          {filters.actorEmail  && <a href={filterUrl({ actor: undefined })}    class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-gray-100 text-gray-700 text-xs hover:bg-gray-200">Actor: {filters.actorEmail} ×</a>}
+          {filters.targetEmail && <a href={filterUrl({ target: undefined })}   class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-gray-100 text-gray-700 text-xs hover:bg-gray-200">Target: {filters.targetEmail} ×</a>}
+          {filters.outcome     && <a href={filterUrl({ outcome: undefined })}  class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-gray-100 text-gray-700 text-xs hover:bg-gray-200">Outcome: {filters.outcome} ×</a>}
+          {filters.dateFrom    && <a href={filterUrl({ from: undefined })}     class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-gray-100 text-gray-700 text-xs hover:bg-gray-200">From: {filters.dateFrom} ×</a>}
+          {filters.dateTo      && <a href={filterUrl({ to: undefined })}       class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-gray-100 text-gray-700 text-xs hover:bg-gray-200">To: {filters.dateTo} ×</a>}
+          {filters.resourceId  && <a href={filterUrl({ rid: undefined })}      class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-gray-100 text-gray-700 text-xs hover:bg-gray-200">Resource: {filters.resourceId} ×</a>}
+        </div>
       )}
+
+      <!-- Results table -->
+      <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        {rows.length === 0 ? (
+          <div class="p-12 text-center text-gray-400">
+            <svg class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+            </svg>
+            <p class="font-medium">No events found</p>
+            <p class="text-sm mt-1">
+              {Object.values(filters).some(Boolean)
+                ? 'Try adjusting your filters or clearing them.'
+                : 'Events will appear here as users interact with the portal.'}
+            </p>
+          </div>
+        ) : (
+          <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-100 text-sm">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Timestamp</th>
+                  <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Category</th>
+                  <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Action</th>
+                  <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Actor</th>
+                  <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Target / Resource</th>
+                  <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Outcome</th>
+                  <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Details</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-50">
+                {rows.map((row) => {
+                  const details = row.details ? (() => { try { return JSON.parse(row.details!); } catch { return null; } })() : null;
+                  return (
+                    <tr class="hover:bg-gray-50 transition-colors">
+                      <!-- Timestamp -->
+                      <td class="px-4 py-3 whitespace-nowrap text-gray-500 text-xs font-mono">
+                        {fmt(row.timestamp)}
+                      </td>
+
+                      <!-- Category badge -->
+                      <td class="px-4 py-3 whitespace-nowrap">
+                        <a
+                          href={filterUrl({ category: row.category })}
+                          class={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${catColor(row.category)} hover:opacity-80`}
+                          title="Filter by this category"
+                        >
+                          {row.category}
+                        </a>
+                      </td>
+
+                      <!-- Action -->
+                      <td class="px-4 py-3">
+                        <div class="font-medium text-gray-800">
+                          {row.action_label || row.action.replace(/_/g, ' ')}
+                        </div>
+                        <div class="text-xs text-gray-400 font-mono mt-0.5">{row.action}</div>
+                      </td>
+
+                      <!-- Actor -->
+                      <td class="px-4 py-3">
+                        <a
+                          href={filterUrl({ actor: row.actor_email })}
+                          class="text-clr-green hover:underline text-xs"
+                          title="Filter by this actor"
+                        >
+                          {row.actor_email}
+                        </a>
+                        {row.actor_role && (
+                          <div class="text-xs text-gray-400 mt-0.5">{row.actor_role}</div>
+                        )}
+                        {row.ip_address && (
+                          <div class="text-xs text-gray-300 font-mono mt-0.5">{row.ip_address}</div>
+                        )}
+                      </td>
+
+                      <!-- Target / Resource -->
+                      <td class="px-4 py-3">
+                        {row.target_email && (
+                          <a
+                            href={filterUrl({ target: row.target_email })}
+                            class="text-clr-green hover:underline text-xs block"
+                            title="Filter by this target"
+                          >
+                            {row.target_email}
+                          </a>
+                        )}
+                        {(row.resource_type || row.resource_id) && (
+                          <div class="text-xs text-gray-400 mt-0.5">
+                            {row.resource_type && <span class="font-mono">{row.resource_type}</span>}
+                            {row.resource_id && (
+                              <a
+                                href={filterUrl({ rid: row.resource_id, rtype: row.resource_type ?? undefined })}
+                                class="ml-1 font-mono text-gray-500 hover:text-clr-green hover:underline"
+                                title="Filter by this resource ID"
+                              >
+                                #{row.resource_id.length > 12 ? row.resource_id.slice(0, 12) + '…' : row.resource_id}
+                              </a>
+                            )}
+                          </div>
+                        )}
+                      </td>
+
+                      <!-- Outcome -->
+                      <td class="px-4 py-3 whitespace-nowrap">
+                        <span class={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${outcomeColor(row.outcome)}`}>
+                          {row.outcome}
+                        </span>
+                      </td>
+
+                      <!-- Details (expandable) -->
+                      <td class="px-4 py-3 max-w-xs">
+                        {details ? (
+                          <details class="cursor-pointer">
+                            <summary class="text-xs text-gray-500 hover:text-gray-700 select-none list-none flex items-center gap-1">
+                              <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                              View details
+                            </summary>
+                            <div class="mt-2 text-xs font-mono bg-gray-50 rounded p-2 whitespace-pre-wrap break-all max-h-40 overflow-y-auto border border-gray-100">
+                              {JSON.stringify(details, null, 2)}
+                            </div>
+                          </details>
+                        ) : (
+                          <span class="text-gray-300 text-xs">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <!-- Pagination -->
+        {totalPages > 1 && (
+          <div class="px-6 py-4 border-t border-gray-100 flex items-center justify-between flex-wrap gap-4">
+            <p class="text-sm text-gray-500">
+              Showing {offset + 1}–{Math.min(offset + limit, total)} of {total.toLocaleString()} events
+            </p>
+            <div class="flex items-center gap-1">
+              {page > 1 && (
+                <a href={pageUrl(1)} class="px-3 py-1.5 rounded-lg border border-gray-200 text-xs text-gray-600 hover:bg-gray-50">«</a>
+              )}
+              {page > 1 && (
+                <a href={pageUrl(page - 1)} class="px-3 py-1.5 rounded-lg border border-gray-200 text-xs text-gray-600 hover:bg-gray-50">‹ Prev</a>
+              )}
+
+              {/* Show up to 5 page numbers around current page */}
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                const start = Math.max(1, Math.min(page - 2, totalPages - 4));
+                return start + i;
+              }).filter(p => p >= 1 && p <= totalPages).map(p => (
+                <a
+                  href={pageUrl(p)}
+                  class={`px-3 py-1.5 rounded-lg border text-xs font-medium ${p === page ? 'bg-clr-green text-white border-clr-green' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                >
+                  {p}
+                </a>
+              ))}
+
+              {page < totalPages && (
+                <a href={pageUrl(page + 1)} class="px-3 py-1.5 rounded-lg border border-gray-200 text-xs text-gray-600 hover:bg-gray-50">Next ›</a>
+              )}
+              {page < totalPages && (
+                <a href={pageUrl(totalPages)} class="px-3 py-1.5 rounded-lg border border-gray-200 text-xs text-gray-600 hover:bg-gray-50">»</a>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <!-- Category quick-filter cards -->
+      <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+        <h2 class="text-sm font-semibold text-gray-700 mb-3">Filter by category</h2>
+        <div class="flex flex-wrap gap-2">
+          {CATEGORIES.map(c => (
+            <a
+              href={filterUrl({ category: filters.category === c.value ? undefined : c.value })}
+              class={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                filters.category === c.value
+                  ? `${catColor(c.value)} border-current`
+                  : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              {c.label}
+            </a>
+          ))}
+        </div>
+      </div>
+
+      <!-- Retention policy note -->
+      <div class="bg-blue-50 border border-blue-100 rounded-xl p-4 text-sm text-blue-800">
+        <span class="font-semibold">Record retention:</span> Financial, compliance, ARB, and document events are retained 7 years per FL §720.303.
+        Auth and system events are retained 1 year. Security events are retained 2 years.
+        Events older than their retention period are eligible for scheduled cleanup.
+      </div>
     </div>
-  </section>
-
-  <!-- Directory: contact reveal log -->
-      <section aria-labelledby="dir-reveal-heading">
-        <h2 id="dir-reveal-heading" class="text-2xl font-heading font-semibold text-clr-green mb-3">Contact reveal log (directory)</h2>
-        <p class="text-base text-gray-600 mb-3">Who viewed whose phone or email. Board, ARB, and Admin access is recorded here even when the member has opted out of sharing with other members. Target &quot;(full directory export)&quot; means the viewer downloaded the full member list (names, emails, phones) as CSV; one log entry per export.</p>
-        <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          {directoryLogs.length === 0 ? (
-            <p class="p-4 text-gray-500">No directory reveal entries yet.</p>
-          ) : (
-            <div class="overflow-x-auto">
-              <table class="w-full text-sm">
-                <thead class="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th class="text-left py-2 px-3 font-medium text-gray-700">When</th>
-                    <th class="text-left py-2 px-3 font-medium text-gray-700">Viewer</th>
-                    <th class="text-left py-2 px-3 font-medium text-gray-700">Viewer role</th>
-                    <th class="text-left py-2 px-3 font-medium text-gray-700">Target (whose info was revealed)</th>
-                    <th class="text-left py-2 px-3 font-medium text-gray-700">Phone</th>
-                    <th class="text-left py-2 px-3 font-medium text-gray-700">Email</th>
-                    <th class="text-left py-2 px-3 font-medium text-gray-700">IP</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {directoryLogs.map((row) => (
-                    <tr class="border-b border-gray-100 hover:bg-gray-50/50">
-                      <td class="py-2 px-3 text-gray-600">{formatDate(row.timestamp)}</td>
-                      <td class="py-2 px-3 font-mono text-sm">{row.viewer_email ?? BLANK}</td>
-                      <td class="py-2 px-3">{row.viewer_role ?? BLANK}</td>
-                      <td class="py-2 px-3">{row.target_name ?? BLANK}</td>
-                      <td class="py-2 px-3 font-mono text-gray-500">{REDACTED}</td>
-                      <td class="py-2 px-3 font-mono text-gray-500">{REDACTED}</td>
-                      <td class="py-2 px-3 text-gray-500 text-xs">{row.ip_address ?? BLANK}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-          {directoryLogs.length > 0 && (
-            <nav class="flex items-center justify-between gap-2 py-2 px-3 border-t border-gray-200 bg-gray-50 text-sm" aria-label="Directory log pagination">
-              <span class="text-gray-600">Page {directoryPage}</span>
-              <div class="flex gap-2">
-                {directoryPage > 1 && <a href={auditPageUrl('directory_page', directoryPage - 1)} class="text-clr-green hover:underline font-medium">Previous</a>}
-                {directoryLogs.length === pageSize && <a href={auditPageUrl('directory_page', directoryPage + 1)} class="text-clr-green hover:underline font-medium">Next</a>}
-              </div>
-            </nav>
-          )}
-        </div>
-      </section>
-
-      <!-- Who added which owner -->
-      <section aria-labelledby="dir-added-heading">
-        <h2 id="dir-added-heading" class="text-2xl font-heading font-semibold text-clr-green mb-3">Directory: who added which owner</h2>
-        <p class="text-base text-gray-600 mb-3">Owners added via the board directory (with recorded creator).</p>
-        <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          {ownersWithCreator.length === 0 ? (
-            <p class="p-4 text-gray-500">No directory add records (created_by_email) yet.</p>
-          ) : (
-            <div class="overflow-x-auto">
-              <table class="w-full text-sm">
-                <thead class="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th class="text-left py-2 px-3 font-medium text-gray-700">Owner (name / email)</th>
-                    <th class="text-left py-2 px-3 font-medium text-gray-700">Added by</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {ownersWithCreator.map((o) => (
-                    <tr class="border-b border-gray-100 hover:bg-gray-50/50">
-                      <td class="py-2 px-3">{o.name ?? BLANK} / {REDACTED}</td>
-                      <td class="py-2 px-3">{o.created_by_email ?? BLANK}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </section>
-
-      <!-- Who updated which owner -->
-      <section aria-labelledby="dir-updated-heading">
-        <h2 id="dir-updated-heading" class="text-2xl font-heading font-semibold text-clr-green mb-3">Directory: who updated which owner</h2>
-        <p class="text-base text-gray-600 mb-3">Last update by board (edit or CSV upload). Run the owners-updated-by migration to populate.</p>
-        <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          {ownersWithUpdater.length === 0 ? (
-            <p class="p-4 text-gray-500">No directory update records (updated_by) yet.</p>
-          ) : (
-            <div class="overflow-x-auto">
-              <table class="w-full text-sm">
-                <thead class="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th class="text-left py-2 px-3 font-medium text-gray-700">Updated at</th>
-                    <th class="text-left py-2 px-3 font-medium text-gray-700">Owner (name / email)</th>
-                    <th class="text-left py-2 px-3 font-medium text-gray-700">Updated by</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {ownersWithUpdater.slice(0, 300).map((o) => (
-                    <tr class="border-b border-gray-100 hover:bg-gray-50/50">
-                      <td class="py-2 px-3 text-gray-600">{formatDate(o.updated_at ?? null)}</td>
-                      <td class="py-2 px-3">{o.name ?? BLANK} / {REDACTED}</td>
-                      <td class="py-2 px-3">{o.updated_by ?? BLANK}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </section>
-
-      <!-- Assessment payments recorded -->
-      <section aria-labelledby="payments-audit-heading">
-        <h2 id="payments-audit-heading" class="text-2xl font-heading font-semibold text-clr-green mb-3">Assessment payments recorded</h2>
-        <p class="text-base text-gray-600 mb-3">Who recorded which payment (dues and special assessments). Only payments with a recorded-by value appear.</p>
-        <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          {paymentAudit.length === 0 ? (
-            <p class="p-4 text-gray-500">No payment records with recorded-by yet.</p>
-          ) : (
-            <div class="overflow-x-auto">
-              <table class="w-full text-sm">
-                <thead class="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th class="text-left py-2 px-3 font-medium text-gray-700">When</th>
-                    <th class="text-left py-2 px-3 font-medium text-gray-700">Owner</th>
-                    <th class="text-left py-2 px-3 font-medium text-gray-700">Paid at</th>
-                    <th class="text-left py-2 px-3 font-medium text-gray-700">Amount</th>
-                    <th class="text-left py-2 px-3 font-medium text-gray-700">Method</th>
-                    <th class="text-left py-2 px-3 font-medium text-gray-700">Check #</th>
-                    <th class="text-left py-2 px-3 font-medium text-gray-700">Recorded by</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {paymentAudit.map((row) => (
-                    <tr class="border-b border-gray-100 hover:bg-gray-50/50">
-                      <td class="py-2 px-3 text-gray-600">{formatDate(row.created)}</td>
-                      <td class="py-2 px-3">{REDACTED}</td>
-                      <td class="py-2 px-3">{row.paid_at ?? BLANK}</td>
-                      <td class="py-2 px-3">{row.amount != null ? `$${Number(row.amount).toFixed(2)}` : BLANK}</td>
-                      <td class="py-2 px-3">{row.payment_method === 'electronic_transfer' ? 'E-transfer' : row.payment_method === 'check' ? 'Check' : row.payment_method === 'cash' ? 'Cash' : row.payment_method ?? BLANK}</td>
-                      <td class="py-2 px-3">{row.check_number ?? BLANK}</td>
-                      <td class="py-2 px-3">{REDACTED}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-          {paymentAudit.length > 0 && (
-            <nav class="flex items-center justify-between gap-2 py-2 px-3 border-t border-gray-200 bg-gray-50 text-sm" aria-label="Payments pagination">
-              <span class="text-gray-600">Page {paymentsPage}</span>
-              <div class="flex gap-2">
-                {paymentsPage > 1 && <a href={auditPageUrl('payments_page', paymentsPage - 1)} class="text-clr-green hover:underline font-medium">Previous</a>}
-                {paymentAudit.length === pageSize && <a href={auditPageUrl('payments_page', paymentsPage + 1)} class="text-clr-green hover:underline font-medium">Next</a>}
-              </div>
-            </nav>
-          )}
-        </div>
-      </section>
-
-      <!-- Vendor list: changes (create, update, delete) -->
-      <section aria-labelledby="vendor-changes-heading">
-        <h2 id="vendor-changes-heading" class="text-2xl font-heading font-semibold text-clr-green mb-3">Vendor list: changes</h2>
-        <p class="text-base text-gray-600 mb-3">Who created, updated, or deleted vendors (including vendors approved from member suggestions). Run the vendor-audit migration to enable.</p>
-        <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          {vendorAuditLog.length === 0 ? (
-            <p class="p-4 text-gray-500">No vendor change log yet.</p>
-          ) : (
-            <div class="overflow-x-auto">
-              <table class="w-full text-sm">
-                <thead class="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th class="text-left py-2 px-3 font-medium text-gray-700">When</th>
-                    <th class="text-left py-2 px-3 font-medium text-gray-700">Action</th>
-                    <th class="text-left py-2 px-3 font-medium text-gray-700">Vendor (name)</th>
-                    <th class="text-left py-2 px-3 font-medium text-gray-700">Vendor ID</th>
-                    <th class="text-left py-2 px-3 font-medium text-gray-700">By</th>
-                    <th class="text-left py-2 px-3 font-medium text-gray-700">IP</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {vendorAuditLog.map((row) => (
-                    <tr class="border-b border-gray-100 hover:bg-gray-50/50">
-                      <td class="py-2 px-3 text-gray-600">{formatDate(row.created)}</td>
-                      <td class="py-2 px-3">{row.action}</td>
-                      <td class="py-2 px-3">{row.vendor_name ?? BLANK}</td>
-                      <td class="py-2 px-3 font-mono text-gray-600">{row.vendor_id ?? BLANK}</td>
-                      <td class="py-2 px-3">{row.done_by_email ?? BLANK}</td>
-                      <td class="py-2 px-3 text-gray-500 text-xs">{row.ip_address ?? BLANK}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-          {vendorAuditLog.length > 0 && (
-            <nav class="flex items-center justify-between gap-2 py-2 px-3 border-t border-gray-200 bg-gray-50 text-sm" aria-label="Vendor audit pagination">
-              <span class="text-gray-600">Page {vendorPage}</span>
-              <div class="flex gap-2">
-                {vendorPage > 1 && <a href={auditPageUrl('vendor_page', vendorPage - 1)} class="text-clr-green hover:underline font-medium">Previous</a>}
-                {vendorAuditLog.length === pageSize && <a href={auditPageUrl('vendor_page', vendorPage + 1)} class="text-clr-green hover:underline font-medium">Next</a>}
-              </div>
-            </nav>
-          )}
-        </div>
-      </section>
-
-      <!-- Vendor submissions: approved/rejected -->
-      <section aria-labelledby="vendor-audit-heading">
-        <h2 id="vendor-audit-heading" class="text-2xl font-heading font-semibold text-clr-green mb-3">Vendor submissions: approved or rejected</h2>
-        <p class="text-base text-gray-600 mb-3">Who reviewed member-suggested vendors (approved or rejected) and when.</p>
-        <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          {vendorSubmissionsAudit.length === 0 ? (
-            <p class="p-4 text-gray-500">No vendor approvals or rejections yet.</p>
-          ) : (
-            <div class="overflow-x-auto">
-              <table class="w-full text-sm">
-                <thead class="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th class="text-left py-2 px-3 font-medium text-gray-700">Reviewed at</th>
-                    <th class="text-left py-2 px-3 font-medium text-gray-700">Vendor (name)</th>
-                    <th class="text-left py-2 px-3 font-medium text-gray-700">Status</th>
-                    <th class="text-left py-2 px-3 font-medium text-gray-700">Reviewed by</th>
-                    <th class="text-left py-2 px-3 font-medium text-gray-700">Submitted by</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {vendorSubmissionsAudit.map((row) => (
-                    <tr class="border-b border-gray-100 hover:bg-gray-50/50">
-                      <td class="py-2 px-3 text-gray-600">{formatDate(row.reviewed_at)}</td>
-                      <td class="py-2 px-3">{row.name ?? BLANK}</td>
-                      <td class="py-2 px-3">{row.status ?? BLANK}</td>
-                      <td class="py-2 px-3">{row.reviewed_by ?? BLANK}</td>
-                      <td class="py-2 px-3">{row.submitted_by ?? BLANK}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </section>
-
-      <!-- Member documents: uploads -->
-      <section aria-labelledby="member-docs-audit-heading">
-        <h2 id="member-docs-audit-heading" class="text-2xl font-heading font-semibold text-clr-green mb-3">Member documents: uploads</h2>
-        <p class="text-base text-gray-600 mb-3">Who uploaded which member-only document (minutes, budgets, other).</p>
-        <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          {memberDocsAudit.length === 0 ? (
-            <p class="p-4 text-gray-500">No member document uploads yet.</p>
-          ) : (
-            <div class="overflow-x-auto">
-              <table class="w-full text-sm">
-                <thead class="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th class="text-left py-2 px-3 font-medium text-gray-700">Category</th>
-                    <th class="text-left py-2 px-3 font-medium text-gray-700">Title</th>
-                    <th class="text-left py-2 px-3 font-medium text-gray-700">Uploaded at</th>
-                    <th class="text-left py-2 px-3 font-medium text-gray-700">Uploaded by</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {memberDocsAudit.map((row) => (
-                    <tr class="border-b border-gray-100 hover:bg-gray-50/50">
-                      <td class="py-2 px-3">{row.category ?? BLANK}</td>
-                      <td class="py-2 px-3">{row.title ?? BLANK}</td>
-                      <td class="py-2 px-3 text-gray-600">{formatDate(row.uploaded_at)}</td>
-                      <td class="py-2 px-3">{row.uploaded_by_email ?? BLANK}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </section>
-
-      <!-- Special assessments: who created -->
-      <section aria-labelledby="special-assessments-audit-heading">
-        <h2 id="special-assessments-audit-heading" class="text-2xl font-heading font-semibold text-clr-green mb-3">Special assessments: who created</h2>
-        <p class="text-base text-gray-600 mb-3">Who created which special assessment (owner, amount, due date).</p>
-        <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          {specialAssessmentsAudit.length === 0 ? (
-            <p class="p-4 text-gray-500">No special assessments yet.</p>
-          ) : (
-            <div class="overflow-x-auto">
-              <table class="w-full text-sm">
-                <thead class="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th class="text-left py-2 px-3 font-medium text-gray-700">Created</th>
-                    <th class="text-left py-2 px-3 font-medium text-gray-700">Owner</th>
-                    <th class="text-left py-2 px-3 font-medium text-gray-700">Description</th>
-                    <th class="text-left py-2 px-3 font-medium text-gray-700">Amount</th>
-                    <th class="text-left py-2 px-3 font-medium text-gray-700">Created by</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {specialAssessmentsAudit.map((row) => (
-                    <tr class="border-b border-gray-100 hover:bg-gray-50/50">
-                      <td class="py-2 px-3 text-gray-600">{formatDate(row.created)}</td>
-                      <td class="py-2 px-3">{REDACTED}</td>
-                      <td class="py-2 px-3 max-w-xs truncate" title={row.description ?? undefined}>{row.description ?? BLANK}</td>
-                      <td class="py-2 px-3">{row.amount != null ? `$${Number(row.amount).toFixed(2)}` : BLANK}</td>
-                      <td class="py-2 px-3">{REDACTED}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </section>
-
-      <!-- Preapproval library: who created -->
-      <section aria-labelledby="preapproval-audit-heading">
-        <h2 id="preapproval-audit-heading" class="text-2xl font-heading font-semibold text-clr-green mb-3">Preapproval library: who created</h2>
-        <p class="text-base text-gray-600 mb-3">Who added which preapproval item (category, title).</p>
-        <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          {preapprovalAudit.length === 0 ? (
-            <p class="p-4 text-gray-500">No preapproval items yet.</p>
-          ) : (
-            <div class="overflow-x-auto">
-              <table class="w-full text-sm">
-                <thead class="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th class="text-left py-2 px-3 font-medium text-gray-700">Created</th>
-                    <th class="text-left py-2 px-3 font-medium text-gray-700">Category</th>
-                    <th class="text-left py-2 px-3 font-medium text-gray-700">Title</th>
-                    <th class="text-left py-2 px-3 font-medium text-gray-700">Created by</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {preapprovalAudit.map((row) => (
-                    <tr class="border-b border-gray-100 hover:bg-gray-50/50">
-                      <td class="py-2 px-3 text-gray-600">{formatDate(row.created)}</td>
-                      <td class="py-2 px-3">{row.category ?? BLANK}</td>
-                      <td class="py-2 px-3 max-w-xs truncate" title={row.title ?? undefined}>{row.title ?? BLANK}</td>
-                      <td class="py-2 px-3">{REDACTED}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </section>
-
-      <!-- Feedback docs: who created -->
-      <section aria-labelledby="feedback-docs-audit-heading">
-        <h2 id="feedback-docs-audit-heading" class="text-2xl font-heading font-semibold text-clr-green mb-3">Feedback docs: who created</h2>
-        <p class="text-base text-gray-600 mb-3">Who created which feedback/ballot document (title, deadline).</p>
-        <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          {feedbackDocsAudit.length === 0 ? (
-            <p class="p-4 text-gray-500">No feedback docs yet.</p>
-          ) : (
-            <div class="overflow-x-auto">
-              <table class="w-full text-sm">
-                <thead class="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th class="text-left py-2 px-3 font-medium text-gray-700">Created</th>
-                    <th class="text-left py-2 px-3 font-medium text-gray-700">Title</th>
-                    <th class="text-left py-2 px-3 font-medium text-gray-700">Deadline</th>
-                    <th class="text-left py-2 px-3 font-medium text-gray-700">Created by</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {feedbackDocsAudit.map((row) => (
-                    <tr class="border-b border-gray-100 hover:bg-gray-50/50">
-                      <td class="py-2 px-3 text-gray-600">{formatDate(row.created)}</td>
-                      <td class="py-2 px-3 max-w-xs truncate" title={row.title ?? undefined}>{row.title ?? BLANK}</td>
-                      <td class="py-2 px-3">{row.deadline ?? BLANK}</td>
-                      <td class="py-2 px-3">{REDACTED}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </section>
-
-      <!-- Meetings: who created -->
-      <section aria-labelledby="meetings-audit-heading">
-        <h2 id="meetings-audit-heading" class="text-2xl font-heading font-semibold text-clr-green mb-3">Meetings: who created</h2>
-        <p class="text-base text-gray-600 mb-3">Who created which meeting (title, date).</p>
-        <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          {meetingsAudit.length === 0 ? (
-            <p class="p-4 text-gray-500">No meetings yet.</p>
-          ) : (
-            <div class="overflow-x-auto">
-              <table class="w-full text-sm">
-                <thead class="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th class="text-left py-2 px-3 font-medium text-gray-700">Created</th>
-                    <th class="text-left py-2 px-3 font-medium text-gray-700">Title</th>
-                    <th class="text-left py-2 px-3 font-medium text-gray-700">Date & time</th>
-                    <th class="text-left py-2 px-3 font-medium text-gray-700">Created by</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {meetingsAudit.map((row) => (
-                    <tr class="border-b border-gray-100 hover:bg-gray-50/50">
-                      <td class="py-2 px-3 text-gray-600">{formatDate(row.created)}</td>
-                      <td class="py-2 px-3 max-w-xs truncate" title={row.title ?? undefined}>{row.title ?? BLANK}</td>
-                      <td class="py-2 px-3">{row.datetime ?? BLANK}</td>
-                      <td class="py-2 px-3">{REDACTED}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </section>
-
-      <!-- ARB audit log -->
-      <section aria-labelledby="arb-audit-heading">
-        <h2 id="arb-audit-heading" class="text-2xl font-heading font-semibold text-clr-green mb-3">ARB audit log</h2>
-        <p class="text-base text-gray-600 mb-3">Status changes: who approved, sent back for requestor updates, etc.</p>
-        <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          {arbLogs.length === 0 ? (
-            <p class="p-4 text-gray-500">No ARB audit entries yet.</p>
-          ) : (
-            <div class="overflow-x-auto">
-              <table class="w-full text-sm">
-                <thead class="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th class="text-left py-2 px-3 font-medium text-gray-700">When</th>
-                    <th class="text-left py-2 px-3 font-medium text-gray-700">Request</th>
-                    <th class="text-left py-2 px-3 font-medium text-gray-700">Action</th>
-                    <th class="text-left py-2 px-3 font-medium text-gray-700">Old &rarr; New status</th>
-                    <th class="text-left py-2 px-3 font-medium text-gray-700">By</th>
-                    <th class="text-left py-2 px-3 font-medium text-gray-700">Notes</th>
-                    <th class="text-left py-2 px-3 font-medium text-gray-700">IP</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {arbLogs.map((row) => (
-                    <tr class="border-b border-gray-100 hover:bg-gray-50/50">
-                      <td class="py-2 px-3 text-gray-600">{formatDate(row.created)}</td>
-                      <td class="py-2 px-3 font-mono">{row.request_id}</td>
-                      <td class="py-2 px-3">{row.action}</td>
-                      <td class="py-2 px-3">{row.old_status ?? BLANK} &rarr; {row.new_status ?? BLANK}</td>
-                      <td class="py-2 px-3 font-mono text-sm">{row.changed_by_email ?? BLANK}{row.changed_by_role ? ` (${row.changed_by_role})` : ''}</td>
-                      <td class="py-2 px-3 text-gray-600 max-w-xs truncate" title={row.notes ?? undefined}>{row.notes ?? BLANK}</td>
-                      <td class="py-2 px-3 text-gray-500 text-xs">{row.ip_address ?? BLANK}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-          {arbLogs.length > 0 && (
-            <nav class="flex items-center justify-between gap-2 py-2 px-3 border-t border-gray-200 bg-gray-50 text-sm" aria-label="ARB audit pagination">
-              <span class="text-gray-600">Page {arbPage}</span>
-              <div class="flex gap-2">
-                {arbPage > 1 && <a href={auditPageUrl('arb_page', arbPage - 1)} class="text-clr-green hover:underline font-medium">Previous</a>}
-                {arbLogs.length === pageSize && <a href={auditPageUrl('arb_page', arbPage + 1)} class="text-clr-green hover:underline font-medium">Next</a>}
-              </div>
-            </nav>
-          )}
-        </div>
-      </section>
   </PortalPage>
 </PortalLayout>

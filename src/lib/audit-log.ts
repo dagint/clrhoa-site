@@ -32,6 +32,180 @@
 
 import { generateCorrelationId } from './logging';
 
+// ─── Unified Audit Log ───────────────────────────────────────────────────────
+// Single table, single interface for all new logging. Existing helpers below
+// continue to write to their legacy tables AND call logEvent() for the unified log.
+
+/** All event categories in the unified log */
+export type UnifiedAuditCategory =
+  | 'auth'         // Login, logout, MFA, password
+  | 'user'         // User account CRUD, role changes
+  | 'arb'          // ARB request workflow
+  | 'directory'    // Member directory access and owner CRUD
+  | 'vendor'       // Vendor management
+  | 'compliance'   // FL §720.303 document compliance
+  | 'financial'    // Assessment payments, special assessments
+  | 'document'     // Public/member document uploads
+  | 'meeting'      // Meetings, RSVPs
+  | 'maintenance'  // Maintenance requests
+  | 'feedback'     // Board feedback docs and member responses
+  | 'system'       // Config, backups, menu, admin actions
+  | 'security';    // Rate limits, suspicious activity
+
+/** Retention years per category (FL §720.303 mandates 7 years for official records) */
+const CATEGORY_RETENTION: Record<UnifiedAuditCategory, number> = {
+  auth:        1,
+  user:        7,
+  arb:         7,
+  directory:   3,
+  vendor:      7,
+  compliance:  7,
+  financial:   7,
+  document:    7,
+  meeting:     7,
+  maintenance: 3,
+  feedback:    3,
+  system:      1,
+  security:    2,
+};
+
+/** Entry shape for the unified audit log */
+export interface UnifiedAuditEntry {
+  actorEmail: string;
+  actorRole?: string | null;
+  ipAddress?: string | null;
+  sessionId?: string | null;
+  category: UnifiedAuditCategory;
+  action: string;               // snake_case key, e.g. 'payment_recorded'
+  actionLabel?: string;         // Human-readable, e.g. 'Payment recorded'
+  outcome?: 'success' | 'failure' | 'partial';
+  resourceType?: string | null;
+  resourceId?: string | null;
+  targetEmail?: string | null;
+  details?: Record<string, unknown> | null;
+  correlationId?: string | null;
+}
+
+/** Row returned from unified_audit_log queries */
+export interface UnifiedAuditRow {
+  id: string;
+  timestamp: string;
+  actor_email: string;
+  actor_role: string | null;
+  ip_address: string | null;
+  session_id: string | null;
+  category: string;
+  action: string;
+  action_label: string | null;
+  outcome: string;
+  resource_type: string | null;
+  resource_id: string | null;
+  target_email: string | null;
+  details: string | null;
+  correlation_id: string | null;
+  retention_years: number;
+}
+
+/**
+ * Write one event to unified_audit_log. This is the primary logging entry point.
+ * Never throws — audit failures must not break the application.
+ */
+export async function logEvent(
+  db: D1Database | undefined,
+  entry: UnifiedAuditEntry
+): Promise<void> {
+  if (!db) return;
+  const retentionYears = CATEGORY_RETENTION[entry.category] ?? 1;
+  try {
+    await db
+      .prepare(
+        `INSERT INTO unified_audit_log
+           (id, timestamp, actor_email, actor_role, ip_address, session_id,
+            category, action, action_label, outcome,
+            resource_type, resource_id, target_email, details, correlation_id, retention_years)
+         VALUES (?, datetime('now'), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .bind(
+        crypto.randomUUID(),
+        entry.actorEmail,
+        entry.actorRole ?? null,
+        entry.ipAddress ?? null,
+        entry.sessionId ?? null,
+        entry.category,
+        entry.action,
+        entry.actionLabel ?? null,
+        entry.outcome ?? 'success',
+        entry.resourceType ?? null,
+        entry.resourceId ?? null,
+        entry.targetEmail ?? null,
+        entry.details ? JSON.stringify(entry.details) : null,
+        entry.correlationId ?? null,
+        retentionYears
+      )
+      .run();
+  } catch (err) {
+    console.error('[unified-audit] Failed to write event:', err, entry);
+  }
+}
+
+/**
+ * Query unified_audit_log with filters. Used by the board audit viewer.
+ */
+export async function queryUnifiedAuditLog(
+  db: D1Database,
+  filters: {
+    category?: string;
+    action?: string;
+    actorEmail?: string;
+    targetEmail?: string;
+    resourceType?: string;
+    resourceId?: string;
+    outcome?: string;
+    search?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    limit?: number;
+    offset?: number;
+  } = {}
+): Promise<{ rows: UnifiedAuditRow[]; total: number }> {
+  const conds: string[] = [];
+  const bind: unknown[] = [];
+
+  if (filters.category)    { conds.push('category = ?');           bind.push(filters.category); }
+  if (filters.action)      { conds.push('action = ?');             bind.push(filters.action); }
+  if (filters.outcome)     { conds.push('outcome = ?');            bind.push(filters.outcome); }
+  if (filters.resourceType){ conds.push('resource_type = ?');      bind.push(filters.resourceType); }
+  if (filters.resourceId)  { conds.push('resource_id = ?');        bind.push(filters.resourceId); }
+  if (filters.actorEmail)  { conds.push('actor_email LIKE ?');     bind.push(`%${filters.actorEmail}%`); }
+  if (filters.targetEmail) { conds.push('target_email LIKE ?');    bind.push(`%${filters.targetEmail}%`); }
+  if (filters.dateFrom)    { conds.push('timestamp >= ?');         bind.push(filters.dateFrom); }
+  if (filters.dateTo)      { conds.push('timestamp <= ?');         bind.push(`${filters.dateTo}T23:59:59`); }
+  if (filters.search) {
+    const s = `%${filters.search}%`;
+    conds.push('(actor_email LIKE ? OR target_email LIKE ? OR action LIKE ? OR resource_id LIKE ? OR details LIKE ?)');
+    bind.push(s, s, s, s, s);
+  }
+
+  const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
+  const limit  = Math.min(filters.limit  ?? 50, 500);
+  const offset = filters.offset ?? 0;
+
+  try {
+    const [dataRes, countRes] = await Promise.all([
+      db.prepare(`SELECT * FROM unified_audit_log ${where} ORDER BY timestamp DESC LIMIT ? OFFSET ?`)
+        .bind(...bind, limit, offset).all<UnifiedAuditRow>(),
+      db.prepare(`SELECT COUNT(*) as total FROM unified_audit_log ${where}`)
+        .bind(...bind).first<{ total: number }>(),
+    ]);
+    return { rows: dataRes.results ?? [], total: countRes?.total ?? 0 };
+  } catch (err) {
+    console.error('[unified-audit] Query failed:', err);
+    return { rows: [], total: 0 };
+  }
+}
+
+// ─── Legacy Audit Tables (kept for backward compat) ──────────────────────────
+
 /** Event categories for audit logs */
 export type EventCategory =
   | 'authentication'  // Login, logout, password changes
@@ -123,6 +297,32 @@ export async function logAuditEvent(
   const outcome = entry.outcome || 'success';
   const correlationId = entry.correlationId || generateCorrelationId();
 
+  // Map legacy category → unified category for dual-write
+  const unifiedCategory: UnifiedAuditCategory =
+    entry.eventCategory === 'authentication' ? 'auth'
+    : entry.eventCategory === 'administrative' ? (
+        entry.eventType?.startsWith('user_') || entry.eventType?.includes('password') ? 'user' : 'system'
+      )
+    : entry.eventCategory === 'authorization' ? 'security'
+    : 'security';
+
+  // Dual-write to unified_audit_log (fire-and-forget, don't await)
+  logEvent(db, {
+    actorEmail: entry.userId || 'system',
+    actorRole: null,
+    ipAddress: entry.ipAddress,
+    sessionId: entry.sessionId,
+    category: unifiedCategory,
+    action: entry.eventType,
+    actionLabel: entry.action,
+    outcome: outcome === 'denied' ? 'failure' : (outcome as 'success' | 'failure'),
+    resourceType: entry.resourceType,
+    resourceId: entry.resourceId,
+    targetEmail: entry.targetUserId,
+    details: entry.details as Record<string, unknown> | null,
+    correlationId,
+  }).catch(() => {}); // never block on this
+
   try {
     await db
       .prepare(
@@ -170,6 +370,7 @@ export async function logAuthEvent(
   db: D1Database | undefined,
   event: Omit<AuditLogEntry, 'eventCategory' | 'severity'>
 ): Promise<void> {
+  // logAuditEvent already dual-writes to unified_audit_log
   await logAuditEvent(db, {
     ...event,
     eventCategory: 'authentication',
