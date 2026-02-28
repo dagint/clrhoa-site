@@ -306,8 +306,8 @@ export async function logAuditEvent(
     : entry.eventCategory === 'authorization' ? 'security'
     : 'security';
 
-  // Dual-write to unified_audit_log (fire-and-forget, don't await)
-  logEvent(db, {
+  // Dual-write to unified_audit_log — awaited so Cloudflare Workers don't drop it
+  await logEvent(db, {
     actorEmail: entry.userId || 'system',
     actorRole: null,
     ipAddress: entry.ipAddress,
@@ -321,7 +321,7 @@ export async function logAuditEvent(
     targetEmail: entry.targetUserId,
     details: entry.details as Record<string, unknown> | null,
     correlationId,
-  }).catch(() => {}); // never block on this
+  });
 
   try {
     await db

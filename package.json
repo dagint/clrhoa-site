@@ -164,6 +164,8 @@
     "db:directory-audit-log:local": "wrangler d1 execute clrhoa_db --local --file=./scripts/db-directory-audit-log.sql",
     "db:unified-audit-log": "wrangler d1 execute clrhoa_db --remote --file=./scripts/db-unified-audit-log.sql",
     "db:unified-audit-log:local": "wrangler d1 execute clrhoa_db --local --file=./scripts/db-unified-audit-log.sql",
+    "db:seed-compliance-docs": "wrangler d1 execute clrhoa_db --remote --file=./scripts/db-seed-compliance-documents.sql",
+    "db:seed-compliance-docs:local": "wrangler d1 execute clrhoa_db --local --file=./scripts/db-seed-compliance-documents.sql",
     "db:local:all": "node scripts/run-all-db-local.js",
     "db:remote:all": "node scripts/run-all-db-remote.js",
     "astro": "astro",
