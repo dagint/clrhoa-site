@@ -15,6 +15,13 @@ import {
   getPublicDocument,
 } from '../../lib/public-documents-db';
 import { sanitizeFileName } from '../../lib/sanitize';
+import { archiveCurrentDocumentsForRequirement, insertComplianceDocument } from '../../lib/compliance-db';
+
+// FL §720.303(4) compliance requirement IDs that map to public doc slugs
+const SLUG_TO_COMPLIANCE: Partial<Record<string, { reqId: string; title: string }>> = {
+  bylaws: { reqId: 'HOA-02', title: 'CLR HOA Recorded Bylaws' },
+  covenants: { reqId: 'HOA-03', title: 'Declaration of Covenants' },
+};
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
@@ -167,6 +174,26 @@ if (!dbResult.success || dbResult.meta?.changes === 0) {
     }),
     { status: 500, headers: { 'Content-Type': 'application/json' } }
   );
+}
+
+// Auto-sync to compliance_documents for slugs that satisfy FL §720.303(4) requirements
+const complianceMapping = SLUG_TO_COMPLIANCE[slug];
+if (complianceMapping) {
+  try {
+    await archiveCurrentDocumentsForRequirement(db, complianceMapping.reqId);
+    await insertComplianceDocument(db, {
+      requirementId: complianceMapping.reqId,
+      title: complianceMapping.title,
+      fileKey,
+      fileSize: file.size,
+      mimeType: file.type,
+      uploadedBy: user.email,
+      visibility: 'public',
+    });
+  } catch (err) {
+    // Don't fail the upload if compliance sync fails — log and continue
+    console.error('[PUBLIC-DOC-UPLOAD] Compliance sync failed for', complianceMapping.reqId, err);
+  }
 }
 
 return new Response(

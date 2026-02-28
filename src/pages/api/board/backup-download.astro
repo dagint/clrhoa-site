@@ -7,6 +7,7 @@ export const prerender = false;
 
 import { getUserRole } from '../../../types/auth';
 import { buildZip } from '../../../lib/zip-simple';
+import { logAdminEvent } from '../../../lib/audit-log';
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env as Env & {
@@ -138,8 +139,10 @@ for (let i = 0; i < 8; i++) {
       { name: `whitelist-${date}.json`, data: JSON.stringify(whitelist, null, 2) },
     ]);
 
-    // Record successful manual download timestamp
+    // Record successful manual download timestamp and audit who downloaded it
     const db = env?.DB as D1Database | undefined;
+    const actorEmail = (user as any)?.email ?? 'unknown';
+    const ipAddress = Astro.request.headers.get('cf-connecting-ip') ?? null;
     if (db) {
       try {
         await db.prepare(
@@ -149,6 +152,15 @@ for (let i = 0; i < 8; i++) {
       } catch (e) {
         console.warn('[BACKUP DOWNLOAD] Could not update last_backup_at:', e);
       }
+      await logAdminEvent(db, {
+        eventType: 'backup_downloaded',
+        userId: actorEmail,
+        action: `Downloaded database backup: clrhoa-backup-${date}.zip`,
+        resourceType: 'backup',
+        resourceId: `clrhoa-backup-${date}.zip`,
+        ipAddress,
+        outcome: 'success',
+      }).catch(() => {});
     }
 
     return new Response(zip, {

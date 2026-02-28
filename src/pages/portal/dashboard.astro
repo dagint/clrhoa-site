@@ -15,7 +15,7 @@ import { getRecentVendorsCount } from '../../lib/vendors-db';
 import { listMaintenanceByHousehold } from '../../lib/maintenance-db';
 import { listUpcomingWithCountsAndUser, householdHasRsvpd } from '../../lib/meetings-db';
 import { listActiveFeedbackDocs, getFeedbackResponse, householdHasResponded } from '../../lib/feedback-db';
-import { getDismissedKeys } from '../../lib/notification-dismissals';
+import { getDismissedKeys, hasPermanentlyDismissed } from '../../lib/notification-dismissals';
 import { countApprovedPreapprovalItems } from '../../lib/preapproval-db';
 
 const { env, session, effectiveRole } = await getPortalContext(Astro);
@@ -105,6 +105,10 @@ const showActionFeedback = feedbackDueCount > 0 && !dismissedSet.has('action_fee
 const showActionMaintenance = maintenanceOpenCount > 0 && !dismissedSet.has('action_maintenance');
 const showActionMeetings = meetingsRsvpCount > 0 && !dismissedSet.has('action_meetings');
 const showActionNeededBanner = showActionFeedback || showActionMaintenance || showActionMeetings;
+
+// One-time preference update prompt: show starting 2026-03-06 until permanently dismissed
+const PREF_PROMPT_START = new Date('2026-03-06T00:00:00');
+const showPrefPrompt = db && new Date() >= PREF_PROMPT_START && !(await hasPermanentlyDismissed(db, email, 'pref_update_prompt'));
 ---
 
 <PortalLayout title="Dashboard | Member Portal | Crooked Lake Reserve HOA">
@@ -137,6 +141,34 @@ const showActionNeededBanner = showActionFeedback || showActionMaintenance || sh
           {showPimBanner && (
             <div class="mb-6">
               <PimElevationBanner elevatedUntil={session.elevated_until!} role={effectiveRole} elevatedRole={elevatedRole} csrfToken={csrfToken} />
+            </div>
+          )}
+
+          <!-- Notification Preference Update Prompt -->
+          {showPrefPrompt && (
+            <div id="pref-prompt-banner" class="mb-6 bg-blue-50 border border-blue-200 rounded-2xl p-5 flex items-start justify-between gap-4">
+              <div class="flex items-start gap-3">
+                <svg class="w-5 h-5 text-blue-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                </svg>
+                <div>
+                  <p class="font-semibold text-blue-900 mb-1">Review your notification preferences</p>
+                  <p class="text-sm text-blue-800">
+                    We've updated how notification emails work. Take a moment to confirm which updates you'd like to receive — ARB requests, feedback, meetings, and more.
+                  </p>
+                  <a href="/portal/preferences" class="inline-block mt-2 text-sm font-medium text-blue-700 underline hover:text-blue-900">
+                    Update notification preferences
+                  </a>
+                </div>
+              </div>
+              <button
+                type="button"
+                class="notification-dismiss shrink-0 text-sm text-blue-600 hover:text-blue-900 underline"
+                data-key="pref_update_prompt"
+                aria-label="Dismiss notification preferences prompt"
+              >
+                Dismiss
+              </button>
             </div>
           )}
 

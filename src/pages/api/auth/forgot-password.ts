@@ -80,6 +80,11 @@ export const POST: APIRoute = async ({ request, locals }) => {
     // Extract site URL once for use in all email functions
     const siteUrl = new URL(request.url).origin;
 
+    // Warn if email client is unavailable (missing RESEND_API_KEY)
+    if (!resend) {
+      console.warn('[FORGOT-PASSWORD] Resend client unavailable — RESEND_API_KEY may not be set. No emails will be sent.');
+    }
+
     // 2. Rate limiting - 3 requests per hour per email
     const rateLimitResult = await checkRateLimit(
       kv,
@@ -219,8 +224,9 @@ export const POST: APIRoute = async ({ request, locals }) => {
     }
 
     // 4. Check if user account is active or pending setup
-    // Active users get reset emails, pending_setup users get setup emails
-    if (user.status === 'pending_setup') {
+    // Active users get reset emails, pending/pending_setup users get setup emails
+    // Note: 'pending' status comes from placeholder records created via the members API
+    if (user.status === 'pending_setup' || user.status === 'pending') {
       // User has account but hasn't set up password yet - send setup email
       const { token } = await generateSetupToken(db, user.email, 'forgot-password-auto');
 
@@ -228,12 +234,20 @@ export const POST: APIRoute = async ({ request, locals }) => {
         try {
           await sendSetupEmail(resend, user.email, token, user.name || undefined, siteUrl);
 
+          // Update placeholder 'pending' to 'pending_setup' now that setup email was sent
+          if (user.status === 'pending') {
+            await db
+              .prepare('UPDATE users SET status = ? WHERE email = ?')
+              .bind('pending_setup', user.email)
+              .run();
+          }
+
           await logSecurityEvent(db, {
             eventType: 'forgot_password_setup_email_sent',
             severity: 'info',
             userId: user.email,
             details: {
-              status: 'pending_setup',
+              status: user.status,
               ip_address: ipAddress,
               user_agent: userAgent,
             },

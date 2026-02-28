@@ -4,6 +4,7 @@
  * POST: Update menu order or reset to defaults
  */
 import type { APIRoute } from 'astro';
+import { logAdminEvent } from '../../../lib/audit-log';
 
 export const prerender = false;
 
@@ -68,12 +69,22 @@ export const POST: APIRoute = async ({ request, locals }) => {
 
     const { updateMenuOrder, resetMenuToDefaults } = await import('../../../lib/menu-db');
 
+    const ipAddress = request.headers.get('cf-connecting-ip') ?? null;
+
     if (body.action === 'reset') {
       // Reset to defaults
       const success = await resetMenuToDefaults(env.DB);
       if (!success) {
         return new Response(JSON.stringify({ error: 'Failed to reset menu' }), { status: 500 });
       }
+      await logAdminEvent(env.DB, {
+        eventType: 'menu_order_reset',
+        userId: user.email,
+        action: 'Reset portal menu order to defaults',
+        resourceType: 'menu',
+        ipAddress,
+        outcome: 'success',
+      }).catch(() => {});
       return new Response(JSON.stringify({ success: true, message: 'Menu reset to defaults' }), { status: 200 });
     }
 
@@ -83,6 +94,15 @@ export const POST: APIRoute = async ({ request, locals }) => {
       if (!success) {
         return new Response(JSON.stringify({ error: 'Failed to update menu order' }), { status: 500 });
       }
+      await logAdminEvent(env.DB, {
+        eventType: 'menu_order_updated',
+        userId: user.email,
+        action: 'Updated portal menu order',
+        resourceType: 'menu',
+        ipAddress,
+        outcome: 'success',
+        details: { item_count: body.items.length },
+      }).catch(() => {});
       return new Response(JSON.stringify({ success: true, message: 'Menu order updated' }), { status: 200 });
     }
 

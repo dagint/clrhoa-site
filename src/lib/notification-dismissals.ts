@@ -1,12 +1,13 @@
 /**
  * Dashboard notification dismissals: "Mark as read" for Action needed and staff outstanding items.
- * Keys: action_feedback, action_maintenance, action_meetings, staff_outstanding.
+ * Keys: action_feedback, action_maintenance, action_meetings, staff_outstanding, pref_update_prompt.
  * Dismissals are respected for DISMISSAL_DAYS; after that the notice can show again.
+ * Exception: pref_update_prompt uses hasPermanentlyDismissed (no TTL, never re-shows).
  */
 
 export const DISMISSAL_DAYS = 7;
 
-const VALID_KEYS = new Set(['action_feedback', 'action_maintenance', 'action_meetings', 'staff_outstanding']);
+const VALID_KEYS = new Set(['action_feedback', 'action_maintenance', 'action_meetings', 'staff_outstanding', 'pref_update_prompt']);
 
 export function isValidDismissalKey(key: string): boolean {
   return typeof key === 'string' && VALID_KEYS.has(key.trim());
@@ -30,6 +31,18 @@ export async function getDismissedKeys(
     .bind(email.trim().toLowerCase(), sinceStr)
     .all<{ notification_key: string }>();
   return new Set((results ?? []).map((r) => r.notification_key));
+}
+
+/** Check if a user has ever dismissed a key (no TTL — permanent check). For one-time prompts. */
+export async function hasPermanentlyDismissed(db: D1Database, email: string, key: string): Promise<boolean> {
+  if (!db || !email?.trim()) return false;
+  const row = await db
+    .prepare(
+      `SELECT 1 FROM notification_dismissals WHERE email = ? AND notification_key = ? LIMIT 1`
+    )
+    .bind(email.trim().toLowerCase(), key.trim())
+    .first();
+  return !!row;
 }
 
 /** Record a dismissal for the user. Replaces any existing row for (email, key). */

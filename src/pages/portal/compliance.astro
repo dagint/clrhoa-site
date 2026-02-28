@@ -40,12 +40,13 @@ const publicDocToRequirement: Record<string, string> = {
 // Enhance compliance statuses with public doc references and recalculate status
 const enhancedStatuses = complianceData.statuses.map((status) => {
   if (!status.document) {
-    // Check if there's a public doc that satisfies this requirement
+    // Check if there's a public doc that satisfies this requirement.
+    // A row existing in public_documents (even with null file_key) means the document
+    // IS available via the content collection on /documents — count it as COMPLIANT.
     const publicSlug = Object.keys(publicDocToRequirement).find(
       slug => publicDocToRequirement[slug] === status.requirement.id
     );
-    if (publicSlug && publicDocsBySlug[publicSlug]?.file_key) {
-      // If we have a public doc, mark this requirement as COMPLIANT
+    if (publicSlug && publicDocsBySlug[publicSlug]) {
       return {
         ...status,
         status: 'COMPLIANT' as const,
@@ -260,14 +261,16 @@ function getDocumentYear(doc: any): number {
                       {effectiveDoc && (
                         <a
                           href={isFromPublicDocs
-                            ? `/api/public-doc-file?slug=${publicDoc.slug}&v=${encodeURIComponent(publicDoc.updated_at || '')}`
+                            ? (publicDoc.file_key
+                                ? `/api/public-doc-file?slug=${publicDoc.slug}&v=${encodeURIComponent(publicDoc.updated_at || '')}`
+                                : `/documents`)
                             : `/api/compliance/file/${document!.file_key}`
                           }
                           class="px-4 py-2 bg-clr-green text-white rounded-lg font-medium hover:brightness-110 text-sm whitespace-nowrap"
                           target="_blank"
                           rel="noopener noreferrer"
                         >
-                          Download PDF
+                          {isFromPublicDocs && !publicDoc.file_key ? 'View on Documents Page' : 'Download PDF'}
                         </a>
                       )}
                     </div>

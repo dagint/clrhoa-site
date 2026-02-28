@@ -66,13 +66,17 @@ export async function POST(context: APIContext): Promise<Response> {
   }
 
   try {
-    // Get current assumed_role before clearing (for logging)
+    // Get current assumed_role and elevated_until before clearing (for logging)
     const dbSession = await env.DB
-      .prepare('SELECT assumed_role FROM sessions WHERE id = ?')
+      .prepare('SELECT assumed_role, elevated_until FROM sessions WHERE id = ?')
       .bind(session.id)
-      .first<{ assumed_role: string | null }>();
+      .first<{ assumed_role: string | null; elevated_until: number | null }>();
 
     const assumedRole = dbSession?.assumed_role;
+    // Convert the stored ms timestamp to ISO string so the log shows when elevation was due to expire
+    const originalExpiry = dbSession?.elevated_until
+      ? new Date(dbSession.elevated_until).toISOString()
+      : null;
 
     // Clear elevation and assumed role from session
     await env.DB
@@ -80,13 +84,13 @@ export async function POST(context: APIContext): Promise<Response> {
       .bind(session.id)
       .run();
 
-    // Log the drop action with the specific role that was dropped
+    // Log the drop action, including the original expiry so auditors can see how long elevation lasted
     const loggedRole = assumedRole || userRole;
     await insertPimElevationLog(env.DB, {
       email: user.email,
       role: loggedRole,
       action: 'drop',
-      expires_at: null,
+      expires_at: originalExpiry,  // original expiry (was it dropped early or at natural end?)
     });
 
     return new Response(JSON.stringify({

@@ -160,6 +160,8 @@
     "db:auth:verify:local": "bash scripts/verify-auth-schema.sh local",
     "db:sessions:fix-expires": "wrangler d1 execute clrhoa_db --remote --file=./scripts/migrations/fix-sessions-expires-at.sql",
     "db:sessions:fix-expires:local": "wrangler d1 execute clrhoa_db --local --file=./scripts/migrations/fix-sessions-expires-at.sql",
+    "db:directory-audit-log": "wrangler d1 execute clrhoa_db --remote --file=./scripts/db-directory-audit-log.sql",
+    "db:directory-audit-log:local": "wrangler d1 execute clrhoa_db --local --file=./scripts/db-directory-audit-log.sql",
     "db:local:all": "node scripts/run-all-db-local.js",
     "db:remote:all": "node scripts/run-all-db-remote.js",
     "astro": "astro",
@@ -226,6 +228,9 @@
   "overrides": {
     "undici": ">=7.18.2",
     "lodash": "4.17.23",
+    "rollup": ">=4.59.0",
+    "devalue": ">=5.6.3",
+    "ajv": ">=8.18.0",
     "@astrojs/cloudflare": {
       "wrangler": "4.59.1"
     }

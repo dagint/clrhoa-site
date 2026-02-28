@@ -6,6 +6,7 @@
 export const prerender = false;
 
 import { getUserEmail, getUserRole } from '../../../types/auth';
+import { logAdminEvent } from '../../../lib/audit-log';
 
 const runtime = Astro.locals.runtime;
 const env = runtime?.env;
@@ -103,6 +104,24 @@ if (Astro.request.method === 'POST') {
     include_r2_files ? 1 : 0,
     getUserEmail(user)
   ).run();
+
+  const actorEmail = getUserEmail(user);
+  const ipAddress = Astro.request.headers.get('cf-connecting-ip') ?? null;
+  await logAdminEvent(db, {
+    eventType: 'backup_config_updated',
+    userId: actorEmail,
+    action: 'Updated backup configuration',
+    resourceType: 'backup_config',
+    ipAddress,
+    outcome: 'success',
+    details: {
+      google_drive_enabled,
+      schedule_type,
+      schedule_hour_utc,
+      include_r2_manifest,
+      include_r2_files,
+    },
+  }).catch(() => {});
 
   return new Response(JSON.stringify({ ok: true }), {
     headers: { 'Content-Type': 'application/json' },
