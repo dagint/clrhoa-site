@@ -211,10 +211,10 @@
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.6",
-    "@cloudflare/workers-types": "^4.20260214.0",
+    "@cloudflare/workers-types": "^4.20260228.1",
     "@playwright/test": "^1.58.2",
     "@types/bcryptjs": "^3.0.0",
-    "@types/node": "^25.2.3",
+    "@types/node": "^25.3.2",
     "@types/qrcode": "^1.5.6",
     "@vitest/ui": "^4.0.18",
     "dotenv": "^17.3.1",
@@ -223,7 +223,7 @@
     "terser": "^5.36.0",
     "typescript": "^5.9.3",
     "vitest": "^4.0.18",
-    "wrangler": "^4.65.0"
+    "wrangler": "^4.69.0"
   },
   "overrides": {
     "undici": ">=7.18.2",
