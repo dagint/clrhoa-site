@@ -304,8 +304,9 @@ describe('Audit Logging', () => {
         details: { attempts: 5, window: '15min' },
       });
 
-      // Should call prepare twice (once for audit_logs, once for security_events)
-      expect(mockDb.prepare).toHaveBeenCalledTimes(2);
+      // Should call prepare three times: unified_audit_log (dual-write), audit_logs, security_events
+      expect(mockDb.prepare).toHaveBeenCalledTimes(3);
+      expect(mockDb.prepare).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO unified_audit_log'));
       expect(mockDb.prepare).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO audit_logs'));
       expect(mockDb.prepare).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO security_events'));
     });
@@ -320,7 +321,8 @@ describe('Audit Logging', () => {
       });
 
       // Check security_events call includes remediation fields
-      const securityEventsCall = preparedStatement.bind.mock.calls[1];
+      // Order: [0]=unified_audit_log, [1]=audit_logs, [2]=security_events
+      const securityEventsCall = preparedStatement.bind.mock.calls[2];
       expect(securityEventsCall).toContain(1); // autoRemediated = true (1)
       expect(securityEventsCall).toContain('account_locked'); // remediationAction
     });
