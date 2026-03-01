@@ -394,54 +394,57 @@ if (totalBytes > MAX_TOTAL_BYTES) {
   );
 }
 
-// Check for duplicate requests (same owner, similar description within last 30 days)
-// Exclude requests created in last 2 minutes to avoid flagging current session's auto-saves
-try {
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-  const twoMinutesAgo = new Date();
-  twoMinutesAgo.setMinutes(twoMinutesAgo.getMinutes() - 2);
-  const recentRequests = await db
-    .prepare(
-      `SELECT id, description, created FROM arb_requests WHERE owner_email = ? AND created > ? AND created < ? ORDER BY created DESC LIMIT 10`
-    )
-    .bind(user.email.toLowerCase(), thirtyDaysAgo.toISOString(), twoMinutesAgo.toISOString())
-    .all<{ id: string; description: string; created: string }>();
+// Check for duplicate requests only when submitting (not auto-saving drafts).
+// Exclude pending/cancelled requests — the user's own draft may be in pending state
+// and should not block them from submitting. Only flag active/concluded requests.
+if (isSubmit) {
+  try {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const twoMinutesAgo = new Date();
+    twoMinutesAgo.setMinutes(twoMinutesAgo.getMinutes() - 2);
+    const recentRequests = await db
+      .prepare(
+        `SELECT id, description, created FROM arb_requests WHERE owner_email = ? AND created > ? AND created < ? AND status NOT IN ('pending', 'cancelled') ORDER BY created DESC LIMIT 10`
+      )
+      .bind(user.email.toLowerCase(), thirtyDaysAgo.toISOString(), twoMinutesAgo.toISOString())
+      .all<{ id: string; description: string; created: string }>();
 
-  // Simple similarity check: if description is very similar (80%+ match) or exact duplicate
-  const descLower = description.toLowerCase().trim();
-  for (const req of recentRequests.results ?? []) {
-    const reqDescLower = req.description.toLowerCase().trim();
-    if (descLower === reqDescLower) {
-      return new Response(
-        JSON.stringify({
-          error: `Duplicate request detected. You submitted an identical request (${req.id}) on ${formatEasternDate(req.created)}. Please check your existing requests or modify this submission.`,
-          duplicateRequestId: req.id,
-        }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      );
-    }
-    // Simple similarity: check if descriptions are very similar (80%+ words match)
-    const descWords = new Set(descLower.split(/\s+/).filter(w => w.length > 3));
-    const reqWords = new Set(reqDescLower.split(/\s+/).filter(w => w.length > 3));
-    if (descWords.size > 0 && reqWords.size > 0) {
-      const intersection = new Set([...descWords].filter(w => reqWords.has(w)));
-      const similarity = intersection.size / Math.max(descWords.size, reqWords.size);
-      if (similarity > 0.8) {
+    // Simple similarity check: if description is very similar (80%+ match) or exact duplicate
+    const descLower = description.toLowerCase().trim();
+    for (const req of recentRequests.results ?? []) {
+      const reqDescLower = req.description.toLowerCase().trim();
+      if (descLower === reqDescLower) {
         return new Response(
           JSON.stringify({
-            error: `Similar request detected. You submitted a very similar request (${req.id}) on ${formatEasternDate(req.created)}. Please review your existing requests or modify this submission to be more distinct.`,
+            error: `Duplicate request detected. You submitted an identical request (${req.id}) on ${formatEasternDate(req.created)}. Please check your existing requests or modify this submission.`,
             duplicateRequestId: req.id,
-            warning: true,
           }),
           { status: 400, headers: { 'Content-Type': 'application/json' } }
         );
       }
+      // Simple similarity: check if descriptions are very similar (80%+ words match)
+      const descWords = new Set(descLower.split(/\s+/).filter(w => w.length > 3));
+      const reqWords = new Set(reqDescLower.split(/\s+/).filter(w => w.length > 3));
+      if (descWords.size > 0 && reqWords.size > 0) {
+        const intersection = new Set([...descWords].filter(w => reqWords.has(w)));
+        const similarity = intersection.size / Math.max(descWords.size, reqWords.size);
+        if (similarity > 0.8) {
+          return new Response(
+            JSON.stringify({
+              error: `Similar request detected. You submitted a very similar request (${req.id}) on ${formatEasternDate(req.created)}. Please review your existing requests or modify this submission to be more distinct.`,
+              duplicateRequestId: req.id,
+              warning: true,
+            }),
+            { status: 400, headers: { 'Content-Type': 'application/json' } }
+          );
+        }
+      }
     }
+  } catch (e) {
+    logger.error('Duplicate check failed', { error: String(e) });
+    // Don't block submission if duplicate check fails
   }
-} catch (e) {
-  logger.error('Duplicate check failed', { error: String(e) });
-  // Don't block submission if duplicate check fails
 }
 
 let requestId: string;
