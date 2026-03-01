@@ -398,12 +398,35 @@ function formatApproval(arbEsign: string | null, esignTimestamp: string | null):
         margin: 0.5in;
       }
 
-      /* Hide navigation, headers, and interactive elements */
-      header, .no-print, .request-summary, [role="status"] { display: none !important; }
-      main > p:first-of-type { display: none !important; }
+      /* ── Hide all portal chrome: sidebar, header, nav, interactive elements ── */
+      #portal-sidebar,
+      header,
+      nav,
+      .no-print,
+      .request-summary,
+      [role="status"],
+      main > p:first-of-type {
+        display: none !important;
+      }
 
-      /* CRITICAL: Hide all scrollbars in print */
-      * {
+      /* ── Break PortalLayout's h-screen / overflow-hidden lock ──
+         PortalLayout wraps everything in `div.flex.h-screen.overflow-hidden`.
+         h-screen = height:100vh clips everything to the viewport.
+         We must override height AND overflow on every ancestor. */
+      html, body {
+        overflow: visible !important;
+        height: auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
+      }
+
+      /* Explicitly kill the h-screen Tailwind class (height:100vh) */
+      .h-screen {
+        height: auto !important;
+      }
+
+      /* Reset ALL block containers: height, overflow, scrollbar */
+      *, *::before, *::after {
         overflow: visible !important;
         -webkit-overflow-scrolling: auto !important;
       }
@@ -414,20 +437,21 @@ function formatApproval(arbEsign: string | null, esignTimestamp: string | null):
         height: 0 !important;
       }
 
-      /* Remove overflow and height constraints to prevent scroll bars */
-      body, html {
+      div, section, article, aside, main, form {
         overflow: visible !important;
         height: auto !important;
-        min-height: 0 !important;
         max-height: none !important;
+        min-height: 0 !important;
       }
 
-      /* Remove PortalPage layout constraints */
+      /* Portal-specific overrides */
       #portal-content {
         overflow: visible !important;
         margin-left: 0 !important;
         height: auto !important;
         max-height: none !important;
+        padding: 0 !important;
+        flex: none !important;
       }
 
       main {
@@ -435,9 +459,15 @@ function formatApproval(arbEsign: string | null, esignTimestamp: string | null):
         height: auto !important;
         max-height: none !important;
         padding-top: 0 !important;
+        flex: none !important;
       }
 
-      /* Only show the card being printed */
+      /* Remove max-width constraints */
+      .max-w-5xl, .max-w-7xl, .max-w-4xl {
+        max-width: none !important;
+      }
+
+      /* ── Only show the card being printed ── */
       #request-list > li:not(.print-this-card) { display: none !important; }
 
       /* Show request details */
@@ -454,36 +484,19 @@ function formatApproval(arbEsign: string | null, esignTimestamp: string | null):
         box-shadow: none;
         border: 1px solid #e5e7eb;
         page-break-inside: avoid;
-        margin-bottom: 1rem;
+        margin: 0;
         padding: 1rem;
         overflow: visible !important;
         max-height: none !important;
         height: auto !important;
       }
 
-      /* Hide iframes in print */
+      /* Hide image preview iframes in print (content is in form-view) */
       .print-this-card .request-details-screen iframe { display: none !important; }
 
       /* Ensure print-form-view is visible when printing */
       .print-this-card .print-form-view.hidden { display: block !important; }
       .print-this-card .print-form-view[aria-hidden="true"] { display: block !important; }
-
-      /* Remove max-width constraints for better print layout */
-      .max-w-5xl, .max-w-7xl, .max-w-4xl {
-        max-width: none !important;
-      }
-
-      /* Override all Tailwind overflow classes */
-      .overflow-auto, .overflow-scroll, .overflow-x-auto, .overflow-y-auto,
-      .overflow-x-scroll, .overflow-y-scroll, .overflow-hidden {
-        overflow: visible !important;
-      }
-
-      /* Ensure all containers are visible */
-      div, section, article, aside {
-        overflow: visible !important;
-        max-height: none !important;
-      }
     }
   </style>
 
