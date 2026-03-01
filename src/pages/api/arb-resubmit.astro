@@ -11,6 +11,7 @@ import { getSecurityMonitor } from '../../lib/monitoring';
 import { getArbRequest, setArbRequestInReview } from '../../lib/arb-db';
 import { incrementCycle, transitionStatus, setDeadline } from '../../lib/arb-voting-db';
 import { canTransitionStatus } from '../../lib/arb-status-machine';
+import { notifyRequestSubmitted } from '../../lib/arb-voting-notification-triggers';
 import { logEvent } from '../../lib/audit-log';
 
 const runtime = Astro.locals.runtime;
@@ -124,6 +125,13 @@ if (request.workflow_version !== 2) {
     resourceId: requestId,
     targetEmail: request.owner_email,
   });
+  if (env) {
+    try {
+      await notifyRequestSubmitted(env, db, request);
+    } catch (e) {
+      console.warn('[arb-resubmit] Failed to send V1 resubmit notification:', e);
+    }
+  }
   return new Response(
     JSON.stringify({
       success: true,
@@ -207,6 +215,13 @@ await logEvent(db, {
   targetEmail: request.owner_email,
   details: { previous_stage: currentStage },
 });
+if (env) {
+  try {
+    await notifyRequestSubmitted(env, db, request);
+  } catch (e) {
+    console.warn('[arb-resubmit] Failed to send V2 resubmit notification:', e);
+  }
+}
 return new Response(
   JSON.stringify({
     success: true,

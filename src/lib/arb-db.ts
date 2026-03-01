@@ -135,7 +135,7 @@ export async function getArbRequest(
 ): Promise<ArbRequest | null> {
   const row = await db
     .prepare(
-      'SELECT id, owner_email, applicant_name, phone, property_address, application_type, description, status, esign_timestamp, arb_esign, signature_id, created, updated_at, copied_from_id, revision_notes, arb_internal_notes, owner_notes, review_deadline, deleted_at FROM arb_requests WHERE id = ? AND (deleted_at IS NULL OR deleted_at = "") LIMIT 1'
+      'SELECT id, owner_email, applicant_name, phone, property_address, application_type, description, status, esign_timestamp, arb_esign, signature_id, created, updated_at, copied_from_id, revision_notes, arb_internal_notes, owner_notes, review_deadline, deleted_at, workflow_version, current_stage, current_cycle, submitted_at, resolved_at, auto_approved_reason, deadline_date FROM arb_requests WHERE id = ? AND (deleted_at IS NULL OR deleted_at = "") LIMIT 1'
     )
     .bind(id)
     .first<ArbRequest & { arb_internal_notes?: string | null; owner_notes?: string | null; review_deadline?: string | null; deleted_at?: string | null }>();
@@ -155,7 +155,7 @@ export async function listArbRequestsByOwner(
 ): Promise<ArbRequest[]> {
   const { results } = await db
     .prepare(
-      'SELECT id, owner_email, applicant_name, phone, property_address, application_type, description, status, esign_timestamp, arb_esign, signature_id, created, updated_at, copied_from_id, revision_notes, arb_internal_notes, owner_notes, review_deadline, deleted_at FROM arb_requests WHERE owner_email = ? AND (deleted_at IS NULL OR deleted_at = "") ORDER BY created DESC'
+      'SELECT id, owner_email, applicant_name, phone, property_address, application_type, description, status, esign_timestamp, arb_esign, signature_id, created, updated_at, copied_from_id, revision_notes, arb_internal_notes, owner_notes, review_deadline, deleted_at, workflow_version, current_stage, current_cycle, submitted_at, resolved_at, auto_approved_reason, deadline_date FROM arb_requests WHERE owner_email = ? AND (deleted_at IS NULL OR deleted_at = "") ORDER BY created DESC'
     )
     .bind(ownerEmail.trim().toLowerCase())
     .all<ArbRequest & { arb_internal_notes?: string | null; owner_notes?: string | null; review_deadline?: string | null; deleted_at?: string | null }>();
@@ -169,7 +169,7 @@ export async function listArbRequestsByOwner(
 }
 
 const ARB_REQUEST_SELECT =
-  'SELECT id, owner_email, applicant_name, phone, property_address, application_type, description, status, esign_timestamp, arb_esign, signature_id, created, updated_at, copied_from_id, revision_notes, arb_internal_notes, owner_notes, review_deadline, deleted_at FROM arb_requests';
+  'SELECT id, owner_email, applicant_name, phone, property_address, application_type, description, status, esign_timestamp, arb_esign, signature_id, created, updated_at, copied_from_id, revision_notes, arb_internal_notes, owner_notes, review_deadline, deleted_at, workflow_version, current_stage, current_cycle, submitted_at, resolved_at, auto_approved_reason, deadline_date FROM arb_requests';
 const ARB_REQUEST_DELETED_COND = ' (deleted_at IS NULL OR deleted_at = "") ';
 type ArbRequestRow = ArbRequest & { arb_internal_notes?: string | null; owner_notes?: string | null; review_deadline?: string | null; deleted_at?: string | null };
 
@@ -212,7 +212,7 @@ export async function listArbRequestsByHousehold(
 export async function listAllArbRequests(db: D1Database): Promise<ArbRequest[]> {
   const { results } = await db
     .prepare(
-      'SELECT id, owner_email, applicant_name, phone, property_address, application_type, description, status, esign_timestamp, arb_esign, signature_id, created, updated_at, copied_from_id, revision_notes, arb_internal_notes, owner_notes, review_deadline, deleted_at FROM arb_requests WHERE deleted_at IS NULL OR deleted_at = "" ORDER BY created DESC'
+      'SELECT id, owner_email, applicant_name, phone, property_address, application_type, description, status, esign_timestamp, arb_esign, signature_id, created, updated_at, copied_from_id, revision_notes, arb_internal_notes, owner_notes, review_deadline, deleted_at, workflow_version, current_stage, current_cycle, submitted_at, resolved_at, auto_approved_reason, deadline_date FROM arb_requests WHERE deleted_at IS NULL OR deleted_at = "" ORDER BY created DESC'
     )
     .all<ArbRequest & { arb_internal_notes?: string | null; owner_notes?: string | null; review_deadline?: string | null; deleted_at?: string | null }>();
   return (results ?? []).map(row => ({
@@ -255,7 +255,7 @@ export async function listAllArbRequestsFiltered(
   const where = conditions.join(' AND ');
   const { results } = await db
     .prepare(
-      `SELECT id, owner_email, applicant_name, phone, property_address, application_type, description, status, esign_timestamp, arb_esign, signature_id, created, updated_at, copied_from_id, revision_notes, arb_internal_notes, owner_notes, review_deadline, deleted_at FROM arb_requests WHERE ${where} ORDER BY created DESC`
+      `SELECT id, owner_email, applicant_name, phone, property_address, application_type, description, status, esign_timestamp, arb_esign, signature_id, created, updated_at, copied_from_id, revision_notes, arb_internal_notes, owner_notes, review_deadline, deleted_at, workflow_version, current_stage, current_cycle, submitted_at, resolved_at, auto_approved_reason, deadline_date FROM arb_requests WHERE ${where} ORDER BY created DESC`
     )
     .bind(...bind)
     .all<ArbRequest & { arb_internal_notes?: string | null; owner_notes?: string | null; review_deadline?: string | null; deleted_at?: string | null }>();
