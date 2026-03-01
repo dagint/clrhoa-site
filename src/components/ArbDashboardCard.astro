@@ -208,14 +208,6 @@ function selectedTypes(applicationType: string | null): string[] {
                       style="min-height: 120px;"
                     />
                   )}
-                  {isPdf && viewUrl && (
-                    <iframe
-                      src={viewUrl}
-                      title={`View ${file.filename}`}
-                      class="w-full max-w-md aspect-video rounded border border-gray-300 bg-gray-100"
-                      style="min-height: 400px;"
-                    />
-                  )}
                   {viewUrl && (
                     <a href={viewUrl} target="_blank" rel="noopener noreferrer" class="text-clr-green font-semibold hover:underline text-xs inline-block mt-1">View / download</a>
                   )}
