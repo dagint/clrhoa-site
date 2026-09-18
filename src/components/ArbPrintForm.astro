@@ -1,0 +1,104 @@
+---
+/**
+ * Printable ARB request laid out like the "Architectural Review Application" PDF,
+ * including the ARB decision section with ARC and Board attestation lines.
+ * The default slot renders after the owner's attachments checklist (e.g. uploaded file list);
+ * slotted markup keeps the parent's scoped print styles.
+ */
+import type { ArbRequest } from '../lib/arb-db';
+import type { ElectronicSignature } from '../lib/esignature-db';
+import {
+  APPLICATION_TYPES,
+  ATTACHMENT_CHECKLIST,
+  getArbDecisionSummary,
+  parseApplicationType,
+} from '../lib/arb-application';
+import { sanitizeForDisplay } from '../lib/sanitize';
+import { formatEasternDate } from '../lib/timezone';
+
+interface Props {
+  request: ArbRequest;
+  signature?: ElectronicSignature | null;
+  /** Legacy (v1) single decision parsed from arb_esign. */
+  approval?: { status: string; by: string; date: string } | null;
+}
+
+const { request: req, signature = null, approval = null } = Astro.props;
+const { types, otherText, attachments } = parseApplicationType(req.application_type);
+const decision = getArbDecisionSummary(req);
+const date = (value: string | null | undefined) => (value ? formatEasternDate(value) : '');
+const box = (checked: boolean) => (checked ? '☒' : '☐');
+
+const notes: string[] = [];
+if (req.revision_notes?.trim()) notes.push(req.revision_notes.trim());
+if (decision.autoApproved) notes.push('Approved automatically: the review deadline expired without a majority decision.');
+if (approval && decision.boardResult === null) notes.push(`Decision recorded by ${approval.by}.`);
+---
+
+<div class="arb-print-form text-sm text-gray-900">
+  <h3 class="text-center text-lg font-bold tracking-wide">ARCHITECTURAL REVIEW APPLICATION</h3>
+  <p class="text-center mb-4">Crooked Lake Reserve Homeowners Association</p>
+
+  <div class="grid grid-cols-3 gap-x-6 gap-y-3 mb-4">
+    <div class="col-span-2 border-b border-gray-700 pb-0.5">Crooked Lake Reserve HOA<div class="text-xs font-semibold">Association Name</div></div>
+    <div class="border-b border-gray-700 pb-0.5">{date(req.created)}<div class="text-xs font-semibold">Date of Application</div></div>
+    <div class="col-span-2 border-b border-gray-700 pb-0.5">{req.applicant_name || '\u00a0'}<div class="text-xs font-semibold">Applicant's Name</div></div>
+    <div class="border-b border-gray-700 pb-0.5">{req.phone || '\u00a0'}<div class="text-xs font-semibold">Phone Number</div></div>
+    <div class="col-span-2 border-b border-gray-700 pb-0.5">{req.property_address || '\u00a0'}<div class="text-xs font-semibold">Property Address</div></div>
+    <div class="border-b border-gray-700 pb-0.5 break-all">{req.owner_email}<div class="text-xs font-semibold">Email Address</div></div>
+  </div>
+
+  <p class="font-bold mb-1">Application For:</p>
+  <div class="grid grid-cols-3 gap-x-6 gap-y-1 mb-4">
+    {APPLICATION_TYPES.map((type) => (
+      <div>
+        {box(types.includes(type))} {type}{type === 'Other' && <>: <span class="underline">{otherText ? otherText : '\u00a0'.repeat(12)}</span></>}
+      </div>
+    ))}
+  </div>
+
+  <p class="font-bold mb-1">Project Description:</p>
+  <div class="whitespace-pre-wrap border border-gray-700 p-2 mb-4 min-h-[4rem]" set:html={sanitizeForDisplay(req.description)}></div>
+
+  <p class="font-bold mb-1">ATTACHMENTS SUBMITTED BY PROPERTY OWNER</p>
+  <div class="grid grid-cols-2 gap-x-6 gap-y-1 mb-3">
+    {ATTACHMENT_CHECKLIST.map((item) => (<div>{box(attachments.includes(item))} {item}</div>))}
+  </div>
+
+  <slot />
+
+  <div class="grid grid-cols-3 gap-x-6 mt-4 mb-4">
+    <div class="col-span-2 border-b border-gray-700 pb-0.5">
+      {signature ? `Signed electronically: ${signature.signer_name}` : '\u00a0'}
+      <div class="text-xs font-semibold">Signature of Homeowner</div>
+    </div>
+    <div class="border-b border-gray-700 pb-0.5">{date(signature?.signed_at ?? null) || '\u00a0'}<div class="text-xs font-semibold">Date Signed</div></div>
+  </div>
+
+  <div class="arb-decision-section border-t-2 border-dashed border-gray-500 pt-3">
+    <p class="text-center font-bold mb-3">THIS SECTION TO BE COMPLETED BY ARCHITECTURAL REVIEW BOARD</p>
+    <div class="grid grid-cols-3 gap-x-6 mb-3">
+      <div class="border-b border-gray-700 pb-0.5">{date(decision.receivedDate) || '\u00a0'}<div class="text-xs font-semibold">Request Rec'd</div></div>
+      <div class="border-b border-gray-700 pb-0.5">{date(decision.approvedDate) || '\u00a0'}<div class="text-xs font-semibold">Date Approved</div></div>
+      <div class="border-b border-gray-700 pb-0.5">{date(decision.deniedDate) || '\u00a0'}<div class="text-xs font-semibold">Date Denied</div></div>
+    </div>
+
+    <p class="font-bold mb-1">NOTES / COMMENTS:</p>
+    <div class="whitespace-pre-wrap border border-gray-700 p-2 mb-2 min-h-[2.5rem]">{notes.join('\n\n') || '\u00a0'}</div>
+    <p class="text-xs italic mb-3">Internal majority review is performed by ARB/ARC and Board; a single authorized signer from each attests to the decision below.</p>
+
+    <p class="font-bold">ARB/ARC Chair (attesting to ARC majority decision) <span class="font-normal">— Result: {decision.arcResult}</span></p>
+    <div class="grid grid-cols-5 gap-x-6 mt-5 mb-4">
+      <div class="col-span-2 border-b border-gray-700 pb-0.5">&nbsp;<div class="text-xs font-semibold">Signature</div></div>
+      <div class="col-span-2 border-b border-gray-700 pb-0.5">&nbsp;<div class="text-xs font-semibold">Printed Name</div></div>
+      <div class="border-b border-gray-700 pb-0.5">&nbsp;<div class="text-xs font-semibold">Date</div></div>
+    </div>
+
+    <p class="font-bold">Board (attesting to Board majority decision) <span class="font-normal">— Result: {decision.boardResult ?? 'Not applicable (single-stage review)'}</span></p>
+    <div class="grid grid-cols-5 gap-x-6 mt-5">
+      <div class="col-span-2 border-b border-gray-700 pb-0.5">&nbsp;<div class="text-xs font-semibold">Signature</div></div>
+      <div class="col-span-2 border-b border-gray-700 pb-0.5">&nbsp;<div class="text-xs font-semibold">Printed Name</div></div>
+      <div class="border-b border-gray-700 pb-0.5">&nbsp;<div class="text-xs font-semibold">Date</div></div>
+    </div>
+  </div>
+</div>

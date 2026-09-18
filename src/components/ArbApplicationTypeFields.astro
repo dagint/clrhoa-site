@@ -1,0 +1,59 @@
+---
+/**
+ * "Application For" checkboxes plus the "Other:" description, matching the ARB application PDF.
+ * Posts `application_type` (repeated) and `application_other`; parsed by applicationTypeFromForm().
+ */
+import { APPLICATION_TYPES, OTHER_TEXT_MAX_LENGTH, parseApplicationType } from '../lib/arb-application';
+
+interface Props {
+  /** Stored arb_requests.application_type value, for prefilling the edit form. */
+  value?: string | null;
+  showOptionalHint?: boolean;
+}
+
+const { value = null, showOptionalHint = true } = Astro.props;
+const { types, otherText } = parseApplicationType(value);
+---
+
+<fieldset>
+  <legend class="block text-sm font-semibold text-gray-700 mb-2">
+    Application for {showOptionalHint && <span class="text-gray-400 font-normal">(optional)</span>}
+  </legend>
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-2">
+    {APPLICATION_TYPES.map((type) => (
+      <label class="inline-flex items-center gap-2">
+        <input
+          type="checkbox"
+          name="application_type"
+          value={type}
+          checked={types.includes(type)}
+          data-application-other-toggle={type === 'Other' ? '' : undefined}
+          class="rounded border-gray-300 text-clr-green focus:ring-clr-green"
+        />
+        <span class="text-sm">{type}{type === 'Other' && ':'}</span>
+      </label>
+    ))}
+  </div>
+  <div class="mt-2 sm:w-2/3">
+    <label for="application_other" class="sr-only">Other (describe)</label>
+    <input
+      id="application_other"
+      name="application_other"
+      type="text"
+      maxlength={OTHER_TEXT_MAX_LENGTH}
+      value={otherText ?? ''}
+      placeholder="If Other, describe (e.g. pergola, solar panels)"
+      class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-clr-green focus:ring-1 focus:ring-clr-green"
+    />
+  </div>
+</fieldset>
+
+<script>
+  // Typing an "Other" description checks the Other box so the two stay consistent.
+  document.querySelectorAll<HTMLInputElement>('#application_other').forEach((input) => {
+    const toggle = input.closest('fieldset')?.querySelector<HTMLInputElement>('[data-application-other-toggle]');
+    input.addEventListener('input', () => {
+      if (toggle && input.value.trim()) toggle.checked = true;
+    });
+  });
+</script>

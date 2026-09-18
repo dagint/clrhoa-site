@@ -1,0 +1,35 @@
+---
+/**
+ * "Attachments submitted by property owner" checklist from the ARB application PDF.
+ * Posts `attachments_checklist` (repeated); parsed by applicationTypeFromForm().
+ */
+import { ATTACHMENT_CHECKLIST, parseApplicationType } from '../lib/arb-application';
+
+interface Props {
+  /** Stored arb_requests.application_type value, for prefilling the edit form. */
+  value?: string | null;
+}
+
+const { value = null } = Astro.props;
+const { attachments } = parseApplicationType(value);
+---
+
+<fieldset>
+  <legend class="block text-sm font-semibold text-gray-700 mb-2">
+    Attachments submitted <span class="text-gray-400 font-normal">(check all that apply)</span>
+  </legend>
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
+    {ATTACHMENT_CHECKLIST.map((item) => (
+      <label class="inline-flex items-start gap-2">
+        <input
+          type="checkbox"
+          name="attachments_checklist"
+          value={item}
+          checked={attachments.includes(item)}
+          class="mt-0.5 rounded border-gray-300 text-clr-green focus:ring-clr-green"
+        />
+        <span class="text-sm">{item}</span>
+      </label>
+    ))}
+  </div>
+</fieldset>

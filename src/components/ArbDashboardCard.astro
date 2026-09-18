@@ -2,6 +2,8 @@
 import type { ArbRequest, ArbFile } from '../lib/arb-db';
 import type { ElectronicSignature } from '../lib/esignature-db';
 import ESignatureDisplay from './ESignatureDisplay.astro';
+import ArbApplicationSummary from './ArbApplicationSummary.astro';
+import { formatApplicationTypes } from '../lib/arb-application';
 import { sanitizeForDisplay } from '../lib/sanitize';
 import { formatEasternDateTime, formatEasternDate } from '../lib/timezone';
 
@@ -45,10 +47,6 @@ function isPdfFilename(filename: string): boolean {
   return /\.pdf$/i.test(filename);
 }
 
-const APPLICATION_TYPES = ['Exterior Paint', 'Landscape Installation', 'Swimming Pool', 'Recreational Equipment', 'Fencing', 'Other'];
-function selectedTypes(applicationType: string | null): string[] {
-  return applicationType ? applicationType.split(',').map((s) => s.trim()).filter(Boolean) : [];
-}
 ---
 
 <button
@@ -143,17 +141,7 @@ function selectedTypes(applicationType: string | null): string[] {
           <div class="w-full rounded-lg border border-gray-200 bg-gray-100 px-3 py-2 text-gray-700">{req.owner_email}</div>
         </div>
       </div>
-      <div>
-        <span class="block text-sm font-semibold text-gray-500 mb-2">Application for</span>
-        <div class="flex flex-wrap gap-x-6 gap-y-2">
-          {APPLICATION_TYPES.map((type) => (
-            <label class="inline-flex items-center gap-2 text-gray-600">
-              <input type="checkbox" disabled checked={selectedTypes(req.application_type).includes(type)} class="rounded border-gray-300 bg-gray-100" />
-              <span class="text-sm">{type}</span>
-            </label>
-          ))}
-        </div>
-      </div>
+      <ArbApplicationSummary value={req.application_type} />
       <div>
         <label class="block text-sm font-semibold text-gray-500 mb-1">Description</label>
         <div class="w-full rounded-lg border border-gray-200 bg-gray-100 px-3 py-2 text-gray-700 whitespace-pre-wrap min-h-[80px]" set:html={sanitizeForDisplay(req.description)}></div>
@@ -267,7 +255,7 @@ function selectedTypes(applicationType: string | null): string[] {
         <div><span class="font-semibold text-gray-600">Property address:</span> {sanitizeForDisplay(req.property_address) || '-'}</div>
         <div><span class="font-semibold text-gray-600">Email:</span> {sanitizeForDisplay(req.owner_email)}</div>
       </div>
-      <div><span class="font-semibold text-gray-600">Application for:</span> {sanitizeForDisplay(req.application_type) || '-'}</div>
+      <div><span class="font-semibold text-gray-600">Application for:</span> {formatApplicationTypes(req.application_type) || '-'}</div>
       <div><span class="font-semibold text-gray-600">Description:</span></div>
       <div class="whitespace-pre-wrap border border-gray-200 p-3 rounded" set:html={sanitizeForDisplay(req.description)}></div>
       <div class="text-xs text-gray-500">Submitted: {formatEasternDateTime(req.created)}</div>

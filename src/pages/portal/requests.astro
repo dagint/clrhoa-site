@@ -8,6 +8,7 @@ import { getPortalBadgeCounts } from '../../lib/portal-badge-counts';
 import { listArbRequestsByHousehold, listArbAuditLogForRequest, getSubmittedForReviewAt } from '../../lib/arb-db';
 import type { ArbRequest, ArbAuditLogRow } from '../../lib/arb-db';
 import { sanitizeForDisplay } from '../../lib/sanitize';
+import { formatApplicationTypes } from '../../lib/arb-application';
 import { formatEasternDate, formatEasternDateTime } from '../../lib/timezone';
 
 const { env, session, effectiveRole } = await getPortalContext(Astro, { fingerprint: true });
@@ -226,7 +227,7 @@ function statusLabel(status: string): string {
                         </div>
                         <div>
                           <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Application for</label>
-                          <p class="text-base text-gray-800">{sanitizeForDisplay(req.application_type) || '—'}</p>
+                          <p class="text-base text-gray-800">{formatApplicationTypes(req.application_type) || '—'}</p>
                         </div>
                         <div>
                           <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Description</label>

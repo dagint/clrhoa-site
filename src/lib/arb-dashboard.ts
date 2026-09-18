@@ -7,6 +7,7 @@
 import type { ArbRequest, ArbFile } from './arb-db';
 import { listAllArbRequests, listArbFilesByRequest, listArbRequestsByHousehold } from './arb-db';
 import { listPendingSubmissions } from './vendor-submissions-db';
+import { parseApplicationType } from './arb-application';
 
 export type { ArbRequest, ArbFile };
 
@@ -48,17 +49,11 @@ export function isImageFilename(filename: string): boolean {
   return IMAGE_EXT.test(filename);
 }
 
-export const APPLICATION_TYPES = [
-  'Exterior Paint',
-  'Landscape Installation',
-  'Swimming Pool',
-  'Recreational Equipment',
-  'Fencing',
-  'Other',
-] as const;
+export { APPLICATION_TYPES } from './arb-application';
 
+/** Selected "Application for" categories (excludes the Other description and attachments checklist). */
 export function selectedTypes(applicationType: string | null): string[] {
-  return applicationType ? applicationType.split(',').map((s) => s.trim()).filter(Boolean) : [];
+  return parseApplicationType(applicationType).types;
 }
 
 /** Parse arb_esign (format: "STATUS | Name | email | date") for display. */

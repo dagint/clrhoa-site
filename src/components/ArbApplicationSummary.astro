@@ -1,0 +1,27 @@
+---
+/** Read-only "Application for" categories, Other description, and owner attachments checklist. */
+import { APPLICATION_TYPES, parseApplicationType } from '../lib/arb-application';
+
+interface Props {
+  value: string | null;
+}
+
+const { types, otherText, attachments } = parseApplicationType(Astro.props.value);
+---
+
+<div>
+  <span class="block text-sm font-semibold text-gray-500 mb-2">Application for</span>
+  <div class="flex flex-wrap gap-x-6 gap-y-2">
+    {APPLICATION_TYPES.map((type) => (
+      <label class="inline-flex items-center gap-2 text-gray-600 cursor-default">
+        <input type="checkbox" disabled checked={types.includes(type)} class="rounded border-gray-300 bg-gray-100" />
+        <span class="text-sm">{type}{type === 'Other' && otherText && `: ${otherText}`}</span>
+      </label>
+    ))}
+  </div>
+  {attachments.length > 0 && (
+    <p class="mt-2 text-sm text-gray-600">
+      <span class="font-semibold text-gray-500">Attachments submitted:</span> {attachments.join('; ')}
+    </p>
+  )}
+</div>
