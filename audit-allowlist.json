@@ -1,0 +1,26 @@
+{
+  "$comment": "Temporary exceptions for scripts/audit-check.mjs. Each entry must name the advisory, why it is accepted, and an expiry date. Remove entries once the fix ships; expired entries fail CI.",
+  "advisories": [
+    {
+      "id": "GHSA-26w7-cxv4-gfx2",
+      "package": "astro",
+      "severity": "critical",
+      "reason": "RCE via AVIF image optimization. Site uses imageService: 'passthrough', so Astro image optimization never runs on user input. Fixed by the Astro 7 / Cloudflare Workers migration.",
+      "expires": "2026-12-18"
+    },
+    {
+      "id": "GHSA-2pvr-wf23-7pc7",
+      "package": "astro",
+      "severity": "high",
+      "reason": "Host header SSRF in prerendered error page fetch. Requires the Astro 6+ upgrade, which requires moving from Cloudflare Pages to Workers. Tracked in the Astro migration.",
+      "expires": "2026-12-18"
+    },
+    {
+      "id": "GHSA-8hv8-536x-4wqp",
+      "package": "astro",
+      "severity": "high",
+      "reason": "Reflected XSS via unescaped slot name. Site does not build slot names from request data. Fixed by the Astro 6+ upgrade tracked in the Astro migration.",
+      "expires": "2026-12-18"
+    }
+  ]
+}

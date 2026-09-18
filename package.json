@@ -172,6 +172,7 @@
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage",
+    "audit:check": "node scripts/audit-check.mjs --level=high",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:debug": "playwright test --debug",
@@ -223,7 +224,7 @@
     "@vitest/ui": "^4.1.11",
     "dotenv": "^17.3.1",
     "jsdom": "^28.1.0",
-    "sharp": "^0.34.5",
+    "sharp": "^0.35.4",
     "terser": "^5.36.0",
     "typescript": "^5.9.3",
     "vitest": "^4.1.11",
@@ -239,6 +240,7 @@
     "@astrojs/cloudflare": {
       "wrangler": "4.59.1"
     },
-    "@astrojs/language-server": "2.16.16"
+    "@astrojs/language-server": "2.16.16",
+    "sharp": "$sharp"
   }
 }
