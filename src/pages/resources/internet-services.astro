@@ -1,5 +1,8 @@
 ---
 import ResourcesLayout from '../../layouts/ResourcesLayout.astro';
+
+// Update whenever provider details on this page change.
+const lastUpdated = 'September 2026';
 ---
 
 <ResourcesLayout title="Internet Services" description="Available internet providers, typical speeds, and options for Crooked Lake Reserve" currentSection="internet-services">
@@ -11,14 +14,37 @@ import ResourcesLayout from '../../layouts/ResourcesLayout.astro';
         </svg>
         <h1 class="text-3xl font-heading font-bold text-clr-green">Internet Services</h1>
       </div>
+      <p class="text-sm text-gray-500 font-body -mt-4 mb-6">
+        <strong>Last updated:</strong> {lastUpdated}
+      </p>
 
       <div class="space-y-6">
         <p class="text-gray-700 font-body">
           Several internet options are available to Crooked Lake Reserve residents. Below is an overview of each service type, typical speeds, and links to check availability and sign up.
         </p>
 
-        <!-- Cable: Xfinity -->
+        <!-- Fiber: Wire3 -->
         <div class="bg-clr-beige/30 border-2 border-clr-green rounded-2xl p-6 md:p-8">
+          <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
+            <div class="flex flex-wrap items-center gap-3">
+              <h2 class="text-xl font-heading font-bold text-clr-green">Wire3 (Fiber)</h2>
+              <span class="inline-flex items-center bg-green-100 text-green-800 border border-green-300 px-2.5 py-0.5 rounded-full text-xs font-semibold font-body">Now Available</span>
+            </div>
+            <a href="https://wire3.com/availability/" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 bg-clr-orange hover:brightness-110 text-white px-4 py-2 rounded-lg font-semibold text-sm shadow-md hover:shadow-lg transition-all font-body">
+              Check Wire3 availability →
+            </a>
+          </div>
+          <p class="text-gray-700 font-body mb-3">
+            Wire3 fiber-optic internet is now available to all homes in Crooked Lake Reserve. Fiber delivers symmetrical upload and download speeds, low latency, and consistent performance—ideal for video calls, working from home, large uploads, and households with many devices. Wire3 is a Florida-based provider with no contracts, and plans include a Wi-Fi router.
+          </p>
+          <div class="bg-white/60 rounded-lg p-4 border border-gray-200">
+            <strong class="text-clr-green">Typical speeds:</strong>
+            <span class="text-gray-700 font-body"> Symmetrical plans from 250 Mbps up to multi-gigabit tiers. Check the Wire3 website for current plans and pricing at your address.</span>
+          </div>
+        </div>
+
+        <!-- Cable: Xfinity -->
+        <div class="bg-clr-beige/30 border border-gray-200 rounded-2xl p-6 md:p-8">
           <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
             <h2 class="text-xl font-heading font-bold text-clr-green">Xfinity (Cable)</h2>
             <a href="https://www.xfinity.com" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 bg-clr-orange hover:brightness-110 text-white px-4 py-2 rounded-lg font-semibold text-sm shadow-md hover:shadow-lg transition-all font-body">
@@ -30,7 +56,7 @@ import ResourcesLayout from '../../layouts/ResourcesLayout.astro';
           </p>
           <div class="bg-white/60 rounded-lg p-4 border border-gray-200">
             <strong class="text-clr-green">Typical speeds:</strong>
-            <span class="text-gray-700 font-body"> Plan-dependent; often 100–200 Mbps on entry tiers up to 1,200 Mbps or higher on higher tiers. Check the Xfinity website for current plans and pricing at your address.</span>
+            <span class="text-gray-700 font-body"> Plan-dependent, from a few hundred Mbps on entry tiers up to gigabit and faster on higher tiers. Upload speeds are much lower than download speeds. Check the Xfinity website for current plans and pricing at your address.</span>
           </div>
         </div>
 
@@ -57,10 +83,10 @@ import ResourcesLayout from '../../layouts/ResourcesLayout.astro';
             </div>
             <div class="bg-white/60 rounded-lg p-4 border border-gray-200">
               <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
-                <strong class="text-clr-green">AT&T Internet</strong>
-                <a href="https://www.att.com/internet" target="_blank" rel="noopener noreferrer" class="text-clr-orange hover:underline font-semibold text-sm">Check availability →</a>
+                <strong class="text-clr-green">AT&T Internet Air</strong>
+                <a href="https://www.att.com/internet/internet-air/" target="_blank" rel="noopener noreferrer" class="text-clr-orange hover:underline font-semibold text-sm">Check availability →</a>
               </div>
-              <p class="text-gray-700 font-body text-sm">Fiber and fixed wireless options in some areas. Speeds and availability depend on your address.</p>
+              <p class="text-gray-700 font-body text-sm">Wireless home internet over AT&T's cellular network (AT&T Fiber is not offered in our community). Speeds vary by location and signal strength.</p>
             </div>
           </div>
         </div>
@@ -87,26 +113,13 @@ import ResourcesLayout from '../../layouts/ResourcesLayout.astro';
           </div>
         </div>
 
-        <!-- Fiber (Coming Soon) -->
-        <div class="bg-clr-beige/30 border border-gray-200 rounded-2xl p-6 md:p-8 border-dashed">
-          <h2 class="text-xl font-heading font-bold text-clr-green mb-3">Fiber Internet (Coming Soon)</h2>
-          <p class="text-gray-700 font-body mb-3">
-            Fiber-optic internet is planned for the area. Fiber typically offers symmetric upload and download speeds (e.g., 100 Mbps to 1 Gbps or more), low latency, and reliable performance - ideal for video calls, large uploads, and multiple users.
-          </p>
-          <div class="bg-blue-50 border-2 border-blue-200 rounded-lg p-4">
-            <p class="text-blue-800 font-body text-sm">
-              <strong>Status:</strong> Service is expected to become available from the provider in the future. Check with the HOA board or the provider’s website for rollout updates and when sign-up opens for Crooked Lake Reserve.
-            </p>
-          </div>
-        </div>
-
         <!-- Choosing & Tips -->
         <div class="bg-white border-2 border-clr-green rounded-2xl p-6 md:p-8">
           <h2 class="text-xl font-heading font-bold text-clr-green mb-4">Choosing a Provider & Tips</h2>
           <ul class="space-y-2 text-gray-700 font-body">
             <li class="flex items-start gap-2">
               <span class="text-clr-orange font-bold mt-1">•</span>
-              <span><strong>Check your address:</strong> Use each provider’s website to confirm availability and plan options at your specific address.</span>
+              <span><strong>Check your address:</strong> Use each provider's website to confirm availability and plan options at your specific address.</span>
             </li>
             <li class="flex items-start gap-2">
               <span class="text-clr-orange font-bold mt-1">•</span>
@@ -114,11 +127,11 @@ import ResourcesLayout from '../../layouts/ResourcesLayout.astro';
             </li>
             <li class="flex items-start gap-2">
               <span class="text-clr-orange font-bold mt-1">•</span>
-              <span><strong>Equipment placement:</strong> For Starlink, follow the rear-of-home guideline and ensure a clear view of the sky. For cellular home internet, place the modem near a window or where signal is strongest.</span>
+              <span><strong>Equipment placement:</strong> For Starlink, follow the rear-of-home guideline and ensure a clear view of the sky. For fiber, ask the installer where the exterior box and cable run will go before work begins. For cellular home internet, place the modem near a window or where signal is strongest.</span>
             </li>
             <li class="flex items-start gap-2">
               <span class="text-clr-orange font-bold mt-1">•</span>
-              <span><strong>ARB approval:</strong> Exterior equipment (e.g., Starlink dish, fixed wireless antennas) may require architectural review. Submit an ARB request before installing.</span>
+              <span><strong>ARB approval:</strong> Exterior equipment (e.g., Starlink dish, fixed wireless antennas) and any exterior changes from an installation must follow HOA guidelines and may require architectural review. Submit an ARB request before installing if you're unsure.</span>
             </li>
           </ul>
         </div>
