@@ -1,4 +1,5 @@
 ---
+import { getEnv } from '../../../lib/env';
 /**
  * GET /api/news-file/news/{newsItemId}/{filename} — Serve a news item photo from R2.
  * If the news item is public (is_public=1), anyone can view. Otherwise requires session (portal member).
@@ -7,8 +8,7 @@ export const prerender = false;
 
 import { getNewsItemById, getNewsItemImageKeys } from '../../../lib/news-items-db';
 
-const runtime = Astro.locals.runtime;
-const env = runtime?.env;
+const env = getEnv(Astro.locals);
 const rawKey = Astro.params.key;
 if (!rawKey) {
   return new Response('Bad Request', { status: 400 });

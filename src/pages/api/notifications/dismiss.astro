@@ -1,4 +1,5 @@
 ---
+import { getEnv } from '../../../lib/env';
 /**
  * POST /api/notifications/dismiss — Mark a dashboard notification as read.
  * Body: { key: string }. Keys: action_feedback, action_maintenance, action_meetings, staff_outstanding.
@@ -13,7 +14,7 @@ const auth = await requireSession(Astro);
 if ('response' in auth) return auth.response;
 const { session } = auth;
 
-const dbResult = requireDb(Astro.locals.runtime?.env);
+const dbResult = requireDb(getEnv(Astro.locals));
 if ('response' in dbResult) return dbResult.response;
 const { db } = dbResult;
 

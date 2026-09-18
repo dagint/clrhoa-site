@@ -32,6 +32,7 @@
 
 export const prerender = false;
 
+import { getEnv } from '../../../../lib/env';
 import type { APIRoute } from 'astro';
 import { requireRole } from '../../../../lib/auth/middleware';
 import { logAuditEvent } from '../../../../lib/audit-log';
@@ -57,8 +58,8 @@ export const PATCH: APIRoute = async (context) => {
     return authResult.redirect;
   }
 
-  const db = context.locals.runtime?.env?.DB;
-  const resend = getResendClient(context.locals.runtime.env);
+  const db = getEnv(context.locals)?.DB;
+  const resend = getResendClient(getEnv(context.locals));
 
   if (!db) {
     return new Response(

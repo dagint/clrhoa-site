@@ -1,4 +1,5 @@
 ---
+import { getEnv } from '../../lib/env';
 /**
  * POST /api/arb-copy — owner copies an approved or rejected request into a new pending request.
  * Body (JSON): requestId (source request to copy).
@@ -13,8 +14,7 @@ import { getSecurityMonitor } from '../../lib/monitoring';
 import { copyArbRequest } from '../../lib/arb-db';
 import { logEvent } from '../../lib/audit-log';
 
-const runtime = Astro.locals.runtime;
-const env = runtime?.env;
+const env = getEnv(Astro.locals);
 const user = Astro.locals.user;
 const session = Astro.locals.session;
 

@@ -1,4 +1,5 @@
 ---
+import { getEnv } from '../../../lib/env';
 /**
  * GET /api/board/backup-config — Board/Admin only. Returns backup settings (no secrets).
  * POST /api/board/backup-config — Board/Admin only. Saves schedule, folder id, enabled.
@@ -8,8 +9,7 @@ export const prerender = false;
 import { getUserEmail, getUserRole } from '../../../types/auth';
 import { logAdminEvent } from '../../../lib/audit-log';
 
-const runtime = Astro.locals.runtime;
-const env = runtime?.env;
+const env = getEnv(Astro.locals);
 
 // Use session from middleware (already validated by middleware for /api/board/* routes)
 const user = Astro.locals.user;

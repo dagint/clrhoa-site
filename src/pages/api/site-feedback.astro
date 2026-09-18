@@ -1,4 +1,5 @@
 ---
+import { getEnv } from '../../lib/env';
 /**
  * POST /api/site-feedback — Submit widget feedback (thumbs + comment). Rate limit 3/day per IP.
  * GET /api/site-feedback — Admin only: list with filters (?thumbs=1|-1, ?from=, ?to=, ?url=), ?export=csv.
@@ -9,8 +10,7 @@ import { isElevatedRole, getEffectiveRole } from '../../lib/auth';
 import { checkRateLimit, getRateLimitConfig } from '../../lib/rate-limit';
 import { insertSiteFeedback, listSiteFeedback } from '../../lib/site-feedback-db';
 
-const runtime = Astro.locals.runtime;
-const env = runtime?.env;
+const env = getEnv(Astro.locals);
 const db = env?.DB;
 const kv = env?.KV;
 const ip =

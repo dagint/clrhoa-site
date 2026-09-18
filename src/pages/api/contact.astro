@@ -1,4 +1,5 @@
 ---
+import { getEnv } from '../../lib/env';
 /**
  * POST /api/contact — public contact form. Logs to contact_submissions (backup), then sends email via Resend/MailChannels.
  * Body: name, email, message, recipient (form or JSON). No auth required.
@@ -33,8 +34,7 @@ if (Astro.request.method !== 'POST') {
   return new Response(null, { status: 405, headers: { Allow: 'POST' } });
 }
 
-const runtime = Astro.locals.runtime;
-const env = runtime?.env;
+const env = getEnv(Astro.locals);
 const db = env?.DB;
 const boardEmail = env?.NOTIFY_BOARD_EMAIL;
 const site = import.meta.env.SITE ?? 'https://clrhoa.com';

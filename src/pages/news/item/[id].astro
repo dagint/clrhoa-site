@@ -1,4 +1,5 @@
 ---
+import { getEnv } from '../../../lib/env';
 export const prerender = false;
 
 import BaseLayout from '../../../layouts/BaseLayout.astro';
@@ -6,8 +7,7 @@ import { getNewsItemById, getNewsItemImageKeys } from '../../../lib/news-items-d
 import { formatEasternDate } from '../../../lib/timezone';
 
 const { id } = Astro.params;
-const runtime = Astro.locals.runtime;
-const db = runtime?.env?.DB;
+const db = getEnv(Astro.locals)?.DB;
 
 if (!id || !db) {
   return Astro.redirect('/news');

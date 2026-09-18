@@ -1,4 +1,5 @@
 ---
+import { getEnv } from '../lib/env';
 /**
  * Gmail-style sidebar navigation for portal.
  * Large, clear menu items optimized for elderly users.
@@ -40,7 +41,7 @@ const isStaffFromWhitelist = !!elevatedLink;
 const isStaff = isElevated || isStaffFromWhitelist;
 
 // Load menu items from database (with fallback to defaults)
-const db = Astro.locals.runtime?.env?.DB;
+const db = getEnv(Astro.locals)?.DB;
 const dbMenuItems = db ? await getMenuItems(db) : [];
 
 // Map badge keys to actual values

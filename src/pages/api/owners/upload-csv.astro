@@ -1,4 +1,5 @@
 ---
+import { getEnv } from '../../../lib/env';
 /**
  * POST /api/owners/upload-csv — upload directory as CSV (board, admin, arb).
  * FormData: file (CSV), csrf_token.
@@ -12,8 +13,7 @@ import { getOwnerByEmail, insertOwner, updateOwner } from '../../../lib/director
 import { checkRateLimit, getRateLimitConfig } from '../../../lib/rate-limit';
 import { getSecurityMonitor } from '../../../lib/monitoring';
 
-const runtime = Astro.locals.runtime;
-const env = runtime?.env;
+const env = getEnv(Astro.locals);
 const user = Astro.locals.user;
 const session = Astro.locals.session;
 const ipAddress = Astro.request.headers.get('cf-connecting-ip') ??

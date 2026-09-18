@@ -33,6 +33,7 @@
 
 export const prerender = false;
 
+import { getEnv } from '../../../../lib/env';
 import type { APIRoute } from 'astro';
 import { requireAuth } from '../../../../lib/auth/middleware';
 import { verifyPassword } from '../../../../lib/password';
@@ -61,9 +62,9 @@ export const POST: APIRoute = async (context) => {
   const { user } = authResult;
   const userEmail = getUserEmail(user) || 'unknown';
 
-  const db = context.locals.runtime?.env?.DB;
-  const kv = context.locals.runtime?.env?.KV as KVNamespace | undefined;
-  const sessionSecret = context.locals.runtime?.env?.SESSION_SECRET;
+  const db = getEnv(context.locals)?.DB;
+  const kv = getEnv(context.locals)?.KV as KVNamespace | undefined;
+  const sessionSecret = getEnv(context.locals)?.SESSION_SECRET;
   const ipAddress = context.request.headers.get('cf-connecting-ip') || 'unknown';
   const userAgent = context.request.headers.get('user-agent') || 'unknown';
 

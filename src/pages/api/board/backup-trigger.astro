@@ -1,4 +1,5 @@
 ---
+import { getEnv } from '../../../lib/env';
 /**
  * POST /api/board/backup-trigger — Board/Admin only. Manually triggers backup Worker.
  * Calls the backup Worker's /trigger endpoint to run an immediate backup.
@@ -8,8 +9,7 @@ export const prerender = false;
 import { getUserRole } from '../../../types/auth';
 import { logAdminEvent } from '../../../lib/audit-log';
 
-const runtime = Astro.locals.runtime;
-const env = runtime?.env as Env & {
+const env = getEnv(Astro.locals) as Env & {
   BACKUP_TRIGGER_SECRET?: string;
   BACKUP_WORKER_URL?: string;
 };

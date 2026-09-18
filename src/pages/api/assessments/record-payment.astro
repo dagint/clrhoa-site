@@ -1,4 +1,5 @@
 ---
+import { getEnv } from '../../../lib/env';
 /**
  * POST /api/assessments/record-payment — board records a dues payment.
  * Body: owner_email, amount, paid_at (YYYY-MM-DD), balance_after?, full_year?, quarters_to_apply? (1–4),
@@ -15,8 +16,7 @@ function json(data: object, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
 }
 
-const runtime = Astro.locals.runtime;
-const env = runtime?.env;
+const env = getEnv(Astro.locals);
 const user = Astro.locals.user;
 const session = Astro.locals.session;
 if (!session || !user) return json({ error: 'Unauthorized' }, 401);

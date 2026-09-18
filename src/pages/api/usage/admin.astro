@@ -1,4 +1,5 @@
 ---
+import { getEnv } from '../../../lib/env';
 /**
  * GET /api/usage/admin — Admin only: user_id → path → created_at (role access).
  */
@@ -7,8 +8,7 @@ export const prerender = false;
 import { isElevatedRole, getEffectiveRole } from '../../../lib/auth';
 import { getAdminPageViews } from '../../../lib/usage-db';
 
-const runtime = Astro.locals.runtime;
-const env = runtime?.env;
+const env = getEnv(Astro.locals);
 const db = env?.DB;
 
 if (Astro.request.method !== 'GET') {

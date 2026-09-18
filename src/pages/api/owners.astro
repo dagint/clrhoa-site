@@ -1,4 +1,5 @@
 ---
+import { getEnv } from '../../lib/env';
 /**
  * /api/owners — board-only CRUD for directory owners.
  * GET: list owners. POST: create. PUT: update. DELETE: delete.
@@ -8,8 +9,7 @@ export const prerender = false;
 import { verifyCsrfToken, verifyOrigin, setLoginWhitelistRole, removeFromLoginWhitelistUnlessAdmin, VALID_ROLES, isElevatedRole, getEffectiveRole, isBoardOrArbOnly } from '../../lib/auth';
 import { listOwners, getOwnerById, insertOwner, updateOwner, deleteOwners, getOwnerByEmail, getOwnersByIds, validateLotNumber } from '../../lib/directory-db';
 
-const runtime = Astro.locals.runtime;
-const env = runtime?.env;
+const env = getEnv(Astro.locals);
 const user = Astro.locals.user;
 const session = Astro.locals.session;
 

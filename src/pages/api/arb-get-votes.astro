@@ -1,4 +1,5 @@
 ---
+import { getEnv } from '../../lib/env';
 /**
  * GET /api/arb-get-votes — Get vote status for a request with privacy rules.
  *
@@ -35,8 +36,7 @@ import {
   checkAndApplyDeadlines,
 } from '../../lib/arb-voting-db';
 
-const runtime = Astro.locals.runtime;
-const env = runtime?.env;
+const env = getEnv(Astro.locals);
 
 // Auth check
 const user = Astro.locals.user;

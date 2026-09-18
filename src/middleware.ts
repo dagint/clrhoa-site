@@ -6,6 +6,7 @@
  * - Security headers on all responses.
  */
 
+import { getEnv } from './lib/env';
 import type { MiddlewareHandler } from 'astro';
 import { getSessionFromCookie, isElevatedRole as isElevatedRoleLegacy, getEffectiveRole, isAdminRole as isAdminRoleLegacy } from './lib/auth';
 import {
@@ -99,7 +100,7 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
   // Note: context.locals is initialized by Astro with runtime property, so we just add correlationId
   context.locals.correlationId = correlationId;
 
-  const env = context.locals.runtime?.env;
+  const env = getEnv(context.locals);
   const cookieHeader = context.request.headers.get('cookie') ?? undefined;
 
   // Auth routes (/auth/*): public routes for login, password reset, etc.

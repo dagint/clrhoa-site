@@ -1,4 +1,5 @@
 ---
+import { getEnv } from '../../lib/env';
 /**
  * POST /api/arb-check-deadlines — Trigger deadline check and auto-approval.
  *
@@ -27,8 +28,7 @@ import {
   getRequestsNearingDeadline,
 } from '../../lib/arb-voting-db';
 
-const runtime = Astro.locals.runtime;
-const env = runtime?.env;
+const env = getEnv(Astro.locals);
 
 // Auth check - only ARC, Board, or Admin can check deadlines
 const user = Astro.locals.user;

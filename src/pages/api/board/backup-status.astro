@@ -1,4 +1,5 @@
 ---
+import { getEnv } from '../../../lib/env';
 /**
  * GET /api/board/backup-status — Board/Admin only. Returns whether Cloudflare credentials
  * are configured (for manual download) and last R2 backup run time. Does not expose secrets.
@@ -7,8 +8,7 @@ export const prerender = false;
 
 import { getUserRole } from '../../../types/auth';
 
-const runtime = Astro.locals.runtime;
-const env = runtime?.env as Record<string, unknown> & { CLOUDFLARE_ACCOUNT_ID?: string; CLOUDFLARE_BACKUP_API_TOKEN?: string };
+const env = getEnv(Astro.locals) as Record<string, unknown> & { CLOUDFLARE_ACCOUNT_ID?: string; CLOUDFLARE_BACKUP_API_TOKEN?: string };
 
 // Use session from middleware (already validated by middleware for /api/board/* routes)
 const user = Astro.locals.user;

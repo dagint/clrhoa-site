@@ -7,6 +7,7 @@
  * The middleware sets Astro.locals.user and Astro.locals.session for authenticated users.
  */
 
+import { getEnv } from './env';
 import type { User, Session } from 'lucia';
 import { getUserEmail, getUserRole } from '../types/auth';
 import { getEffectiveRole } from './auth';
@@ -62,7 +63,7 @@ export async function getPortalContext(
   astro: PortalContextAstro,
   options?: { fingerprint?: boolean }
 ): Promise<PortalContextResult> {
-  const env = astro.locals.runtime?.env;
+  const env = getEnv(astro.locals);
   const user = astro.locals.user;
   const luciaSession = astro.locals.session;
   const userAgent = astro.request.headers.get('user-agent') ?? null;

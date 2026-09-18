@@ -1,4 +1,5 @@
 ---
+import { getEnv } from '../../lib/env';
 /**
  * POST /api/member-document-upload — Board: upload member-only doc (minutes, budgets, other).
  * FormData: category, title, file, csrf_token. Stored in R2 under member-docs/, metadata in D1.
@@ -18,8 +19,7 @@ const CATEGORY_TO_COMPLIANCE: Partial<Record<string, string>> = {
   contracts: 'HOA-05',
 };
 
-const runtime = Astro.locals.runtime;
-const env = runtime?.env;
+const env = getEnv(Astro.locals);
 const user = Astro.locals.user;
 const session = Astro.locals.session;
 

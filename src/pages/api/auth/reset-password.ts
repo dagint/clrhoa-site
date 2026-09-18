@@ -35,6 +35,7 @@
  */
 export const prerender = false;
 
+import { getEnv } from '../../../lib/env';
 import type { APIRoute } from 'astro';
 import { hashPassword } from '../../../lib/password';
 import { logSecurityEvent } from '../../../lib/audit-log';
@@ -83,9 +84,9 @@ function validatePassword(password: string): { valid: boolean; error?: string } 
 }
 
 export const POST: APIRoute = async ({ request, locals }) => {
-  const db = locals.runtime.env.DB;
-  const kv = locals.runtime?.env?.KV as KVNamespace | undefined;
-  const resend = getResendClient(locals.runtime.env);
+  const db = getEnv(locals).DB;
+  const kv = getEnv(locals)?.KV as KVNamespace | undefined;
+  const resend = getResendClient(getEnv(locals));
   const ipAddress = request.headers.get('cf-connecting-ip') || 'unknown';
   const userAgent = request.headers.get('user-agent') || 'unknown';
 

@@ -5,6 +5,7 @@
  * Checks session validity and ensures effective role is 'admin'.
  */
 
+import { getEnv } from '../lib/env';
 import type { AstroGlobal } from 'astro';
 import { getSessionFromCookie, getEffectiveRole } from '../lib/auth';
 
@@ -48,8 +49,7 @@ export type AdminAuthCheck = AdminAuthResult | AdminAuthError;
 export async function withAdminAuthorization(
   Astro: AstroGlobal
 ): Promise<AdminAuthCheck> {
-  const runtime = Astro.locals.runtime;
-  const env = runtime?.env;
+  const env = getEnv(Astro.locals);
 
   // Check session secret
   if (!env?.SESSION_SECRET) {

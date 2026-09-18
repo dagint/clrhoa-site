@@ -1,4 +1,5 @@
 ---
+import { getEnv } from '../../lib/env';
 /**
  * /api/meetings — CRUD for meetings.
  * GET: list (all authenticated get upcoming; board gets all).
@@ -25,7 +26,7 @@ const auth = await requireSession(Astro);
 if ('response' in auth) return auth.response;
 const { session } = auth;
 
-const dbResult = requireDb(Astro.locals.runtime?.env);
+const dbResult = requireDb(getEnv(Astro.locals));
 if ('response' in dbResult) return dbResult.response;
 const { db } = dbResult;
 
@@ -153,7 +154,7 @@ if (Astro.request.method === 'DELETE') {
   if (!id) return jsonResponse({ error: 'id is required' }, 400);
   const meeting = await getMeetingById(db, id);
   if (!meeting) return jsonResponse({ error: 'Meeting not found' }, 404);
-  const r2 = Astro.locals.runtime?.env?.CLOURHOA_FILES;
+  const r2 = getEnv(Astro.locals)?.CLOURHOA_FILES;
   if (r2 && meeting.agenda_r2_key) {
     try {
       await r2.delete(meeting.agenda_r2_key);

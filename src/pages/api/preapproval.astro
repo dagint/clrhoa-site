@@ -1,4 +1,5 @@
 ---
+import { getEnv } from '../../lib/env';
 /**
  * /api/preapproval
  * GET: list all items (optional category filter) - any authenticated.
@@ -28,10 +29,10 @@ const auth = await requireSession(Astro);
 if ('response' in auth) return auth.response;
 const { session } = auth;
 
-const dbResult = requireDb(Astro.locals.runtime?.env);
+const dbResult = requireDb(getEnv(Astro.locals));
 if ('response' in dbResult) return dbResult.response;
 const { db } = dbResult;
-const env = Astro.locals.runtime?.env;
+const env = getEnv(Astro.locals);
 const r2 = env?.CLOURHOA_FILES;
 
 const origin = Astro.request.headers.get('origin');

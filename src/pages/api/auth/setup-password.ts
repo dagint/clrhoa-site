@@ -31,6 +31,7 @@
  */
 export const prerender = false;
 
+import { getEnv } from '../../../lib/env';
 import type { APIRoute } from 'astro';
 import { hashPassword } from '../../../lib/password';
 import { createSession } from '../../../lib/lucia/session';
@@ -86,7 +87,7 @@ function validatePassword(password: string): { valid: boolean; error?: string } 
 }
 
 export const POST: APIRoute = async ({ request, locals, cookies }) => {
-  const db = locals.runtime.env.DB;
+  const db = getEnv(locals).DB;
   const ipAddress = request.headers.get('cf-connecting-ip') || 'unknown';
   const userAgent = request.headers.get('user-agent') || 'unknown';
 
@@ -130,7 +131,7 @@ export const POST: APIRoute = async ({ request, locals, cookies }) => {
     }
 
     // 2. Rate limiting - prevent token brute force (10 attempts per hour per IP)
-    const kv = locals.runtime?.env?.KV as KVNamespace | undefined;
+    const kv = getEnv(locals)?.KV as KVNamespace | undefined;
     const rateLimitResult = await checkRateLimit(
       kv,
       '/api/auth/setup-password',

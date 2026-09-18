@@ -1,4 +1,5 @@
 ---
+import { getEnv } from '../../lib/env';
 /**
  * POST /api/feedback-upload — board uploads PDF for a feedback doc.
  * Returns { key } for use in feedback doc create.
@@ -17,8 +18,8 @@ const effectiveRole = getEffectiveRole(session);
 const isBoard = isBoardOnly(effectiveRole) || effectiveRole === 'admin';
 if (!isBoard) return jsonResponse({ error: 'Forbidden' }, 403);
 
-const r2 = Astro.locals.runtime?.env?.CLOURHOA_FILES;
-const db = Astro.locals.runtime?.env?.DB;
+const r2 = getEnv(Astro.locals)?.CLOURHOA_FILES;
+const db = getEnv(Astro.locals)?.DB;
 if (!r2) return jsonResponse({ error: 'Server configuration error' }, 503);
 
 if (Astro.request.method !== 'POST') {

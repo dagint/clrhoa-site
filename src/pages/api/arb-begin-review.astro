@@ -1,4 +1,5 @@
 ---
+import { getEnv } from '../../lib/env';
 /**
  * POST /api/arb-begin-review — Begin ARC review (SUBMITTED → ARC_REVIEW).
  *
@@ -30,8 +31,7 @@ import { transitionStatus, setDeadline } from '../../lib/arb-voting-db';
 import { canTransitionStatus } from '../../lib/arb-status-machine';
 import { logEvent } from '../../lib/audit-log';
 
-const runtime = Astro.locals.runtime;
-const env = runtime?.env;
+const env = getEnv(Astro.locals);
 
 // Auth check
 const user = Astro.locals.user;

@@ -5,6 +5,7 @@
  * Logs the deletion for audit purposes.
  */
 
+import { getEnv } from '../../lib/env';
 import type { APIContext } from 'astro';
 import { getEffectiveRole } from '../../lib/auth';
 import { deleteSiteFeedback } from '../../lib/site-feedback-db';
@@ -13,7 +14,7 @@ import { logAdminEvent } from '../../lib/audit-log';
 export const prerender = false;
 
 export async function POST(context: APIContext): Promise<Response> {
-  const env = context.locals.runtime?.env;
+  const env = getEnv(context.locals);
   const user = context.locals.user;
   const session = context.locals.session;
 

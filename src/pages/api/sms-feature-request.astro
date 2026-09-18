@@ -1,4 +1,5 @@
 ---
+import { getEnv } from '../../lib/env';
 /**
  * POST /api/sms-feature-request — Record that this member wants SMS (auth required, uses owner's lot_number).
  * GET /api/sms-feature-request — Admin only: counts + list of requests.
@@ -9,8 +10,7 @@ import { isElevatedRole, getEffectiveRole } from '../../lib/auth';
 import { getOwnerByEmail, validateLotNumber } from '../../lib/directory-db';
 import { insertSmsFeatureRequest, getSmsFeatureRequestCounts, listSmsFeatureRequests } from '../../lib/sms-feature-request-db';
 
-const runtime = Astro.locals.runtime;
-const env = runtime?.env;
+const env = getEnv(Astro.locals);
 const db = env?.DB;
 
 if (Astro.request.method === 'POST') {

@@ -1,4 +1,5 @@
 ---
+import { getEnv } from '../lib/env';
 export const prerender = false;
 
 import BaseLayout from '../layouts/BaseLayout.astro';
@@ -25,8 +26,7 @@ console.log('[DOCUMENTS-PAGE] By category:', Object.fromEntries(Object.entries(d
 const categories = ['Governing Documents', 'Policies', 'Forms', 'Other'] as const;
 
 // Board/ARB may have uploaded replacements; use those links when present (public page: only slug/file_key/content_type)
-const runtime = Astro.locals.runtime;
-const env = runtime?.env;
+const env = getEnv(Astro.locals);
 const db = env?.DB;
 const publicOverrides = db ? await listPublicDocuments(db) : [];
 console.log('[DOCUMENTS-PAGE] Public overrides from DB:', publicOverrides.map(r => ({ slug: r.slug, hasFileKey: !!r.file_key, file_key: r.file_key })));

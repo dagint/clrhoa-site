@@ -3,13 +3,14 @@
  * GET: Get current menu items
  * POST: Update menu order or reset to defaults
  */
+import { getEnv } from '../../../lib/env';
 import type { APIRoute } from 'astro';
 import { logAdminEvent } from '../../../lib/audit-log';
 
 export const prerender = false;
 
 export const GET: APIRoute = async ({ locals }) => {
-  const env = locals.runtime?.env;
+  const env = getEnv(locals);
   const session = locals.session;
   const user = locals.user;
 
@@ -41,7 +42,7 @@ export const GET: APIRoute = async ({ locals }) => {
 };
 
 export const POST: APIRoute = async ({ request, locals }) => {
-  const env = locals.runtime?.env;
+  const env = getEnv(locals);
   const session = locals.session;
   const user = locals.user;
 

@@ -1,4 +1,5 @@
 ---
+import { getEnv } from '../../../lib/env';
 /**
  * GET /api/board/contact-submissions — Board/Admin/arb_board only. Returns contact form submissions with paging.
  *   Query: ?page=1&pageSize=20 (defaults: page=1, pageSize=20)
@@ -9,8 +10,7 @@ export const prerender = false;
 import { getEffectiveRole } from '../../../lib/auth';
 import { CONTACT_SUBMISSIONS_EXPIRY_WHERE } from '../../../lib/contact-submissions';
 
-const runtime = Astro.locals.runtime;
-const env = runtime?.env as { SESSION_SECRET?: string; DB?: D1Database };
+const env = getEnv(Astro.locals) as { SESSION_SECRET?: string; DB?: D1Database };
 const user = Astro.locals.user;
 const session = Astro.locals.session;
 

@@ -1,4 +1,5 @@
 ---
+import { getEnv } from '../../lib/env';
 /**
  * GET /api/public-doc-file?slug= — Serve a public document file from R2 (no auth).
  * Used when board/ARB have uploaded a replacement; otherwise /documents uses content collection links.
@@ -14,8 +15,7 @@ if (!slug) {
   return new Response('Missing slug', { status: 400 });
 }
 
-const runtime = Astro.locals.runtime;
-const env = runtime?.env;
+const env = getEnv(Astro.locals);
 const db = env?.DB;
 const r2 = env?.CLOURHOA_FILES;
 

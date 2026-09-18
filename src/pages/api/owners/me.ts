@@ -5,6 +5,7 @@
 
 export const prerender = false;
 
+import { getEnv } from '../../../lib/env';
 import type { APIRoute } from 'astro';
 import { requireAuth } from '../../../lib/auth/middleware';
 import { getOwnerByEmail, upsertOwnerByEmail, insertDirectoryLog, validateLotNumber } from '../../../lib/directory-db';
@@ -27,7 +28,7 @@ export const GET: APIRoute = async (context) => {
     );
   }
 
-  const db = context.locals.runtime?.env?.DB;
+  const db = getEnv(context.locals)?.DB;
   if (!db) {
     return new Response(
       JSON.stringify({ error: 'Database not available' }),
@@ -88,7 +89,7 @@ export const PUT: APIRoute = async (context) => {
     );
   }
 
-  const db = context.locals.runtime?.env?.DB;
+  const db = getEnv(context.locals)?.DB;
   if (!db) {
     return new Response(
       JSON.stringify({ error: 'Database not available' }),

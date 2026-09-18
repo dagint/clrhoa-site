@@ -4,6 +4,7 @@
  * DELETE: Remove a position from a user
  * GET: Get current positions
  */
+import { getEnv } from '../../../lib/env';
 import type { APIRoute } from 'astro';
 import { verifyCsrfToken } from '../../../lib/auth';
 import {
@@ -37,7 +38,7 @@ function getEffectiveRole(session: ExtendedSession, user: any): string {
 }
 
 export const POST: APIRoute = async ({ request, locals }) => {
-  const env = locals.runtime?.env;
+  const env = getEnv(locals);
   if (!env?.DB) {
     return new Response(JSON.stringify({ error: 'Service unavailable' }), { status: 503 });
   }
@@ -136,7 +137,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
 };
 
 export const GET: APIRoute = async ({ locals }) => {
-  const env = locals.runtime?.env;
+  const env = getEnv(locals);
   if (!env?.DB) {
     return new Response(JSON.stringify({ error: 'Service unavailable' }), { status: 503 });
   }

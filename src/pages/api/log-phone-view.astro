@@ -1,4 +1,5 @@
 ---
+import { getEnv } from '../../lib/env';
 /**
  * POST /api/log-phone-view — log directory phone or email reveal and return value.
  * Body (JSON): { ownerId, csrf_token, reveal?: 'phone' | 'email' }. Default reveal is 'phone'.
@@ -11,8 +12,7 @@ import { getOwnerById, getPhonesArray, insertDirectoryLog } from '../../lib/dire
 import { checkRateLimit, getRateLimitConfig } from '../../lib/rate-limit';
 import { getSecurityMonitor } from '../../lib/monitoring';
 
-const runtime = Astro.locals.runtime;
-const env = runtime?.env;
+const env = getEnv(Astro.locals);
 const userAgent = Astro.request.headers.get('user-agent') ?? null;
 const ipAddress = Astro.request.headers.get('cf-connecting-ip') ??
   Astro.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;

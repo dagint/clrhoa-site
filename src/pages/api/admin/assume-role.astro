@@ -1,4 +1,5 @@
 ---
+import { getEnv } from '../../../lib/env';
 /**
  * POST /api/admin/assume-role — Admin only. Set or clear assumed role (Board or ARB, not both).
  * Body: { role: 'board' | 'arb' | 'none', csrf_token: string }.
@@ -9,8 +10,7 @@ export const prerender = false;
 import { verifyCsrfToken, verifyOrigin, ASSUMED_ROLE_TTL_MS, type AdminAssumedRole } from '../../../lib/auth';
 import { insertAdminAssumedRoleAudit } from '../../../lib/admin-assumed-role-db';
 
-const runtime = Astro.locals.runtime;
-const env = runtime?.env;
+const env = getEnv(Astro.locals);
 const db = env?.DB;
 const user = Astro.locals.user;
 const session = Astro.locals.session;

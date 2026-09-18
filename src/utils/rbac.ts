@@ -3,6 +3,7 @@
  * Used in Astro page frontmatter to check permissions and redirect unauthorized users.
  */
 
+import { getEnv } from '../lib/env';
 import type { AstroGlobal } from 'astro';
 import { getSessionFromCookie, getEffectiveRole, isElevatedRole, isAdminRole, isBoardOnly, isArbRole } from '../lib/auth';
 
@@ -13,7 +14,7 @@ export type Role = 'member' | 'admin' | 'board' | 'arb' | 'arb_board';
  * Returns null if no session exists.
  */
 export async function getCurrentUser(Astro: AstroGlobal): Promise<{ email: string; role: string; name: string | null; effectiveRole: string } | null> {
-  const env = Astro.locals.runtime?.env;
+  const env = getEnv(Astro.locals);
   if (!env?.SESSION_SECRET) return null;
 
   const cookieHeader = Astro.request.headers.get('cookie') ?? undefined;
