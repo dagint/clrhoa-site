@@ -11,7 +11,7 @@ interface Env {
   CLOUDFLARE_BACKUP_API_TOKEN: string;
   D1_DATABASE_ID: string;
   BACKUP_RETENTION_DAYS: string;
-  CLOURHOA_USERS: KVNamespace;
+  CLRHOA_USERS: KVNamespace;
   BACKUP_R2: R2Bucket;
   DB?: D1Database; // Phase 3: read backup_config
 }
@@ -111,7 +111,7 @@ async function runBackup(env: Env, date: string): Promise<void> {
   });
 
   // 2. Backup KV whitelist (JSON dump)
-  const whitelist = await dumpWhitelistKV(env.CLOURHOA_USERS);
+  const whitelist = await dumpWhitelistKV(env.CLRHOA_USERS);
   const kvKey = `backups/kv/whitelist-${date}.json`;
   await env.BACKUP_R2.put(kvKey, JSON.stringify(whitelist, null, 2), {
     httpMetadata: { contentType: "application/json" },

@@ -12,7 +12,7 @@ High-level structure of the Crooked Lake Reserve HOA site: public pages, member 
 
 ## Auth flow
 
-1. **Login**: User hits `/portal/login`; credentials (e.g. Google OAuth or magic link) are validated. If the email is in KV whitelist (`CLOURHOA_USERS`), a **signed session cookie** is set (HMAC-SHA256, HttpOnly, Secure, SameSite=Lax).
+1. **Login**: User hits `/portal/login`; credentials (e.g. Google OAuth or magic link) are validated. If the email is in KV whitelist (`CLRHOA_USERS`), a **signed session cookie** is set (HMAC-SHA256, HttpOnly, Secure, SameSite=Lax).
 2. **Middleware** (runs on every request): For `/portal/*` (except login), checks for session cookie; if missing, redirects to login. For `/board/*`, also checks elevated role. For profile completeness, redirects to `/portal/profile?required=1` if name/address/phone missing.
 3. **APIs**: Protected APIs use `requireSession(Astro)` (from `api-helpers`) or manual `getSessionFromCookie`; then role or ownership checks as needed (e.g. `requireArbRequestOwner` in `access-control`).
 
@@ -30,7 +30,7 @@ High-level structure of the Crooked Lake Reserve HOA site: public pages, member 
 ## Data stores
 
 - **D1** — SQLite (users, owners, arb_requests, meetings, assessments, feedback, member_documents, public_documents, directory_logs, etc.).
-- **KV** — `CLOURHOA_USERS` (login whitelist + role); `KV` (rate limiting, login lockout).
+- **KV** — `CLRHOA_USERS` (login whitelist + role); `KV` (rate limiting, login lockout).
 - **R2** — `CLOURHOA_FILES` (ARB attachments, member docs, feedback PDFs, public doc overrides, etc.).
 
 ## Build and deploy

@@ -59,7 +59,7 @@ After adding or changing Variables, **re-run the deploy** (push a small commit t
 
 - **Workers & Pages → your project (e.g. clrhoa-site) → Settings**
   - **Environment variables** — plain variables and **Encrypt** (secrets)
-  - **Bindings** — D1 database, KV namespaces, R2 bucket (same names as in `wrangler.toml`: `DB`, `CLOURHOA_USERS`, `SESSION`, `KV`, `CLOURHOA_FILES`)
+  - **Bindings** — D1 database, KV namespaces, R2 bucket (same names as in `wrangler.toml`: `DB`, `CLRHOA_USERS`, `SESSION`, `KV`, `CLOURHOA_FILES`)
 
 A **separate** place exists only if you use the **backup Worker** (Board → Backups, `npm run backup:deploy`). That Worker has its own project and its own secrets; the table below lists only what the **site** (Pages) needs.
 
@@ -84,7 +84,7 @@ These are **resource bindings** in Pages (Settings → Bindings), not key/value 
 | Binding name | Type | Purpose |
 |--------------|------|---------|
 | `DB` | D1 | Database (portal, directory, vendors, news, etc.) |
-| `CLOURHOA_USERS` | KV | Login allow list (who can log in) |
+| `CLRHOA_USERS` | KV | Login allow list (who can log in) |
 | `SESSION` | KV | Session storage |
 | `KV` | KV | Rate limiting / login lockout (replace `REPLACE_WITH_RATE_LIMIT_KV_ID` in wrangler.toml with real namespace id) |
 | `CLOURHOA_FILES` | R2 | Portal files (e.g. member documents) |

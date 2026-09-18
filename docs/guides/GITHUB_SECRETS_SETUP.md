@@ -152,7 +152,7 @@ database_name = "clrhoa_db"
 database_id = "a214f9da-3577-4ee7-bc50-bc9b9754a79c"
 
 [[kv_namespaces]]
-binding = "CLOURHOA_USERS"
+binding = "CLRHOA_USERS"
 id = "e936ea7760c04b268c4472eb24575d46"
 # ... etc
 ```

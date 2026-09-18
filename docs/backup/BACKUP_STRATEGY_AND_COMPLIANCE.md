@@ -19,7 +19,7 @@ This document describes the backup strategy for the HOA portal: what we backup, 
 | Data | Include? | Reason | Approx. size |
 |------|----------|--------|---------------|
 | **D1 (full DB)** | Yes | All app data: owners, ARB, assessments, meetings, feedback, etc. | One SQL dump; compress (e.g. gzip) for storage. |
-| **KV – whitelist (CLOURHOA_USERS)** | Yes | Needed to restore who can log in and roles. | Small JSON. |
+| **KV – whitelist (CLRHOA_USERS)** | Yes | Needed to restore who can log in and roles. | Small JSON. |
 | **KV – SESSION** | No | Ephemeral; users re-login. | Skip. |
 | **KV – rate limit (KV)** | No | Ephemeral; safe to lose. | Skip. |
 | **R2 (file contents)** | Optional | Large; already durable in R2. For compliance, optional “manifest” (key list + sizes) or periodic full copy to Drive. | Manifest: small. Full: large. |
@@ -90,7 +90,7 @@ This document describes the backup strategy for the HOA portal: what we backup, 
 1. **Backup Worker (separate from Pages)**
    - Runs on cron (e.g. `0 2 * * *` daily 2 AM UTC).
    - Uses Cloudflare **D1 Export API** (POST to trigger export, poll until ready, fetch SQL via signed URL).
-   - Optionally: list CLOURHOA_USERS KV and write a small JSON to R2.
+   - Optionally: list CLRHOA_USERS KV and write a small JSON to R2.
    - Writes to R2: e.g. `backups/d1/YYYY-MM-DD.sql.gz`, `backups/kv/whitelist-YYYY-MM-DD.json`.
    - Requires: Worker with D1 + R2 bindings; **Cloudflare API token** (or use Workflows if available) to trigger D1 export, plus account ID.
    - **Note:** Workers cannot run `wrangler d1 export`; they must use the [D1 Export REST API](https://developers.cloudflare.com/api/resources/d1/subresources/database/methods/export/) (trigger export, poll, then fetch result and upload to R2).

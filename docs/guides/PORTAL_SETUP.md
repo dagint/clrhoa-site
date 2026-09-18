@@ -46,7 +46,7 @@ npx wrangler d1 create clrhoa_db
 npx wrangler kv namespace create clrhoa_users
 npx wrangler kv namespace create SESSION
 npx wrangler kv namespace create RATE_LIMIT
-# → copy ids into wrangler.toml (CLOURHOA_USERS, SESSION, and KV = RATE_LIMIT id)
+# → copy ids into wrangler.toml (CLRHOA_USERS, SESSION, and KV = RATE_LIMIT id)
 
 # R2 bucket (portal documents)
 # If you get "Please enable R2 through the Cloudflare Dashboard", enable R2 first:
@@ -58,7 +58,7 @@ npx wrangler r2 bucket create clrhoa-files
 # → bucket_name is clrhoa-files (binding in wrangler.toml is already set)
 ```
 
-Then **in your editor**, open `wrangler.toml` and paste the printed IDs: D1 `database_id`, `CLOURHOA_USERS` id, `SESSION` id, and **KV** = the id from `RATE_LIMIT` (used for rate limiting and login lockout). Replace `REPLACE_WITH_RATE_LIMIT_KV_ID` in the `KV` binding with that id.
+Then **in your editor**, open `wrangler.toml` and paste the printed IDs: D1 `database_id`, `CLRHOA_USERS` id, `SESSION` id, and **KV** = the id from `RATE_LIMIT` (used for rate limiting and login lockout). Replace `REPLACE_WITH_RATE_LIMIT_KV_ID` in the `KV` binding with that id.
 
 ## 2. D1 schema (run on your computer, or run SQL in dashboard)
 
@@ -96,16 +96,16 @@ To allow an email to log in, add a key to the `clrhoa_users` KV namespace.
 
 ```bash
 # Add one user for local login (use your own email; run from project root)
-npx wrangler kv key put "your-email@example.com" "1" --binding=CLOURHOA_USERS --local
+npx wrangler kv key put "your-email@example.com" "1" --binding=CLRHOA_USERS --local
 # Or with a role:
-npx wrangler kv key put "your-email@example.com" "{\"role\":\"admin\"}" --binding=CLOURHOA_USERS --local
+npx wrangler kv key put "your-email@example.com" "{\"role\":\"admin\"}" --binding=CLRHOA_USERS --local
 ```
 
 **Production (remote) KV** — from your computer:
 
 ```bash
-npx wrangler kv key put "member@example.com" "1" --binding=CLOURHOA_USERS --remote
-npx wrangler kv key put "board@example.com" "{\"role\":\"admin\"}" --binding=CLOURHOA_USERS --remote
+npx wrangler kv key put "member@example.com" "1" --binding=CLRHOA_USERS --remote
+npx wrangler kv key put "board@example.com" "{\"role\":\"admin\"}" --binding=CLRHOA_USERS --remote
 ```
 
 **Option B — in Cloudflare dashboard:** Workers & Pages → KV → select `clrhoa_users` → Add entry (key = email, value = `1` or `{"role":"admin"}`). Dashboard edits apply to **remote** only; local dev still needs the `--local` commands above.

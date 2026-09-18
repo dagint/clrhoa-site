@@ -13,7 +13,7 @@
   - Name: `clrhoa-backup`
   - URL: https://clrhoa-backup.dagint.workers.dev
   - Schedule: Daily at 2:00 AM UTC (`0 2 * * *`)
-  - Bindings: D1 (clrhoa_db), KV (CLOURHOA_USERS), R2 (clrhoa-files)
+  - Bindings: D1 (clrhoa_db), KV (CLRHOA_USERS), R2 (clrhoa-files)
   - **NEW:** Now backs up D1 database + KV whitelist + **ALL R2 files**
 
 - ✅ **Contact Cleanup Worker** deployed successfully

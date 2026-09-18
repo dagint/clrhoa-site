@@ -234,7 +234,7 @@ for (let i = startRow; i < lines.length; i++) {
           }
         );
         added += 1;
-        await addToLoginWhitelistIfMissing(env?.CLOURHOA_USERS, email);
+        await addToLoginWhitelistIfMissing(env?.CLRHOA_USERS, email);
       }
     } else {
       await insertOwner(

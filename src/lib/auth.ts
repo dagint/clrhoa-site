@@ -30,7 +30,7 @@ export interface SessionPayload {
 }
 
 export interface EnvWithAuth {
-  CLOURHOA_USERS?: KVNamespace;
+  CLRHOA_USERS?: KVNamespace;
   SESSION_SECRET?: string;
   KV?: KVNamespace; // For rate limiting and lockout tracking
 }

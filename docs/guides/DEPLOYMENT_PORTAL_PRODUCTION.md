@@ -37,7 +37,7 @@ So deploying with an empty or new D1 does **not** break these pages; DB-backed s
 
 ### Portal and login
 
-- **Login is allowed only for emails in the KV allow list** (`CLOURHOA_USERS`).
+- **Login is allowed only for emails in the KV allow list** (`CLRHOA_USERS`).
 - If **no** keys are in that KV namespace, **no one** can log in.
 - So you must **add at least one email (e.g. admin) to KV** before or right after deploy so that person can log in and then add the directory and other users.
 
@@ -63,7 +63,7 @@ npx wrangler r2 bucket create clrhoa-files
 Put the printed **IDs** into `wrangler.toml`:
 
 - D1: `database_id` under `[[d1_databases]]`
-- KV: `id` for `CLOURHOA_USERS`, `SESSION`, and replace `REPLACE_WITH_RATE_LIMIT_KV_ID` with the RATE_LIMIT namespace id for `KV`
+- KV: `id` for `CLRHOA_USERS`, `SESSION`, and replace `REPLACE_WITH_RATE_LIMIT_KV_ID` with the RATE_LIMIT namespace id for `KV`
 - R2: bucket name `clrhoa-files` is already set; no id needed
 
 ### 2.2 Run all D1 migrations (production)
@@ -93,35 +93,35 @@ If you deploy via **wrangler pages deploy** and your project is linked to the sa
 In **Cloudflare Dashboard → Workers & Pages → your project → Settings**:
 
 - **D1:** Bind database `clrhoa_db` as `DB`.
-- **KV:** Bind the three namespaces as `CLOURHOA_USERS`, `SESSION`, and `KV` (same names as in `wrangler.toml`).
+- **KV:** Bind the three namespaces as `CLRHOA_USERS`, `SESSION`, and `KV` (same names as in `wrangler.toml`).
 - **R2:** Bind bucket `clrhoa-files` as `CLOURHOA_FILES`.
 
 (If you deploy with `wrangler pages deploy` and use `wrangler.toml`, bindings may come from there; ensure they match.)
 
 ### 2.5 First user (allow list) so someone can log in
 
-Portal login only allows emails that exist in the **CLOURHOA_USERS** KV namespace. Add at least one admin **before** you need to log in.
+Portal login only allows emails that exist in the **CLRHOA_USERS** KV namespace. Add at least one admin **before** you need to log in.
 
 **Option A – Cloudflare Dashboard**
 
 1. Go to **Workers & Pages → Storage → KV**.
-2. Open the namespace that is bound as **CLOURHOA_USERS** (use the id from `wrangler.toml`).
+2. Open the namespace that is bound as **CLRHOA_USERS** (use the id from `wrangler.toml`).
 3. **Add entry:**
    - **Key:** the email (e.g. `your-admin@example.com`). Use lowercase.
    - **Value:** `{"role":"admin"}` for an admin, or `1` for a plain member.
 
 **Option B – Wrangler (production namespace)**
 
-Use the **production** KV namespace id for `CLOURHOA_USERS` (the one in `wrangler.toml`):
+Use the **production** KV namespace id for `CLRHOA_USERS` (the one in `wrangler.toml`):
 
 ```bash
 # One admin (replace with your email)
-npx wrangler kv key put "your-admin@example.com" '{"role":"admin"}' --namespace-id=YOUR_CLOURHOA_USERS_NAMESPACE_ID
+npx wrangler kv key put "your-admin@example.com" '{"role":"admin"}' --namespace-id=YOUR_CLRHOA_USERS_NAMESPACE_ID
 ```
 
 After deploy, that user can log in at **/portal/login** and then use **Board → Directory** to add owners and set roles. Adding an owner with a role (or “can log in”) updates the allow list (KV) so those users can log in too. So the **allow list** is maintained by:
 
-- **KV (CLOURHOA_USERS):** Who can log in at all.
+- **KV (CLRHOA_USERS):** Who can log in at all.
 - **Board → Directory:** Adding/editing owners and their roles updates KV. Removing someone from the directory removes them from KV **unless** their role is **admin** (admins stay in KV even if removed from the directory).
 
 ---
@@ -154,8 +154,8 @@ If you had a **static** vendor list on the old site (hardcoded HTML), that conte
 |--------|------------|
 | Public /news and /resources/vendors “breaking” | They don’t break; they use DB and show empty if D1 is empty. Static markdown news still works. |
 | Not losing public data | Don’t drop or reset D1. Run only migrations. If old site was static, re-add vendors via Board or a seed. |
-| Someone can log in to add/update directory | Add at least one email to KV (CLOURHOA_USERS) as admin before or right after deploy; then log in and use Board → Directory. |
-| Allow list (who can register / have portal access) | The allow list **is** KV (CLOURHOA_USERS). Board → Directory adds/removes members and updates KV; admins stay in KV even if removed from directory. |
+| Someone can log in to add/update directory | Add at least one email to KV (CLRHOA_USERS) as admin before or right after deploy; then log in and use Board → Directory. |
+| Allow list (who can register / have portal access) | The allow list **is** KV (CLRHOA_USERS). Board → Directory adds/removes members and updates KV; admins stay in KV even if removed from directory. |
 
 **Order of operations:** Create D1/KV/R2 → run remote migrations → set SESSION_SECRET → add first admin to KV → configure Pages bindings and secrets → deploy → log in as that admin → add directory and vendors.
 

@@ -11,7 +11,7 @@ Implementation lives in `src/lib/rate-limit.ts` (rate limits) and `src/lib/auth.
 
 ## 1. Binding and setup
 
-- **Namespace:** Create a dedicated KV namespace (e.g. `RATE_LIMIT`) and bind it as **`KV`** in `wrangler.toml`. It is **separate** from `CLOURHOA_USERS` (email whitelist).
+- **Namespace:** Create a dedicated KV namespace (e.g. `RATE_LIMIT`) and bind it as **`KV`** in `wrangler.toml`. It is **separate** from `CLRHOA_USERS` (email whitelist).
 - **Creation:**
 
   ```bash

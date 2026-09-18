@@ -18,7 +18,7 @@ export interface PortalUser {
 
 export interface EnvWithDb {
   DB: D1Database;
-  CLOURHOA_USERS?: KVNamespace;
+  CLRHOA_USERS?: KVNamespace;
   CLOURHOA_FILES?: R2Bucket;
   SESSION_SECRET?: string;
 }

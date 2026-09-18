@@ -246,7 +246,7 @@ await loginAs(context, 'admin', { elevated: true, assumeRole: 'board' });
 1. Verify D1/KV database connectivity
 2. Reset `route_permissions` table to defaults
 3. Seed 5 test users to D1 `users` table
-4. Add test users to KV `CLOURHOA_USERS` namespace
+4. Add test users to KV `CLRHOA_USERS` namespace
 5. Verify wrangler dev server availability
 
 ### Test Execution

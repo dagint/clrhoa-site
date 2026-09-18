@@ -81,7 +81,7 @@ export const POST: APIRoute = async ({ request, locals, clientAddress }) => {
 
   // Get client IP for audit logging
   const clientIp = clientAddress || request.headers.get('cf-connecting-ip') || 'unknown';
-  const kv = locals.runtime?.env?.CLOURHOA_USERS;
+  const kv = locals.runtime?.env?.CLRHOA_USERS;
   if (!db) {
     return new Response(JSON.stringify({ error: 'Server configuration error' }), {
       status: 503,

@@ -25,7 +25,7 @@ Create these in the same account as your Pages project. If they already exist (e
 Update placeholders so deploys and local production preview use the right resources.
 
 - [ ] **D1:** Set `database_id` under `[[d1_databases]]` (binding `DB`)
-- [ ] **KV CLOURHOA_USERS:** Set `id` for the allow-list namespace
+- [ ] **KV CLRHOA_USERS:** Set `id` for the allow-list namespace
 - [ ] **KV SESSION:** Set `id` for the session namespace
 - [ ] **KV (rate limit):** Replace `REPLACE_WITH_RATE_LIMIT_KV_ID` with the **RATE_LIMIT** namespace id; binding name must be `KV`
 - [ ] **R2:** `bucket_name = "clrhoa-files"` (no id)
@@ -46,7 +46,7 @@ Run all migrations against **remote** D1 so tables exist before first deploy.
 In **Cloudflare Dashboard → Workers & Pages → [your Pages project] → Settings → Bindings**:
 
 - [ ] **D1:** Bind database `clrhoa_db` as **`DB`**
-- [ ] **KV:** Bind namespace (allow list) as **`CLOURHOA_USERS`**
+- [ ] **KV:** Bind namespace (allow list) as **`CLRHOA_USERS`**
 - [ ] **KV:** Bind namespace (sessions) as **`SESSION`**
 - [ ] **KV:** Bind namespace (rate limit) as **`KV`**
 - [ ] **R2:** Bind bucket `clrhoa-files` as **`CLOURHOA_FILES`**
@@ -130,16 +130,16 @@ No separate “rate limit config” env vars are required. Optional: review or t
 
 ## 7. First user (allow list) so someone can log in
 
-Portal login only allows emails present in **CLOURHOA_USERS** KV. Add at least one admin **before** or immediately after deploy.
+Portal login only allows emails present in **CLRHOA_USERS** KV. Add at least one admin **before** or immediately after deploy.
 
 **Option A – Dashboard**
 
-- [ ] Workers & Pages → Storage → KV → open the namespace bound as **CLOURHOA_USERS**
+- [ ] Workers & Pages → Storage → KV → open the namespace bound as **CLRHOA_USERS**
 - [ ] Add entry: **Key** = admin email (lowercase), **Value** = `{"role":"admin"}`
 
 **Option B – Wrangler (production)**
 
-- [ ] `npx wrangler kv key put "admin@example.com" '{"role":"admin"}' --namespace-id=YOUR_CLOURHOA_USERS_NAMESPACE_ID`
+- [ ] `npx wrangler kv key put "admin@example.com" '{"role":"admin"}' --namespace-id=YOUR_CLRHOA_USERS_NAMESPACE_ID`
 
 After that, use **Board → Directory** to add owners and set “can log in” / roles; the app syncs them to KV.
 
@@ -184,7 +184,7 @@ Cron is set in `workers/backup/wrangler.toml` (e.g. daily 2:00 AM UTC). No DNS o
 |------|--------|
 | D1, KV (3), R2 | Create in Cloudflare; put IDs in wrangler.toml; bind in **Pages** project |
 | SESSION_SECRET, RESEND_API_KEY, etc. | **Pages** → Settings → Environment variables (Encrypt for secrets) |
-| First admin user | **KV** namespace CLOURHOA_USERS (Dashboard or wrangler kv key put) |
+| First admin user | **KV** namespace CLRHOA_USERS (Dashboard or wrangler kv key put) |
 | Backup cron + R2/D1 export | **Backup Worker** (separate project); CLOUDFLARE_API_TOKEN scoped D1 Read + R2 Edit (+ KV Read) |
 | Backup “Download ZIP” from portal | **Pages** env: CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN (same scoping idea) |
 
@@ -194,9 +194,9 @@ Cron is set in `workers/backup/wrangler.toml` (e.g. daily 2:00 AM UTC). No DNS o
 
 1. Create D1, KV x3, R2 → update wrangler.toml with IDs.
 2. Run `npm run db:remote:all`.
-3. In Pages: bind DB, CLOURHOA_USERS, SESSION, KV, CLOURHOA_FILES.
+3. In Pages: bind DB, CLRHOA_USERS, SESSION, KV, CLOURHOA_FILES.
 4. In Pages: set SESSION_SECRET (required); NOTIFY_* and Resend (or MailChannels); backup vars if needed; PUBLIC_* and SITE.
-5. Add first admin to CLOURHOA_USERS KV.
+5. Add first admin to CLRHOA_USERS KV.
 6. (Optional) Deploy backup Worker and set its secrets.
 7. Deploy Pages → test login, Board, and notifications.
 
