@@ -220,23 +220,25 @@
     "@types/bcryptjs": "^3.0.0",
     "@types/node": "^25.3.2",
     "@types/qrcode": "^1.5.6",
-    "@vitest/ui": "^4.0.18",
+    "@vitest/ui": "^4.1.11",
     "dotenv": "^17.3.1",
     "jsdom": "^28.1.0",
     "sharp": "^0.34.5",
     "terser": "^5.36.0",
     "typescript": "^5.9.3",
-    "vitest": "^4.0.18",
+    "vitest": "^4.1.11",
     "wrangler": "^4.69.0"
   },
   "overrides": {
-    "undici": ">=7.18.2",
-    "lodash": "4.17.23",
+    "undici": "^7.29.1",
+    "ws": "^8.21.3",
+    "lodash": "4.18.1",
     "rollup": ">=4.59.0",
     "devalue": ">=5.6.3",
     "ajv": ">=8.18.0",
     "@astrojs/cloudflare": {
       "wrangler": "4.59.1"
-    }
+    },
+    "@astrojs/language-server": "2.16.16"
   }
 }
