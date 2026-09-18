@@ -105,7 +105,7 @@ npx wrangler r2 object get clrhoa-files --key="arb/REQUEST_ID/originals/file.jpg
 ### Restoring from R2 or Google Drive backups
 
 - **D1:** Download the `.sql.gz` from R2 (Dashboard or `wrangler r2 object get`) or from the Google Drive backup folder. Decompress, then run `npx wrangler d1 execute clrhoa_db --remote --file=path/to/backup.sql` (see Restore from Backup above). Restoring overwrites existing data; back up the current DB first if needed.
-- **KV whitelist:** If you have `whitelist-YYYY-MM-DD.json`, use a small script or Worker to re-put keys into the `CLOURHOA_USERS` KV namespace. Document the JSON shape in the backup Worker so restore is repeatable.
+- **KV whitelist:** If you have `whitelist-YYYY-MM-DD.json`, use a small script or Worker to re-put keys into the `CLRHOA_USERS` KV namespace. Document the JSON shape in the backup Worker so restore is repeatable.
 - **R2 files:** If you only backed up a manifest, R2 originals are still in place. If you backed up full R2 to Drive, restore by uploading from Drive back to R2 (or a new bucket) and updating any key references if needed.
 
 ## Backup Retention Policy

@@ -65,7 +65,7 @@ The security model is built on three foundational layers:
 
 ### Login Whitelist (KV Store)
 
-**Storage**: Cloudflare KV namespace (`CLOURHOA_USERS`)
+**Storage**: Cloudflare KV namespace (`CLRHOA_USERS`)
 
 **Purpose**: Controls who can log in to the portal
 
@@ -425,7 +425,7 @@ function getEffectiveRole(session: SessionPayload | null): string
 - 15-minute lockout duration
 - Automatic unlock on successful login
 
-**Storage**: KV namespace (`CLOURHOA_USERS` or `KV`)
+**Storage**: KV namespace (`CLRHOA_USERS` or `KV`)
 
 ### Audit Logging
 

@@ -116,7 +116,7 @@ if (Astro.request.method === 'POST') {
       operation_type: 'manual',
     }
   );
-  await setLoginWhitelistRole(env?.CLOURHOA_USERS, emailRaw, roleToStore);
+  await setLoginWhitelistRole(env?.CLRHOA_USERS, emailRaw, roleToStore);
   return new Response(JSON.stringify({ success: true, id }), {
     status: 200,
     headers: { 'Content-Type': 'application/json' },
@@ -192,7 +192,7 @@ if (Astro.request.method === 'PUT') {
       headers: { 'Content-Type': 'application/json' },
     });
   }
-  const kv = env?.CLOURHOA_USERS;
+  const kv = env?.CLRHOA_USERS;
   const newEmail = body.email?.trim().toLowerCase();
   if (kv && newEmail) {
     if (oldEmail && newEmail !== oldEmail) {
@@ -255,7 +255,7 @@ if (Astro.request.method === 'DELETE') {
     role: effectiveRole,
     operation_type: 'manual',
   });
-  const kv = env?.CLOURHOA_USERS;
+  const kv = env?.CLRHOA_USERS;
   for (const owner of ownersToDelete) {
     const email = owner.email?.trim();
     if (email) await removeFromLoginWhitelistUnlessAdmin(kv, email);

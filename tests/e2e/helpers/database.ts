@@ -62,14 +62,14 @@ function executeD1Command(sql: string, dbName: string = 'clrhoa_db'): string {
  * @param action - KV action (put, get, delete, list)
  * @param key - KV key
  * @param value - KV value (for put action)
- * @param namespace - KV namespace ID (defaults to CLOURHOA_USERS)
+ * @param namespace - KV namespace ID (defaults to CLRHOA_USERS)
  * @returns Command output
  */
 function executeKVCommand(
   action: 'put' | 'get' | 'delete' | 'list',
   key?: string,
   value?: string,
-  namespace: string = 'CLOURHOA_USERS'
+  namespace: string = 'CLRHOA_USERS'
 ): string {
   // For local E2E tests, KV is managed by wrangler dev server
   // We don't need to seed KV via CLI - authentication will work via D1 users table

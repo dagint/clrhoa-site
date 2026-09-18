@@ -9,7 +9,6 @@
 interface Env {
   DB: D1Database;
   CLRHOA_USERS: KVNamespace;
-  CLOURHOA_USERS: KVNamespace; // Deprecated: use CLRHOA_USERS (kept for backward compatibility)
   CLOURHOA_FILES: R2Bucket;
   SESSION: KVNamespace;
   SESSION_SECRET: string;

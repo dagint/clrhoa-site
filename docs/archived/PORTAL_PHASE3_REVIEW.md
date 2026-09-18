@@ -116,7 +116,7 @@ See `src/lib/rate-limit.ts` and the endpoint handlers. **Rate limiting requires 
 - **Email reveal:** `npm run db:directory-logs-email` / `db:directory-logs-email:local` (adds `target_email` to directory_logs). **Required for “Reveal email” in the directory.** Phone-only reveal works without this migration.
 - **Owners created_at:** `npm run db:owners-created-at` / `db:owners-created-at:local` (adds `created_at` to owners). Optional; used for the dashboard “Recent updates” notice (new members in directory). If skipped, that notice shows only new vendors.
 
-**Login allow list:** When a new owner is added (single add or CSV upload with email), their email is automatically added to the login whitelist (KV `CLOURHOA_USERS`) as a member so they can sign in. Existing whitelist entries (e.g. admin/board/arb) are never overwritten.
+**Login allow list:** When a new owner is added (single add or CSV upload with email), their email is automatically added to the login whitelist (KV `CLRHOA_USERS`) as a member so they can sign in. Existing whitelist entries (e.g. admin/board/arb) are never overwritten.
 
 Run migrations in that order. For new environments, run all three (phase3, owners-phones, directory-logs-email) so all features work.
 
