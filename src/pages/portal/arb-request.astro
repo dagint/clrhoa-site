@@ -5,6 +5,8 @@ import PortalLayout from '../../layouts/PortalLayout.astro';
 import PortalPage from '../../components/PortalPage.astro';
 import FormField from '../../components/FormField.astro';
 import ESignatureCapture from '../../components/ESignatureCapture.astro';
+import ArbApplicationTypeFields from '../../components/ArbApplicationTypeFields.astro';
+import ArbAttachmentChecklist from '../../components/ArbAttachmentChecklist.astro';
 import { getPortalContext } from '../../lib/portal-context';
 import { getPortalBadgeCounts } from '../../lib/portal-badge-counts';
 import { formatEasternDateTime, formatEasternDate } from '../../lib/timezone';
@@ -208,35 +210,7 @@ const arbInputClass = 'w-full rounded-lg border border-gray-300 px-4 py-3 text-b
           </div>
         </div>
 
-          <div>
-            <span class="block text-sm font-semibold text-gray-700 mb-2">Application for <span class="text-gray-400 font-normal">(optional)</span></span>
-          <div class="flex flex-wrap gap-x-6 gap-y-2">
-            <label class="inline-flex items-center gap-2">
-              <input type="checkbox" name="application_type" value="Exterior Paint" class="rounded border-gray-300 text-clr-green focus:ring-clr-green" />
-              <span class="text-sm">Exterior Paint</span>
-            </label>
-            <label class="inline-flex items-center gap-2">
-              <input type="checkbox" name="application_type" value="Landscape Installation" class="rounded border-gray-300 text-clr-green focus:ring-clr-green" />
-              <span class="text-sm">Landscape Installation</span>
-            </label>
-            <label class="inline-flex items-center gap-2">
-              <input type="checkbox" name="application_type" value="Swimming Pool" class="rounded border-gray-300 text-clr-green focus:ring-clr-green" />
-              <span class="text-sm">Swimming Pool</span>
-            </label>
-            <label class="inline-flex items-center gap-2">
-              <input type="checkbox" name="application_type" value="Recreational Equipment" class="rounded border-gray-300 text-clr-green focus:ring-clr-green" />
-              <span class="text-sm">Recreational Equipment</span>
-            </label>
-            <label class="inline-flex items-center gap-2">
-              <input type="checkbox" name="application_type" value="Fencing" class="rounded border-gray-300 text-clr-green focus:ring-clr-green" />
-              <span class="text-sm">Fencing</span>
-            </label>
-            <label class="inline-flex items-center gap-2">
-              <input type="checkbox" name="application_type" value="Other" class="rounded border-gray-300 text-clr-green focus:ring-clr-green" />
-              <span class="text-sm">Other</span>
-            </label>
-          </div>
-        </div>
+        <ArbApplicationTypeFields />
 
         <div>
           <FormField
@@ -259,6 +233,8 @@ const arbInputClass = 'w-full rounded-lg border border-gray-300 px-4 py-3 text-b
         <p class="text-sm text-gray-600 rounded-lg bg-gray-50 p-3 border border-gray-100">
           <strong>Note:</strong> It is the property owner's responsibility to ensure that all requests conform to applicable zoning and building regulations and that approved projects are properly permitted in accordance with city, state, and municipal requirements.
         </p>
+
+        <ArbAttachmentChecklist />
 
         <div>
           <label class="block text-sm font-semibold text-gray-700 mb-2">
@@ -434,6 +410,11 @@ const arbInputClass = 'w-full rounded-lg border border-gray-300 px-4 py-3 text-b
         applicationTypeEls.forEach(function (el) {
           if (el.value) formData.append('application_type', el.value);
         });
+        form.querySelectorAll('[name="attachments_checklist"]:checked').forEach(function (el) {
+          if (el.value) formData.append('attachments_checklist', el.value);
+        });
+        const applicationOther = form.querySelector('[name="application_other"]')?.value?.trim() ?? '';
+        if (applicationOther) formData.set('application_other', applicationOther);
 
         try {
           const res = await fetch('/api/arb-auto-save', { method: 'POST', body: formData });
@@ -548,6 +529,11 @@ const arbInputClass = 'w-full rounded-lg border border-gray-300 px-4 py-3 text-b
           applicationTypeEls.forEach(function (el) {
             if (el.value) formData.append('application_type', el.value);
           });
+          form.querySelectorAll('[name="attachments_checklist"]:checked').forEach(function (el) {
+            if (el.value) formData.append('attachments_checklist', el.value);
+          });
+          const applicationOther = form.querySelector('[name="application_other"]')?.value?.trim() ?? '';
+          if (applicationOther) formData.set('application_other', applicationOther);
 
           // Include electronic signature fields when submitting
           if (isSubmit) {

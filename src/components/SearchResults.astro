@@ -1,4 +1,5 @@
 ---
+import { formatApplicationTypes } from '../lib/arb-application';
 /**
  * Display search results from API (arb, meetings, vendors, owners, feedback_docs, preapproval).
  */
@@ -24,7 +25,7 @@ const { arb, meetings, vendors, owners, feedback_docs = [], preapproval = [], qu
           <li>
             <a href={`/portal/my-requests#${r.id}`} class="block p-3 rounded-lg bg-gray-50 hover:bg-gray-100 portal-theme-card border border-gray-100">
               <span class="font-medium text-gray-900 portal-theme-text">{r.description?.slice(0, 80) || 'ARB request'}{r.description && r.description.length > 80 ? '…' : ''}</span>
-              <span class="block text-sm text-gray-500 mt-1">Type: {r.application_type ?? '-'} | {r.status}</span>
+              <span class="block text-sm text-gray-500 mt-1">Type: {formatApplicationTypes(r.application_type) || '-'} | {r.status}</span>
             </a>
           </li>
         ))}

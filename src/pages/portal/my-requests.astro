@@ -4,6 +4,8 @@ export const prerender = false;
 import PortalLayout from '../../layouts/PortalLayout.astro';
 import PortalPage from '../../components/PortalPage.astro';
 import ESignatureDisplay from '../../components/ESignatureDisplay.astro';
+import ArbPrintForm from '../../components/ArbPrintForm.astro';
+import ArbApplicationSummary from '../../components/ArbApplicationSummary.astro';
 import { getPortalContext } from '../../lib/portal-context';
 import { getPortalBadgeCounts } from '../../lib/portal-badge-counts';
 import { listArbRequestsByHousehold, batchLoadArbFilesByRequests } from '../../lib/arb-db';
@@ -65,10 +67,6 @@ function isImageFilename(filename: string): boolean {
   return IMAGE_EXT.test(filename);
 }
 
-const APPLICATION_TYPES = ['Exterior Paint', 'Landscape Installation', 'Swimming Pool', 'Recreational Equipment', 'Fencing', 'Other'];
-function selectedTypes(applicationType: string | null): string[] {
-  return applicationType ? applicationType.split(',').map((s) => s.trim()).filter(Boolean) : [];
-}
 
 /** Parse arb_esign (format: "STATUS | Name | email | date") for display. */
 function formatApproval(arbEsign: string | null, esignTimestamp: string | null): { status: string; by: string; date: string } | null {
@@ -255,17 +253,7 @@ function formatApproval(arbEsign: string | null, esignTimestamp: string | null):
                           <div class="w-full rounded-lg border border-gray-200 bg-gray-100 px-3 py-2 text-gray-700 cursor-not-allowed">{req.owner_email}</div>
                         </div>
                       </div>
-                      <div>
-                        <span class="block text-sm font-semibold text-gray-500 mb-2">Application for</span>
-                        <div class="flex flex-wrap gap-x-6 gap-y-2">
-                          {APPLICATION_TYPES.map((type) => (
-                            <label class="inline-flex items-center gap-2 text-gray-600 cursor-default">
-                              <input type="checkbox" disabled checked={selectedTypes(req.application_type).includes(type)} class="rounded border-gray-300 bg-gray-100" />
-                              <span class="text-sm">{type}</span>
-                            </label>
-                          ))}
-                        </div>
-                      </div>
+                      <ArbApplicationSummary value={req.application_type} />
                       <div>
                         <label class="block text-sm font-semibold text-gray-500 mb-1">Description of changes</label>
                         <div class="w-full rounded-lg border border-gray-200 bg-gray-100 px-3 py-2 text-gray-700 whitespace-pre-wrap cursor-not-allowed min-h-[100px]" set:html={sanitizeForDisplay(req.description)}></div>
@@ -356,33 +344,16 @@ function formatApproval(arbEsign: string | null, esignTimestamp: string | null):
                     </div>
                   </div>
                   <div class="print-form-view hidden p-6" aria-hidden="true">
-                    <h3 class="text-lg font-bold text-gray-800 mb-4">Architectural Review Application</h3>
-                    <div class="space-y-3 text-sm">
-                      <div class="grid grid-cols-2 gap-4">
-                        <div><span class="font-semibold text-gray-600">Association:</span> Crooked Lake Reserve</div>
-                        <div><span class="font-semibold text-gray-600">Date of application:</span> {formatEasternDate(req.created)}</div>
-                      </div>
-                      <div class="grid grid-cols-2 gap-4">
-                        <div><span class="font-semibold text-gray-600">Applicant:</span> {sanitizeForDisplay(req.applicant_name) || '-'}</div>
-                        <div><span class="font-semibold text-gray-600">Phone:</span> {sanitizeForDisplay(req.phone) || '-'}</div>
-                      </div>
-                      <div class="grid grid-cols-2 gap-4">
-                        <div><span class="font-semibold text-gray-600">Property address:</span> {sanitizeForDisplay(req.property_address) || '-'}</div>
-                        <div><span class="font-semibold text-gray-600">Email:</span> {sanitizeForDisplay(req.owner_email)}</div>
-                      </div>
-                      <div><span class="font-semibold text-gray-600">Application for:</span> {sanitizeForDisplay(req.application_type) || '-'}</div>
-                      <div><span class="font-semibold text-gray-600">Description:</span></div>
-                      <div class="whitespace-pre-wrap border border-gray-200 p-3 rounded" set:html={sanitizeForDisplay(req.description)}></div>
-                      <div class="text-xs text-gray-500">Submitted: {formatEasternDateTime(req.created)}</div>
+                    <ArbPrintForm request={req} signature={signaturesByRequestId[req.id] ?? null} approval={approval}>
                       {files.length > 0 && (
                         <div class="print-attachments-section pt-2 border-t">
-                          <p class="font-semibold">Attachments ({files.length})</p>
+                          <p class="font-semibold">Files uploaded ({files.length})</p>
                           <ul class="list-disc pl-5">
                             {files.map((f) => (<li>{f.filename}</li>))}
                           </ul>
                         </div>
                       )}
-                    </div>
+                    </ArbPrintForm>
                   </div>
                 </div>
               </li>

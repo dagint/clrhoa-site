@@ -1,5 +1,6 @@
 ---
 import { getEnv } from '../../lib/env';
+import { applicationTypeFromForm } from '../../lib/arb-application';
 /**
  * POST /api/arb-update — owner can update a pending ARB request (applicant_name, phone, property_address, application_type, description).
  * Form: request_id, applicant_name, phone, property_address, application_type (multiple), description.
@@ -117,10 +118,7 @@ try {
       headers: { 'Content-Type': 'application/json' },
     });
   }
-  const types = formData.getAll('application_type');
-  const applicationType = Array.isArray(types) && types.length > 0
-    ? types.map((t) => String(t).trim()).filter(Boolean).join(', ')
-    : null;
+  const applicationType = applicationTypeFromForm(formData);
   const ownerNotes = (formData.get('owner_notes') as string)?.trim() || null;
 
   logger.info('Updating ARB request', {

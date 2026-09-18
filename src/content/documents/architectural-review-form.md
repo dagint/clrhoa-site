@@ -1,20 +1,23 @@
 ---
-title: ARB Request Form (2026)
+title: Architectural Review Application
 slug: arb-request-form
 category: Forms
-description: Submit this form to request Architectural Review Board (ARB) approval for modifications or improvements to your property.
+description: Request Architectural Review Board (ARB) approval before starting exterior changes to your property. You can also submit online through the member portal.
 fileUrl: /docs/CLR-ARB-Request-Form-2026.docx
 published: true
 ---
 
-# ARB Request Form (2026)
+# Architectural Review Application
 
-Use this form to request Architectural Review Board (ARB) approval for modifications to your property, including:
+Use this form to request Architectural Review Board (ARB) approval before making exterior changes to your property. Do not start work until your application is approved. Application categories:
 
-- Exterior paint colors
-- Fence installations
-- Deck additions
-- Landscaping changes
+- Exterior paint
+- Landscape installation
+- Swimming pool
+- Recreational equipment
+- Fencing
 - Other exterior modifications
 
-Please complete the form and submit it to the board along with any required documentation (plans, photos, etc.).
+Include a written description, a lot survey showing the location of the installation, specifications (plans, dimensions, materials, colors), paint chips or color samples, and any pictures or brochures. Landscaping plans must include the size, number, and type of plants. Incomplete applications delay the approval process.
+
+Members can submit the same application online in the member portal under **More → ARB Requests → New Request**.

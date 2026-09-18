@@ -1,5 +1,6 @@
 ---
 import { getEnv } from '../../lib/env';
+import { applicationTypeFromForm } from '../../lib/arb-application';
 /**
  * POST /api/arb-upload — authenticated ARB request submission.
  * Multipart: description, esign (checkbox), files[] (image/* or PDF).
@@ -179,10 +180,7 @@ try {
   applicantName = (formData.get('applicant_name') as string)?.trim() || null;
   phone = (formData.get('phone') as string)?.trim() || null;
   propertyAddress = (formData.get('property_address') as string)?.trim() || null;
-  const types = formData.getAll('application_type');
-  applicationType = Array.isArray(types) && types.length > 0
-    ? types.map((t) => String(t).trim()).filter(Boolean).join(', ')
-    : null;
+  applicationType = applicationTypeFromForm(formData);
 
   // Extract electronic signature fields
   esigTypedName = (formData.get('esig_typed_name') as string)?.trim() || null;
