@@ -19,6 +19,7 @@
  * - Member: /portal/dashboard
  */
 
+import { getEnv } from './env';
 import type { SessionPayload } from './auth';
 import { getSessionFromCookie, isElevatedRole, getEffectiveRole, isAdminRole, isArbRole } from './auth';
 import { ROLE_LANDING } from '../config/navigation';
@@ -63,7 +64,7 @@ export type GetRoleContextResult =
  * Caller should check: if ('redirect' in r) return Astro.redirect(r.redirect);
  */
 export async function getAdminContext(astro: RoleContextAstro): Promise<GetRoleContextResult> {
-  const env = astro.locals.runtime?.env;
+  const env = getEnv(astro.locals);
   const user = astro.locals.user;
   const luciaSession = astro.locals.session;
 
@@ -123,7 +124,7 @@ export async function getAdminContext(astro: RoleContextAstro): Promise<GetRoleC
  * Caller should check: if ('redirect' in r) return Astro.redirect(r.redirect);
  */
 export async function getBoardContext(astro: RoleContextAstro): Promise<GetRoleContextResult> {
-  const env = astro.locals.runtime?.env;
+  const env = getEnv(astro.locals);
   const user = astro.locals.user;
   const luciaSession = astro.locals.session;
 
@@ -183,7 +184,7 @@ export async function getBoardContext(astro: RoleContextAstro): Promise<GetRoleC
  * Caller should check: if ('redirect' in r) return Astro.redirect(r.redirect);
  */
 export async function getArbContext(astro: RoleContextAstro): Promise<GetRoleContextResult> {
-  const env = astro.locals.runtime?.env;
+  const env = getEnv(astro.locals);
   const user = astro.locals.user;
   const luciaSession = astro.locals.session;
 

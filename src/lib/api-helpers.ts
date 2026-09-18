@@ -4,6 +4,7 @@
  */
 /// <reference types="@cloudflare/workers-types" />
 
+import { getEnv } from './env';
 import type { SessionPayload } from './auth';
 import { getSessionFromCookie } from './auth';
 
@@ -43,7 +44,7 @@ export async function requireSession(
   | { session: SessionPayload }
   | { response: Response }
 > {
-  const env = ctx.locals.runtime?.env;
+  const env = getEnv(ctx.locals);
   const cookieHeader = ctx.request.headers.get('cookie') ?? undefined;
   const session = await getSessionFromCookie(
     cookieHeader,

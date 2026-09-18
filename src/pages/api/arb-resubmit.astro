@@ -1,4 +1,5 @@
 ---
+import { getEnv } from '../../lib/env';
 /**
  * POST /api/arb-resubmit — Owner submits (or resubmits) a pending request for ARB review.
  * Body: requestId (JSON) or request_id (form). Sets status to in_review.
@@ -14,8 +15,7 @@ import { canTransitionStatus } from '../../lib/arb-status-machine';
 import { notifyRequestSubmitted } from '../../lib/arb-voting-notification-triggers';
 import { logEvent } from '../../lib/audit-log';
 
-const runtime = Astro.locals.runtime;
-const env = runtime?.env;
+const env = getEnv(Astro.locals);
 const user = Astro.locals.user;
 const session = Astro.locals.session;
 

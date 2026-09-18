@@ -15,6 +15,7 @@
  * ```
  */
 
+import { getEnv } from '../env';
 import type { APIContext } from 'astro';
 import { createLucia } from '../lucia';
 import type { Session, User } from 'lucia';
@@ -102,7 +103,7 @@ export async function getSession(context: APIContext): Promise<{
   session: Session | null;
   user: User | null;
 }> {
-  const db = context.locals.runtime?.env?.DB;
+  const db = getEnv(context.locals)?.DB;
   if (!db) {
     return { session: null, user: null };
   }

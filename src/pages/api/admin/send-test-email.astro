@@ -1,4 +1,5 @@
 ---
+import { getEnv } from '../../../lib/env';
 /**
  * POST /api/admin/send-test-email — Board/Admin only. Send a test email to a given address.
  * Body: { to: string, subject?: string, body?: string, csrf_token: string }.
@@ -11,8 +12,7 @@ import { isElevatedRole } from '../../../lib/auth';
 import { sendEmail } from '../../../lib/notifications';
 import { validateSession, getSessionId } from '../../../lib/auth/middleware';
 
-const runtime = Astro.locals.runtime;
-const env = runtime?.env;
+const env = getEnv(Astro.locals);
 
 if (Astro.request.method !== 'POST') {
   return new Response(JSON.stringify({ error: 'Method not allowed' }), {

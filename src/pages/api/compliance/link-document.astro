@@ -1,4 +1,5 @@
 ---
+import { getEnv } from '../../../lib/env';
 /**
  * POST /api/compliance/link-document — Board/Admin only.
  * Links an existing member_documents or public_documents record as the current
@@ -25,8 +26,7 @@ import { logEvent } from '../../../lib/audit-log';
 import { getMemberDocument } from '../../../lib/member-documents-db';
 import { getPublicDocument } from '../../../lib/public-documents-db';
 
-const runtime = Astro.locals.runtime;
-const env = runtime?.env;
+const env = getEnv(Astro.locals);
 const user = Astro.locals.user;
 const session = Astro.locals.session;
 

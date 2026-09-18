@@ -1,4 +1,5 @@
 ---
+import { getEnv } from '../../lib/env';
 /**
  * POST /api/maintenance-submit — owner submits a maintenance request.
  * Multipart: category, description, photos[] (image/*, 5MB each, 25MB total).
@@ -24,7 +25,7 @@ if (!session || !user) {
   return jsonResponse({ error: 'Unauthorized' }, 401);
 }
 
-const env = Astro.locals.runtime?.env;
+const env = getEnv(Astro.locals);
 const db = env?.DB;
 if (!db) {
   return jsonResponse({ error: 'Server configuration error' }, 503);

@@ -1,4 +1,5 @@
 ---
+import { getEnv } from '../../lib/env';
 /**
  * GET /api/search?q=... — Search ARB, meetings, vendors, owners (authenticated).
  */
@@ -12,7 +13,7 @@ const auth = await requireSession(Astro);
 if ('response' in auth) return auth.response;
 const { session } = auth;
 
-const dbResult = requireDb(Astro.locals.runtime?.env);
+const dbResult = requireDb(getEnv(Astro.locals));
 if ('response' in dbResult) return dbResult.response;
 const { db } = dbResult;
 

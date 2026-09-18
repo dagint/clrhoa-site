@@ -10,6 +10,7 @@
  * All drop requests are logged to pim_elevation_logs table.
  */
 
+import { getEnv } from '../../../lib/env';
 import type { APIContext } from 'astro';
 import { insertPimElevationLog } from '../../../lib/pim-db';
 import { verifyCsrfToken } from '../../../lib/auth';
@@ -17,7 +18,7 @@ import { verifyCsrfToken } from '../../../lib/auth';
 export const prerender = false;
 
 export async function POST(context: APIContext): Promise<Response> {
-  const env = context.locals.runtime?.env;
+  const env = getEnv(context.locals);
   const user = context.locals.user;
   const session = context.locals.session;
 

@@ -30,6 +30,7 @@
  * - 500: Server error
  */
 
+import { getEnv } from '../../../lib/env';
 import type { APIRoute } from 'astro';
 import { hashPassword, verifyPassword } from '../../../lib/password';
 import { logSecurityEvent } from '../../../lib/audit-log';
@@ -82,9 +83,9 @@ function validatePassword(password: string): { valid: boolean; error?: string } 
 export const prerender = false;
 
 export const POST: APIRoute = async ({ request, locals, cookies }) => {
-  const db = locals.runtime?.env?.DB as D1Database | undefined;
-  const kv = locals.runtime?.env?.KV as KVNamespace | undefined;
-  const resend = getResendClient(locals.runtime.env);
+  const db = getEnv(locals)?.DB as D1Database | undefined;
+  const kv = getEnv(locals)?.KV as KVNamespace | undefined;
+  const resend = getResendClient(getEnv(locals));
   const session = locals.session;
   const user = locals.user as AuthenticatedUser | null;
 

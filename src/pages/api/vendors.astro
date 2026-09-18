@@ -1,4 +1,5 @@
 ---
+import { getEnv } from '../../lib/env';
 /**
  * /api/vendors — GET: list (any auth). POST/PUT/DELETE: board only.
  * POST/PUT: FormData with files; upload to R2 under vendors/{id}/.
@@ -32,8 +33,7 @@ function safeFileName(name: string): string {
   return name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 100) || 'file';
 }
 
-const runtime = Astro.locals.runtime;
-const env = runtime?.env;
+const env = getEnv(Astro.locals);
 const user = Astro.locals.user;
 const session = Astro.locals.session;
 const ipAddress = Astro.request.headers.get('cf-connecting-ip') ??

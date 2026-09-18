@@ -1,4 +1,5 @@
 ---
+import { getEnv } from '../../../lib/env';
 /**
  * POST /api/vendors/upload-csv — bulk upload vendors from CSV (board, admin, arb_board).
  * FormData: file (or csv), csrf_token.
@@ -12,8 +13,7 @@ import { insertVendor, insertVendorAuditLog } from '../../../lib/vendors-db';
 import { checkRateLimit, getRateLimitConfig } from '../../../lib/rate-limit';
 import { getSecurityMonitor } from '../../../lib/monitoring';
 
-const runtime = Astro.locals.runtime;
-const env = runtime?.env;
+const env = getEnv(Astro.locals);
 const user = Astro.locals.user;
 const session = Astro.locals.session;
 

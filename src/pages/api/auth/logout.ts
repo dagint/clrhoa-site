@@ -20,6 +20,7 @@
 
 /// <reference types="@cloudflare/workers-types" />
 
+import { getEnv } from '../../../lib/env';
 import type { APIRoute } from 'astro';
 import { createLucia } from '../../../lib/lucia';
 import { logAuthEvent } from '../../../lib/audit-log';
@@ -39,7 +40,7 @@ interface LogoutResponse {
  * POST /api/auth/logout
  */
 export const POST: APIRoute = async ({ request, locals, cookies }) => {
-  const db = locals.runtime?.env?.DB as D1Database | undefined;
+  const db = getEnv(locals)?.DB as D1Database | undefined;
 
   const ipAddress = request.headers.get('CF-Connecting-IP') ||
                     request.headers.get('X-Forwarded-For')?.split(',')[0]?.trim() ||

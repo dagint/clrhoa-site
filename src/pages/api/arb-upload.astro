@@ -1,4 +1,5 @@
 ---
+import { getEnv } from '../../lib/env';
 /**
  * POST /api/arb-upload — authenticated ARB request submission.
  * Multipart: description, esign (checkbox), files[] (image/* or PDF).
@@ -44,8 +45,7 @@ function isAllowedType(t: string): boolean {
   return false;
 }
 
-const runtime = Astro.locals.runtime;
-const env = runtime?.env;
+const env = getEnv(Astro.locals);
 const user = Astro.locals.user;
 const session = Astro.locals.session;
 const userAgent = Astro.request.headers.get('user-agent') ?? null;

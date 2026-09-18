@@ -1,12 +1,12 @@
 ---
+import { getEnv } from '../../../../lib/env';
 /**
  * GET /api/portal/requests/sse — Server-Sent Events for live updates on /portal/requests.
  * Sends a "ping" event every 20s so the client can refetch from GET /api/portal/requests.
  */
 export const prerender = false;
 
-const runtime = Astro.locals.runtime;
-const env = runtime?.env;
+const env = getEnv(Astro.locals);
 const user = Astro.locals.user;
   const session = Astro.locals.session;
 

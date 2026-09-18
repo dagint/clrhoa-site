@@ -1,4 +1,5 @@
 ---
+import { getEnv } from '../../../lib/env';
 /**
  * GET /api/board/google-drive-auth — Board/Admin only. Redirects to Google OAuth for Drive.
  * Requires env: GOOGLE_CLIENT_ID. Redirect URI must be registered in Google Cloud Console.
@@ -7,8 +8,7 @@ export const prerender = false;
 
 import { getUserRole } from '../../../types/auth';
 
-const runtime = Astro.locals.runtime;
-const env = runtime?.env as Env & { GOOGLE_CLIENT_ID?: string };
+const env = getEnv(Astro.locals) as Env & { GOOGLE_CLIENT_ID?: string };
 
 // Use session from middleware (already validated by middleware for /api/board/* routes)
 const user = Astro.locals.user;

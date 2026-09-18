@@ -1,4 +1,5 @@
 ---
+import { getEnv } from '../lib/env';
 /**
  * Usage dashboard moved to /portal/usage (portal-only, elevated roles).
  * Redirect so old links and login return URLs still work.
@@ -7,8 +8,7 @@ export const prerender = false;
 
 import { getSessionFromCookie, isElevatedRole } from '../lib/auth';
 
-const runtime = Astro.locals.runtime;
-const env = runtime?.env;
+const env = getEnv(Astro.locals);
 const secret = env?.SESSION_SECRET;
 
 const session = secret

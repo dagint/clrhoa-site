@@ -26,6 +26,7 @@
  * - 500: Server error
  */
 
+import { getEnv } from '../../../lib/env';
 import type { APIRoute } from 'astro';
 import { verifyCsrfToken, getEffectiveRole, isBoardOnly } from '../../../lib/auth';
 import { generateSetupToken, sendSetupEmail, resendSetupToken } from '../../../lib/auth/setup-tokens';
@@ -36,10 +37,10 @@ import crypto from 'node:crypto';
 export const prerender = false;
 
 export const POST: APIRoute = async ({ request, locals }) => {
-  const db = locals.runtime.env.DB;
+  const db = getEnv(locals).DB;
   const user = locals.user;
   const session = locals.session;
-  const resend = getResendClient(locals.runtime.env);
+  const resend = getResendClient(getEnv(locals));
   const ipAddress = request.headers.get('cf-connecting-ip') || 'unknown';
 
   // 1. Auth check
@@ -114,7 +115,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
       // Create new user account with pending_setup status
       // Get role from KV or default to member
       let role = 'member';
-      const kv = locals.runtime?.env?.KV as KVNamespace | undefined;
+      const kv = getEnv(locals)?.KV as KVNamespace | undefined;
       if (kv) {
         const kvRole = await kv.get(targetEmail);
         if (kvRole && ['member', 'board', 'arb', 'arb_board', 'admin'].includes(kvRole)) {

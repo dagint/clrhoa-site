@@ -27,6 +27,7 @@
  * - 500: Server error
  */
 
+import { getEnv } from '../../../lib/env';
 import type { APIRoute } from 'astro';
 import { checkRateLimit } from '../../../lib/rate-limit';
 import { logSecurityEvent } from '../../../lib/audit-log';
@@ -47,9 +48,9 @@ function isValidEmail(email: string): boolean {
 export const prerender = false;
 
 export const POST: APIRoute = async ({ request, locals }) => {
-  const db = locals.runtime.env.DB;
-  const kv = locals.runtime?.env?.KV as KVNamespace | undefined;
-  const resend = getResendClient(locals.runtime.env);
+  const db = getEnv(locals).DB;
+  const kv = getEnv(locals)?.KV as KVNamespace | undefined;
+  const resend = getResendClient(getEnv(locals));
   const ipAddress = request.headers.get('cf-connecting-ip') || 'unknown';
   const userAgent = request.headers.get('user-agent') || 'unknown';
 

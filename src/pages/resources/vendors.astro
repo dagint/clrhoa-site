@@ -1,12 +1,12 @@
 ---
+import { getEnv } from '../../lib/env';
 export const prerender = false;
 
 import ResourcesLayout from '../../layouts/ResourcesLayout.astro';
 import { listPublicVendors } from '../../lib/vendors-db';
 
 // Public page shows same vendor list as portal (from DB); only name, category, website (or Request contact).
-const runtime = Astro.locals.runtime;
-const env = runtime?.env;
+const env = getEnv(Astro.locals);
 const db = env?.DB;
 const vendorsList = db ? await listPublicVendors(db) : [];
 

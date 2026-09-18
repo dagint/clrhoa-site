@@ -1,4 +1,5 @@
 ---
+import { getEnv } from '../../lib/env';
 /**
  * GET /api/arb-download-zip?requestId=... — Download all attachments for a request as ZIP.
  * Requires authentication. Owner can download their own requests; ARB/Board/Admin can download any.
@@ -9,8 +10,7 @@ import { getEffectiveRole } from '../../lib/auth';
 import { getArbRequest, listArbFilesByRequest } from '../../lib/arb-db';
 import { listEmailsAtSameAddress } from '../../lib/directory-db.js';
 
-const runtime = Astro.locals.runtime;
-const env = runtime?.env;
+const env = getEnv(Astro.locals);
 const user = Astro.locals.user;
 const session = Astro.locals.session;
 

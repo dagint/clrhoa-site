@@ -1,4 +1,5 @@
 ---
+import { getEnv } from '../../../lib/env';
 /**
  * POST /api/usage/record — Record a page view (path from body).
  * Sets _usage_sid cookie if missing for anonymous session. Optionally attaches user_id from Lucia auth.
@@ -12,8 +13,7 @@ import { insertPageView } from '../../../lib/usage-db';
 const USAGE_SID_COOKIE = '_usage_sid';
 const USAGE_SID_MAX_AGE = 60 * 60 * 24 * 365; // 1 year
 
-const runtime = Astro.locals.runtime;
-const env = runtime?.env;
+const env = getEnv(Astro.locals);
 const db = env?.DB;
 
 if (Astro.request.method !== 'POST') {

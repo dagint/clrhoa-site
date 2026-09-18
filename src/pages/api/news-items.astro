@@ -1,4 +1,5 @@
 ---
+import { getEnv } from '../../lib/env';
 /**
  * GET /api/news-items — Public: ?public=1 returns only is_public=1. No query = all (admin only).
  * POST /api/news-items — Board/admin: create news (title, body, is_public 0|1).
@@ -9,8 +10,7 @@ import { isElevatedRole, getEffectiveRole, isBoardOnly } from '../../lib/auth';
 import { listPublicNewsItems, listAllNewsItems, insertNewsItem, getNewsItemById, getNewsItemImageKeys, deleteNewsItem } from '../../lib/news-items-db';
 import { logAdminEvent } from '../../lib/audit-log';
 
-const runtime = Astro.locals.runtime;
-const env = runtime?.env;
+const env = getEnv(Astro.locals);
 const db = env?.DB;
 
 if (!db) {

@@ -7,6 +7,7 @@
 
 import type { AstroGlobal } from 'astro';
 import type { PermissionLevel, RoleType } from '../lib/permissions-db';
+import { getEnv } from '../lib/env';
 import { getCurrentUser } from './rbac';
 import { hasPermission } from '../lib/permissions-db';
 import { PROTECTED_ROUTES } from './rbac';
@@ -82,8 +83,7 @@ export async function requirePermission(
   requiredLevel: PermissionLevel = 'read',
   redirectTo?: string
 ): Promise<Response | null> {
-  const runtime = Astro.locals.runtime;
-  const env = runtime?.env;
+  const env = getEnv(Astro.locals);
   const db = env?.DB;
   const path = Astro.url.pathname;
 
@@ -134,8 +134,7 @@ export async function checkPermission(
   Astro: AstroGlobal,
   requiredLevel: PermissionLevel = 'read'
 ): Promise<PermissionCheckResult> {
-  const runtime = Astro.locals.runtime;
-  const env = runtime?.env;
+  const env = getEnv(Astro.locals);
   const db = env?.DB;
   const path = Astro.url.pathname;
 
@@ -278,8 +277,7 @@ export async function canUserPerformAction(
   Astro: AstroGlobal,
   action: 'view' | 'create' | 'edit' | 'delete'
 ): Promise<boolean> {
-  const runtime = Astro.locals.runtime;
-  const env = runtime?.env;
+  const env = getEnv(Astro.locals);
   const db = env?.DB;
   const path = Astro.url.pathname;
 

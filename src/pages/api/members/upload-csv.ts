@@ -26,6 +26,7 @@
  * }
  */
 
+import { getEnv } from '../../../lib/env';
 import type { APIRoute } from 'astro';
 import { getEffectiveRole, isElevatedRole, VALID_ROLES, verifyCsrfToken } from '../../../lib/auth';
 import { getMemberByEmail } from '../../../lib/members-db';
@@ -77,11 +78,11 @@ export const POST: APIRoute = async ({ request, locals, clientAddress }) => {
     });
   }
 
-  const db = locals.runtime?.env?.DB;
+  const db = getEnv(locals)?.DB;
 
   // Get client IP for audit logging
   const clientIp = clientAddress || request.headers.get('cf-connecting-ip') || 'unknown';
-  const kv = locals.runtime?.env?.CLRHOA_USERS;
+  const kv = getEnv(locals)?.CLRHOA_USERS;
   if (!db) {
     return new Response(JSON.stringify({ error: 'Server configuration error' }), {
       status: 503,
@@ -90,7 +91,7 @@ export const POST: APIRoute = async ({ request, locals, clientAddress }) => {
   }
 
   // 2. Rate limiting
-  const rateLimitKv = locals.runtime?.env?.KV;
+  const rateLimitKv = getEnv(locals)?.KV;
   const clientIpAddress = request.headers.get('cf-connecting-ip') || 'unknown';
   const endpoint = '/api/members/upload-csv';
   const rateLimitConfig = getRateLimitConfig(endpoint);

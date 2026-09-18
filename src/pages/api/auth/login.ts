@@ -31,6 +31,7 @@
 
 /// <reference types="@cloudflare/workers-types" />
 
+import { getEnv } from '../../../lib/env';
 import type { APIRoute } from 'astro';
 import { createLucia } from '../../../lib/lucia';
 import { createSession } from '../../../lib/lucia/session';
@@ -86,8 +87,8 @@ function getClientIP(request: Request): string {
  * POST /api/auth/login
  */
 export const POST: APIRoute = async ({ request, locals, cookies }) => {
-  const db = locals.runtime?.env?.DB as D1Database | undefined;
-  const kv = locals.runtime?.env?.KV as KVNamespace | undefined;
+  const db = getEnv(locals)?.DB as D1Database | undefined;
+  const kv = getEnv(locals)?.KV as KVNamespace | undefined;
 
   if (!db || !kv) {
     return new Response(

@@ -5,6 +5,7 @@
  * It creates proper Lucia sessions that will be validated correctly.
  */
 
+import { getEnv } from '../../../lib/env';
 import type { APIContext } from 'astro';
 import { createLucia } from '../../../lib/lucia';
 import { createSession } from '../../../lib/lucia/session';
@@ -37,7 +38,7 @@ export async function POST(context: APIContext): Promise<Response> {
       });
     }
 
-    const env = context.locals.runtime?.env;
+    const env = getEnv(context.locals);
     if (!env?.DB) {
       return new Response(JSON.stringify({ error: 'Database not available' }), {
         status: 500,

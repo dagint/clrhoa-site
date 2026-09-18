@@ -1,4 +1,5 @@
 ---
+import { getEnv } from '../../../../lib/env';
 /**
  * GET /api/compliance/file/{...key} — Serve compliance documents from R2.
  * Access control: Board/Admin only for members-only docs, public for public docs.
@@ -8,8 +9,7 @@ export const prerender = false;
 import { getEffectiveRole, isBoardOnly } from '../../../../lib/auth';
 import { getComplianceDocumentByFileKey } from '../../../../lib/compliance-db';
 
-const runtime = Astro.locals.runtime;
-const env = runtime?.env;
+const env = getEnv(Astro.locals);
 
 if (Astro.request.method !== 'GET') {
   return new Response('Method not allowed', { status: 405 });

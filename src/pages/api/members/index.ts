@@ -7,6 +7,7 @@
  * DELETE: Delete member (removes from both tables)
  */
 
+import { getEnv } from '../../../lib/env';
 import type { APIRoute } from 'astro';
 import { getMemberByEmail, listAllMembers } from '../../../lib/members-db';
 import { getEffectiveRole, isElevatedRole, VALID_ROLES } from '../../../lib/auth';
@@ -35,7 +36,7 @@ export const GET: APIRoute = async ({ locals }) => {
     });
   }
 
-  const db = locals.runtime?.env?.DB;
+  const db = getEnv(locals)?.DB;
   if (!db) {
     return new Response(JSON.stringify({ error: 'Server configuration error' }), {
       status: 503,
@@ -77,8 +78,8 @@ export const POST: APIRoute = async ({ request, locals, clientAddress }) => {
     });
   }
 
-  const db = locals.runtime?.env?.DB;
-  const kv = locals.runtime?.env?.CLRHOA_USERS;
+  const db = getEnv(locals)?.DB;
+  const kv = getEnv(locals)?.CLRHOA_USERS;
   if (!db) {
     return new Response(JSON.stringify({ error: 'Server configuration error' }), {
       status: 503,
@@ -211,8 +212,8 @@ export const PUT: APIRoute = async ({ request, locals, clientAddress }) => {
     });
   }
 
-  const db = locals.runtime?.env?.DB;
-  const kv = locals.runtime?.env?.CLRHOA_USERS;
+  const db = getEnv(locals)?.DB;
+  const kv = getEnv(locals)?.CLRHOA_USERS;
   if (!db) {
     return new Response(JSON.stringify({ error: 'Server configuration error' }), {
       status: 503,
@@ -378,8 +379,8 @@ export const DELETE: APIRoute = async ({ request, locals, clientAddress }) => {
     });
   }
 
-  const db = locals.runtime?.env?.DB;
-  const kv = locals.runtime?.env?.CLRHOA_USERS;
+  const db = getEnv(locals)?.DB;
+  const kv = getEnv(locals)?.CLRHOA_USERS;
   if (!db) {
     return new Response(JSON.stringify({ error: 'Server configuration error' }), {
       status: 503,

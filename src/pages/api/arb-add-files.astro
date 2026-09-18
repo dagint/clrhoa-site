@@ -1,4 +1,5 @@
 ---
+import { getEnv } from '../../lib/env';
 /**
  * POST /api/arb-add-files — owner adds attachments to an existing pending request.
  * Multipart: request_id, file_0, file_1, ... (or files[]). Same limits as arb-upload (5MB/file, 25MB total for request).
@@ -64,8 +65,7 @@ async function validateFileMimeType(file: File | Blob): Promise<boolean> {
   return isAllowedType(file.type) || file.type === 'application/pdf';
 }
 
-const runtime = Astro.locals.runtime;
-const env = runtime?.env;
+const env = getEnv(Astro.locals);
 const logger = createLogger({ endpoint: 'arb-add-files' });
 const user = Astro.locals.user;
 const session = Astro.locals.session;

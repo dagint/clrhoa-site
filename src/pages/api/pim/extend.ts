@@ -12,6 +12,7 @@
  * All extension requests are logged to pim_elevation_log table.
  */
 
+import { getEnv } from '../../../lib/env';
 import type { APIContext } from 'astro';
 import { insertPimElevationLog } from '../../../lib/pim-db';
 import { verifyCsrfToken } from '../../../lib/auth';
@@ -22,7 +23,7 @@ const EXTENSION_DURATION_MS = 45 * 60 * 1000; // 45 minutes
 const EXTENSION_THRESHOLD_MS = 15 * 60 * 1000; // 15 minutes - can extend when this much time left
 
 export async function POST(context: APIContext): Promise<Response> {
-  const env = context.locals.runtime?.env;
+  const env = getEnv(context.locals);
   const user = context.locals.user;
   const session = context.locals.session;
 

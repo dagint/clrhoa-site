@@ -19,6 +19,7 @@
 
 export const prerender = false;
 
+import { getEnv } from '../../../../lib/env';
 import type { APIRoute } from 'astro';
 import { requireRole } from '../../../../lib/auth/middleware';
 
@@ -41,7 +42,7 @@ export const GET: APIRoute = async (context) => {
     return authResult.redirect;
   }
 
-  const db = context.locals.runtime?.env?.DB;
+  const db = getEnv(context.locals)?.DB;
   if (!db) {
     return new Response(
       JSON.stringify({ error: 'Database not available' }),

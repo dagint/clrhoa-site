@@ -1,4 +1,5 @@
 ---
+import { getEnv } from '../../../lib/env';
 /**
  * GET /api/permissions/for-role?role=<role>
  *
@@ -16,8 +17,7 @@ import { getEffectiveRole } from '../../../lib/auth';
 import { getRolePermissions } from '../../../utils/permissions';
 import { isValidRole } from '../../../utils/permissions';
 
-const runtime = Astro.locals.runtime;
-const env = runtime?.env;
+const env = getEnv(Astro.locals);
 const db = env?.DB;
 
 if (Astro.request.method !== 'GET') {
