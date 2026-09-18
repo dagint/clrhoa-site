@@ -37,8 +37,8 @@ jobs:
         continue-on-error: true
         id: npm-audit
 
-      - name: Run npm audit (production only, high and critical)
-        run: npm audit --production --audit-level=high
+      - name: Run npm audit gate (high and critical, with reviewed allowlist)
+        run: node scripts/audit-check.mjs --level=high
 
       - name: Check for outdated dependencies with security issues
         run: |
