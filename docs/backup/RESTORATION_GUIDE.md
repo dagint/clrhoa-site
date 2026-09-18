@@ -68,7 +68,7 @@ let restored = 0;
 for (const [email, value] of Object.entries(whitelist)) {
   try {
     execSync(
-      `echo "${value}" | npx wrangler kv:key put "${email}" --binding=CLOURHOA_USERS --preview false`,
+      `echo "${value}" | npx wrangler kv:key put "${email}" --binding=CLRHOA_USERS --preview false`,
       { stdio: 'inherit' }
     );
     restored++;

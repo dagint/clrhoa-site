@@ -27,7 +27,7 @@ import { ROLE_LANDING } from '../config/navigation';
 export interface RoleEnv {
   SESSION_SECRET?: string;
   DB?: D1Database;
-  CLOURHOA_USERS?: KVNamespace;
+  CLRHOA_USERS?: KVNamespace;
 }
 
 /** Minimal Astro-like context for role-based pages. */

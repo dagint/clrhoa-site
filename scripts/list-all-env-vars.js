@@ -30,7 +30,7 @@ for (const line of envLines) {
   
   const [, name, optionalMarker] = match;
   // Skip bindings (DB, KV, R2) - these are configured in wrangler.toml
-  if (['DB', 'CLOURHOA_USERS', 'CLOURHOA_FILES', 'KV', 'SESSION'].includes(name)) {
+  if (['DB', 'CLRHOA_USERS', 'CLOURHOA_FILES', 'KV', 'SESSION'].includes(name)) {
     continue;
   }
   
