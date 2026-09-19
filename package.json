@@ -228,7 +228,7 @@
     "terser": "^5.36.0",
     "typescript": "^5.9.3",
     "vitest": "^4.1.11",
-    "wrangler": "^4.69.0"
+    "wrangler": "~4.107.1"
   },
   "overrides": {
     "undici": "^7.29.1",
