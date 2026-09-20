@@ -52,6 +52,10 @@ updates:
         versions: [">=4.108.0"]
       - dependency-name: "@cloudflare/workers-types"
         update-types: ["version-update:semver-major"]
+      # astro check needs TypeScript's programmatic API, which the TS 7 native compiler
+      # does not ship yet (withastro/roadmap#1321). Remove once @astrojs/check supports 7.
+      - dependency-name: "typescript"
+        versions: [">=7.0.0"]
     rebase-strategy: "auto"
 
   # Enable version updates for GitHub Actions
